@@ -108,6 +108,8 @@ struct FileData {
     next_seq: u32,
     /// Tema escolhido na janela "Gerenciador" (ver `THEMES`); vazio = "system".
     theme: String,
+    /// Idioma escolhido na Configuração (ver `LANGUAGES`); vazio = "system".
+    language: String,
     /// Posição, tamanho e estado da janela "Gerenciador".
     manager: ManagerState,
     /// Cor das notas novas, escolhida no gerenciador; `None` = `DEFAULT_COLOR`.
@@ -145,6 +147,9 @@ impl Default for ManagerState {
         }
     }
 }
+
+/// Idiomas aceitos: seguir o sistema operacional, português ou inglês.
+pub const LANGUAGES: [&str; 3] = ["system", "pt-BR", "en"];
 
 /// Temas aceitos: seguir o sistema operacional, claro ou escuro.
 pub const THEMES: [&str; 3] = ["system", "light", "dark"];
@@ -239,6 +244,34 @@ impl Store {
     pub fn set_theme(&self, theme: &str) {
         self.data.lock().unwrap().theme = theme.to_string();
         self.mark_dirty();
+    }
+
+    /// Idioma escolhido ("system", "pt-BR" ou "en").
+    pub fn language(&self) -> String {
+        let language = self.data.lock().unwrap().language.clone();
+        if LANGUAGES.contains(&language.as_str()) {
+            language
+        } else {
+            "system".into()
+        }
+    }
+
+    pub fn set_language(&self, language: &str) {
+        self.data.lock().unwrap().language = language.to_string();
+        self.mark_dirty();
+    }
+
+    /// Idioma efetivo da interface: "pt" ou "en". "system" usa o idioma do
+    /// sistema operacional (português se for pt-*, inglês nos demais casos).
+    pub fn effective_language(&self) -> &'static str {
+        match self.language().as_str() {
+            "pt-BR" => "pt",
+            "en" => "en",
+            _ => match sys_locale::get_locale() {
+                Some(locale) if locale.to_lowercase().starts_with("pt") => "pt",
+                _ => "en",
+            },
+        }
     }
 
     /// Cor com que as notas novas nascem.

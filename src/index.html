@@ -21,63 +21,63 @@
         </svg>
       </button>
 
-      <button class="color-btn" id="colorBtn" type="button" aria-label="Cor da nota" aria-haspopup="true" aria-expanded="false">
+      <button class="color-btn" id="colorBtn" type="button" data-i18n-attr="aria-label=noteColor" aria-haspopup="true" aria-expanded="false">
         <span class="dot" aria-hidden="true"></span>
       </button>
 
-      <div class="identity" title="Clique duplo para editar o título">
+      <div class="identity" data-i18n-attr="title=editTitleHint">
         <span class="note-name" id="noteName"></span>
         <input class="title-input" id="titleInput" type="text" maxlength="80" spellcheck="false"
-               placeholder="Título da nota" aria-label="Título da nota" hidden>
+               data-i18n-attr="placeholder=noteTitle,aria-label=noteTitle" hidden>
       </div>
 
       <div class="actions">
-        <button class="icon-btn" id="newBtn" type="button" aria-label="Nova nota">
+        <button class="icon-btn" id="newBtn" type="button" data-i18n-attr="aria-label=newNote">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
         </button>
         <button class="icon-btn collapse" id="collapseBtn" type="button" aria-label="Recolher nota">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 9.75 8 6.25l3.5 3.5"/></svg>
         </button>
-        <button class="icon-btn close" id="closeBtn" type="button" aria-label="Fechar nota">
+        <button class="icon-btn close" id="closeBtn" type="button" data-i18n-attr="aria-label=closeNote">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
         </button>
       </div>
     </header>
 
     <div class="menu color-menu" id="colorMenu" hidden>
-      <div class="menu-label">Cor da nota</div>
+      <div class="menu-label" data-i18n="noteColor"></div>
       <div class="swatches" id="swatches">
-        <button type="button" class="swatch" data-color="yellow" aria-label="Amarelo" title="Amarelo"></button>
-        <button type="button" class="swatch" data-color="green" aria-label="Verde" title="Verde"></button>
-        <button type="button" class="swatch" data-color="coral" aria-label="Coral" title="Coral"></button>
-        <button type="button" class="swatch" data-color="teal" aria-label="Azul-petróleo" title="Azul-petróleo"></button>
-        <button type="button" class="swatch" data-color="iris" aria-label="Íris" title="Íris"></button>
-        <button type="button" class="swatch" data-color="lavender" aria-label="Lavanda" title="Lavanda"></button>
-        <button type="button" class="swatch" data-color="mono" aria-label="Branco" title="Branco"></button>
-        <button type="button" class="swatch" data-color="custom" aria-label="Personalizada" title="Personalizada…"></button>
-        <button type="button" class="swatch" data-color="" aria-label="Sem cor" title="Sem cor"></button>
+        <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
+        <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
+        <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
+        <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
+        <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
+        <button type="button" class="swatch" data-color="lavender" data-i18n-attr="aria-label=lavender,title=lavender"></button>
+        <button type="button" class="swatch" data-color="mono"></button>
+        <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+        <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
       </div>
       <!-- Seletor de cor do sistema, aberto pelo botão "Personalizada". -->
       <input type="color" class="custom-color" id="customColor" tabindex="-1" aria-hidden="true">
     </div>
 
     <!-- Barra que aparece acima do texto selecionado. Os atalhos vão no title (app.js). -->
-    <div class="format-bar" id="formatBar" role="toolbar" aria-label="Formatação" hidden>
-      <button type="button" class="fmt-btn" data-cmd="bold" data-key="B" aria-label="Negrito" aria-pressed="false"><b>N</b></button>
-      <button type="button" class="fmt-btn" data-cmd="italic" data-key="I" aria-label="Itálico" aria-pressed="false"><i>I</i></button>
-      <button type="button" class="fmt-btn" data-cmd="underline" data-key="U" aria-label="Sublinhado" aria-pressed="false"><u>S</u></button>
+    <div class="format-bar" id="formatBar" role="toolbar" data-i18n-attr="aria-label=formatting" hidden>
+      <button type="button" class="fmt-btn" data-cmd="bold" data-key="B" data-i18n-attr="aria-label=bold" aria-pressed="false"><b data-i18n="boldLetter"></b></button>
+      <button type="button" class="fmt-btn" data-cmd="italic" data-key="I" data-i18n-attr="aria-label=italic" aria-pressed="false"><i data-i18n="italicLetter"></i></button>
+      <button type="button" class="fmt-btn" data-cmd="underline" data-key="U" data-i18n-attr="aria-label=underline" aria-pressed="false"><u data-i18n="underlineLetter"></u></button>
       <span class="fmt-sep" aria-hidden="true"></span>
-      <span class="fmt-sizes" role="group" aria-label="Tamanho do texto">
-        <button type="button" class="fmt-btn fmt-size sz-s" data-size="2" aria-label="Texto pequeno" aria-pressed="false">A</button>
-        <button type="button" class="fmt-btn fmt-size sz-m" data-size="3" aria-label="Texto normal" aria-pressed="false">A</button>
-        <button type="button" class="fmt-btn fmt-size sz-l" data-size="5" aria-label="Texto grande" aria-pressed="false">A</button>
+      <span class="fmt-sizes" role="group" data-i18n-attr="aria-label=textSize">
+        <button type="button" class="fmt-btn fmt-size sz-s" data-size="2" data-i18n-attr="aria-label=smallText" aria-pressed="false">A</button>
+        <button type="button" class="fmt-btn fmt-size sz-m" data-size="3" data-i18n-attr="aria-label=normalText" aria-pressed="false">A</button>
+        <button type="button" class="fmt-btn fmt-size sz-l" data-size="5" data-i18n-attr="aria-label=largeText" aria-pressed="false">A</button>
       </span>
     </div>
 
     <main class="body">
       <div class="editor" id="editor" contenteditable="true" spellcheck="true" lang="pt-BR" role="textbox"
-           aria-multiline="true" aria-label="Texto da nota"
-           data-placeholder="Escreva algo…"></div>
+           aria-multiline="true" data-i18n-attr="aria-label=noteText"
+           data-placeholder=""></div>
     </main>
 
     <footer class="statusbar">
@@ -89,6 +89,7 @@
     </footer>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="chrome.js"></script>
   <script src="app.js"></script>
 </body>

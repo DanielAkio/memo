@@ -12,6 +12,8 @@
     : parts.map((p) => ({ Mod: 'Ctrl' }[p] || p)).join('+'));
 
   const $ = (id) => document.getElementById(id);
+  const I18n = window.TaxinhaI18n;
+  const { t } = I18n;
   const frame = $('frame');
   const titlebar = $('titlebar');
   const editor = $('editor');
@@ -36,51 +38,25 @@
   const customColor = $('customColor');
   const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
 
-  const COLOR_NAMES = Object.fromEntries(
-    [...document.querySelectorAll('.swatch')].map((sw) => [sw.dataset.color, sw.getAttribute('aria-label')]),
-  );
+  const colorName = (color) => document.querySelector(`.swatch[data-color="${color}"]`).getAttribute('aria-label');
 
   // Item de checklist no texto puro: "[ ]" ou "[x]" no começo da linha.
   const CHECK_RE = /^(\s*)\[([ xX])\](?= |$) ?/;
   const plain = (t) => t.replace(/^(\s*)\[[ xX]\](?= |$) ?/gm, '$1');
 
-  const firstLine = (t) => plain(t).split('\n').map((s) => s.trim()).find(Boolean) || 'Nota vazia';
+  const firstLine = (t) => plain(t).split('\n').map((s) => s.trim()).find(Boolean) || t('emptyNote');
   const wordCount = (t) => (plain(t).trim().match(/\S+/g) || []).length;
   const displayName = () => note.title || firstLine(note.text);
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-  // Placeholder da nota vazia: uma frase sorteada a cada nota aberta.
-  const PLACEHOLDERS = [
-    'Escreva antes que esqueça…',
-    'Prometo não contar pra ninguém.',
-    'Lista de compras, plano secreto ou dominação mundial?',
-    'Anota aí, que o cérebro tá cheio.',
-    'Pode desabafar, eu sou só um papel.',
-    'Uma ideia genial começa aqui. Ou não.',
-    'Escreva algo antes que o café esfrie.',
-    'Post-it digital, zero cola.',
-    'Aquela senha não, hein.',
-    'Rabisque à vontade, ninguém tá olhando.',
-    'Isto não é um diário. Ou é?',
-    'Lembrete: beber água.',
-    'O que o você do futuro precisa saber?',
-    'Escreva rápido, a tachinha tá segurando.',
-    'Fofoca boa merece ser anotada.',
-    'Coisas que eu ia lembrar de cabeça (mentira).',
-    'Digite aqui e finja que está produtivo.',
-    'Mais um post-it pra coleção.',
-    'Deixa que eu seguro essa ideia pra você.',
-    'Era uma vez uma nota em branco…',
-  ];
-
-  const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
 
   function editedLabel(ms) {
     if (!ms) return '';
     const d = new Date(ms);
     const sameDay = d.toDateString() === new Date().toDateString();
-    return `editada ${sameDay ? timeFmt.format(d) : dateFmt.format(d).replace('.', '')}`;
+    const fmt = new Intl.DateTimeFormat(I18n.locale(), sameDay
+      ? { hour: '2-digit', minute: '2-digit' }
+      : { day: 'numeric', month: 'short' });
+    return t('edited', { when: fmt.format(d).replace('.', '') });
   }
 
   // ------------------------------------------------------------- render
@@ -96,7 +72,7 @@
     frame.classList.toggle('is-collapsed', note.collapsed);
 
     pinBtn.setAttribute('aria-pressed', String(note.pinned));
-    const pinLabel = note.pinned ? 'Desafixar' : 'Fixar acima de tudo';
+    const pinLabel = t(note.pinned ? 'unpin' : 'pin');
     pinBtn.setAttribute('aria-label', pinLabel);
     pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
 
@@ -104,24 +80,26 @@
       const checked = sw === customSwatch ? custom : sw.dataset.color === (note.color || '');
       sw.setAttribute('aria-checked', String(checked));
     }
-    const collapseLabel = note.collapsed ? 'Expandir nota' : 'Recolher nota';
+    const collapseLabel = t(note.collapsed ? 'expandNote' : 'collapseNote');
     collapseBtn.setAttribute('aria-label', collapseLabel);
     collapseBtn.title = collapseLabel;
-    colorBtn.title = custom ? `Cor: Personalizada (${note.color})` : `Cor: ${COLOR_NAMES[note.color || '']}`;
+    colorBtn.title = custom
+      ? t('colorCustomIs', { hex: note.color })
+      : t('colorIs', { name: colorName(note.color || '') });
     renderMeta();
   }
 
   function renderMeta() {
     const n = wordCount(note.text);
-    $('count').textContent = `${n} ${n === 1 ? 'palavra' : 'palavras'}`;
-    $('edited').textContent = note.text.trim() ? editedLabel(note.updatedAt) : 'nota nova';
+    $('count').textContent = t(n === 1 ? 'wordOne' : 'wordMany', { n });
+    $('edited').textContent = note.text.trim() ? editedLabel(note.updatedAt) : t('newNoteStatus');
     editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check'));
     renderName();
   }
 
   // Nome na barra: o título, ou "Sem título" (mesmo com a nota recolhida).
   function renderName() {
-    nameEl.textContent = note.title || 'Sem título';
+    nameEl.textContent = note.title || t('untitled');
     nameEl.classList.toggle('is-empty', !note.title);
 
     // O título da janela nativa aparece na taskbar; atualiza sem pressa.
@@ -719,26 +697,39 @@
   function renderMonoName() {
     const theme = document.documentElement.dataset.theme;
     const light = theme ? theme === 'light' : systemLight.matches;
-    const name = light ? 'Preto' : 'Branco';
+    const name = t(light ? 'black' : 'white');
     const sw = document.querySelector('.swatch[data-color="mono"]');
     sw.setAttribute('aria-label', name);
     sw.title = name;
-    COLOR_NAMES.mono = name;
     if (note) render();
   }
   systemLight.addEventListener('change', renderMonoName);
 
-  async function init() {
-    editor.dataset.placeholder = PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)];
-    $('newBtn').title = `Nova nota (${keys('Mod', 'N')})`;
-    $('closeBtn').title = 'Fechar (vai para a lixeira)';
+  // Textos que dependem do idioma e não estão só no HTML (tooltips com
+  // atalhos, placeholder, ortografia). Chamado ao abrir e ao trocar o idioma.
+  function applyLanguage(lang) {
+    I18n.set(lang);
+    editor.lang = I18n.locale();
+    editor.dataset.placeholder = I18n.placeholder();
+    $('newBtn').title = `${t('newNote')} (${keys('Mod', 'N')})`;
+    $('closeBtn').title = t('closeToTrash');
     for (const btn of formatBar.querySelectorAll('[data-key]')) {
       btn.title = `${btn.getAttribute('aria-label')} (${keys('Mod', btn.dataset.key)})`;
     }
-    const sizeKeys = { 2: ` (${keys('Mod', 'Shift', '<')} diminui)`, 5: ` (${keys('Mod', 'Shift', '>')} aumenta)` };
+    const sizeKeys = {
+      2: ` (${t('smaller', { keys: keys('Mod', 'Shift', '<') })})`,
+      5: ` (${t('larger', { keys: keys('Mod', 'Shift', '>') })})`,
+    };
     for (const btn of formatBar.querySelectorAll('[data-size]')) {
       btn.title = btn.getAttribute('aria-label') + (sizeKeys[btn.dataset.size] || '');
     }
+    renderMonoName();
+  }
+
+  async function init() {
+    const [, lang] = await invoke('get_language');
+    applyLanguage(lang);
+    window.__TAURI__.event.listen('language-changed', (e) => applyLanguage(e.payload));
 
     // Formatação em tags (<b>, <i>, <u>), não em style="…".
     document.execCommand('styleWithCSS', false, false);

@@ -8,7 +8,7 @@ use std::{sync::Arc, thread, time::Duration};
 
 use store::{
     is_valid_color, now_ms, ManagerState, Note, Store, COLLAPSED_H, DEFAULT_H, DEFAULT_TEXT_MAX,
-    DEFAULT_W, THEMES, TITLE_MAX,
+    DEFAULT_W, LANGUAGES, THEMES, TITLE_MAX,
 };
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -127,7 +127,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
         state.height
     };
     let window = WebviewWindowBuilder::new(app, MANAGER, WebviewUrl::App("manager.html".into()))
-        .title("Gerenciador — Taxinha")
+        .title(manager_title(store.effective_language()))
         .inner_size(state.width, height)
         .decorations(false)
         // Redimensiona pelas alças da página (resize_to), com ímã.
@@ -149,6 +149,53 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     window.show()?;
     window.set_focus()?;
     Ok(())
+}
+
+/// Título da janela "Gerenciador" (barra de tarefas) no idioma da interface.
+fn manager_title(lang: &str) -> &'static str {
+    if lang == "en" {
+        "Manager — Taxinha"
+    } else {
+        "Gerenciador — Taxinha"
+    }
+}
+
+/// Textos do menu da bandeja no idioma da interface.
+fn tray_labels(lang: &str) -> [&'static str; 4] {
+    if lang == "en" {
+        ["New note", "Show all notes", "Manager", "Quit Taxinha"]
+    } else {
+        [
+            "Nova nota",
+            "Mostrar todas as notas",
+            "Gerenciador",
+            "Sair da Taxinha",
+        ]
+    }
+}
+
+/// Troca o idioma de todas as janelas (escolhido na Configuração).
+fn set_language(app: &AppHandle, language: &str) {
+    let store = app.state::<Shared>();
+    store.set_language(language);
+    store.flush();
+    let lang = store.effective_language();
+    if let Some(manager) = app.get_webview_window(MANAGER) {
+        let _ = manager.set_title(manager_title(lang));
+    }
+    let _ = app.emit("language-changed", lang);
+    refresh_tray(app);
+}
+
+/// Remonta o menu da bandeja (o idioma mudou). Menus só podem ser alterados
+/// na thread principal (exigência do macOS).
+fn refresh_tray(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let (Some(tray), Ok(menu)) = (handle.tray_by_id("taxinha"), build_tray_menu(&handle)) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    });
 }
 
 /// Fundo nativo da janela no tema efetivo ("system" segue o sistema).
@@ -247,16 +294,17 @@ fn open_welcome(app: &AppHandle, pos: Option<(i32, i32)>) -> tauri::Result<()> {
     let existing = store
         .active()
         .into_iter()
-        .find(|n| n.html == welcome::HTML && n.title == welcome::TITLE);
+        .find(|n| welcome::is_untouched(&n.title, &n.html));
+    let content = welcome::for_lang(store.effective_language());
     let note = match existing {
         Some(note) => note,
         None => {
             let note = store.create(pos);
             store
                 .update(&note.id, |n| {
-                    n.title = welcome::TITLE.into();
-                    n.text = welcome::TEXT.into();
-                    n.html = welcome::HTML.into();
+                    n.title = content.title.into();
+                    n.text = content.text.into();
+                    n.html = content.html.into();
                     n.width = welcome::WIDTH;
                     n.height = welcome::HEIGHT;
                 })
@@ -758,6 +806,22 @@ fn empty_trash(app: AppHandle, store: State<'_, Shared>) {
 }
 
 /// Troca o tema de todas as janelas (escolhido na janela "Gerenciador").
+/// Idioma escolhido e o efetivo ("pt" ou "en"), para as páginas.
+#[tauri::command]
+fn get_language(store: State<'_, Shared>) -> (String, &'static str) {
+    (store.language(), store.effective_language())
+}
+
+/// Troca o idioma da interface (escolhido no "Gerenciador").
+#[tauri::command]
+fn change_language(app: AppHandle, language: String) -> Result<(), String> {
+    if !LANGUAGES.contains(&language.as_str()) {
+        return Err(format!("idioma desconhecido: {language}"));
+    }
+    set_language(&app, &language);
+    Ok(())
+}
+
 #[tauri::command]
 fn change_theme(app: AppHandle, theme: String) -> Result<(), String> {
     if !THEMES.contains(&theme.as_str()) {
@@ -818,12 +882,14 @@ fn set_default_color(
 
 /// Menu da bandeja: atalhos e "Sair". Tema e ajuda ficam no "Gerenciador".
 fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let new_item = MenuItem::with_id(app, "new", "Nova nota", true, None::<&str>)?;
-    let show_item = MenuItem::with_id(app, "show", "Mostrar todas as notas", true, None::<&str>)?;
+    let [new_label, show_label, manager_label, quit_label] =
+        tray_labels(app.state::<Shared>().effective_language());
+    let new_item = MenuItem::with_id(app, "new", new_label, true, None::<&str>)?;
+    let show_item = MenuItem::with_id(app, "show", show_label, true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let manager_item = MenuItem::with_id(app, "manager", "Gerenciador", true, None::<&str>)?;
+    let manager_item = MenuItem::with_id(app, "manager", manager_label, true, None::<&str>)?;
     let separator2 = PredefinedMenuItem::separator(app)?;
-    let quit_item = MenuItem::with_id(app, "quit", "Sair da Taxinha", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", quit_label, true, None::<&str>)?;
     Menu::with_items(
         app,
         &[
@@ -921,6 +987,8 @@ fn main() {
             delete_forever,
             empty_trash,
             change_theme,
+            get_language,
+            change_language,
             show_welcome,
             quit_app,
             get_default_color,

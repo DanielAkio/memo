@@ -22,15 +22,15 @@
           </g>
         </svg>
       </button>
-      <span class="mgr-title">Gerenciador</span>
+      <span class="mgr-title" data-i18n="manager"></span>
       <div class="actions">
-        <button class="icon-btn" id="newBtn" type="button" aria-label="Nova nota">
+        <button class="icon-btn" id="newBtn" type="button" data-i18n-attr="aria-label=newNote">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
         </button>
         <button class="icon-btn collapse" id="collapseBtn" type="button" aria-label="Recolher">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 9.75 8 6.25l3.5 3.5"/></svg>
         </button>
-        <button class="icon-btn close" id="closeBtn" type="button" aria-label="Fechar" title="Fechar">
+        <button class="icon-btn close" id="closeBtn" type="button" data-i18n-attr="aria-label=close,title=close">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
         </button>
       </div>
@@ -40,24 +40,24 @@
       <header class="mgr-head">
         <div class="tabs" role="tablist">
           <button type="button" class="tab" role="tab" id="tabNotes" data-view="notes" aria-selected="true">
-            Notas <span class="tab-count" id="countNotes">0</span>
+            <span data-i18n="tabNotes"></span> <span class="tab-count" id="countNotes">0</span>
           </button>
           <button type="button" class="tab" role="tab" id="tabTrash" data-view="trash" aria-selected="false">
-            Lixeira <span class="tab-count" id="countTrash">0</span>
+            <span data-i18n="tabTrash"></span> <span class="tab-count" id="countTrash">0</span>
           </button>
           <button type="button" class="tab" role="tab" id="tabSettings" data-view="settings" aria-selected="false">
-            Configuração
+            <span data-i18n="tabSettings"></span>
           </button>
         </div>
         <label class="search" id="searchBox">
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/></svg>
-          <input type="search" id="search" placeholder="Buscar" aria-label="Buscar notas" spellcheck="false" autocomplete="off">
+          <input type="search" id="search" data-i18n-attr="placeholder=search,aria-label=searchNotes" spellcheck="false" autocomplete="off">
         </label>
       </header>
 
       <div class="trash-bar" id="trashBar" hidden>
-        <span>Notas na lixeira são excluídas de vez depois de 30 dias.</span>
-        <button type="button" class="btn danger" id="emptyTrash">Esvaziar lixeira</button>
+        <span data-i18n="trashInfo"></span>
+        <button type="button" class="btn danger" id="emptyTrash" data-i18n="emptyTrash"></button>
       </div>
 
       <main class="list-wrap" id="listWrap">
@@ -66,52 +66,60 @@
       </main>
 
       <section class="settings" id="settingsView" hidden>
-        <h2 class="settings-title">Aparência</h2>
+        <h2 class="settings-title" data-i18n="appearance"></h2>
         <div class="setting">
-          <span class="setting-label" id="themeLabel">Tema</span>
+          <span class="setting-label" id="themeLabel" data-i18n="theme"></span>
           <div class="segmented" id="themeSwitch" role="radiogroup" aria-labelledby="themeLabel">
-            <button type="button" class="seg" role="radio" data-theme="system" aria-checked="false">Sistema</button>
-            <button type="button" class="seg" role="radio" data-theme="light" aria-checked="false">Claro</button>
-            <button type="button" class="seg" role="radio" data-theme="dark" aria-checked="false">Escuro</button>
+            <button type="button" class="seg" role="radio" data-theme="system" aria-checked="false" data-i18n="system"></button>
+            <button type="button" class="seg" role="radio" data-theme="light" aria-checked="false" data-i18n="light"></button>
+            <button type="button" class="seg" role="radio" data-theme="dark" aria-checked="false" data-i18n="dark"></button>
           </div>
+        </div>
+        <div class="setting">
+          <label class="setting-label" for="languageSelect" data-i18n="language"></label>
+          <!-- Os nomes dos idiomas ficam sempre no próprio idioma. -->
+          <select class="field select" id="languageSelect">
+            <option value="system" data-i18n="system"></option>
+            <option value="pt-BR" lang="pt-BR">Português</option>
+            <option value="en" lang="en">English</option>
+          </select>
         </div>
         <h2 class="settings-title">
-          Notas novas
-          <span class="info" tabindex="0" role="img" aria-label="Vale para as notas criadas daqui em diante."
-                data-tip="Vale para as notas criadas daqui em diante.">i</span>
+          <span data-i18n="newNotes"></span>
+          <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=newNotesTip,data-tip=newNotesTip">i</span>
         </h2>
         <div class="setting">
-          <span class="setting-label">Cor</span>
+          <span class="setting-label" data-i18n="color"></span>
           <div class="swatches" id="defaultSwatches">
-            <button type="button" class="swatch" data-color="yellow" aria-label="Amarelo" title="Amarelo"></button>
-            <button type="button" class="swatch" data-color="green" aria-label="Verde" title="Verde"></button>
-            <button type="button" class="swatch" data-color="coral" aria-label="Coral" title="Coral"></button>
-            <button type="button" class="swatch" data-color="teal" aria-label="Azul-petróleo" title="Azul-petróleo"></button>
-            <button type="button" class="swatch" data-color="iris" aria-label="Íris" title="Íris"></button>
-            <button type="button" class="swatch" data-color="lavender" aria-label="Lavanda" title="Lavanda"></button>
-            <button type="button" class="swatch" data-color="mono" aria-label="Branco" title="Branco"></button>
-            <button type="button" class="swatch" data-color="custom" aria-label="Personalizada" title="Personalizada…"></button>
-            <button type="button" class="swatch" data-color="" aria-label="Sem cor" title="Sem cor"></button>
+            <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
+            <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
+            <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
+            <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
+            <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
+            <button type="button" class="swatch" data-color="lavender" data-i18n-attr="aria-label=lavender,title=lavender"></button>
+            <button type="button" class="swatch" data-color="mono"></button>
+            <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+            <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
           </div>
         </div>
         <div class="setting">
-          <label class="setting-label" for="defaultTitle">Título</label>
+          <label class="setting-label" for="defaultTitle" data-i18n="title"></label>
           <input class="field" id="defaultTitle" type="text" maxlength="80" spellcheck="false"
-                 autocomplete="off" placeholder="Sem título">
+                 autocomplete="off" data-i18n-attr="placeholder=untitled">
         </div>
         <div class="setting setting-top">
-          <label class="setting-label" for="defaultText">Texto</label>
+          <label class="setting-label" for="defaultText" data-i18n="text"></label>
           <div class="field-wrap">
-            <textarea class="field" id="defaultText" rows="5" maxlength="5000" spellcheck="true" lang="pt-BR"
-                      placeholder="Vazio (a nota mostra uma frase aleatória)"></textarea>
+            <textarea class="field" id="defaultText" rows="5" maxlength="5000" spellcheck="true"
+                      data-i18n-attr="placeholder=defaultTextPlaceholder"></textarea>
           </div>
         </div>
-        <h2 class="settings-title">Aplicativo</h2>
+        <h2 class="settings-title" data-i18n="application"></h2>
         <div class="setting">
-          <span class="setting-label">Ajuda e saída</span>
+          <span class="setting-label" data-i18n="helpAndQuit"></span>
           <div class="app-actions">
-            <button type="button" class="btn" id="helpBtn">Como usar a Taxinha</button>
-            <button type="button" class="btn danger" id="quitBtn">Sair da Taxinha</button>
+            <button type="button" class="btn" id="helpBtn" data-i18n="howTo"></button>
+            <button type="button" class="btn danger" id="quitBtn" data-i18n="quit"></button>
           </div>
         </div>
         <input type="color" class="custom-color" id="customColor" tabindex="-1" aria-hidden="true">
@@ -123,6 +131,7 @@
     </span>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="chrome.js"></script>
   <script src="manager.js"></script>
 </body>

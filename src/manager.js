@@ -14,6 +14,8 @@
     : parts.map((p) => ({ Mod: 'Ctrl' }[p] || p)).join('+'));
 
   const $ = (id) => document.getElementById(id);
+  const I18n = window.TaxinhaI18n;
+  const { t } = I18n;
   const frame = $('frame');
   const pinBtn = $('pinBtn');
   const collapseBtn = $('collapseBtn');
@@ -43,21 +45,20 @@
   // Para a busca: minúsculas e sem acentos.
   const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-  const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
-  const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   function editedLabel(ms) {
     if (!ms) return '';
     const d = new Date(ms);
-    return d.toDateString() === new Date().toDateString()
-      ? timeFmt.format(d)
-      : dateFmt.format(d).replace('.', '');
+    const fmt = new Intl.DateTimeFormat(I18n.locale(), d.toDateString() === new Date().toDateString()
+      ? { hour: '2-digit', minute: '2-digit' }
+      : { day: 'numeric', month: 'short' });
+    return fmt.format(d).replace('.', '');
   }
 
   function purgeLabel(trashedAt) {
     const left = TRASH_DAYS - Math.floor((Date.now() - trashedAt) / DAY_MS);
-    if (left <= 1) return 'some amanhã';
-    return `some em ${left} dias`;
+    if (left <= 1) return t('goneTomorrow');
+    return t('goneIn', { n: left });
   }
 
   function lines(note) {
@@ -68,7 +69,7 @@
   function titleAndPreview(note) {
     const ls = lines(note);
     if (note.title) return { title: note.title, preview: ls.join(' · '), named: true };
-    return { title: ls[0] || 'Nota vazia', preview: ls.slice(1).join(' · '), named: Boolean(ls[0]) };
+    return { title: ls[0] || t('emptyNote'), preview: ls.slice(1).join(' · '), named: Boolean(ls[0]) };
   }
 
   function el(tag, cls, text) {
@@ -116,8 +117,8 @@
 
     list.replaceChildren(...shown.map(view === 'notes' ? noteRow : trashRow));
     empty.hidden = shown.length > 0;
-    if (q) empty.textContent = `Nada encontrado para “${search.value.trim()}”.`;
-    else empty.textContent = view === 'notes' ? 'Nenhuma nota aberta.' : 'A lixeira está vazia.';
+    if (q) empty.textContent = t('nothingFound', { q: search.value.trim() });
+    else empty.textContent = t(view === 'notes' ? 'noNotes' : 'trashIsEmpty');
   }
 
   function baseRow(note) {
@@ -136,13 +137,13 @@
 
   function noteRow(note) {
     const row = baseRow(note);
-    row.title = 'Abrir nota';
+    row.title = t('openNote');
     row.tabIndex = 0;
     const trashBtn = el('button', 'icon-btn');
     trashBtn.type = 'button';
     trashBtn.dataset.act = 'trash';
-    trashBtn.title = 'Mandar para a lixeira';
-    trashBtn.setAttribute('aria-label', 'Mandar para a lixeira');
+    trashBtn.title = t('moveToTrash');
+    trashBtn.setAttribute('aria-label', t('moveToTrash'));
     trashBtn.append(icon(TRASH_ICON));
     const actions = el('div', 'row-actions');
     actions.append(trashBtn);
@@ -152,10 +153,10 @@
 
   function trashRow(note) {
     const row = baseRow(note);
-    const restore = el('button', 'btn', 'Restaurar');
+    const restore = el('button', 'btn', t('restore'));
     restore.type = 'button';
     restore.dataset.act = 'restore';
-    const del = el('button', 'btn danger', 'Excluir');
+    const del = el('button', 'btn danger', t('delete'));
     del.type = 'button';
     del.dataset.act = 'delete';
     const actions = el('div', 'row-actions');
@@ -275,7 +276,7 @@
     const theme = document.documentElement.dataset.theme;
     const light = theme ? theme === 'light' : systemLight.matches;
     const sw = document.querySelector('#defaultSwatches .swatch[data-color="mono"]');
-    const name = light ? 'Preto' : 'Branco';
+    const name = t(light ? 'black' : 'white');
     sw.setAttribute('aria-label', name);
     sw.title = name;
   }
@@ -305,7 +306,7 @@
   });
 
   emptyTrashBtn.addEventListener('click', async () => {
-    if (!confirmFirst(emptyTrashBtn, 'Clique de novo para esvaziar')) return;
+    if (!confirmFirst(emptyTrashBtn, t('emptyTrashConfirm'))) return;
     try {
       await invoke('empty_trash');
     } catch (err) {
@@ -330,7 +331,7 @@
   });
   // Sair fecha o app inteiro (todas as notas); pede um segundo clique.
   $('quitBtn').addEventListener('click', () => {
-    if (!confirmFirst($('quitBtn'), 'Clique de novo para sair')) return;
+    if (!confirmFirst($('quitBtn'), t('quitConfirm'))) return;
     invoke('quit_app').catch((err) => console.error('quit_app', err));
   });
 
@@ -368,10 +369,10 @@
   function renderWindow() {
     frame.classList.toggle('is-collapsed', win.collapsed);
     pinBtn.setAttribute('aria-pressed', String(win.pinned));
-    const pinLabel = win.pinned ? 'Desafixar' : 'Fixar acima de tudo';
+    const pinLabel = t(win.pinned ? 'unpin' : 'pin');
     pinBtn.setAttribute('aria-label', pinLabel);
     pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
-    const collapseLabel = win.collapsed ? 'Expandir' : 'Recolher';
+    const collapseLabel = t(win.collapsed ? 'expand' : 'collapse');
     collapseBtn.setAttribute('aria-label', collapseLabel);
     collapseBtn.title = collapseLabel;
   }
@@ -407,15 +408,38 @@
   collapseBtn.addEventListener('click', toggleCollapse);
   $('newBtn').addEventListener('click', newNote);
   $('closeBtn').addEventListener('click', closeWindow);
-  $('newBtn').title = `Nova nota (${keys('Mod', 'N')})`;
 
   window.addEventListener('focus', () => frame.classList.add('is-focused'));
   window.addEventListener('blur', () => frame.classList.remove('is-focused'));
+
+  // -------------------------------------------------------------- idioma
+
+  function applyLanguage(setting, lang) {
+    I18n.set(lang);
+    document.title = `${t('manager')} — Taxinha`;
+    $('defaultText').lang = I18n.locale();
+    $('newBtn').title = `${t('newNote')} (${keys('Mod', 'N')})`;
+    $('languageSelect').value = setting;
+    renderWindow();
+    renderMonoName();
+    render();
+  }
+
+  let languageSetting = 'system';
+  $('languageSelect').addEventListener('change', (e) => {
+    languageSetting = e.target.value;
+    invoke('change_language', { language: languageSetting })
+      .catch((err) => console.error('change_language', err));
+  });
 
   // --------------------------------------------------------------- init
 
   async function init() {
     win = await invoke('load_manager');
+    let lang;
+    [languageSetting, lang] = await invoke('get_language');
+    applyLanguage(languageSetting, lang);
+    listen('language-changed', (e) => applyLanguage(languageSetting, e.payload));
     renderWindow();
     if (document.hasFocus()) frame.classList.add('is-focused');
     applyTheme(await invoke('get_theme'));

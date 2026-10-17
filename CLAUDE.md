@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Taxinha is a cross-platform (Windows/macOS/Linux) sticky-notes desktop app built on **Tauri 2**. Each note is its own frameless window; the headline feature is the pin button, which toggles "always on top". The UI, comments, user-facing strings and commit-facing docs are in **Brazilian Portuguese** — keep new code and copy consistent with that.
+Taxinha is a cross-platform (Windows/macOS/Linux) sticky-notes desktop app built on **Tauri 2**. Each note is its own frameless window; the headline feature is the pin button, which toggles "always on top". Comments and commit-facing docs are in **Brazilian Portuguese** — keep new code consistent with that. The UI is translated: Portuguese (default) and English (see *Languages* below); every new user-facing string needs both.
 
 ## Commands
 
@@ -24,6 +24,7 @@ src/                 frontend — plain HTML/CSS/JS, no bundler, served as-is (f
   app.js             per-window logic; talks to Rust via window.__TAURI__ (withGlobalTauri)
   base.css           shared by both pages: fonts, tokens, light/dark themes, label colours, swatches,
                      and the window chrome (.frame, .titlebar, .icon-btn, .pin, .collapse, .grip)
+  i18n.js            UI strings pt/en (`TaxinhaI18n.t`), placeholder phrases, data-i18n helpers
   chrome.js          shared window behaviour: titlebar drag and edge/corner resize, both with snapping; double/middle click
   styles.css         note window components, derived from docs/style.md
   manager.html/.js/.css  the "Gerenciador" window: tabs Notas / Lixeira (with search) / Configuração
@@ -56,6 +57,8 @@ docs/style.md        design reference ("Linear"-style dark system) the UI follow
 
 **Startup:** the Gerenciador opens on every launch (`setup`), on relaunch through the single-instance plugin and on macOS Dock reopen, together with the notes that were open. **First run:** when `Store::is_first_run()` (no notes and `next_seq <= 1`, i.e. a fresh `notes.json`), `setup` creates the welcome note from `welcome.rs` instead of an empty one, placed beside the Gerenciador (`open_welcome(app, pos)` with `beside`). The manager's "Como usar a Taxinha" button (`show_welcome`) reopens it through the same `open_welcome`, which focuses an untouched copy (same title and HTML) if one is open instead of duplicating it. Its `HTML` must only use tags the `sanitize` whitelist keeps, and `TEXT` must equal what `toPlain` produces from that HTML.
 
+**Languages:** `FileData.language` is `system` | `pt-BR` | `en` (empty = system); `Store::effective_language()` resolves it to `"pt"` or `"en"` (system: `sys-locale`, Portuguese for any `pt*` locale, English otherwise). Pages call `get_language` → `(setting, effective)` and `TaxinhaI18n.set(effective)`; the manager's Configuração has a language list (`<select id="languageSelect">`, `change_language`), and `set_language` emits `language-changed` (effective lang) to every window, rebuilds the tray (`refresh_tray`, main thread) and retitles the manager. In HTML, static text uses `data-i18n="key"` and `data-i18n-attr="attr=key,…"`; JS uses `t('key', vars)`. Rust-side strings (tray labels, manager window title, welcome note) are chosen with the effective language (`tray_labels`, `manager_title`, `welcome::for_lang`). Note content and new-note defaults are never translated.
+
 **Lifecycle:** single-instance plugin (relaunch → `show_all`). Each note window appears in the taskbar (grouped under the app icon); on macOS the app has a Dock icon and `RunEvent::Reopen` → `show_all`. Closing the last window doesn't quit (`prevent_exit` when no exit code); with no notes open the app lives only in the tray, and only "Sair da Taxinha" (tray menu, or `quit_app` in the manager's Configuração tab) exits. On Linux under Wayland, `GDK_BACKEND=x11` is forced (unless already set) so always-on-top works through XWayland.
 
 **Frontend (`app.js`)**: a single IIFE. Text saves are debounced 250 ms and flushed on blur/window blur/beforeunload. Pin toggling is optimistic and reverts on error. Titlebar layout: pin on the far left, colour dot (`#colorBtn`, opens the swatch popover `#colorMenu`), name, then new / collapse / close on the right. It handles drag (custom, see below), middle-click close (`auxclick` → `closeNote`, same as ✕) and double-click rename (inline `#titleInput` → `set_title`, max 80 chars). All titlebar buttons stay visible when collapsed; opening the colour popover on a collapsed note grows the window (`setSize`, not persisted since `height` is only tracked while expanded) and shrinks it back when the popover closes or the window loses focus. The note name (or first line) is mirrored to the native window title (`setTitle`) for the taskbar. The bottom-right grip calls `startResizeDragging`.
@@ -68,4 +71,5 @@ docs/style.md        design reference ("Linear"-style dark system) the UI follow
 - **Note model** uses `#[serde(rename_all = "camelCase", default)]`, so new fields need a `Default` value and appear camelCase in JS (`updatedAt`, `createdAt`). The file format has `version: 1`.
 - **Design:** follow `docs/style.md` — near-black surfaces (Carbon `#0f1011` is the note background, also set as the native window background to avoid a white flash), Inter at weights 400–590, hairline borders. The only colour on screen is the note's label (stripe + dot); the pin button is deliberately colourless (pinned = filled white icon on a subtle grey background). Use the CSS custom properties in `styles.css` rather than raw colours.
 - **CSP** (`tauri.conf.json`) is `default-src 'self'`: no CDNs, remote fonts or inline scripts. Keep all assets local.
-- Rust errors returned to JS are `String`s; user-facing error text is in Portuguese.
+- Rust errors returned to JS are `String`s (logged to the console, not shown), in Portuguese.
+- **Strings:** add every new UI string to both `pt` and `en` in `i18n.js` (and to `tray_labels` / `welcome.rs` if it lives in Rust).

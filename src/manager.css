@@ -286,6 +286,25 @@ body {
   -webkit-user-select: text;
 }
 textarea.field { resize: vertical; min-height: 84px; }
+
+/* Lista de escolha (idioma): mesmo visual dos campos, com seta própria. */
+.select {
+  flex: none;
+  width: auto;
+  min-width: 180px;
+  height: 30px;
+  padding: 0 28px 0 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: default;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-fog) 50%),
+                    linear-gradient(135deg, var(--color-fog) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 13px, calc(100% - 10px) 13px;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+.select:hover { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.select option { background: var(--color-obsidian); color: var(--color-mist); }
 .field::placeholder { color: var(--color-ash); }
 .field:focus { box-shadow: inset 0 0 0 1px var(--color-smoke); }
 /* Ícone "i" ao lado de um título de seção; o texto aparece num tooltip. */

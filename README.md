@@ -20,6 +20,7 @@ Cada nota é uma janela própria, e **um clique na tachinha** a mantém por cima
 | Redimensionar | Pelas bordas ou pelo canto inferior direito; perto de uma borda da tela ou de outra nota, a borda gruda |
 | Recolher / expandir até a barra de título | Botão de seta, ao lado do `✕` |
 | Mudar a cor (padrão: amarela) | Clique na bolinha colorida à esquerda do título e escolha a cor, ou "Personalizada" para qualquer cor |
+| Idioma (português / inglês) | Gerenciador → Configuração → Idioma: Sistema (padrão), Português ou English |
 | Tema claro / escuro | Gerenciador → Configuração → Tema: Sistema (padrão), Claro ou Escuro |
 | Rever as dicas da primeira nota | Gerenciador → Configuração → Como usar a Taxinha |
 | Mostrar todas as notas | Ícone na bandeja (barra de menus no macOS) |
