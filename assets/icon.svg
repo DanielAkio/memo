@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Taxinha — app icon. Void canvas, hairline edge, acid-lime pin. -->
-  <rect x="64" y="64" width="896" height="896" rx="200" fill="#08090a"/>
-  <rect x="66" y="66" width="892" height="892" rx="198" fill="none" stroke="#23252a" stroke-width="4"/>
-  <g transform="translate(528 500) rotate(45)">
+  <!-- Taxinha — app icon. Só a tachinha, centralizada sobre fundo transparente
+       (a caixa da tachinha girada vai de -212 a 325 nos dois eixos). -->
+  <g transform="translate(512 512) scale(1.6) translate(-56.5 56.5) rotate(45)">
     <!-- needle -->
     <polygon points="-15,28 15,28 0,300" fill="#d0d6e0"/>
     <!-- body -->
