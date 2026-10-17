@@ -12,7 +12,7 @@ npm run build    # tauri build — installers in src-tauri/target/release/bundle
 
 There are no tests, linters or JS build step. For Rust-only checks: `cargo check` / `cargo clippy` inside `src-tauri/`.
 
-CI (`.github/workflows/build.yml`) builds installers for Windows, macOS arm64 + x64, and Linux (ubuntu-22.04) on every push/PR; a `v*` tag creates a draft GitHub release via `tauri-action`. Builds are unsigned.
+CI (`.github/workflows/build.yml`) builds installers for Windows, macOS arm64 + x64, and Linux (ubuntu-22.04). It runs only via `workflow_dispatch` (manual); run from a `v*` tag, it creates a draft GitHub release via `tauri-action`. Builds are unsigned.
 
 ## Layout
 

@@ -1,12 +1,9 @@
 name: Build
 
-# Roda a cada push e, numa tag v*, publica um rascunho de release com os
-# instaladores de Windows, macOS (Apple Silicon e Intel) e Linux.
+# Roda só manualmente (Actions → Build → Run workflow). Executado a partir de
+# uma tag v*, publica um rascunho de release com os instaladores de Windows,
+# macOS (Apple Silicon e Intel) e Linux.
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
-  pull_request:
   workflow_dispatch:
 
 permissions:

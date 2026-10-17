@@ -42,8 +42,9 @@ npm run build    # gera o instalador do sistema atual em src-tauri/target/releas
 ## Instaladores para os três sistemas
 
 O workflow em `.github/workflows/build.yml` compila no GitHub Actions para Windows (`.msi` e `.exe`),
-macOS Apple Silicon e Intel (`.dmg`) e Linux (`.deb`, `.rpm`, `.AppImage`). Basta subir o projeto para um
-repositório: cada push gera os instaladores como artefatos, e uma tag `v0.1.0` cria um rascunho de release.
+macOS Apple Silicon e Intel (`.dmg`) e Linux (`.deb`, `.rpm`, `.AppImage`). Ele roda só manualmente, em
+Actions → Build → Run workflow, e gera os instaladores como artefatos. Rodando a partir de uma tag `v0.1.0`,
+cria também um rascunho de release.
 
 Os builds não são assinados. No macOS, abra pela primeira vez com clique direito → Abrir; no Windows, o
 SmartScreen pode pedir "Executar assim mesmo".
