@@ -4,6 +4,7 @@
 (() => {
   const { invoke } = window.__TAURI__.core;
   const appWindow = window.__TAURI__.window.getCurrentWindow();
+  const { LogicalSize } = window.__TAURI__.dpi;
 
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   const keys = (...parts) => (isMac
@@ -13,22 +14,64 @@
   const $ = (id) => document.getElementById(id);
   const frame = $('frame');
   const titlebar = $('titlebar');
-  const text = $('text');
+  const editor = $('editor');
   const pinBtn = $('pinBtn');
-  const menu = $('menu');
-  const menuBtn = $('menuBtn');
-  const deleteItem = $('deleteItem');
-  const deleteLabel = $('deleteLabel');
+  const colorMenu = $('colorMenu');
+  const formatBar = $('formatBar');
+  const collapseBtn = $('collapseBtn');
+  const colorBtn = $('colorBtn');
+  const nameEl = $('noteName');
+  const titleInput = $('titleInput');
 
   let note = null;
   let saveTimer = null;
   let textDirty = false;
-  let confirmTimer = null;
+  let titleTimer = null;
+  let renaming = false;
+  let colorsGrown = false;
 
   // ------------------------------------------------------------ helpers
 
-  const firstLine = (t) => t.split('\n').map((s) => s.trim()).find(Boolean) || 'Nota vazia';
-  const wordCount = (t) => (t.trim().match(/\S+/g) || []).length;
+  const customSwatch = document.querySelector('.swatch[data-color="custom"]');
+  const customColor = $('customColor');
+  const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
+
+  const COLOR_NAMES = Object.fromEntries(
+    [...document.querySelectorAll('.swatch')].map((sw) => [sw.dataset.color, sw.getAttribute('aria-label')]),
+  );
+
+  // Item de checklist no texto puro: "[ ]" ou "[x]" no começo da linha.
+  const CHECK_RE = /^(\s*)\[([ xX])\](?= |$) ?/;
+  const plain = (t) => t.replace(/^(\s*)\[[ xX]\](?= |$) ?/gm, '$1');
+
+  const firstLine = (t) => plain(t).split('\n').map((s) => s.trim()).find(Boolean) || 'Nota vazia';
+  const wordCount = (t) => (plain(t).trim().match(/\S+/g) || []).length;
+  const displayName = () => note.title || firstLine(note.text);
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // Placeholder da nota vazia: uma frase sorteada a cada nota aberta.
+  const PLACEHOLDERS = [
+    'Escreva antes que esqueça…',
+    'Prometo não contar pra ninguém.',
+    'Lista de compras, plano secreto ou dominação mundial?',
+    'Anota aí, que o cérebro tá cheio.',
+    'Pode desabafar, eu sou só um papel.',
+    'Uma ideia genial começa aqui. Ou não.',
+    'Escreva algo antes que o café esfrie.',
+    'Post-it digital, zero cola.',
+    'Aquela senha não, hein.',
+    'Rabisque à vontade, ninguém tá olhando.',
+    'Isto não é um diário. Ou é?',
+    'Lembrete: beber água.',
+    'O que o você do futuro precisa saber?',
+    'Escreva rápido, a tachinha tá segurando.',
+    'Fofoca boa merece ser anotada.',
+    'Coisas que eu ia lembrar de cabeça (mentira).',
+    'Digite aqui e finja que está produtivo.',
+    'Mais um post-it pra coleção.',
+    'Deixa que eu seguro essa ideia pra você.',
+    'Era uma vez uma nota em branco…',
+  ];
 
   const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
@@ -43,12 +86,14 @@
   // ------------------------------------------------------------- render
 
   function render() {
-    frame.dataset.color = note.color || '';
+    // Cor personalizada (#rrggbb) vai direto na variável --note-color.
+    const custom = isCustomColor(note.color);
+    frame.dataset.color = custom ? 'custom' : note.color || '';
+    if (custom) frame.style.setProperty('--note-color', note.color);
+    else frame.style.removeProperty('--note-color');
+    customSwatch.style.setProperty('--sw', custom ? note.color : '');
+    if (!custom) customSwatch.style.removeProperty('--sw');
     frame.classList.toggle('is-collapsed', note.collapsed);
-
-    $('noteId').textContent = `TXN-${note.seq}`;
-    $('noteTitle').textContent = firstLine(note.text);
-    document.title = `${firstLine(note.text)} — Taxinha`;
 
     pinBtn.setAttribute('aria-pressed', String(note.pinned));
     const pinLabel = note.pinned ? 'Desafixar' : 'Fixar acima de tudo';
@@ -56,9 +101,13 @@
     pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
 
     for (const sw of document.querySelectorAll('.swatch')) {
-      sw.setAttribute('aria-checked', String(sw.dataset.color === (note.color || '')));
+      const checked = sw === customSwatch ? custom : sw.dataset.color === (note.color || '');
+      sw.setAttribute('aria-checked', String(checked));
     }
-    $('collapseItem').firstElementChild.textContent = note.collapsed ? 'Expandir nota' : 'Recolher nota';
+    const collapseLabel = note.collapsed ? 'Expandir nota' : 'Recolher nota';
+    collapseBtn.setAttribute('aria-label', collapseLabel);
+    collapseBtn.title = collapseLabel;
+    colorBtn.title = custom ? `Cor: Personalizada (${note.color})` : `Cor: ${COLOR_NAMES[note.color || '']}`;
     renderMeta();
   }
 
@@ -66,7 +115,146 @@
     const n = wordCount(note.text);
     $('count').textContent = `${n} ${n === 1 ? 'palavra' : 'palavras'}`;
     $('edited').textContent = note.text.trim() ? editedLabel(note.updatedAt) : 'nota nova';
-    $('noteTitle').textContent = firstLine(note.text);
+    editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check'));
+    renderName();
+  }
+
+  // Nome na barra: o título, ou "Sem título" (mesmo com a nota recolhida).
+  function renderName() {
+    nameEl.textContent = note.title || 'Sem título';
+    nameEl.classList.toggle('is-empty', !note.title);
+
+    // O título da janela nativa aparece na taskbar; atualiza sem pressa.
+    const title = `${displayName()} — Taxinha`;
+    if (document.title === title) return;
+    document.title = title;
+    clearTimeout(titleTimer);
+    titleTimer = setTimeout(() => {
+      appWindow.setTitle(title).catch((err) => console.error('setTitle', err));
+    }, 400);
+  }
+
+  // ------------------------------------------------- conteúdo do editor
+  //
+  // O editor é um contenteditable em que cada linha é um <div>. Formatação
+  // fica em <b>, <i> e <u>; um item de checklist é <div class="check">
+  // (marcado: "check done"). Além do HTML, a nota guarda o texto puro, com
+  // os itens como "[ ] " / "[x] ", que o Rust usa na bandeja.
+
+  const isBlock = (n) => n !== editor && n.nodeType === 1 && (n.nodeName === 'DIV' || n.nodeName === 'P');
+  const INLINE = { B: 'b', STRONG: 'b', I: 'i', EM: 'i', U: 'u' };
+  const DROP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+
+  // Texto puro a partir do HTML do editor.
+  function toPlain() {
+    const lines = [];
+    let cur = null;
+    const flush = () => {
+      if (cur !== null) lines.push(cur);
+      cur = null;
+    };
+    const walk = (node) => {
+      for (const n of node.childNodes) {
+        if (n.nodeType === 3) {
+          cur = (cur ?? '') + n.data;
+        } else if (n.nodeName === 'BR') {
+          // O <br> final de um bloco só segura a altura de uma linha vazia.
+          if (n.nextSibling || !isBlock(n.parentNode)) { lines.push(cur ?? ''); cur = ''; } else cur = cur ?? '';
+        } else if (isBlock(n)) {
+          flush();
+          cur = n.classList.contains('check') ? (n.classList.contains('done') ? '[x] ' : '[ ] ') : '';
+          walk(n);
+          flush();
+        } else if (n.nodeType === 1) {
+          walk(n);
+        }
+      }
+    };
+    walk(editor);
+    flush();
+    return lines.join('\n');
+  }
+
+  // HTML para notas que só têm texto puro (criadas antes da formatação).
+  function fromPlain(text) {
+    if (!text) return '<div><br></div>';
+    return text.split('\n').map((line) => {
+      const m = CHECK_RE.exec(line);
+      const body = m ? line.slice(m[0].length) : line;
+      const cls = m ? ` class="check${m[2] === ' ' ? '' : ' done'}"` : '';
+      return `<div${cls}>${body ? esc(body) : '<br>'}</div>`;
+    }).join('');
+  }
+
+  // Remonta o HTML salvo só com o que o editor usa: linhas, <br>, <b>, <i>,
+  // <u> e as classes do checklist. Qualquer outra coisa vira texto.
+  function sanitize(html) {
+    const src = new DOMParser().parseFromString(html, 'text/html').body;
+    const out = document.createDocumentFragment();
+    const copy = (from, to) => {
+      for (const n of from.childNodes) {
+        if (n.nodeType === 3) {
+          to.appendChild(document.createTextNode(n.data));
+        } else if (DROP.has(n.nodeName)) {
+          continue;
+        } else if (n.nodeName === 'BR') {
+          to.appendChild(document.createElement('br'));
+        } else if (isBlock(n)) {
+          const div = document.createElement('div');
+          if (n.classList.contains('check')) div.classList.add('check');
+          if (n.classList.contains('done')) div.classList.add('done');
+          copy(n, div);
+          to.appendChild(div);
+        } else if (INLINE[n.nodeName]) {
+          copy(n, to.appendChild(document.createElement(INLINE[n.nodeName])));
+        } else if (n.nodeName === 'FONT' && SIZES.includes(n.getAttribute('size'))) {
+          const font = to.appendChild(document.createElement('font'));
+          font.setAttribute('size', n.getAttribute('size'));
+          copy(n, font);
+        } else if (n.nodeType === 1) {
+          copy(n, to);
+        }
+      }
+    };
+    copy(src, out);
+
+    // Garante que tudo esteja dentro de linhas (<div>).
+    const wrapped = document.createDocumentFragment();
+    let run = null;
+    for (const n of [...out.childNodes]) {
+      if (n.nodeName === 'DIV') {
+        run = null;
+        if (!n.firstChild) n.appendChild(document.createElement('br'));
+        wrapped.appendChild(n);
+      } else {
+        if (!run) run = wrapped.appendChild(document.createElement('div'));
+        run.appendChild(n);
+      }
+    }
+    if (!wrapped.firstChild) wrapped.appendChild(document.createElement('div')).appendChild(document.createElement('br'));
+    return wrapped;
+  }
+
+  function loadContent() {
+    editor.replaceChildren(note.html ? sanitize(note.html) : sanitize(fromPlain(note.text)));
+  }
+
+  // A linha (filha direta do editor) onde está o cursor.
+  function currentBlock() {
+    const sel = getSelection();
+    if (!sel.rangeCount) return null;
+    let n = sel.anchorNode;
+    while (n && n.parentNode !== editor) n = n.parentNode;
+    return n && n.nodeName === 'DIV' ? n : null;
+  }
+
+  // Texto entre o começo da linha e o cursor.
+  function textBeforeCaret(block) {
+    const sel = getSelection();
+    const r = document.createRange();
+    r.setStart(block, 0);
+    r.setEnd(sel.anchorNode, sel.anchorOffset);
+    return r;
   }
 
   // --------------------------------------------------------------- save
@@ -83,11 +271,211 @@
     if (!textDirty) return;
     textDirty = false;
     try {
-      await invoke('save_text', { text: note.text });
+      await invoke('save_text', { text: note.text, html: note.html });
     } catch (err) {
       textDirty = true;
       console.error('save_text', err);
     }
+  }
+
+  function onContentChanged() {
+    note.text = toPlain();
+    note.html = editor.innerHTML;
+    note.updatedAt = Date.now();
+    renderMeta();
+    scheduleSave();
+  }
+
+  // ---------------------------------------------------------- checklist
+
+  // "[]" digitado no começo de uma linha transforma a linha em item.
+  function expandCheckbox() {
+    const sel = getSelection();
+    if (!sel.isCollapsed) return false;
+    let block = currentBlock();
+    if (!block) {
+      document.execCommand('formatBlock', false, 'div');
+      block = currentBlock();
+    }
+    if (!block || block.classList.contains('check')) return false;
+    const before = textBeforeCaret(block);
+    // "[]", "[ ]" ou "[x]" (este já marcado).
+    const m = /^\s*\[([  xX]?)\]$/.exec(before.toString());
+    if (!m) return false;
+    const done = /x/i.test(m[1]);
+    sel.removeAllRanges();
+    sel.addRange(before);
+    document.execCommand('delete'); // entra no desfazer
+    // Se a linha ficou vazia e era a única, o Chromium remove o próprio <div>;
+    // nesse caso recria a linha no lugar do cursor.
+    if (!block.isConnected) {
+      document.execCommand('formatBlock', false, 'div');
+      block = currentBlock();
+      if (!block) return false;
+    }
+    block.classList.add('check');
+    block.classList.toggle('done', done);
+    return true;
+  }
+
+  function toggleCheck(block) {
+    block.classList.toggle('done');
+    onContentChanged();
+  }
+
+  // Clique na caixa (à esquerda do item) marca/desmarca sem mover o cursor.
+  function checkAt(e) {
+    const block = e.target.closest && e.target.closest('.check');
+    if (!block || !editor.contains(block)) return null;
+    return e.clientX < block.getBoundingClientRect().left + 22 ? block : null;
+  }
+
+  function onEditorKeydown(e) {
+    if (e.isComposing) return;
+    const mod = isMac ? e.metaKey : e.ctrlKey;
+    const key = e.key.toLowerCase();
+
+    // Atalhos de formatação no padrão de mercado.
+    if (mod && !e.shiftKey && !e.altKey && FORMAT_KEYS[key]) {
+      e.preventDefault();
+      format(FORMAT_KEYS[key]);
+      return;
+    }
+    if (mod && e.shiftKey && !e.altKey && (e.code === 'Period' || e.code === 'Comma')) {
+      e.preventDefault();
+      stepSize(e.code === 'Period' ? 1 : -1);
+      return;
+    }
+
+    const block = currentBlock();
+    if (!block || !block.classList.contains('check')) return;
+    const atStart = getSelection().isCollapsed && textBeforeCaret(block).toString() === '';
+
+    // Enter num item vazio, ou Backspace no começo do item, sai da lista.
+    if ((e.key === 'Enter' && !e.shiftKey && !mod && !e.altKey && block.textContent.trim() === '')
+        || (e.key === 'Backspace' && !mod && atStart)) {
+      e.preventDefault();
+      block.classList.remove('check', 'done');
+      if (!block.classList.length) block.removeAttribute('class');
+      onContentChanged();
+    }
+  }
+
+  // Espaço digitado logo no começo de um item é descartado ("[] tarefa").
+  function swallowLeadingSpace() {
+    const block = currentBlock();
+    if (!block || !block.classList.contains('check')) return;
+    if (!/^[  ]$/.test(textBeforeCaret(block).toString())) return;
+    document.execCommand('delete');
+  }
+
+  function onEditorInput(e) {
+    if (e.inputType === 'insertText' && e.data === ']') expandCheckbox();
+    if (e.inputType === 'insertText' && e.data === ' ') swallowLeadingSpace();
+    // Enter num item cria o próximo item (o navegador copia a linha), desmarcado.
+    if (e.inputType === 'insertParagraph') currentBlock()?.classList.remove('done');
+    onContentChanged();
+  }
+
+  // Colar sempre como texto puro: evita trazer estilos de outros apps.
+  function onPaste(e) {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    if (text) document.execCommand('insertText', false, text);
+  }
+
+  // ---------------------------------------------------------- formatação
+
+  const FORMAT_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
+
+  function format(cmd) {
+    editor.focus();
+    document.execCommand(cmd);
+    onContentChanged();
+    scheduleFormatBar();
+  }
+
+  // Tamanhos de texto: o execCommand gera <font size="N"> e o CSS define o
+  // tamanho real de cada N. "3" é o normal.
+  const SIZES = ['2', '3', '5'];
+
+  function currentSize() {
+    const sel = getSelection();
+    if (!sel.rangeCount) return '3';
+    // Desce até o primeiro texto da seleção (uma linha inteira selecionada
+    // começa no <div>, não dentro do <font>).
+    const range = sel.getRangeAt(0);
+    let n = range.startContainer.childNodes[range.startOffset] || range.startContainer;
+    while (n.firstChild) n = n.firstChild;
+    if (n.nodeType === 3) n = n.parentNode;
+    const font = n.closest && n.closest('font[size]');
+    return font && editor.contains(font) ? font.getAttribute('size') : '3';
+  }
+
+  function setSize(size) {
+    editor.focus();
+    document.execCommand('fontSize', false, size);
+    onContentChanged();
+    scheduleFormatBar();
+  }
+
+  // Ctrl+Shift+> / Ctrl+Shift+< sobem ou descem um tamanho.
+  function stepSize(dir) {
+    const i = SIZES.indexOf(currentSize());
+    const next = SIZES[Math.max(0, Math.min(SIZES.length - 1, (i < 0 ? 1 : i) + dir))];
+    if (next !== currentSize()) setSize(next);
+  }
+
+  // ------------------------------------------- barra de formatação
+
+  // Ao selecionar texto, uma barrinha com negrito/itálico/sublinhado aparece
+  // logo acima da seleção (ou abaixo, se não couber acima).
+  let selecting = false;
+  let barFrame = 0;
+
+  function selectionRange() {
+    const sel = getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return null;
+    const range = sel.getRangeAt(0);
+    return editor.contains(range.commonAncestorContainer) ? range : null;
+  }
+
+  function updateFormatBar() {
+    const range = !selecting && note && !note.collapsed && document.activeElement === editor && selectionRange();
+    const rects = range ? [...range.getClientRects()].filter((r) => r.width || r.height) : [];
+    if (!rects.length) { hideFormatBar(); return; }
+
+    for (const btn of formatBar.querySelectorAll('[data-cmd]')) {
+      btn.setAttribute('aria-pressed', String(document.queryCommandState(btn.dataset.cmd)));
+    }
+    const size = currentSize();
+    for (const btn of formatBar.querySelectorAll('[data-size]')) {
+      btn.setAttribute('aria-pressed', String(btn.dataset.size === size));
+    }
+    formatBar.hidden = false;
+
+    const first = rects[0];
+    const last = rects[rects.length - 1];
+    const bounds = editor.getBoundingClientRect();
+    const w = formatBar.offsetWidth;
+    const h = formatBar.offsetHeight;
+    const center = rects.length === 1 ? (first.left + first.right) / 2 : first.left + 24;
+    // Acima da seleção (pode cobrir a barra de título); sem espaço, abaixo.
+    let top = first.top - h - 6;
+    if (top < 4) top = last.bottom + 6;
+    top = Math.max(4, Math.min(top, bounds.bottom - h));
+    const left = Math.max(4, Math.min(center - w / 2, window.innerWidth - w - 4));
+    formatBar.style.left = `${left}px`;
+    formatBar.style.top = `${top}px`;
+  }
+
+  const scheduleFormatBar = () => {
+    cancelAnimationFrame(barFrame);
+    barFrame = requestAnimationFrame(updateFormatBar);
+  };
+
+  function hideFormatBar() {
+    formatBar.hidden = true;
   }
 
   // ------------------------------------------------------------ actions
@@ -106,7 +494,8 @@
   }
 
   async function toggleCollapse() {
-    closeMenu();
+    closeColors(false);
+    hideFormatBar();
     note.collapsed = !note.collapsed;
     render();
     try {
@@ -114,11 +503,11 @@
     } catch (err) {
       console.error('set_collapsed', err);
     }
-    if (!note.collapsed) text.focus();
+    if (!note.collapsed) editor.focus();
   }
 
   async function newNote() {
-    closeMenu();
+    closeColors();
     await flushText();
     invoke('new_note').catch((err) => console.error('new_note', err));
   }
@@ -129,77 +518,168 @@
     invoke('set_color', { color }).catch((err) => console.error('set_color', err));
   }
 
-  function resetDelete() {
-    clearTimeout(confirmTimer);
-    deleteItem.classList.remove('confirming');
-    deleteLabel.textContent = 'Excluir nota';
+  // Fechar manda a nota para a lixeira (recuperável pela bandeja por 30 dias).
+  async function closeNote() {
+    closeColors();
+    if (renaming) await finishRename(true);
+    await flushText();
+    invoke('trash_note').catch((err) => console.error('trash_note', err));
   }
 
-  function requestDelete() {
-    // Nota vazia sai direto; com texto, pede um segundo clique.
-    if (note.text.trim() && !deleteItem.classList.contains('confirming')) {
-      deleteItem.classList.add('confirming');
-      deleteLabel.textContent = 'Clique de novo para excluir';
-      clearTimeout(confirmTimer);
-      confirmTimer = setTimeout(resetDelete, 3000);
-      return;
+  // ------------------------------------------------------------ título
+
+  function startRename() {
+    if (renaming) return;
+    renaming = true;
+    closeColors();
+    titleInput.value = note.title;
+    nameEl.hidden = true;
+    titleInput.hidden = false;
+    titleInput.focus();
+    titleInput.select();
+  }
+
+  async function finishRename(save) {
+    if (!renaming) return;
+    renaming = false;
+    const value = titleInput.value.trim();
+    titleInput.hidden = true;
+    nameEl.hidden = false;
+    if (save && value !== note.title) {
+      note.title = value;
+      renderName();
+      try {
+        note.title = await invoke('set_title', { title: value });
+      } catch (err) {
+        console.error('set_title', err);
+      }
     }
-    clearTimeout(saveTimer);
-    textDirty = false;
-    invoke('delete_note').catch((err) => console.error('delete_note', err));
+    renderName();
+    if (!note.collapsed) editor.focus();
   }
 
-  // --------------------------------------------------------------- menu
+  // -------------------------------------------------------- seletor de cor
 
-  function openMenu() {
-    menu.hidden = false;
+  // Recolhida, a janela só tem a altura da barra de título: enquanto o
+  // seletor estiver aberto ela cresce o suficiente para mostrá-lo.
+  const resizeWindow = (height) => appWindow
+    .setSize(new LogicalSize(window.innerWidth, height))
+    .catch((err) => console.error('setSize', err));
+
+  function openColors() {
+    hideFormatBar();
+    colorMenu.hidden = false;
     frame.classList.add('menu-open');
-    menuBtn.setAttribute('aria-expanded', 'true');
+    colorBtn.setAttribute('aria-expanded', 'true');
+    if (note.collapsed) {
+      colorsGrown = true;
+      resizeWindow(colorMenu.offsetTop + colorMenu.offsetHeight + 6);
+    }
   }
 
-  function closeMenu() {
-    if (menu.hidden) return;
-    menu.hidden = true;
+  // `shrink = false` quando outra ação já vai redimensionar a janela.
+  function closeColors(shrink = true) {
+    if (colorMenu.hidden) return;
+    colorMenu.hidden = true;
     frame.classList.remove('menu-open');
-    menuBtn.setAttribute('aria-expanded', 'false');
-    resetDelete();
+    colorBtn.setAttribute('aria-expanded', 'false');
+    if (colorsGrown) {
+      colorsGrown = false;
+      if (shrink) resizeWindow(titlebar.offsetHeight);
+    }
   }
 
   // ------------------------------------------------------------- events
 
-  text.addEventListener('input', () => {
-    note.text = text.value;
-    note.updatedAt = Date.now();
-    renderMeta();
-    document.title = `${firstLine(note.text)} — Taxinha`;
-    scheduleSave();
+  editor.addEventListener('input', onEditorInput);
+  editor.addEventListener('keydown', onEditorKeydown);
+  editor.addEventListener('paste', onPaste);
+  editor.addEventListener('blur', flushText);
+  editor.addEventListener('scroll', scheduleFormatBar);
+
+  editor.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const block = checkAt(e);
+    if (!block) return;
+    e.preventDefault();
+    toggleCheck(block);
   });
-  text.addEventListener('blur', flushText);
+  editor.addEventListener('mousemove', (e) => {
+    editor.style.cursor = checkAt(e) ? 'default' : '';
+  });
+
+  // Durante o arraste da seleção a barra fica escondida; aparece ao soltar.
+  editor.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { selecting = true; hideFormatBar(); }
+  });
+  document.addEventListener('mouseup', () => {
+    if (!selecting) return;
+    selecting = false;
+    scheduleFormatBar();
+  });
+  document.addEventListener('selectionchange', scheduleFormatBar);
+  new ResizeObserver(scheduleFormatBar).observe(editor);
+
+  // mousedown com preventDefault: o clique na barra não tira a seleção do texto.
+  formatBar.addEventListener('mousedown', (e) => e.preventDefault());
+  formatBar.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-cmd], [data-size]');
+    if (!btn) return;
+    if (btn.dataset.size) setSize(btn.dataset.size);
+    else format(btn.dataset.cmd);
+  });
 
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
-  $('newItem').addEventListener('click', newNote);
-  $('collapseItem').addEventListener('click', toggleCollapse);
-  deleteItem.addEventListener('click', requestDelete);
+  collapseBtn.addEventListener('click', toggleCollapse);
+  $('closeBtn').addEventListener('click', closeNote);
 
-  menuBtn.addEventListener('click', (e) => {
+  titleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finishRename(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finishRename(false); }
+  });
+  titleInput.addEventListener('blur', () => finishRename(true));
+
+  colorBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    menu.hidden ? openMenu() : closeMenu();
+    colorMenu.hidden ? openColors() : closeColors();
   });
   $('swatches').addEventListener('click', (e) => {
     const sw = e.target.closest('.swatch');
-    if (sw) setColor(sw.dataset.color);
+    if (!sw) return;
+    if (sw === customSwatch) {
+      // Abre o seletor do sistema já na cor atual da nota.
+      customColor.value = isCustomColor(note.color)
+        ? note.color
+        : (getComputedStyle(frame).getPropertyValue('--note-color').trim().match(/^#[0-9a-f]{6}$/i) || ['#f2c94c'])[0];
+      customColor.click();
+      return;
+    }
+    setColor(sw.dataset.color);
+    closeColors();
+  });
+  // Só aplica ao confirmar no seletor; cancelar não muda nada.
+  customColor.addEventListener('change', () => {
+    setColor(customColor.value.toLowerCase());
+    closeColors();
   });
   document.addEventListener('mousedown', (e) => {
-    if (!menu.hidden && !menu.contains(e.target) && !menuBtn.contains(e.target)) closeMenu();
+    if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) closeColors();
   });
 
-  // Barra de título: arrastar move a nota, clique duplo recolhe/expande.
+  // Barra de título: arrastar move a nota, clique duplo edita o título e
+  // clique do meio (botão da rodinha) fecha, como uma aba do navegador.
   titlebar.addEventListener('mousedown', (e) => {
-    if (e.button !== 0 || e.target.closest('.actions')) return;
+    if (e.button === 1) { e.preventDefault(); return; } // sem rolagem automática
+    if (e.button !== 0 || e.target.closest('button, input')) return;
     e.preventDefault();
-    if (e.detail === 2) toggleCollapse();
+    if (e.detail === 2) startRename();
     else appWindow.startDragging();
+  });
+  titlebar.addEventListener('auxclick', (e) => {
+    if (e.button !== 1 || e.target.closest('input')) return;
+    e.preventDefault();
+    closeNote();
   });
 
   $('grip').addEventListener('mousedown', (e) => {
@@ -213,38 +693,84 @@
     const key = e.key.toLowerCase();
     if (mod && e.shiftKey && key === 'p') { e.preventDefault(); togglePin(); }
     else if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); }
-    else if (e.key === 'Escape') closeMenu();
+    else if (e.key === 'Escape') { closeColors(); hideFormatBar(); }
   });
 
-  // Menu de contexto nativo só dentro do texto (copiar, colar, ortografia).
+  // Menu de contexto nativo só no texto e no campo de título (copiar, colar,
+  // ortografia); no resto da nota ele não faz sentido.
   document.addEventListener('contextmenu', (e) => {
-    if (!e.target.closest('textarea')) e.preventDefault();
+    if (!e.target.closest('input, #editor')) e.preventDefault();
   });
 
   window.addEventListener('focus', () => frame.classList.add('is-focused'));
-  window.addEventListener('blur', () => { frame.classList.remove('is-focused'); flushText(); });
-  window.addEventListener('beforeunload', () => { if (textDirty) invoke('save_text', { text: note.text }); });
+  window.addEventListener('blur', () => {
+    frame.classList.remove('is-focused');
+    hideFormatBar();
+    // Recolhida, o seletor aberto deixa a janela maior; fecha ao sair da nota.
+    if (colorsGrown) closeColors();
+    flushText();
+  });
+  window.addEventListener('beforeunload', () => {
+    if (textDirty) invoke('save_text', { text: note.text, html: note.html });
+  });
 
   // Atualiza o "editada às…" na virada do dia.
   setInterval(() => note && renderMeta(), 60_000);
 
   // --------------------------------------------------------------- init
 
+  function applyTheme(theme) {
+    if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+    renderMonoName();
+  }
+
+  // A cor "mono" é branca no tema escuro e preta no claro; o nome acompanha.
+  const systemLight = matchMedia('(prefers-color-scheme: light)');
+  function renderMonoName() {
+    const theme = document.documentElement.dataset.theme;
+    const light = theme ? theme === 'light' : systemLight.matches;
+    const name = light ? 'Preto' : 'Branco';
+    const sw = document.querySelector('.swatch[data-color="mono"]');
+    sw.setAttribute('aria-label', name);
+    sw.title = name;
+    COLOR_NAMES.mono = name;
+    if (note) render();
+  }
+  systemLight.addEventListener('change', renderMonoName);
+
   async function init() {
-    for (const k of document.querySelectorAll('kbd[data-shortcut]')) {
-      k.textContent = keys('Mod', k.dataset.shortcut);
-    }
+    editor.dataset.placeholder = PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)];
     $('newBtn').title = `Nova nota (${keys('Mod', 'N')})`;
-    $('menuBtn').title = 'Mais opções';
+    $('closeBtn').title = 'Fechar (vai para a lixeira)';
+    for (const btn of formatBar.querySelectorAll('[data-key]')) {
+      btn.title = `${btn.getAttribute('aria-label')} (${keys('Mod', btn.dataset.key)})`;
+    }
+    const sizeKeys = { 2: ` (${keys('Mod', 'Shift', '<')} diminui)`, 5: ` (${keys('Mod', 'Shift', '>')} aumenta)` };
+    for (const btn of formatBar.querySelectorAll('[data-size]')) {
+      btn.title = btn.getAttribute('aria-label') + (sizeKeys[btn.dataset.size] || '');
+    }
+
+    // Formatação em tags (<b>, <i>, <u>), não em style="…".
+    document.execCommand('styleWithCSS', false, false);
+    document.execCommand('defaultParagraphSeparator', false, 'div');
+
+    // Tema escolhido na bandeja ("system" = segue o sistema, via CSS).
+    applyTheme(await invoke('get_theme'));
+    window.__TAURI__.event.listen('theme-changed', (e) => applyTheme(e.payload));
 
     note = await invoke('load_note');
     if (!note) return;
-    text.value = note.text;
+    loadContent();
     render();
     if (document.hasFocus()) frame.classList.add('is-focused');
     if (!note.collapsed) {
-      text.focus();
-      text.setSelectionRange(text.value.length, text.value.length);
+      editor.focus();
+      const r = document.createRange();
+      r.selectNodeContents(editor);
+      r.collapse(false);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
     }
   }
 

@@ -20,14 +20,41 @@ pub const DEFAULT_H: f64 = 320.0;
 pub const COLLAPSED_H: f64 = 36.0;
 
 /// Etiquetas de cor aceitas (vazio = sem cor).
-pub const COLORS: [&str; 6] = ["", "green", "coral", "teal", "iris", "lavender"];
+pub const COLORS: [&str; 8] = [
+    "", "yellow", "green", "coral", "teal", "iris", "lavender", "mono",
+];
+
+/// Uma cor é válida se for uma das etiquetas acima ou uma cor personalizada
+/// no formato `#rrggbb`.
+pub fn is_valid_color(color: &str) -> bool {
+    COLORS.contains(&color)
+        || (color.len() == 7
+            && color.starts_with('#')
+            && color[1..].chars().all(|c| c.is_ascii_hexdigit()))
+}
+
+/// Cor com que toda nota nova nasce.
+pub const DEFAULT_COLOR: &str = "yellow";
+
+/// Tempo que uma nota fica na lixeira antes de ser apagada de vez (30 dias).
+pub const TRASH_TTL_MS: u64 = 30 * 86_400_000;
+
+/// Tamanho máximo do nome de uma nota, em caracteres.
+pub const TITLE_MAX: usize = 80;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Note {
     pub id: String,
     pub seq: u32,
+    /// Nome dado pelo usuário (vazio = sem nome).
+    pub title: String,
+    /// Texto puro (itens de checklist como "[ ] " / "[x] "): usado na
+    /// bandeja, na contagem de palavras e para reconstruir notas antigas.
     pub text: String,
+    /// Conteúdo formatado (negrito, itálico, sublinhado, checklist) gerado
+    /// pelo editor. Vazio em notas anteriores à formatação.
+    pub html: String,
     /// Posição física (pixels de tela) do canto superior esquerdo.
     pub x: Option<i32>,
     pub y: Option<i32>,
@@ -39,6 +66,40 @@ pub struct Note {
     pub collapsed: bool,
     pub created_at: u64,
     pub updated_at: u64,
+    /// Quando foi para a lixeira; `None` = nota ativa.
+    pub trashed_at: Option<u64>,
+}
+
+impl Note {
+    /// Nome para listas (bandeja): o título, ou a primeira linha do texto.
+    pub fn display_name(&self) -> String {
+        if !self.title.trim().is_empty() {
+            return self.title.trim().to_string();
+        }
+        self.text
+            .lines()
+            .map(|l| strip_checkbox(l).trim())
+            .find(|l| !l.is_empty())
+            .unwrap_or("Nota vazia")
+            .to_string()
+    }
+
+    pub fn is_blank(&self) -> bool {
+        self.title.trim().is_empty() && self.text.trim().is_empty()
+    }
+}
+
+/// Tira o marcador de checklist (`[ ]` / `[x]`) do começo de uma linha.
+fn strip_checkbox(line: &str) -> &str {
+    let rest = line.trim_start();
+    for mark in ["[ ]", "[x]", "[X]"] {
+        if let Some(after) = rest.strip_prefix(mark) {
+            if after.is_empty() || after.starts_with(' ') {
+                return after;
+            }
+        }
+    }
+    line
 }
 
 impl Default for Note {
@@ -46,16 +107,19 @@ impl Default for Note {
         Self {
             id: String::new(),
             seq: 0,
+            title: String::new(),
             text: String::new(),
+            html: String::new(),
             x: None,
             y: None,
             width: DEFAULT_W,
             height: DEFAULT_H,
             pinned: false,
-            color: String::new(),
+            color: DEFAULT_COLOR.to_string(),
             collapsed: false,
             created_at: 0,
             updated_at: 0,
+            trashed_at: None,
         }
     }
 }
@@ -65,8 +129,13 @@ impl Default for Note {
 struct FileData {
     version: u32,
     next_seq: u32,
+    /// Tema escolhido na bandeja (ver `THEMES`); vazio = "system".
+    theme: String,
     notes: Vec<Note>,
 }
+
+/// Temas aceitos: seguir o sistema operacional, claro ou escuro.
+pub const THEMES: [&str; 3] = ["system", "light", "dark"];
 
 pub struct Store {
     path: PathBuf,
@@ -109,15 +178,78 @@ impl Store {
         let max_seq = data.notes.iter().map(|n| n.seq).max().unwrap_or(0);
         data.next_seq = data.next_seq.max(max_seq + 1).max(1);
 
-        Self {
+        let store = Self {
             path,
             data: Mutex::new(data),
             dirty: AtomicBool::new(false),
+        };
+        store.purge_trash(now_ms());
+        store
+    }
+
+    /// Notas fora da lixeira.
+    pub fn active(&self) -> Vec<Note> {
+        let data = self.data.lock().unwrap();
+        data.notes
+            .iter()
+            .filter(|n| n.trashed_at.is_none())
+            .cloned()
+            .collect()
+    }
+
+    /// Notas na lixeira, da mais recente para a mais antiga.
+    pub fn trashed(&self) -> Vec<Note> {
+        let mut notes: Vec<Note> = {
+            let data = self.data.lock().unwrap();
+            data.notes
+                .iter()
+                .filter(|n| n.trashed_at.is_some())
+                .cloned()
+                .collect()
+        };
+        notes.sort_by_key(|n| std::cmp::Reverse(n.trashed_at));
+        notes
+    }
+
+    /// Apaga de vez as notas que estão na lixeira há mais de 30 dias.
+    /// Devolve `true` se alguma foi removida.
+    pub fn purge_trash(&self, now: u64) -> bool {
+        let removed = {
+            let mut data = self.data.lock().unwrap();
+            let before = data.notes.len();
+            data.notes.retain(|n| {
+                n.trashed_at
+                    .map_or(true, |t| now.saturating_sub(t) < TRASH_TTL_MS)
+            });
+            data.notes.len() != before
+        };
+        if removed {
+            self.mark_dirty();
+        }
+        removed
+    }
+
+    pub fn theme(&self) -> String {
+        let theme = self.data.lock().unwrap().theme.clone();
+        if THEMES.contains(&theme.as_str()) {
+            theme
+        } else {
+            "system".into()
         }
     }
 
-    pub fn notes(&self) -> Vec<Note> {
-        self.data.lock().unwrap().notes.clone()
+    pub fn set_theme(&self, theme: &str) {
+        self.data.lock().unwrap().theme = theme.to_string();
+        self.mark_dirty();
+    }
+
+    pub fn empty_trash(&self) {
+        self.data
+            .lock()
+            .unwrap()
+            .notes
+            .retain(|n| n.trashed_at.is_none());
+        self.mark_dirty();
     }
 
     pub fn get(&self, id: &str) -> Option<Note> {
@@ -128,6 +260,12 @@ impl Store {
             .iter()
             .find(|n| n.id == id)
             .cloned()
+    }
+
+    /// Nenhuma nota foi criada até hoje (primeira execução do app).
+    pub fn is_first_run(&self) -> bool {
+        let data = self.data.lock().unwrap();
+        data.notes.is_empty() && data.next_seq <= 1
     }
 
     pub fn create(&self, pos: Option<(i32, i32)>) -> Note {

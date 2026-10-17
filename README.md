@@ -7,16 +7,25 @@ Cada nota é uma janela própria, e **um clique na tachinha** a mantém por cima
 
 | Ação | Como |
 |------|------|
-| Fixar / desafixar por cima de tudo | Clique na tachinha da barra de título, ou `Ctrl+Shift+P` (`⌘⇧P` no Mac) |
+| Fixar / desafixar por cima de tudo | Clique na tachinha, à esquerda na barra de título, ou `Ctrl+Shift+P` (`⌘⇧P` no Mac) |
+| Dar um título à nota | Clique duplo na barra de título; `Enter` salva, `Esc` cancela |
+| Checklist | Digite `[]` no começo de uma linha; clique na caixa para marcar (o texto fica tachado) |
+| Negrito, itálico, sublinhado | `Ctrl+B`, `Ctrl+I`, `Ctrl+U` (`⌘` no Mac), ou selecione o texto e use a barrinha que aparece acima da seleção |
+| Tamanho do texto (pequeno, normal, grande) | Botões "A" na barrinha da seleção, ou `Ctrl+Shift+>` / `Ctrl+Shift+<` (`⌘⇧` no Mac) |
 | Nova nota | Botão `+`, `Ctrl+N` (`⌘N`) ou o ícone da Taxinha na bandeja |
+| Fechar | Botão `✕` ou clique do meio (rodinha) na barra de título: a nota vai para a lixeira |
+| Recuperar da lixeira | Ícone na bandeja → Lixeira; notas há mais de 30 dias na lixeira são apagadas |
 | Mover | Arraste pela barra de título |
 | Redimensionar | Pelas bordas ou pelo canto inferior direito |
-| Recolher até a barra de título | Clique duplo no título |
-| Cor da etiqueta, excluir | Botão `⋯` |
+| Recolher / expandir até a barra de título | Botão de seta, ao lado do `✕` |
+| Mudar a cor (padrão: amarela) | Clique na bolinha colorida à esquerda do título e escolha a cor, ou "Personalizada" para qualquer cor |
+| Tema claro / escuro | Ícone na bandeja → Tema → Sistema (padrão), Claro ou Escuro |
+| Rever as dicas da primeira nota | Ícone na bandeja → Como usar a Taxinha |
 | Mostrar todas / Sair | Ícone na bandeja (barra de menus no macOS) |
 
-Fechar a última nota não encerra o app: ele continua na bandeja. Texto, posição, tamanho, cor e estado de fixação
-são salvos automaticamente em `notes.json`, na pasta de dados do app:
+As notas abertas aparecem na barra de tarefas (no Dock, no macOS). Fechar a última nota não encerra o app: ele
+continua na bandeja. Texto, título, posição, tamanho, cor e estado de fixação são salvos automaticamente em
+`notes.json`, na pasta de dados do app:
 
 - Windows: `%APPDATA%\br.taxinha.notas\`
 - macOS: `~/Library/Application Support/br.taxinha.notas/`
@@ -38,6 +47,21 @@ npm install
 npm run dev      # abre o app em modo desenvolvimento
 npm run build    # gera o instalador do sistema atual em src-tauri/target/release/bundle/
 ```
+
+No VS Code, o mesmo `npm run dev` está em **Run and Debug** → **Rodar em modo dev**.
+
+## Instalador do Windows via Docker
+
+Para gerar o instalador do Windows sem instalar Rust, Node ou o Visual Studio, basta ter o
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto. No VS Code, vá em **Run and Debug**,
+escolha **Gerar instalador do Windows (Docker)** e clique em ▶. Pelo terminal:
+
+```bash
+docker compose -f docker/compose.yml run --build --rm windows
+```
+
+O `*-setup.exe` (NSIS) aparece em `dist/`. O primeiro build demora mais, porque monta a imagem e baixa o SDK do
+Windows; os seguintes reaproveitam os caches. O `.msi` só sai pela CI, porque o WiX exige Windows.
 
 ## Instaladores para os três sistemas
 
@@ -66,8 +90,8 @@ src-tauri/src/
 src-tauri/icons/     ícones gerados a partir de assets/icon.svg
 ```
 
-Visual baseado no [`docs/style.md`](docs/style.md) do projeto: superfícies quase pretas, Inter em pesos 400–590, bordas hairline e um
-único acento acid-lime (`#e4f222`) reservado para a ação de fixar.
+Visual baseado no [`docs/style.md`](docs/style.md) do projeto: superfícies quase pretas, Inter em pesos 400–590, bordas hairline e, como
+única cor, a etiqueta da nota (amarela por padrão).
 
 ## Licença
 
