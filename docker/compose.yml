@@ -1,0 +1,35 @@
+# Gera o instalador do Windows em dist/:
+#   docker compose -f docker/compose.yml run --rm windows
+# node_modules, target e os caches ficam em volumes, para não misturar com os
+# arquivos do Windows e para os builds seguintes não recompilarem tudo.
+name: taxinha
+
+services:
+  windows:
+    build:
+      context: .
+      dockerfile: windows.Dockerfile
+    image: taxinha-build-windows
+    working_dir: /app
+    volumes:
+      - ..:/app
+      - node_modules:/app/node_modules
+      - target:/app/src-tauri/target
+      - cargo-registry:/usr/local/cargo/registry
+      - xwin-cache:/xwin-cache
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        npm install --no-save --no-audit --no-fund
+        npx tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+        mkdir -p dist
+        cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe dist/
+        echo "Instalador em dist/:" && ls dist/*-setup.exe
+
+volumes:
+  node_modules:
+  target:
+  cargo-registry:
+  xwin-cache:

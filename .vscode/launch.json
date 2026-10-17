@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Rodar em modo dev",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "npm install --no-audit --no-fund; npm run dev"
+    },
+    {
+      "name": "Gerar instalador do Windows (Docker)",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "docker compose -f docker/compose.yml run --build --rm windows"
+    }
+  ]
+}
