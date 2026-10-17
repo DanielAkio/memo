@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Taxinha</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="frame" id="frame">
+    <header class="titlebar" id="titlebar">
+      <div class="identity">
+        <span class="dot" id="dot" aria-hidden="true"></span>
+        <span class="note-id" id="noteId">TXN-0</span>
+        <span class="note-title" id="noteTitle"></span>
+      </div>
+
+      <div class="actions">
+        <button class="icon-btn pin" id="pinBtn" type="button" aria-pressed="false">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <g transform="rotate(45 8 8)">
+              <path class="pin-needle" d="M8 10.4V15"/>
+              <path class="pin-body" d="M5.7 3.6h4.6l.7 5.1H5z"/>
+              <rect class="pin-body" x="3.6" y="8.4" width="8.8" height="2" rx=".9"/>
+              <rect class="pin-body" x="4.9" y="1.6" width="6.2" height="2" rx=".9"/>
+            </g>
+          </svg>
+        </button>
+        <button class="icon-btn hide-collapsed" id="newBtn" type="button" aria-label="Nova nota">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
+        </button>
+        <button class="icon-btn hide-collapsed" id="menuBtn" type="button" aria-label="Mais opções" aria-haspopup="menu" aria-expanded="false">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="menu" id="menu" role="menu" hidden>
+      <div class="menu-label">Etiqueta</div>
+      <div class="swatches" id="swatches">
+        <button type="button" class="swatch" data-color="" aria-label="Sem cor"></button>
+        <button type="button" class="swatch" data-color="green" aria-label="Verde"></button>
+        <button type="button" class="swatch" data-color="coral" aria-label="Coral"></button>
+        <button type="button" class="swatch" data-color="teal" aria-label="Azul-petróleo"></button>
+        <button type="button" class="swatch" data-color="iris" aria-label="Íris"></button>
+        <button type="button" class="swatch" data-color="lavender" aria-label="Lavanda"></button>
+      </div>
+      <div class="menu-sep"></div>
+      <button type="button" class="menu-item" role="menuitem" id="collapseItem">
+        <span>Recolher nota</span><kbd>2× título</kbd>
+      </button>
+      <button type="button" class="menu-item" role="menuitem" id="newItem">
+        <span>Nova nota</span><kbd data-shortcut="N">N</kbd>
+      </button>
+      <div class="menu-sep"></div>
+      <button type="button" class="menu-item danger" role="menuitem" id="deleteItem">
+        <span id="deleteLabel">Excluir nota</span>
+      </button>
+    </div>
+
+    <main class="body">
+      <textarea id="text" spellcheck="true" lang="pt-BR" placeholder="Escreva algo…" aria-label="Texto da nota"></textarea>
+    </main>
+
+    <footer class="statusbar">
+      <span id="edited"></span>
+      <span id="count"></span>
+      <span class="grip" id="grip" aria-hidden="true">
+        <svg viewBox="0 0 10 10"><path d="M9 3 3 9M9 6 6 9"/></svg>
+      </span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

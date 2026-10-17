@@ -1,0 +1,361 @@
+/* Taxinha — estilo segundo o docs/style.md ("midnight precision instrument").
+   Superfícies quase pretas, texto em escala de cinza, bordas hairline e um
+   único acento acid-lime reservado para a ação de fixar. */
+
+@font-face { font-family: "Inter Taxinha"; src: url("fonts/Inter-Regular.woff") format("woff"); font-weight: 300 449; font-display: block; }
+@font-face { font-family: "Inter Taxinha"; src: url("fonts/Inter-Medium.woff") format("woff"); font-weight: 450 549; font-display: block; }
+@font-face { font-family: "Inter Taxinha"; src: url("fonts/Inter-SemiBold.woff") format("woff"); font-weight: 550 700; font-display: block; }
+
+:root {
+  --color-void: #08090a;
+  --color-carbon: #0f1011;
+  --color-obsidian: #161718;
+  --color-graphite: #23252a;
+  --color-smoke: #383b3f;
+  --color-ash: #62666d;
+  --color-fog: #8a8f98;
+  --color-mist: #d0d6e0;
+  --color-bone: #e5e5e6;
+  --color-paper: #ffffff;
+  --color-acid-lime: #e4f222;
+  --color-pulse-green: #27a644;
+  --color-coral-red: #eb5757;
+  --color-signal-teal: #02b8cc;
+  --color-iris-violet: #6366f1;
+  --color-lavender: #8b5cf6;
+
+  --font-ui: "Inter Taxinha", "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Berkeley Mono", ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+
+  --radius-badge: 4px;
+  --radius-button: 6px;
+  --radius-card: 12px;
+
+  --shadow-sm: rgba(0, 0, 0, 0.4) 0px 2px 4px 0px;
+  --shadow-xl: rgba(8, 9, 10, 0.6) 0px 4px 32px 0px;
+  --hairline: rgb(35, 37, 42) 0px 0px 0px 1px inset;
+
+  --titlebar-h: 36px;
+  --note-color: transparent;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-carbon);
+  color: var(--color-mist);
+  font-family: var(--font-ui);
+  font-feature-settings: "cv01" on, "ss03" on, "zero" on;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button { font: inherit; color: inherit; }
+
+/* ------------------------------------------------------------------ frame */
+
+.frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-carbon);
+  box-shadow: var(--hairline);
+}
+
+/* Etiqueta de cor: um fio vertical de 2px na borda esquerda. */
+.frame::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--note-color);
+  z-index: 3;
+  pointer-events: none;
+}
+
+[data-color="green"]    { --note-color: var(--color-pulse-green); }
+[data-color="coral"]    { --note-color: var(--color-coral-red); }
+[data-color="teal"]     { --note-color: var(--color-signal-teal); }
+[data-color="iris"]     { --note-color: var(--color-iris-violet); }
+[data-color="lavender"] { --note-color: var(--color-lavender); }
+
+/* --------------------------------------------------------------- titlebar */
+
+.titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--titlebar-h);
+  padding: 0 4px 0 14px;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--note-color);
+  display: none;
+}
+.frame[data-color]:not([data-color=""]) .dot { display: block; }
+
+.note-id {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: -0.013em;
+  color: var(--color-ash);
+}
+
+.note-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 510;
+  letter-spacing: -0.010em;
+  color: var(--color-mist);
+  display: none;
+}
+.is-collapsed .note-title { display: block; }
+
+.actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-fog);
+  cursor: default;
+  transition: background-color 120ms ease, color 120ms ease, opacity 160ms ease;
+}
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-btn circle { fill: currentColor; stroke: none; }
+.icon-btn:hover { background: rgba(255, 255, 255, 0.05); color: var(--color-mist); }
+.icon-btn:active { background: rgba(255, 255, 255, 0.08); }
+.icon-btn:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
+
+/* Botões secundários só aparecem com a nota em foco ou sob o mouse. */
+.icon-btn:not(.pin) { opacity: 0; }
+.is-focused .icon-btn,
+.frame:hover .icon-btn,
+.menu-open .icon-btn { opacity: 1; }
+.pin { opacity: 0.55; }
+.is-focused .pin, .frame:hover .pin { opacity: 1; }
+
+/* A ação principal: fixada = preenchimento acid-lime, o único cromático da tela. */
+.pin[aria-pressed="true"] {
+  opacity: 1;
+  background: var(--color-acid-lime);
+  color: var(--color-void);
+  box-shadow: rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
+              rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+}
+.pin[aria-pressed="true"]:hover { background: #ecf65a; color: var(--color-void); }
+.pin[aria-pressed="true"] .pin-body { fill: currentColor; }
+.pin .pin-needle { stroke-width: 1.6; }
+
+.is-collapsed .hide-collapsed { display: none; }
+
+/* ------------------------------------------------------------------- body */
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  border-top: 1px solid var(--color-graphite);
+}
+.is-collapsed .body,
+.is-collapsed .statusbar { display: none; }
+
+textarea {
+  flex: 1;
+  width: 100%;
+  margin: 0;
+  padding: 12px 16px 8px;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--color-mist);
+  caret-color: var(--color-paper);
+  font-family: var(--font-ui);
+  font-feature-settings: "cv01" on, "ss03" on, "zero" on;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: -0.011em;
+  overflow-y: auto;
+}
+textarea::placeholder { color: var(--color-ash); }
+textarea::selection { background: rgba(208, 214, 224, 0.18); color: var(--color-paper); }
+
+textarea::-webkit-scrollbar { width: 10px; }
+textarea::-webkit-scrollbar-track { background: transparent; }
+textarea::-webkit-scrollbar-thumb {
+  background: var(--color-graphite);
+  border: 3px solid var(--color-carbon);
+  border-radius: 9999px;
+}
+textarea::-webkit-scrollbar-thumb:hover { background: var(--color-smoke); }
+
+/* ------------------------------------------------------------- statusbar */
+
+.statusbar {
+  flex: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+  padding: 0 28px 0 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: -0.013em;
+  color: var(--color-ash);
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+#edited { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+
+.grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  cursor: nwse-resize;
+  color: var(--color-smoke);
+}
+.grip svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; }
+.grip:hover { color: var(--color-fog); }
+
+/* ------------------------------------------------------------------ menu */
+
+.menu {
+  position: absolute;
+  top: calc(var(--titlebar-h) - 2px);
+  right: 6px;
+  z-index: 10;
+  width: 200px;
+  padding: 6px;
+  background: var(--color-obsidian);
+  border-radius: 8px;
+  box-shadow: rgba(255, 255, 255, 0.03) 0px 0px 0px 1px inset, rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset,
+              rgba(0, 0, 0, 0.6) 0px 0px 0px 1px, rgba(8, 9, 10, 0.6) 0px 4px 32px 0px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.menu[hidden] { display: none; }
+
+.menu-label {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-ash);
+}
+
+.swatches {
+  display: flex;
+  gap: 4px;
+  padding: 0 4px 4px;
+}
+.swatch {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-badge);
+  background: transparent;
+  cursor: default;
+}
+.swatch::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 9999px;
+  background: var(--sw);
+}
+.swatch[data-color=""]::after { background: transparent; box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.swatch[data-color="green"]    { --sw: var(--color-pulse-green); }
+.swatch[data-color="coral"]    { --sw: var(--color-coral-red); }
+.swatch[data-color="teal"]     { --sw: var(--color-signal-teal); }
+.swatch[data-color="iris"]     { --sw: var(--color-iris-violet); }
+.swatch[data-color="lavender"] { --sw: var(--color-lavender); }
+.swatch:hover { background: rgba(255, 255, 255, 0.05); }
+.swatch[aria-checked="true"] { box-shadow: inset 0 0 0 1px var(--color-fog); }
+
+.menu-sep { height: 1px; margin: 6px -6px; background: var(--color-graphite); }
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-mist);
+  font-size: 13px;
+  letter-spacing: -0.010em;
+  text-align: left;
+  cursor: default;
+}
+.menu-item:hover, .menu-item:focus-visible { background: rgba(255, 255, 255, 0.05); outline: 0; }
+.menu-item kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ash);
+  padding: 0 5px;
+  border-radius: var(--radius-badge);
+  background: rgba(255, 255, 255, 0.05);
+  line-height: 18px;
+}
+.menu-item.danger { color: var(--color-fog); }
+.menu-item.danger.confirming { color: var(--color-paper); background: rgba(235, 87, 87, 0.16); }
