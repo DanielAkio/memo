@@ -667,25 +667,14 @@
     if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) closeColors();
   });
 
-  // Barra de título: arrastar move a nota, clique duplo edita o título e
-  // clique do meio (botão da rodinha) fecha, como uma aba do navegador.
-  titlebar.addEventListener('mousedown', (e) => {
-    if (e.button === 1) { e.preventDefault(); return; } // sem rolagem automática
-    if (e.button !== 0 || e.target.closest('button, input')) return;
-    e.preventDefault();
-    if (e.detail === 2) startRename();
-    else appWindow.startDragging();
-  });
-  titlebar.addEventListener('auxclick', (e) => {
-    if (e.button !== 1 || e.target.closest('input')) return;
-    e.preventDefault();
-    closeNote();
-  });
-
-  $('grip').addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    appWindow.startResizeDragging('SouthEast');
+  // Barra de título (chrome.js): arrastar com ímã, clique duplo edita o
+  // título, clique do meio fecha; alça de redimensionar no canto.
+  window.TaxinhaChrome.attach({
+    frame,
+    titlebar,
+    grip: $('grip'),
+    onDoubleClick: startRename,
+    onClose: closeNote,
   });
 
   document.addEventListener('keydown', (e) => {

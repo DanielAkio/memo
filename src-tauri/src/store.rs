@@ -39,6 +39,9 @@ pub const DEFAULT_COLOR: &str = "yellow";
 /// Tempo que uma nota fica na lixeira antes de ser apagada de vez (30 dias).
 pub const TRASH_TTL_MS: u64 = 30 * 86_400_000;
 
+/// Tamanho máximo do texto padrão das notas novas, em caracteres.
+pub const DEFAULT_TEXT_MAX: usize = 5000;
+
 /// Tamanho máximo do nome de uma nota, em caracteres.
 pub const TITLE_MAX: usize = 80;
 
@@ -71,35 +74,9 @@ pub struct Note {
 }
 
 impl Note {
-    /// Nome para listas (bandeja): o título, ou a primeira linha do texto.
-    pub fn display_name(&self) -> String {
-        if !self.title.trim().is_empty() {
-            return self.title.trim().to_string();
-        }
-        self.text
-            .lines()
-            .map(|l| strip_checkbox(l).trim())
-            .find(|l| !l.is_empty())
-            .unwrap_or("Nota vazia")
-            .to_string()
-    }
-
     pub fn is_blank(&self) -> bool {
         self.title.trim().is_empty() && self.text.trim().is_empty()
     }
-}
-
-/// Tira o marcador de checklist (`[ ]` / `[x]`) do começo de uma linha.
-fn strip_checkbox(line: &str) -> &str {
-    let rest = line.trim_start();
-    for mark in ["[ ]", "[x]", "[X]"] {
-        if let Some(after) = rest.strip_prefix(mark) {
-            if after.is_empty() || after.starts_with(' ') {
-                return after;
-            }
-        }
-    }
-    line
 }
 
 impl Default for Note {
@@ -129,9 +106,44 @@ impl Default for Note {
 struct FileData {
     version: u32,
     next_seq: u32,
-    /// Tema escolhido na bandeja (ver `THEMES`); vazio = "system".
+    /// Tema escolhido na janela "Gerenciador" (ver `THEMES`); vazio = "system".
     theme: String,
+    /// Posição, tamanho e estado da janela "Gerenciador".
+    manager: ManagerState,
+    /// Cor das notas novas, escolhida no gerenciador; `None` = `DEFAULT_COLOR`.
+    default_color: Option<String>,
+    /// Título e texto (puro, com "[ ] " para checklist) das notas novas,
+    /// definidos no gerenciador. Vazios = nota em branco.
+    default_title: String,
+    default_text: String,
     notes: Vec<Note>,
+}
+
+/// Estado da janela "Gerenciador" (o gerenciador), guardado como o de uma nota.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ManagerState {
+    /// Posição física do canto superior esquerdo; `None` = centralizada.
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    /// Tamanho lógico; `height` é sempre a altura expandida.
+    pub width: f64,
+    pub height: f64,
+    pub pinned: bool,
+    pub collapsed: bool,
+}
+
+impl Default for ManagerState {
+    fn default() -> Self {
+        Self {
+            x: None,
+            y: None,
+            width: 560.0,
+            height: 640.0,
+            pinned: false,
+            collapsed: false,
+        }
+    }
 }
 
 /// Temas aceitos: seguir o sistema operacional, claro ou escuro.
@@ -197,20 +209,6 @@ impl Store {
             .collect()
     }
 
-    /// Notas na lixeira, da mais recente para a mais antiga.
-    pub fn trashed(&self) -> Vec<Note> {
-        let mut notes: Vec<Note> = {
-            let data = self.data.lock().unwrap();
-            data.notes
-                .iter()
-                .filter(|n| n.trashed_at.is_some())
-                .cloned()
-                .collect()
-        };
-        notes.sort_by_key(|n| std::cmp::Reverse(n.trashed_at));
-        notes
-    }
-
     /// Apaga de vez as notas que estão na lixeira há mais de 30 dias.
     /// Devolve `true` se alguma foi removida.
     pub fn purge_trash(&self, now: u64) -> bool {
@@ -243,6 +241,63 @@ impl Store {
         self.mark_dirty();
     }
 
+    /// Cor com que as notas novas nascem.
+    pub fn default_color(&self) -> String {
+        let data = self.data.lock().unwrap();
+        match &data.default_color {
+            Some(c) if is_valid_color(c) => c.clone(),
+            _ => DEFAULT_COLOR.to_string(),
+        }
+    }
+
+    pub fn set_default_color(&self, color: &str) {
+        self.data.lock().unwrap().default_color = Some(color.to_string());
+        self.mark_dirty();
+    }
+
+    /// Título e texto com que as notas novas nascem.
+    pub fn new_note_defaults(&self) -> (String, String) {
+        let data = self.data.lock().unwrap();
+        (data.default_title.clone(), data.default_text.clone())
+    }
+
+    pub fn set_new_note_defaults(&self, title: String, text: String) {
+        let mut data = self.data.lock().unwrap();
+        data.default_title = title;
+        data.default_text = text;
+        drop(data);
+        self.mark_dirty();
+    }
+
+    /// A nota está como nasceu: sem nada além do título e do texto padrão.
+    pub fn is_pristine(&self, note: &Note) -> bool {
+        if note.is_blank() {
+            return true;
+        }
+        let (title, text) = self.new_note_defaults();
+        note.title == title && note.text == text
+    }
+
+    pub fn manager(&self) -> ManagerState {
+        self.data.lock().unwrap().manager.clone()
+    }
+
+    /// Aplica `f` ao estado da janela "Gerenciador" e devolve uma cópia.
+    pub fn update_manager<F: FnOnce(&mut ManagerState)>(&self, f: F) -> ManagerState {
+        let state = {
+            let mut data = self.data.lock().unwrap();
+            f(&mut data.manager);
+            data.manager.clone()
+        };
+        self.mark_dirty();
+        state
+    }
+
+    /// Todas as notas, ativas e na lixeira (para o gerenciador).
+    pub fn all(&self) -> Vec<Note> {
+        self.data.lock().unwrap().notes.clone()
+    }
+
     pub fn empty_trash(&self) {
         self.data
             .lock()
@@ -269,6 +324,8 @@ impl Store {
     }
 
     pub fn create(&self, pos: Option<(i32, i32)>) -> Note {
+        let color = self.default_color();
+        let (title, text) = self.new_note_defaults();
         let note = {
             let mut data = self.data.lock().unwrap();
             let seq = data.next_seq.max(1);
@@ -279,6 +336,9 @@ impl Store {
                 seq,
                 x: pos.map(|p| p.0),
                 y: pos.map(|p| p.1),
+                color,
+                title,
+                text,
                 created_at: now,
                 updated_at: now,
                 ..Default::default()

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gerenciador — Taxinha</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="manager.css">
+</head>
+<body>
+  <!-- Janela "Gerenciador": gerenciamento das notas e da lixeira. Mesma barra das
+       notas (tachinha, nova nota, recolher, fechar), sem título editável. -->
+  <div class="frame" id="frame" data-color="">
+    <header class="titlebar" id="titlebar">
+      <button class="icon-btn pin" id="pinBtn" type="button" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <g transform="rotate(45 8 8)">
+            <path class="pin-needle" d="M8 10.4V15"/>
+            <path class="pin-body" d="M5.7 3.6h4.6l.7 5.1H5z"/>
+            <rect class="pin-body" x="3.6" y="8.4" width="8.8" height="2" rx=".9"/>
+            <rect class="pin-body" x="4.9" y="1.6" width="6.2" height="2" rx=".9"/>
+          </g>
+        </svg>
+      </button>
+      <span class="mgr-title">Gerenciador</span>
+      <div class="actions">
+        <button class="icon-btn" id="newBtn" type="button" aria-label="Nova nota">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
+        </button>
+        <button class="icon-btn collapse" id="collapseBtn" type="button" aria-label="Recolher">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 9.75 8 6.25l3.5 3.5"/></svg>
+        </button>
+        <button class="icon-btn close" id="closeBtn" type="button" aria-label="Fechar" title="Fechar">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="mgr-body">
+      <header class="mgr-head">
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab" role="tab" id="tabNotes" data-view="notes" aria-selected="true">
+            Notas <span class="tab-count" id="countNotes">0</span>
+          </button>
+          <button type="button" class="tab" role="tab" id="tabTrash" data-view="trash" aria-selected="false">
+            Lixeira <span class="tab-count" id="countTrash">0</span>
+          </button>
+          <button type="button" class="tab" role="tab" id="tabSettings" data-view="settings" aria-selected="false">
+            Configuração
+          </button>
+        </div>
+        <label class="search" id="searchBox">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/></svg>
+          <input type="search" id="search" placeholder="Buscar" aria-label="Buscar notas" spellcheck="false" autocomplete="off">
+        </label>
+      </header>
+
+      <div class="trash-bar" id="trashBar" hidden>
+        <span>Notas na lixeira são excluídas de vez depois de 30 dias.</span>
+        <button type="button" class="btn danger" id="emptyTrash">Esvaziar lixeira</button>
+      </div>
+
+      <main class="list-wrap" id="listWrap">
+        <ul class="list" id="list" role="list"></ul>
+        <p class="empty" id="empty" hidden></p>
+      </main>
+
+      <section class="settings" id="settingsView" hidden>
+        <h2 class="settings-title">Aparência</h2>
+        <div class="setting">
+          <span class="setting-label" id="themeLabel">Tema</span>
+          <div class="segmented" id="themeSwitch" role="radiogroup" aria-labelledby="themeLabel">
+            <button type="button" class="seg" role="radio" data-theme="system" aria-checked="false">Sistema</button>
+            <button type="button" class="seg" role="radio" data-theme="light" aria-checked="false">Claro</button>
+            <button type="button" class="seg" role="radio" data-theme="dark" aria-checked="false">Escuro</button>
+          </div>
+        </div>
+        <h2 class="settings-title">
+          Notas novas
+          <span class="info" tabindex="0" role="img" aria-label="Vale para as notas criadas daqui em diante."
+                data-tip="Vale para as notas criadas daqui em diante.">i</span>
+        </h2>
+        <div class="setting">
+          <span class="setting-label">Cor</span>
+          <div class="swatches" id="defaultSwatches">
+            <button type="button" class="swatch" data-color="yellow" aria-label="Amarelo" title="Amarelo"></button>
+            <button type="button" class="swatch" data-color="green" aria-label="Verde" title="Verde"></button>
+            <button type="button" class="swatch" data-color="coral" aria-label="Coral" title="Coral"></button>
+            <button type="button" class="swatch" data-color="teal" aria-label="Azul-petróleo" title="Azul-petróleo"></button>
+            <button type="button" class="swatch" data-color="iris" aria-label="Íris" title="Íris"></button>
+            <button type="button" class="swatch" data-color="lavender" aria-label="Lavanda" title="Lavanda"></button>
+            <button type="button" class="swatch" data-color="mono" aria-label="Branco" title="Branco"></button>
+            <button type="button" class="swatch" data-color="custom" aria-label="Personalizada" title="Personalizada…"></button>
+            <button type="button" class="swatch" data-color="" aria-label="Sem cor" title="Sem cor"></button>
+          </div>
+        </div>
+        <div class="setting">
+          <label class="setting-label" for="defaultTitle">Título</label>
+          <input class="field" id="defaultTitle" type="text" maxlength="80" spellcheck="false"
+                 autocomplete="off" placeholder="Sem título">
+        </div>
+        <div class="setting setting-top">
+          <label class="setting-label" for="defaultText">Texto</label>
+          <div class="field-wrap">
+            <textarea class="field" id="defaultText" rows="5" maxlength="5000" spellcheck="true" lang="pt-BR"
+                      placeholder="Vazio (a nota mostra uma frase aleatória)"></textarea>
+          </div>
+        </div>
+        <h2 class="settings-title">Aplicativo</h2>
+        <div class="setting">
+          <span class="setting-label">Ajuda e saída</span>
+          <div class="app-actions">
+            <button type="button" class="btn" id="helpBtn">Como usar a Taxinha</button>
+            <button type="button" class="btn danger" id="quitBtn">Sair da Taxinha</button>
+          </div>
+        </div>
+        <input type="color" class="custom-color" id="customColor" tabindex="-1" aria-hidden="true">
+      </section>
+    </div>
+
+    <span class="grip" id="grip" aria-hidden="true">
+      <svg viewBox="0 0 10 10"><path d="M9 3 3 9M9 6 6 9"/></svg>
+    </span>
+  </div>
+
+  <script src="chrome.js"></script>
+  <script src="manager.js"></script>
+</body>
+</html>

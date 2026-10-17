@@ -14,16 +14,19 @@ Cada nota é uma janela própria, e **um clique na tachinha** a mantém por cima
 | Tamanho do texto (pequeno, normal, grande) | Botões "A" na barrinha da seleção, ou `Ctrl+Shift+>` / `Ctrl+Shift+<` (`⌘⇧` no Mac) |
 | Nova nota | Botão `+`, `Ctrl+N` (`⌘N`) ou o ícone da Taxinha na bandeja |
 | Fechar | Botão `✕` ou clique do meio (rodinha) na barra de título: a nota vai para a lixeira |
-| Recuperar da lixeira | Ícone na bandeja → Lixeira; notas há mais de 30 dias na lixeira são apagadas |
-| Mover | Arraste pela barra de título |
-| Redimensionar | Pelas bordas ou pelo canto inferior direito |
+| Ver todas as notas, buscar, recuperar da lixeira | Gerenciador: abre junto com o app, ou pelo ícone na bandeja → Gerenciador. Notas há mais de 30 dias na lixeira são apagadas |
+| Cor, título e texto das novas notas | Gerenciador → Configuração → Notas novas (o texto aceita `[ ]` para checklist) |
+| Mover | Arraste pela barra de título; perto de uma borda da tela ou de outra nota, ela gruda |
+| Redimensionar | Pelas bordas ou pelo canto inferior direito; perto de uma borda da tela ou de outra nota, a borda gruda |
 | Recolher / expandir até a barra de título | Botão de seta, ao lado do `✕` |
 | Mudar a cor (padrão: amarela) | Clique na bolinha colorida à esquerda do título e escolha a cor, ou "Personalizada" para qualquer cor |
-| Tema claro / escuro | Ícone na bandeja → Tema → Sistema (padrão), Claro ou Escuro |
-| Rever as dicas da primeira nota | Ícone na bandeja → Como usar a Taxinha |
-| Mostrar todas / Sair | Ícone na bandeja (barra de menus no macOS) |
+| Tema claro / escuro | Gerenciador → Configuração → Tema: Sistema (padrão), Claro ou Escuro |
+| Rever as dicas da primeira nota | Gerenciador → Configuração → Como usar a Taxinha |
+| Mostrar todas as notas | Ícone na bandeja (barra de menus no macOS) |
+| Sair | Ícone na bandeja → Sair da Taxinha, ou Gerenciador → Configuração → Sair da Taxinha |
 
-As notas abertas aparecem na barra de tarefas (no Dock, no macOS). Fechar a última nota não encerra o app: ele
+Ao abrir, a Taxinha mostra o Gerenciador junto com as notas que estavam abertas (na primeira vez, com a nota de
+boas-vindas). As notas abertas aparecem na barra de tarefas (no Dock, no macOS). Fechar a última nota não encerra o app: ele
 continua na bandeja. Texto, título, posição, tamanho, cor e estado de fixação são salvos automaticamente em
 `notes.json`, na pasta de dados do app:
 

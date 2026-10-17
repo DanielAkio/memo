@@ -1,0 +1,359 @@
+/* Taxinha — janela "Gerenciador" (gerenciamento das notas e da lixeira).
+   Tokens, temas, cores das etiquetas, o seletor de cor e a moldura comum
+   (barra de título, botões, tachinha, alça) vêm do base.css. */
+
+body {
+  font-size: 13px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Título fixo na barra (a janela "Gerenciador" não tem título editável). */
+.mgr-title {
+  flex: 1;
+  min-width: 0;
+  padding-left: 4px;
+  font-size: 13px;
+  font-weight: 510;
+  letter-spacing: -0.010em;
+  color: var(--color-mist);
+}
+
+/* Tudo abaixo da barra de título; some com a janela recolhida. */
+.mgr-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-graphite);
+}
+.is-collapsed .mgr-body,
+.is-collapsed .grip { display: none; }
+
+/* ------------------------------------------------------------------ topo */
+
+.mgr-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-graphite);
+}
+
+.tabs { display: flex; gap: 2px; }
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-fog);
+  font-size: 13px;
+  font-weight: 510;
+  letter-spacing: -0.010em;
+  cursor: default;
+}
+.tab:hover { background: var(--overlay-hover); color: var(--color-mist); }
+.tab[aria-selected="true"] { background: var(--overlay-active); color: var(--color-paper); }
+.tab-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ash);
+}
+
+.search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 260px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0 8px;
+  border-radius: var(--radius-button);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+}
+.search svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--color-ash);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-mist);
+  caret-color: var(--color-paper);
+  font: inherit;
+}
+.search input::placeholder { color: var(--color-ash); }
+.search:focus-within { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+
+/* --------------------------------------------------------------- lixeira */
+
+.trash-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--color-graphite);
+  color: var(--color-ash);
+  font-size: 12px;
+}
+.trash-bar[hidden] { display: none; }
+.trash-bar span { flex: 1; }
+
+/* ---------------------------------------------------------------- lista */
+
+.list-wrap[hidden],
+.search[hidden] { display: none; }
+
+.list-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.list-wrap::-webkit-scrollbar { width: 10px; }
+.list-wrap::-webkit-scrollbar-track { background: transparent; }
+.list-wrap::-webkit-scrollbar-thumb {
+  background: var(--color-graphite);
+  border: 3px solid var(--color-carbon);
+  border-radius: 9999px;
+}
+
+.list {
+  margin: 0;
+  padding: 6px 8px;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 10px;
+  border-radius: 8px;
+  cursor: default;
+}
+.row + .row { margin-top: 2px; }
+.row:hover { background: var(--overlay-hover); }
+.notes-view .row:active { background: var(--overlay-active); }
+
+.row-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--note-color);
+}
+.row-dot[data-color=""] { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+
+.row-main { flex: 1; min-width: 0; }
+.row-title,
+.row-preview {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.row-title {
+  font-size: 13px;
+  font-weight: 510;
+  letter-spacing: -0.010em;
+  color: var(--color-mist);
+}
+.row-title.is-empty { color: var(--color-ash); font-weight: 400; }
+.row-preview {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-ash);
+}
+
+.row-meta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ash);
+  white-space: nowrap;
+}
+
+.row-actions {
+  flex: none;
+  display: flex;
+  gap: 4px;
+}
+/* Nas notas, o botão da lixeira só aparece sob o mouse. */
+.notes-view .row-actions { opacity: 0; }
+.notes-view .row:hover .row-actions,
+.notes-view .row:focus-within .row-actions { opacity: 1; }
+
+
+.btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--overlay-hover);
+  box-shadow: var(--hairline);
+  color: var(--color-mist);
+  font-size: 12px;
+  font-weight: 510;
+  white-space: nowrap;
+  cursor: default;
+}
+.btn:hover { background: var(--overlay-active); color: var(--color-paper); }
+.btn:disabled { opacity: 0.4; background: var(--overlay-hover); color: var(--color-mist); }
+.btn.danger { color: var(--color-fog); }
+.btn.danger.confirming,
+.btn.danger.confirming:hover { background: rgba(235, 87, 87, 0.16); box-shadow: none; color: var(--color-paper); }
+
+.btn:focus-visible,
+.tab:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
+
+.empty {
+  margin: 48px 24px;
+  text-align: center;
+  color: var(--color-ash);
+}
+.empty[hidden] { display: none; }
+
+/* ------------------------------------------------- aba "Configuração" */
+
+.settings {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 24px 24px 16px;
+}
+.settings[hidden] { display: none; }
+
+.settings-title {
+  margin: 20px 0 6px;
+  font-size: 11px;
+  font-weight: 510;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-ash);
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-graphite);
+}
+.setting-label { width: 132px; flex: none; color: var(--color-mist); font-size: 13px; }
+/* Sem linha depois do último ajuste da aba. */
+.settings > .setting:last-of-type { border-bottom: 0; }
+.setting-top { align-items: flex-start; }
+.setting-top .setting-label { padding-top: 6px; }
+
+/* Campos de texto (título e texto padrão das notas novas). */
+.field-wrap { flex: 1; min-width: 0; }
+.field {
+  box-sizing: border-box;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 5px 8px;
+  border: 0;
+  outline: 0;
+  border-radius: var(--radius-button);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+  color: var(--color-mist);
+  caret-color: var(--color-paper);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  user-select: text;
+  -webkit-user-select: text;
+}
+textarea.field { resize: vertical; min-height: 84px; }
+.field::placeholder { color: var(--color-ash); }
+.field:focus { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+/* Ícone "i" ao lado de um título de seção; o texto aparece num tooltip. */
+.settings-title { display: flex; align-items: center; gap: 6px; }
+.info {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 1px var(--color-smoke);
+  color: var(--color-ash);
+  font-size: 10px;
+  font-weight: 590;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: default;
+}
+.info:hover, .info:focus-visible { color: var(--color-mist); box-shadow: inset 0 0 0 1px var(--color-fog); outline: 0; }
+.info::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 8px;
+  border-radius: var(--radius-button);
+  background: var(--color-obsidian);
+  box-shadow: var(--shadow-popover);
+  color: var(--color-mist);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.info:hover::after, .info:focus-visible::after { opacity: 1; }
+.settings .swatches { padding: 0; }
+
+/* Seletor de tema: botões lado a lado, o escolhido destacado. */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+}
+.seg {
+  height: 24px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-fog);
+  font-size: 12px;
+  font-weight: 510;
+  cursor: default;
+}
+.seg:hover { color: var(--color-mist); }
+.seg[aria-checked="true"] { background: var(--overlay-active); color: var(--color-paper); }
+.seg:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
+
+.app-actions { display: flex; flex-wrap: wrap; gap: 8px; }

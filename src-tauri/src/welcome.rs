@@ -22,7 +22,7 @@ pub const HTML: &str = concat!(
     r#"<div class="check">Formatar: selecione um trecho e escolha <b>negrito</b>, <i>itálico</i>, <u>sublinhado</u> ou <font size="5">tamanho</font></div>"#,
     r#"<div class="check">Criar uma caixa como estas: digite [] no começo da linha</div>"#,
     r#"<div><br></div>"#,
-    r#"<div><font size="2">O ✕ manda a nota para a lixeira. Lixeira e tema claro/escuro ficam no ícone da Taxinha, na bandeja.</font></div>"#,
+    r#"<div><font size="2">O ✕ manda a nota para a lixeira. Todas as notas e a lixeira ficam no Gerenciador, que abre com o app ou pelo ícone da Taxinha na bandeja.</font></div>"#,
 );
 
 pub const TEXT: &str = "Olá!
@@ -35,4 +35,4 @@ Notas rápidas que ficam por cima de tudo. Experimente:
 [ ] Formatar: selecione um trecho e escolha negrito, itálico, sublinhado ou tamanho
 [ ] Criar uma caixa como estas: digite [] no começo da linha
 
-O ✕ manda a nota para a lixeira. Lixeira e tema claro/escuro ficam no ícone da Taxinha, na bandeja.";
+O ✕ manda a nota para a lixeira. Todas as notas e a lixeira ficam no Gerenciador, que abre com o app ou pelo ícone da Taxinha na bandeja.";

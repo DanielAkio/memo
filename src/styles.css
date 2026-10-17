@@ -1,160 +1,13 @@
-/* Taxinha — estilo segundo o docs/style.md ("midnight precision instrument").
+/* Taxinha — janela da nota (título, editor, barra de status, menus). Fontes,
+   tokens, temas, cores das etiquetas, seletor de cor e a moldura comum às
+   janelas (barra de título, botões, tachinha, alça) ficam no base.css.
+   Estilo segundo o docs/style.md ("midnight precision instrument").
    Superfícies quase pretas, texto em escala de cinza e bordas hairline; a
    única cor na tela é a etiqueta da nota. O tema claro inverte a escala de
    cinza (mesmos nomes de token) e é escolhido no ícone da bandeja:
    <html data-theme="light|dark">, ou sem atributo para seguir o sistema. */
 
-@font-face { font-family: "Inter Taxinha"; src: url("fonts/Inter-Regular.woff") format("woff"); font-weight: 300 449; font-display: block; }
-@font-face { font-family: "Inter Taxinha"; src: url("fonts/Inter-Medium.woff") format("woff"); font-weight: 450 549; font-display: block; }
-@font-face { font-family: "Inter Taxinha"; src: url("fonts/Inter-SemiBold.woff") format("woff"); font-weight: 550 700; font-display: block; }
-
-:root {
-  --color-void: #08090a;
-  --color-carbon: #0f1011;
-  --color-obsidian: #161718;
-  --color-graphite: #23252a;
-  --color-smoke: #383b3f;
-  --color-ash: #62666d;
-  --color-fog: #8a8f98;
-  --color-mist: #d0d6e0;
-  --color-bone: #e5e5e6;
-  --color-paper: #ffffff;
-  --color-pulse-green: #27a644;
-  --color-coral-red: #eb5757;
-  --color-signal-teal: #02b8cc;
-  --color-iris-violet: #6366f1;
-  --color-lavender: #8b5cf6;
-  /* Cor padrão das notas. */
-  --color-sun-yellow: #f2c94c;
-
-  --font-ui: "Inter Taxinha", "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "Berkeley Mono", ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
-
-  --radius-badge: 4px;
-  --radius-button: 6px;
-  --radius-card: 12px;
-
-  --shadow-sm: rgba(0, 0, 0, 0.4) 0px 2px 4px 0px;
-  --shadow-xl: rgba(8, 9, 10, 0.6) 0px 4px 32px 0px;
-  --hairline: var(--color-graphite) 0px 0px 0px 1px inset;
-  --shadow-popover: rgba(255, 255, 255, 0.03) 0px 0px 0px 1px inset, rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset,
-                    rgba(0, 0, 0, 0.6) 0px 0px 0px 1px, rgba(8, 9, 10, 0.6) 0px 4px 24px 0px;
-
-  /* Realces sobre a superfície (hover, pressionado, seleção). */
-  --overlay-subtle: rgba(255, 255, 255, 0.03);
-  --overlay-hover: rgba(255, 255, 255, 0.05);
-  --overlay-active: rgba(255, 255, 255, 0.08);
-  --overlay-strong: rgba(255, 255, 255, 0.12);
-  --selection: rgba(208, 214, 224, 0.18);
-
-  --titlebar-h: 36px;
-  --note-color: transparent;
-
-  color-scheme: dark;
-}
-
-/* Tema claro: pelo sistema (sem escolha na bandeja) ou escolhido. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --color-void: #ffffff;
-    --color-carbon: #fbfbfa;
-    --color-obsidian: #ffffff;
-    --color-graphite: #e4e5e7;
-    --color-smoke: #c4c7cc;
-    --color-ash: #8a8f98;
-    --color-fog: #62666d;
-    --color-mist: #23252a;
-    --color-bone: #16171a;
-    --color-paper: #08090a;
-    --shadow-popover: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.12) 0px 4px 16px 0px;
-    --overlay-subtle: rgba(0, 0, 0, 0.02);
-    --overlay-hover: rgba(0, 0, 0, 0.04);
-    --overlay-active: rgba(0, 0, 0, 0.07);
-    --overlay-strong: rgba(0, 0, 0, 0.1);
-    --selection: rgba(35, 37, 42, 0.14);
-    color-scheme: light;
-  }
-}
-:root[data-theme="light"] {
-  --color-void: #ffffff;
-  --color-carbon: #fbfbfa;
-  --color-obsidian: #ffffff;
-  --color-graphite: #e4e5e7;
-  --color-smoke: #c4c7cc;
-  --color-ash: #8a8f98;
-  --color-fog: #62666d;
-  --color-mist: #23252a;
-  --color-bone: #16171a;
-  --color-paper: #08090a;
-  --shadow-popover: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.12) 0px 4px 16px 0px;
-  --overlay-subtle: rgba(0, 0, 0, 0.02);
-  --overlay-hover: rgba(0, 0, 0, 0.04);
-  --overlay-active: rgba(0, 0, 0, 0.07);
-  --overlay-strong: rgba(0, 0, 0, 0.1);
-  --selection: rgba(35, 37, 42, 0.14);
-  color-scheme: light;
-}
-
-* { box-sizing: border-box; }
-
-html, body {
-  margin: 0;
-  height: 100%;
-  overflow: hidden;
-  background: var(--color-carbon);
-  color: var(--color-mist);
-  font-family: var(--font-ui);
-  font-feature-settings: "cv01" on, "ss03" on, "zero" on;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-button { font: inherit; color: inherit; }
-
-/* ------------------------------------------------------------------ frame */
-
-.frame {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--color-carbon);
-  box-shadow: var(--hairline);
-}
-
-/* Etiqueta de cor: um fio vertical de 2px na borda esquerda. */
-.frame::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: var(--note-color);
-  z-index: 3;
-  pointer-events: none;
-}
-
-[data-color="green"]    { --note-color: var(--color-pulse-green); }
-[data-color="coral"]    { --note-color: var(--color-coral-red); }
-[data-color="teal"]     { --note-color: var(--color-signal-teal); }
-[data-color="iris"]     { --note-color: var(--color-iris-violet); }
-[data-color="lavender"] { --note-color: var(--color-lavender); }
-[data-color="yellow"]   { --note-color: var(--color-sun-yellow); }
-/* "mono": o tom de maior contraste do tema (branco no escuro, preto no claro). */
-[data-color="mono"]     { --note-color: var(--color-paper); }
-
-/* --------------------------------------------------------------- titlebar */
-
-.titlebar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: var(--titlebar-h);
-  padding: 0 4px;
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: default;
-}
+/* ------------------------------------------- identidade (título, cor) */
 
 .identity {
   display: flex;
@@ -223,63 +76,6 @@ button { font: inherit; color: inherit; }
 }
 .title-input::placeholder { color: var(--color-ash); font-weight: 400; }
 .note-name[hidden], .title-input[hidden] { display: none; }
-
-.actions {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.icon-btn {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-button);
-  background: transparent;
-  color: var(--color-fog);
-  cursor: default;
-  transition: background-color 120ms ease, color 120ms ease, opacity 160ms ease;
-}
-.icon-btn svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.icon-btn circle { fill: currentColor; stroke: none; }
-.icon-btn:hover { background: var(--overlay-hover); color: var(--color-mist); }
-.icon-btn:active { background: var(--overlay-active); }
-.icon-btn:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
-
-/* Botões secundários só aparecem com a nota em foco ou sob o mouse. */
-.icon-btn:not(.pin) { opacity: 0; }
-.is-focused .icon-btn,
-.frame:hover .icon-btn,
-.menu-open .icon-btn { opacity: 1; }
-.pin { opacity: 0.55; }
-.is-focused .pin, .frame:hover .pin { opacity: 1; }
-
-/* Fixada: tachinha preenchida em branco sobre um fundo cinza sutil, sem cor. */
-.pin[aria-pressed="true"] {
-  opacity: 1;
-  background: var(--overlay-active);
-  color: var(--color-paper);
-}
-.pin[aria-pressed="true"]:hover { background: var(--overlay-strong); color: var(--color-paper); }
-.pin[aria-pressed="true"] .pin-body { fill: currentColor; }
-.pin .pin-needle { stroke-width: 1.6; }
-
-/* Seta para cima = recolher; recolhida, aponta para baixo = expandir. */
-.collapse svg { transition: transform 160ms ease; }
-.is-collapsed .collapse svg { transform: rotate(180deg); }
-
 
 /* ------------------------------------------------------------------- body */
 
@@ -396,20 +192,6 @@ button { font: inherit; color: inherit; }
 }
 #edited { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 
-.grip {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  cursor: nwse-resize;
-  color: var(--color-smoke);
-}
-.grip svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; }
-.grip:hover { color: var(--color-fog); }
-
 /* ------------------------------------------------------------------ menu */
 
 .menu {
@@ -441,54 +223,6 @@ button { font: inherit; color: inherit; }
   line-height: 1.4;
   color: var(--color-ash);
 }
-
-.swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 0 2px 4px;
-}
-.swatch {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-badge);
-  background: transparent;
-  cursor: default;
-}
-.swatch::after {
-  content: "";
-  position: absolute;
-  inset: 7px;
-  border-radius: 9999px;
-  background: var(--sw);
-}
-.swatch[data-color=""]::after { background: transparent; box-shadow: inset 0 0 0 1px var(--color-smoke); }
-.swatch[data-color="yellow"]   { --sw: var(--color-sun-yellow); }
-.swatch[data-color="green"]    { --sw: var(--color-pulse-green); }
-.swatch[data-color="coral"]    { --sw: var(--color-coral-red); }
-.swatch[data-color="teal"]     { --sw: var(--color-signal-teal); }
-.swatch[data-color="iris"]     { --sw: var(--color-iris-violet); }
-.swatch[data-color="lavender"] { --sw: var(--color-lavender); }
-.swatch[data-color="mono"]     { --sw: var(--color-paper); }
-/* Personalizada: arco-íris até ser escolhida; depois mostra a cor da nota
-   (--sw vem do app.js). */
-.swatch[data-color="custom"]::after {
-  background: var(--sw, conic-gradient(#eb5757, #f2c94c, #27a644, #02b8cc, #6366f1, #8b5cf6, #eb5757));
-}
-.custom-color {
-  position: absolute;
-  width: 0;
-  height: 0;
-  padding: 0;
-  border: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.swatch:hover { background: var(--overlay-hover); }
-.swatch[aria-checked="true"] { box-shadow: inset 0 0 0 1px var(--color-fog); }
 
 /* Barra de formatação: flutua acima do texto selecionado. */
 .format-bar {
