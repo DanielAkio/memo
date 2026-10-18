@@ -4,7 +4,9 @@
 // or full screen); double click and middle click (close) on the titlebar.
 
 window.MemoChrome = {
-  attach({ frame, titlebar, grip, onDoubleClick, onClose }) {
+  // `resizeEdges`: which edges/corners get a resize handle (a group bar only
+  // changes width). `onDoubleClick` receives the mousedown event.
+  attach({ frame, titlebar, grip, onDoubleClick, onClose, resizeEdges = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] }) {
     const { invoke } = window.__TAURI__.core;
     const appWindow = window.__TAURI__.window.getCurrentWindow();
 
@@ -40,7 +42,7 @@ window.MemoChrome = {
       if (e.button === 1) { e.preventDefault(); return; } // no autoscroll
       if (e.button !== 0 || e.target.closest('button, input')) return;
       e.preventDefault();
-      if (e.detail === 2 && onDoubleClick) { cancelDrag(); onDoubleClick(); }
+      if (e.detail === 2 && onDoubleClick) { cancelDrag(); onDoubleClick(e); }
     });
 
     titlebar.addEventListener('pointerdown', (e) => {
@@ -121,7 +123,7 @@ window.MemoChrome = {
       handle.addEventListener('lostpointercapture', end);
     }
 
-    for (const edges of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) {
+    for (const edges of resizeEdges) {
       const handle = document.createElement('div');
       handle.className = `rs rs-${edges}`;
       handle.setAttribute('aria-hidden', 'true');

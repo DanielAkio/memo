@@ -25,7 +25,11 @@
         <span class="dot" aria-hidden="true"></span>
       </button>
 
-      <div class="identity" data-i18n-attr="title=editTitleHint">
+      <div class="identity">
+        <!-- Shown while hovering the name: click to type a title (left of the name). -->
+        <button class="icon-btn rename-btn" id="renameBtn" type="button" data-i18n-attr="aria-label=editTitle,title=editTitle">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.6 3.2l2.2 2.2-7 7-2.9.7.7-2.9z"/><path d="M9.3 4.5l2.2 2.2"/></svg>
+        </button>
         <span class="note-name" id="noteName"></span>
         <input class="title-input" id="titleInput" type="text" maxlength="80" spellcheck="false"
                data-i18n-attr="placeholder=noteTitle,aria-label=noteTitle" hidden>
@@ -86,8 +90,19 @@
       <div class="code-layer" id="codeLayer"></div>
     </main>
 
+    <!-- Group picker, opened from the footer: the note's group, "no group" or
+         a new one (app.js, "groups"). -->
+    <div class="menu group-menu" id="groupMenu" hidden>
+      <div class="menu-label" data-i18n="groupMenuTitle"></div>
+      <div class="menu-items" id="groupItems" role="menu"></div>
+    </div>
+
     <footer class="statusbar">
-      <span id="edited"></span>
+      <!-- Bottom left: the note's group (with a folder icon) or, without one,
+           "new memory" / "edited …". Clicking opens the group picker. -->
+      <button class="foot-btn" id="footBtn" type="button" aria-haspopup="true" aria-expanded="false">
+        <svg class="foot-folder" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/></svg><span id="edited"></span>
+      </button>
       <span id="count"></span>
       <span class="grip" id="grip" aria-hidden="true">
         <svg viewBox="0 0 10 10"><path d="M9 3 3 9M9 6 6 9"/></svg>

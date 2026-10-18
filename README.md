@@ -10,16 +10,18 @@ The interface is available in English and Portuguese.
 | Action | How |
 |--------|-----|
 | Pin / unpin on top of everything | Click the pin on the left of the titlebar, or `Ctrl+Shift+P` (`⌘⇧P` on Mac) |
-| Give the memory a title | Double-click the titlebar; `Enter` saves, `Esc` cancels |
+| Give the memory a title | Hover over the title and click the pencil; `Enter` saves, `Esc` cancels |
+| Collapse / expand to the titlebar | Double-click the titlebar |
 | Checklist | Type `[]` at the start of a line; click the box to check it (the text gets struck through) |
 | Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` indent and outdent the item (also in checklists) |
-| Code | `` `text` `` (or `Ctrl+E` / the `</>` button in the format bar) for inline code; ` ```sql ` + `Enter` opens a code block (`Enter` on an empty last line leaves the block); the picker in the block's corner chooses the language used for syntax highlighting |
+| Code | `` `text` `` (or `Ctrl+E` / the `</>` button in the format bar) for inline code; ` ```sql ` + `Enter` opens a code block (`Enter` on an empty last line leaves the block); hovering the block shows its language picker (left) and a copy button (right) |
 | Bold, italic, underline, highlight | `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` (`⌘` on Mac), or select text and use the bar that appears above the selection |
 | Text size (small, normal, large) | The "A" buttons in the format bar, or `Ctrl+Shift+>` / `Ctrl+Shift+<` (`⌘⇧` on Mac) |
 | New memory | The `+` button, `Ctrl+N` (`⌘N`) or the Memo tray icon |
+| Groups | Click the folder-with-`+` button in the Memory Manager's titlebar, or choose "New group" in a memory's footer (bottom left): a small bar appears. Drop memories on it, or pick the group in their footer or in the Memory Manager; the footer then shows the group's name. Its `+` creates a memory straight in the group. Double-click the bar to take its memories out (back where they were) or put them away; hover over its name and click the pencil to rename it; its pin keeps it on top like a memory's; click its folder icon to give it a color; its `✕` twice deletes it and sends its memories to the trash |
 | Close | The `✕` button or a middle click (wheel) on the titlebar: the memory goes to the trash |
 | See all memories, search, sort, restore from the trash | Memory Manager: opens with the app, or from the tray icon → Memory Manager. The sort box next to the search orders the list by most recent or by title (A–Z). Memories in the trash for over 30 days are deleted |
-| Colour, title and text for new memories | Memory Manager → Settings → Defaults (the text uses the same editor as a memory: checklist, bullets, code and formatting) |
+| Colour, title and text for new memories; colour and title for new groups | Memory Manager → Settings → Memory defaults / Group defaults (the text uses the same editor as a memory: checklist, bullets, code and formatting) |
 | Move | Drag by the titlebar; near a screen edge or another memory, it snaps. Push the cursor against a screen edge to Snap it: a preview shows the left/right half, a quarter (near a corner) or the whole screen (top edge), and releasing there fits it; dragging it again restores its size |
 | Resize | By the edges or the bottom-right corner; near a screen edge or another memory, the edge snaps |
 | Change the colour (default: yellow) | Click the coloured dot left of the title and pick a colour, or "Custom" for any colour |

@@ -1,0 +1,140 @@
+/* Memo — group bar (group.html): a window as tall as a titlebar. The frame,
+   titlebar, buttons and themes come from base.css. */
+
+.group .titlebar { gap: 6px; padding: 0 4px; }
+
+/* Folder: marks the window as a group and is its colour picker (the group's
+   counterpart of a note's colour dot), drawn in the group's colour. */
+.group-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 26px;
+  margin: 0 -4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-fog);
+  cursor: default;
+}
+.group-icon:hover,
+.group-icon[aria-expanded="true"] { background: var(--overlay-hover); }
+.group-icon:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
+.group-icon svg {
+  grid-area: 1 / 1;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+/* Closed folder while the notes are inside, open one while they are out. */
+.folder-open,
+.is-open .folder-closed { display: none; }
+.is-open .folder-open { display: block; }
+.is-open .group-icon { color: var(--color-mist); }
+.frame:not([data-color=""]) .group-icon { color: var(--note-color); }
+
+.identity {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.group-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.010em;
+  color: var(--color-mist);
+}
+.title-input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  margin: 0 0 0 -6px;
+  padding: 0 6px;
+  border: 0;
+  outline: 0;
+  border-radius: var(--radius-badge);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+  color: var(--color-paper);
+  caret-color: var(--color-paper);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+}
+.group-name.is-empty { color: var(--color-ash); font-weight: 400; }
+.group-name[hidden], .title-input[hidden] { display: none; }
+
+/* Pencil left of the name, only while hovering it: renames the group.
+   Hidden it takes no room; shown it slides the name aside. */
+.frame .titlebar .identity .rename-btn {
+  flex: none;
+  width: 0;
+  height: 22px;
+  margin: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 120ms ease, margin 120ms ease, opacity 120ms ease;
+}
+.frame .titlebar .identity:hover .rename-btn,
+.frame .titlebar .identity .rename-btn:focus-visible {
+  width: 22px;
+  margin: 0 2px 0 -2px;
+  opacity: 1;
+}
+.rename-btn svg { width: 13px; height: 13px; }
+.rename-btn[hidden] { display: none; }
+
+/* Colour picker under the bar, as in a note (styles.css .menu). */
+.menu {
+  position: absolute;
+  top: calc(var(--titlebar-h) - 2px);
+  left: 6px;
+  z-index: 10;
+  max-width: calc(100% - 12px);
+  padding: 6px;
+  background: var(--color-obsidian);
+  border-radius: 8px;
+  box-shadow: var(--shadow-popover);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.menu[hidden] { display: none; }
+.menu-label {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-ash);
+}
+
+/* Number of notes in the group. */
+.group-count {
+  flex: none;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ash);
+}
+
+/* A note being dragged over the bar: dropping it adds it to the group. */
+.frame.drop-hover {
+  background: var(--color-obsidian);
+  box-shadow: inset 0 0 0 1.5px var(--color-mist);
+}
+
+/* ✕ asks for a second click: the group and its notes go away. */
+.close.confirming,
+.close.confirming:hover {
+  opacity: 1;
+  background: rgba(235, 87, 87, 0.16);
+  color: var(--color-paper);
+}

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memo</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="group.css">
+</head>
+<body>
+  <!-- Group bar: a compact window holding notes. Double-click takes them out
+       or puts them back in; the folder icon (in the group's colour) picks
+       its colour; the pencil renames it (group.js). -->
+  <div class="frame group" id="frame" data-color="">
+    <header class="titlebar" id="titlebar">
+      <button class="icon-btn pin" id="pinBtn" type="button" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <g transform="rotate(45 8 8)">
+            <path class="pin-needle" d="M8 10.4V15"/>
+            <path class="pin-body" d="M5.7 3.6h4.6l.7 5.1H5z"/>
+            <rect class="pin-body" x="3.6" y="8.4" width="8.8" height="2" rx=".9"/>
+            <rect class="pin-body" x="4.9" y="1.6" width="6.2" height="2" rx=".9"/>
+          </g>
+        </svg>
+      </button>
+      <!-- Folder: marks the window as a group (closed/open with its notes) and
+           is its colour picker — it is drawn in the group's colour, the way a
+           note's dot is; click to change it. -->
+      <button class="group-icon" id="colorBtn" type="button" data-i18n-attr="aria-label=groupColor" aria-haspopup="true" aria-expanded="false">
+        <svg class="folder-closed" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/></svg>
+        <svg class="folder-open" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 11.75v-7.5a1 1 0 0 1 1-1h2.9l1.5 1.5h3.6a1 1 0 0 1 1 1v1.25"/><path d="M2.5 11.75 4.2 7.6a1 1 0 0 1 .93-.6h8.37l-1.9 4.75a1 1 0 0 1-.93.6H2.5z"/></svg>
+      </button>
+      <div class="identity">
+        <!-- Shown while hovering the name: click to rename the group (left of the name). -->
+        <button class="icon-btn rename-btn" id="renameBtn" type="button" data-i18n-attr="aria-label=groupRename,title=groupRename">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.6 3.2l2.2 2.2-7 7-2.9.7.7-2.9z"/><path d="M9.3 4.5l2.2 2.2"/></svg>
+        </button>
+        <span class="group-name" id="groupName"></span>
+        <input class="title-input" id="nameInput" type="text" maxlength="60" spellcheck="false"
+               data-i18n-attr="placeholder=groupName,aria-label=groupName" hidden>
+      </div>
+      <span class="group-count" id="groupCount"></span>
+      <div class="actions">
+        <button class="icon-btn" id="newBtn" type="button" data-i18n-attr="aria-label=newNoteInGroup">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
+        </button>
+        <button class="icon-btn close" id="closeBtn" type="button" data-i18n-attr="aria-label=deleteGroup">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Colour picker under the bar (the window grows while it's open). -->
+    <div class="menu color-menu" id="colorMenu" hidden>
+      <div class="menu-label" data-i18n="groupColor"></div>
+      <div class="swatches" id="swatches">
+        <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
+        <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
+        <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
+        <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
+        <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
+        <button type="button" class="swatch" data-color="lavender" data-i18n-attr="aria-label=lavender,title=lavender"></button>
+        <button type="button" class="swatch" data-color="mono"></button>
+        <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+        <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+      </div>
+      <input type="color" class="custom-color" id="customColor" tabindex="-1" aria-hidden="true">
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="chrome.js"></script>
+  <script src="group.js"></script>
+</body>
+</html>

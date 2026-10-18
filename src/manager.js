@@ -24,17 +24,18 @@
   const trashBar = $('trashBar');
   const emptyTrashBtn = $('emptyTrash');
   const customColor = $('customColor');
-  const customSwatch = document.querySelector('.swatch[data-color="custom"]');
+  const customSwatch = document.querySelector('#defaultSwatches .swatch[data-color="custom"]');
 
   const DAY_MS = 86_400_000;
   const TRASH_DAYS = 30;
 
   let notes = [];
+  let groups = [];
   let view = 'notes';
   let defaultColor = 'yellow';
   let reloadTimer = null;
-  // State of this window itself (pinned), saved by Rust.
-  let win = { pinned: false };
+  // State of this window itself (pinned, collapsed), saved by Rust.
+  let win = { pinned: false, collapsed: false };
 
   // ------------------------------------------------------------ helpers
 
@@ -138,7 +139,10 @@
 
     const q = fold(search.value.trim());
     const source = view === 'notes' ? active : trashed;
-    const shown = q ? source.filter((n) => fold(`${n.title}\n${plain(n.text)}`).includes(q)) : source;
+    // The group's name counts for the search too.
+    const shown = q
+      ? source.filter((n) => fold(`${n.title}\n${plain(n.text)}\n${groupName(n)}`).includes(q))
+      : source;
 
     list.replaceChildren(...shown.map(view === 'notes' ? noteRow : trashRow));
     empty.hidden = shown.length > 0;
@@ -160,6 +164,29 @@
     return row;
   }
 
+  const groupName = (note) => (groups.find((g) => g.id === note.groupId) || {}).name || '';
+
+  // Group of a memory, changed right in the list: no group, a group or a new
+  // one. Rust moves it (move_note_to_group) and emits "groups-changed".
+  function groupSelect(note) {
+    const select = el('select', 'row-group');
+    select.title = t('moveToGroup');
+    select.setAttribute('aria-label', t('moveToGroup'));
+    const sorted = groups.slice()
+      .sort((a, b) => a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true }));
+    select.append(
+      new Option(t('noGroup'), ''),
+      ...sorted.map((g) => new Option(g.name || t('untitled'), g.id)),
+      new Option(`${t('newGroup')}…`, 'new'),
+    );
+    select.value = note.groupId || '';
+    select.addEventListener('change', () => {
+      invoke('move_note_to_group', { id: note.id, groupId: select.value })
+        .catch((err) => console.error('move_note_to_group', err));
+    });
+    return select;
+  }
+
   function noteRow(note) {
     const row = baseRow(note);
     row.title = t('openNote');
@@ -171,7 +198,17 @@
     trashBtn.setAttribute('aria-label', t('moveToTrash'));
     trashBtn.append(icon(TRASH_ICON));
     const actions = el('div', 'row-actions');
-    actions.append(trashBtn);
+    actions.append(groupSelect(note), trashBtn);
+    const group = groups.find((g) => g.id === note.groupId);
+    if (group) {
+      // The group's name, with a dot in its colour (if it has one).
+      const chip = el('span', 'row-group-chip');
+      const dot = el('span', 'chip-dot');
+      dot.dataset.color = isCustomColor(group.color) ? 'custom' : group.color || '';
+      if (isCustomColor(group.color)) dot.style.setProperty('--note-color', group.color);
+      chip.append(dot, el('span', 'chip-name', group.name || t('untitled')));
+      row.append(chip);
+    }
     row.append(el('span', 'row-meta', editedLabel(note.updatedAt)), actions);
     return row;
   }
@@ -216,7 +253,9 @@
 
   async function load() {
     try {
-      [notes, defaultColor] = await Promise.all([invoke('list_notes'), invoke('get_default_color')]);
+      [notes, defaultColor, groups] = await Promise.all([
+        invoke('list_notes'), invoke('get_default_color'), invoke('list_groups'),
+      ]);
     } catch (err) {
       console.error('list_notes', err);
     }
@@ -227,6 +266,65 @@
   // The default text is edited with the note editor itself, embedded in an
   // <iframe> (index.html?defaults) that loads and saves the content on its
   // own. Only the title is handled here.
+
+  // ----------------------------------------------------- group defaults
+  // Colour and name new groups start with (by default yellow and unnamed,
+  // like a new note).
+
+  const groupSwatches = $('groupSwatches');
+  const groupCustomSwatch = groupSwatches.querySelector('.swatch[data-color="custom"]');
+  const groupCustomColor = $('groupCustomColor');
+  const groupDefaultTitle = $('groupDefaultTitle');
+  let groupDefaultColor = 'yellow';
+  let groupTitleTimer = null;
+
+  function renderGroupDefaultColor() {
+    const custom = isCustomColor(groupDefaultColor);
+    for (const sw of groupSwatches.querySelectorAll('.swatch')) {
+      const checked = sw === groupCustomSwatch ? custom : sw.dataset.color === groupDefaultColor;
+      sw.setAttribute('aria-checked', String(checked));
+    }
+    if (custom) groupCustomSwatch.style.setProperty('--sw', groupDefaultColor);
+    else groupCustomSwatch.style.removeProperty('--sw');
+  }
+
+  function setGroupDefaultColor(color) {
+    groupDefaultColor = color;
+    renderGroupDefaultColor();
+    invoke('set_default_group_color', { color }).catch((err) => console.error('set_default_group_color', err));
+  }
+
+  async function loadGroupDefaults() {
+    try {
+      [groupDefaultColor, groupDefaultTitle.value] = await invoke('get_group_defaults');
+    } catch (err) {
+      console.error('get_group_defaults', err);
+    }
+    renderGroupDefaultColor();
+  }
+
+  function flushGroupTitle() {
+    clearTimeout(groupTitleTimer);
+    invoke('set_default_group_title', { title: groupDefaultTitle.value })
+      .catch((err) => console.error('set_default_group_title', err));
+  }
+
+  groupSwatches.addEventListener('click', (e) => {
+    const sw = e.target.closest('.swatch');
+    if (!sw) return;
+    if (sw === groupCustomSwatch) {
+      groupCustomColor.value = isCustomColor(groupDefaultColor) ? groupDefaultColor : '#f2c94c';
+      groupCustomColor.click();
+      return;
+    }
+    setGroupDefaultColor(sw.dataset.color);
+  });
+  groupCustomColor.addEventListener('change', () => setGroupDefaultColor(groupCustomColor.value.toLowerCase()));
+  groupDefaultTitle.addEventListener('input', () => {
+    clearTimeout(groupTitleTimer);
+    groupTitleTimer = setTimeout(flushGroupTitle, 400);
+  });
+  groupDefaultTitle.addEventListener('change', flushGroupTitle);
 
   const defaultTitle = $('defaultTitle');
   let defaultsTimer = null;
@@ -299,10 +397,11 @@
   function renderMonoName() {
     const theme = document.documentElement.dataset.theme;
     const light = theme ? theme === 'light' : systemLight.matches;
-    const sw = document.querySelector('#defaultSwatches .swatch[data-color="mono"]');
     const name = t(light ? 'black' : 'white');
-    sw.setAttribute('aria-label', name);
-    sw.title = name;
+    for (const sw of document.querySelectorAll('.settings .swatch[data-color="mono"]')) {
+      sw.setAttribute('aria-label', name);
+      sw.title = name;
+    }
   }
   systemLight.addEventListener('change', renderMonoName);
 
@@ -328,7 +427,7 @@
 
   list.addEventListener('click', (e) => {
     const row = e.target.closest('.row');
-    if (!row) return;
+    if (!row || e.target.closest('select')) return;
     const btn = e.target.closest('[data-act]');
     if (btn) act(btn.dataset.act, row.dataset.id);
     else if (view === 'notes') act('open', row.dataset.id);
@@ -384,6 +483,7 @@
     if (mod && key === 'f') {
       e.preventDefault();
       if (view === 'settings' || view === 'help') { view = 'notes'; render(); }
+      if (win.collapsed) toggleCollapse(); // the search is hidden while collapsed
       search.focus();
       search.select();
     } else if (e.key === 'Escape' && document.activeElement === search && search.value) {
@@ -400,6 +500,7 @@
   // ------------------------------------------- window (like a note)
 
   function renderWindow() {
+    frame.classList.toggle('is-collapsed', Boolean(win.collapsed));
     pinBtn.setAttribute('aria-pressed', String(win.pinned));
     const pinLabel = t(win.pinned ? 'unpin' : 'pin');
     pinBtn.setAttribute('aria-label', pinLabel);
@@ -419,14 +520,36 @@
     renderWindow();
   }
 
+  // Double-click on the titlebar: collapse to the titlebar, or expand back
+  // (as for notes).
+  async function toggleCollapse() {
+    win.collapsed = !win.collapsed;
+    renderWindow();
+    try {
+      await invoke('set_collapsed', { collapsed: win.collapsed });
+    } catch (err) {
+      console.error('set_collapsed', err);
+    }
+    if (!win.collapsed) search.focus();
+  }
+
   const newNote = () => invoke('new_note').catch((err) => console.error('new_note', err));
   const closeWindow = () => invoke('close_manager').catch((err) => console.error('close_manager', err));
 
-  window.MemoChrome.attach({ frame, titlebar: $('titlebar'), grip: $('grip'), onClose: closeWindow });
+  window.MemoChrome.attach({
+    frame,
+    titlebar: $('titlebar'),
+    grip: $('grip'),
+    onDoubleClick: toggleCollapse,
+    onClose: closeWindow,
+  });
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
   $('raiseBtn').addEventListener('click', () => {
     invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err));
+  });
+  $('newGroupBtn').addEventListener('click', () => {
+    invoke('new_group').catch((err) => console.error('new_group', err));
   });
   $('closeBtn').addEventListener('click', closeWindow);
 
@@ -512,6 +635,9 @@
     pin: PIN_SVG,
     'pin-on': PIN_SVG,
     plus: '<path d="M8 3.25v9.5M3.25 8h9.5"/>',
+    pencil: '<path d="M10.6 3.2l2.2 2.2-7 7-2.9.7.7-2.9z"/><path d="M9.3 4.5l2.2 2.2"/>',
+    'folder-plus': '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/>',
+    folder: '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>',
     raise: '<rect x="5.25" y="2.75" width="8" height="7" rx="1.5"/><path d="M2.75 6.25v5.5a1.5 1.5 0 0 0 1.5 1.5h5.5"/>',
     close: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',
     search: '<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>',
@@ -595,11 +721,12 @@
     applyTheme(await invoke('get_theme'));
     listen('theme-changed', (e) => applyTheme(e.payload));
     listen('notes-changed', scheduleLoad);
+    listen('groups-changed', scheduleLoad);
     // Switched to another folder's notes file: its theme, language and
     // defaults may differ, so start over.
     listen('store-replaced', () => location.reload());
-    await Promise.all([load(), loadDefaults(), loadDataDir()]);
-    search.focus();
+    await Promise.all([load(), loadDefaults(), loadGroupDefaults(), loadDataDir()]);
+    if (!win.collapsed) search.focus();
   }
 
   init().catch((err) => console.error('init', err));

@@ -1,0 +1,286 @@
+// Memo — group bar: a compact window that holds notes (label group-{id};
+// Rust has the logic, main.rs "Groups"). Double-click takes the notes out
+// (back where they were) or puts them back in; the pencil shown while
+// hovering the name renames; ✕ twice deletes the group and sends its notes
+// to the trash; the pin keeps the bar above other apps, like a note's; the
+// folder icon picks the group's colour (folder and stripe); +
+// (or Mod+N) adds a new note straight into the group.
+// Notes join by being dropped on the bar (Rust emits "drop-hover" with the
+// group id while one is over it), from their footer or from the manager.
+
+(() => {
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+
+  const $ = (id) => document.getElementById(id);
+  const I18n = window.MemoI18n;
+  const { t } = I18n;
+  const frame = $('frame');
+  const titlebar = $('titlebar');
+  const nameEl = $('groupName');
+  const nameInput = $('nameInput');
+  const countEl = $('groupCount');
+  const closeBtn = $('closeBtn');
+  const pinBtn = $('pinBtn');
+  const renameBtn = $('renameBtn');
+  const colorBtn = $('colorBtn');
+  const colorMenu = $('colorMenu');
+  const customColor = $('customColor');
+  const customSwatch = document.querySelector('.swatch[data-color="custom"]');
+  const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
+
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const pinKeys = isMac ? '⌘⇧P' : 'Ctrl+Shift+P';
+  const newKeys = isMac ? '⌘N' : 'Ctrl+N';
+
+  let group = null;
+  let count = 0;
+  let renaming = false;
+  let confirmTimer = null;
+
+  function render() {
+    if (!group) return;
+    // Unnamed (the default, as for notes): "Untitled", greyed out.
+    nameEl.textContent = group.name || t('untitled');
+    nameEl.classList.toggle('is-empty', !group.name);
+    countEl.textContent = String(count);
+    countEl.title = t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count });
+    frame.classList.toggle('is-open', group.open);
+    pinBtn.setAttribute('aria-pressed', String(group.pinned));
+    const pinLabel = t(group.pinned ? 'unpin' : 'pin');
+    pinBtn.setAttribute('aria-label', pinLabel);
+    pinBtn.title = `${pinLabel} (${pinKeys})`;
+    titlebar.title = t(group.open ? 'groupHideHint' : 'groupShowHint');
+    // Colour: a label, or a custom #rrggbb straight into --note-color.
+    const custom = isCustomColor(group.color);
+    frame.dataset.color = custom ? 'custom' : group.color || '';
+    if (custom) frame.style.setProperty('--note-color', group.color);
+    else frame.style.removeProperty('--note-color');
+    if (custom) customSwatch.style.setProperty('--sw', group.color);
+    else customSwatch.style.removeProperty('--sw');
+    for (const sw of document.querySelectorAll('.swatch')) {
+      const checked = sw === customSwatch ? custom : sw.dataset.color === (group.color || '');
+      sw.setAttribute('aria-checked', String(checked));
+    }
+    colorBtn.title = t('groupColor');
+    $('newBtn').title = `${t('newNoteInGroup')} (${newKeys})`;
+    document.title = group.name ? `${group.name} — Memo` : 'Memo';
+    if (!closeBtn.classList.contains('confirming')) closeBtn.title = t('deleteGroup');
+  }
+
+  async function load() {
+    try {
+      const data = await invoke('load_group');
+      if (!data) return;
+      [group, count] = data;
+      render();
+    } catch (err) {
+      console.error('load_group', err);
+    }
+  }
+
+  const toggle = () => invoke('toggle_group').catch((err) => console.error('toggle_group', err));
+  const newNote = () => invoke('new_note_in_group').catch((err) => console.error('new_note_in_group', err));
+  $('newBtn').addEventListener('click', newNote);
+
+  // Same as a note's pin: immediate feedback, reverted if the OS refuses.
+  async function togglePin() {
+    if (!group) return;
+    const next = !group.pinned;
+    group.pinned = next;
+    render();
+    try {
+      group.pinned = await invoke('set_pinned', { pinned: next });
+    } catch (err) {
+      group.pinned = !next;
+      console.error('set_pinned', err);
+    }
+    render();
+  }
+  pinBtn.addEventListener('click', togglePin);
+  document.addEventListener('keydown', (e) => {
+    const mod = isMac ? e.metaKey : e.ctrlKey;
+    if (e.key === 'Escape') closeColors();
+    if (mod && !e.shiftKey && e.key.toLowerCase() === 'n' && !renaming) {
+      e.preventDefault();
+      newNote();
+    }
+    if (mod && e.shiftKey && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      togglePin();
+    }
+  });
+
+  // ------------------------------------------------------------- rename
+
+  function startRename() {
+    if (renaming || !group) return;
+    renaming = true;
+    nameInput.value = group.name;
+    nameEl.hidden = true;
+    renameBtn.hidden = true;
+    nameInput.hidden = false;
+    nameInput.focus();
+    nameInput.select();
+  }
+
+  async function finishRename(save) {
+    if (!renaming) return;
+    renaming = false;
+    const value = nameInput.value.trim();
+    nameInput.hidden = true;
+    nameEl.hidden = false;
+    renameBtn.hidden = false;
+    if (save && value !== group.name) {
+      group.name = value;
+      render();
+      try {
+        group.name = await invoke('rename_group', { name: value });
+      } catch (err) {
+        console.error('rename_group', err);
+      }
+    }
+    render();
+  }
+
+  renameBtn.addEventListener('click', startRename);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finishRename(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finishRename(false); }
+  });
+  nameInput.addEventListener('blur', () => finishRename(true));
+
+  // -------------------------------------------------------------- colour
+
+  // The bar is a titlebar tall: the window grows (Rust, not saved) while the
+  // picker is open and shrinks back when it closes.
+  const setHeight = (height) => invoke('set_group_height', { height })
+    .catch((err) => console.error('set_group_height', err));
+
+  function openColors() {
+    if (renaming) finishRename(true);
+    colorMenu.hidden = false;
+    frame.classList.add('menu-open');
+    colorBtn.setAttribute('aria-expanded', 'true');
+    setHeight(colorMenu.offsetTop + colorMenu.offsetHeight + 6);
+  }
+
+  function closeColors() {
+    if (colorMenu.hidden) return;
+    colorMenu.hidden = true;
+    frame.classList.remove('menu-open');
+    colorBtn.setAttribute('aria-expanded', 'false');
+    setHeight(titlebar.offsetHeight);
+  }
+
+  async function setColor(color) {
+    group.color = color;
+    render();
+    invoke('set_group_color', { color }).catch((err) => console.error('set_group_color', err));
+  }
+
+  colorBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    colorMenu.hidden ? openColors() : closeColors();
+  });
+  $('swatches').addEventListener('click', (e) => {
+    const sw = e.target.closest('.swatch');
+    if (!sw || !group) return;
+    if (sw === customSwatch) {
+      // The system picker opens on the current colour.
+      customColor.value = isCustomColor(group.color) ? group.color : '#f2c94c';
+      customColor.click();
+      return;
+    }
+    setColor(sw.dataset.color);
+    closeColors();
+  });
+  customColor.addEventListener('change', () => {
+    setColor(customColor.value.toLowerCase());
+    closeColors();
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) closeColors();
+  });
+
+  // "mono" is white in the dark theme and black in the light one.
+  const systemLight = matchMedia('(prefers-color-scheme: light)');
+  function renderMonoName() {
+    const theme = document.documentElement.dataset.theme;
+    const light = theme ? theme === 'light' : systemLight.matches;
+    const sw = document.querySelector('.swatch[data-color="mono"]');
+    const name = t(light ? 'black' : 'white');
+    sw.setAttribute('aria-label', name);
+    sw.title = name;
+  }
+  systemLight.addEventListener('change', renderMonoName);
+
+  // ------------------------------------------------------------- delete
+
+  // An empty group goes at once; otherwise a second click within 3 s.
+  function deleteGroup() {
+    if (count > 0 && !closeBtn.classList.contains('confirming')) {
+      closeBtn.classList.add('confirming');
+      closeBtn.title = t('deleteGroupConfirm');
+      clearTimeout(confirmTimer);
+      confirmTimer = setTimeout(() => {
+        closeBtn.classList.remove('confirming');
+        render();
+      }, 3000);
+      return;
+    }
+    invoke('delete_group').catch((err) => console.error('delete_group', err));
+  }
+  closeBtn.addEventListener('click', deleteGroup);
+
+  // ------------------------------------------------------------- window
+
+  window.MemoChrome.attach({
+    frame,
+    titlebar,
+    resizeEdges: ['e', 'w'],
+    onDoubleClick: toggle,
+    onClose: deleteGroup,
+  });
+
+  document.addEventListener('contextmenu', (e) => {
+    if (!e.target.closest('input')) e.preventDefault();
+  });
+  window.addEventListener('focus', () => frame.classList.add('is-focused'));
+  window.addEventListener('blur', () => {
+    frame.classList.remove('is-focused');
+    closeColors();
+  });
+
+  function applyTheme(theme) {
+    if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+    renderMonoName();
+  }
+
+  function applyLanguage(lang) {
+    I18n.set(lang);
+    renderMonoName();
+    render();
+  }
+
+  async function init() {
+    const [, lang] = await invoke('get_language');
+    applyLanguage(lang);
+    applyTheme(await invoke('get_theme'));
+    listen('language-changed', (e) => applyLanguage(e.payload));
+    listen('theme-changed', (e) => applyTheme(e.payload));
+    // Name, open state and member count all come from load_group.
+    listen('groups-changed', load);
+    listen('notes-changed', load);
+    // [groupId, on]: a note dragged over (or away from) one of the bars.
+    listen('drop-hover', (e) => {
+      const [id, on] = e.payload;
+      if (group && id === group.id) frame.classList.toggle('drop-hover', on);
+    });
+    if (document.hasFocus()) frame.classList.add('is-focused');
+    await load();
+  }
+
+  init().catch((err) => console.error('init', err));
+})();

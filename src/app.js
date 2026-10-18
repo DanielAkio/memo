@@ -30,6 +30,9 @@
   const colorBtn = $('colorBtn');
   const nameEl = $('noteName');
   const titleInput = $('titleInput');
+  const footBtn = $('footBtn');
+  const renameBtn = $('renameBtn');
+  const groupMenu = $('groupMenu');
 
   let note = null;
   let saveTimer = null;
@@ -58,15 +61,8 @@
   const displayName = () => note.title || firstLine(note.text);
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  function editedLabel(ms) {
-    if (!ms) return '';
-    const d = new Date(ms);
-    const sameDay = d.toDateString() === new Date().toDateString();
-    const fmt = new Intl.DateTimeFormat(I18n.locale(), sameDay
-      ? { hour: '2-digit', minute: '2-digit' }
-      : { day: 'numeric', month: 'short' });
-    return t('edited', { when: fmt.format(d).replace('.', '') });
-  }
+  // A group's label: its name, or "Untitled" (groups start unnamed).
+  const groupLabel = (g) => g.name || t('untitled');
 
   // ------------------------------------------------------------- render
 
@@ -78,6 +74,7 @@
     else frame.style.removeProperty('--note-color');
     customSwatch.style.setProperty('--sw', custom ? note.color : '');
     if (!custom) customSwatch.style.removeProperty('--sw');
+    frame.classList.toggle('is-collapsed', Boolean(note.collapsed));
 
     pinBtn.setAttribute('aria-pressed', String(note.pinned));
     const pinLabel = t(note.pinned ? 'unpin' : 'pin');
@@ -97,7 +94,17 @@
   function renderMeta() {
     const n = wordCount(note.text);
     $('count').textContent = t(n === 1 ? 'wordOne' : 'wordMany', { n });
-    $('edited').textContent = note.text.trim() ? editedLabel(note.updatedAt) : t('newNoteStatus');
+    // Bottom left, always: the note's group, or "No group".
+    const group = groups.find((g) => g.id === note.groupId);
+    footBtn.classList.toggle('has-group', Boolean(group));
+    // The footer's folder takes the group's colour.
+    const folder = footBtn.querySelector('.foot-folder');
+    const groupColor = (group && group.color) || '';
+    folder.dataset.color = isCustomColor(groupColor) ? 'custom' : groupColor;
+    if (isCustomColor(groupColor)) folder.style.setProperty('--note-color', groupColor);
+    else folder.style.removeProperty('--note-color');
+    footBtn.title = group ? t('groupIs', { name: groupLabel(group) }) : t('addToGroup');
+    $('edited').textContent = group ? groupLabel(group) : t('noGroup');
     editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check'));
     renderName();
   }
@@ -658,7 +665,51 @@
     const picker = item.appendChild(document.createElement('select'));
     picker.className = 'code-lang';
     picker.addEventListener('change', () => setCodeLang(item.pre, picker.value));
+    const copyBtn = item.appendChild(document.createElement('button'));
+    copyBtn.type = 'button';
+    copyBtn.className = 'code-copy';
+    copyBtn.innerHTML = COPY_ICON;
+    // mousedown: keep the caret in the editor; click copies the block's text.
+    copyBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    copyBtn.addEventListener('click', () => copyCode(item.pre, copyBtn));
     return item;
+  }
+
+  const COPY_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.25" y="5.25" width="8" height="8" rx="1.5"/><path d="M10.75 5.25v-1a1.5 1.5 0 0 0-1.5-1.5h-4.5a1.5 1.5 0 0 0-1.5 1.5v4.5a1.5 1.5 0 0 0 1.5 1.5h1"/></svg>';
+  const COPIED_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg>';
+
+  // Copies a code block's text (as plain text, line breaks kept); the button
+  // shows a check for a moment.
+  async function copyCode(pre, btn) {
+    if (!pre || !editor.contains(pre)) return;
+    const text = preText(pre);
+    // A synchronous "copy" whose event carries the text: works within the
+    // click and leaves the editor's focus and selection alone. The async
+    // clipboard API is the fallback.
+    const fill = (e) => {
+      e.clipboardData.setData('text/plain', text);
+      e.preventDefault();
+    };
+    document.addEventListener('copy', fill, { once: true });
+    const copied = document.execCommand('copy');
+    document.removeEventListener('copy', fill);
+    if (!copied) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (err) {
+        console.error('copyCode', err);
+        return;
+      }
+    }
+    btn.innerHTML = COPIED_ICON;
+    btn.classList.add('copied');
+    btn.title = t('copied');
+    clearTimeout(btn.resetTimer);
+    btn.resetTimer = setTimeout(() => {
+      btn.innerHTML = COPY_ICON;
+      btn.classList.remove('copied');
+      btn.title = t('copyCode');
+    }, 1500);
   }
 
   // Lays one item over each code block (position, size, highlighted text,
@@ -669,7 +720,7 @@
     while (codeLayer.children.length < blocks.length) codeLayer.append(codeItem());
     blocks.forEach((pre, i) => {
       const item = codeLayer.children[i];
-      const [copy, picker] = item.children;
+      const [copy, picker, copyBtn] = item.children;
       item.pre = pre;
       item.classList.toggle('is-hovered', pre === hoveredPre);
       item.style.top = `${pre.offsetTop - editor.scrollTop}px`;
@@ -695,6 +746,8 @@
         picker.replaceChildren(...langs.map(([value, label]) => new Option(label || t('plainText'), value)));
         picker.value = lang;
         picker.title = t('codeLanguage');
+        if (!copyBtn.classList.contains('copied')) copyBtn.title = t('copyCode');
+        copyBtn.setAttribute('aria-label', t('copyCode'));
         picker.setAttribute('aria-label', t('codeLanguage'));
       }
     });
@@ -1108,7 +1161,7 @@
   }
 
   function updateFormatBar() {
-    const range = !selecting && note && document.activeElement === editor && selectionRange();
+    const range = !selecting && note && !note.collapsed && document.activeElement === editor && selectionRange();
     const rects = range ? [...range.getClientRects()].filter((r) => r.width || r.height) : [];
     if (!rects.length) { hideFormatBar(); return; }
 
@@ -1164,6 +1217,22 @@
     render();
   }
 
+  // Double-click on the titlebar: collapse to the titlebar, or expand back.
+  async function toggleCollapse() {
+    closeColors();
+    closeGroupMenu();
+    hideFormatBar();
+    if (renaming) await finishRename(true);
+    note.collapsed = !note.collapsed;
+    render();
+    try {
+      await invoke('set_collapsed', { collapsed: note.collapsed });
+    } catch (err) {
+      console.error('set_collapsed', err);
+    }
+    if (!note.collapsed) editor.focus();
+  }
+
   async function newNote() {
     closeColors();
     await flushText();
@@ -1186,12 +1255,14 @@
 
   // ------------------------------------------------------------- title
 
+  // The pencil next to the name (shown on hover) opens the title field.
   function startRename() {
     if (renaming) return;
     renaming = true;
     closeColors();
     titleInput.value = note.title;
     nameEl.hidden = true;
+    renameBtn.hidden = true;
     titleInput.hidden = false;
     titleInput.focus();
     titleInput.select();
@@ -1203,6 +1274,7 @@
     const value = titleInput.value.trim();
     titleInput.hidden = true;
     nameEl.hidden = false;
+    renameBtn.hidden = false;
     if (save && value !== note.title) {
       note.title = value;
       renderName();
@@ -1213,12 +1285,15 @@
       }
     }
     renderName();
-    editor.focus();
+    if (!note.collapsed) editor.focus();
   }
+  renameBtn.addEventListener('click', startRename);
 
   // ------------------------------------------------------- colour picker
 
-  function openColors() {
+  // A collapsed note is only a titlebar: it expands to show the picker.
+  async function openColors() {
+    if (note.collapsed) await toggleCollapse();
     hideFormatBar();
     colorMenu.hidden = false;
     frame.classList.add('menu-open');
@@ -1325,6 +1400,75 @@
   });
   document.addEventListener('mousedown', (e) => {
     if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) closeColors();
+    if (!groupMenu.hidden && !groupMenu.contains(e.target) && !footBtn.contains(e.target)) closeGroupMenu();
+  });
+
+  // -------------------------------------------------------------- groups
+  // The footer shows the note's group; clicking it opens a picker to move
+  // the note to another group, out of its group or into a new one. Rust does
+  // the moving (set_note_group) and emits "groups-changed".
+
+  let groups = [];
+
+  async function loadGroups() {
+    if (EMBED || !note) return;
+    try {
+      [groups, note.groupId] = await Promise.all([invoke('list_groups'), invoke('get_note_group')]);
+    } catch (err) {
+      console.error('list_groups', err);
+    }
+    renderMeta();
+  }
+
+  function groupItem(label, value, { checked = false, muted = false } = {}) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `menu-item${muted ? ' muted' : ''}`;
+    btn.setAttribute('role', 'menuitemradio');
+    btn.setAttribute('aria-checked', String(checked));
+    btn.dataset.group = value;
+    const text = document.createElement('span');
+    text.textContent = label;
+    btn.append(text);
+    return btn;
+  }
+
+  function openGroupMenu() {
+    closeColors();
+    hideFormatBar();
+    const items = groups
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true }))
+      .map((g) => groupItem(groupLabel(g), g.id, { checked: g.id === note.groupId }));
+    const sep = document.createElement('div');
+    sep.className = 'menu-sep';
+    $('groupItems').replaceChildren(
+      ...items,
+      ...(items.length ? [sep] : []),
+      groupItem(t('noGroup'), '', { checked: !note.groupId, muted: true }),
+      groupItem(t('newGroup'), 'new', { muted: true }),
+    );
+    groupMenu.hidden = false;
+    frame.classList.add('menu-open');
+    footBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeGroupMenu() {
+    if (groupMenu.hidden) return;
+    groupMenu.hidden = true;
+    frame.classList.remove('menu-open');
+    footBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  footBtn.addEventListener('click', () => (groupMenu.hidden ? openGroupMenu() : closeGroupMenu()));
+  $('groupItems').addEventListener('click', (e) => {
+    const item = e.target.closest('.menu-item');
+    if (!item) return;
+    closeGroupMenu();
+    if (item.dataset.group === note.groupId) return;
+    flushText();
+    invoke('set_note_group', { groupId: item.dataset.group })
+      .catch((err) => console.error('set_note_group', err));
   });
 
   // Titlebar (chrome.js): drag with snapping, double-click edits the title,
@@ -1334,7 +1478,7 @@
       frame,
       titlebar,
       grip: $('grip'),
-      onDoubleClick: startRename,
+      onDoubleClick: toggleCollapse,
       onClose: closeNote,
     });
   }
@@ -1342,7 +1486,7 @@
   document.addEventListener('keydown', (e) => {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const key = e.key.toLowerCase();
-    if (e.key === 'Escape') { closeColors(); hideFormatBar(); return; }
+    if (e.key === 'Escape') { closeColors(); closeGroupMenu(); hideFormatBar(); return; }
     if (EMBED) return;
     if (mod && e.shiftKey && key === 'p') { e.preventDefault(); togglePin(); }
     else if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); }
@@ -1358,14 +1502,13 @@
   window.addEventListener('blur', () => {
     frame.classList.remove('is-focused');
     hideFormatBar();
+    closeGroupMenu();
     flushText();
   });
   window.addEventListener('beforeunload', () => {
     if (textDirty) invoke(EMBED ? 'set_default_content' : 'save_text', { text: note.text, html: note.html });
   });
 
-  // Refreshes the "edited at…" label when the day rolls over.
-  setInterval(() => note && renderMeta(), 60_000);
 
   // --------------------------------------------------------------- init
 
@@ -1433,8 +1576,12 @@
     if (!note) return;
     loadContent();
     render();
-    if (document.hasFocus()) frame.classList.add('is-focused');
     if (!EMBED) {
+      TAURI.event.listen('groups-changed', loadGroups);
+      await loadGroups();
+    }
+    if (document.hasFocus()) frame.classList.add('is-focused');
+    if (!EMBED && !note.collapsed) {
       editor.focus();
       const r = document.createRange();
       r.selectNodeContents(editor);

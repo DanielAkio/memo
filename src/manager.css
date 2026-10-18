@@ -19,7 +19,7 @@ body {
   color: var(--color-mist);
 }
 
-/* Everything below the titlebar. */
+/* Everything below the titlebar; hidden while collapsed. */
 .mgr-body {
   flex: 1;
   min-height: 0;
@@ -27,6 +27,8 @@ body {
   flex-direction: column;
   border-top: 1px solid var(--color-graphite);
 }
+.is-collapsed .mgr-body,
+.is-collapsed .grip { display: none; }
 
 /* ------------------------------------------------------------------- top */
 
@@ -246,10 +248,53 @@ body {
   display: flex;
   gap: 4px;
 }
+/* The memory's group, before the date. */
+.row-group-chip {
+  flex: none;
+  max-width: 110px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 1px 6px;
+  border-radius: var(--radius-badge);
+  background: var(--overlay-active);
+  color: var(--color-fog);
+  font-size: 11px;
+}
+.row-group-chip { display: inline-flex; align-items: center; gap: 5px; }
+.chip-dot { flex: none; width: 6px; height: 6px; border-radius: 9999px; background: var(--note-color); }
+.chip-dot[data-color=""] { display: none; }
+.chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Group picker in the row's actions (shown on hover, like the trash button). */
+.row-group {
+  max-width: 120px;
+  height: 26px;
+  padding: 0 20px 0 8px;
+  border: 0;
+  outline: 0;
+  border-radius: var(--radius-button);
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--overlay-hover);
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-fog) 50%),
+                    linear-gradient(135deg, var(--color-fog) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 11px, calc(100% - 8px) 11px;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  box-shadow: var(--hairline);
+  color: var(--color-mist);
+  font: inherit;
+  font-size: 12px;
+  cursor: default;
+}
+.row-group:hover, .row-group:focus-visible { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.row-group option { background: var(--color-obsidian); color: var(--color-mist); }
+
 /* In the notes list, the trash button only shows on hover. */
 .notes-view .row-actions { opacity: 0; }
 .notes-view .row:hover .row-actions,
 .notes-view .row:focus-within .row-actions { opacity: 1; }
+.row-actions { align-items: center; }
 
 
 .btn {
@@ -605,6 +650,9 @@ textarea.field { resize: vertical; min-height: 84px; }
 }
 .demo-bar { border-radius: var(--radius-button); background: var(--color-obsidian); box-shadow: var(--hairline); }
 .demo-bar .demo-name { flex: 1; }
+/* A coloured group bar: stripe on the left and the folder in its colour. */
+.demo-bar[data-color] { box-shadow: inset 2px 0 0 var(--note-color), var(--hairline); }
+.help-demo .icon-btn.demo-tint { color: var(--note-color); }
 .demo-list-row { padding: 0 6px; }
 .demo-name {
   min-width: 0;
@@ -656,6 +704,19 @@ textarea.field { resize: vertical; min-height: 84px; }
   color: var(--color-mist);
 }
 .demo-field .icon-btn { width: auto; height: auto; }
+/* A note's footer showing its group (bottom left) and word count. */
+.demo-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 16px;
+  color: var(--color-mist);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.demo-foot .icon-btn { width: auto; height: auto; }
+.demo-foot svg { width: 13px; height: 13px; }
+.demo-foot-meta { color: var(--color-ash); font-family: var(--font-mono); font-size: 11px; }
 .demo-field svg {
   width: 14px;
   height: 14px;

@@ -277,7 +277,7 @@ html, body {
 .is-focused .titlebar .actions,
 .frame:hover .titlebar .actions,
 .menu-open .titlebar .actions {
-  max-width: 96px; /* up to 3 × 28px buttons (manager) + 2 × 2px gaps, with slack */
+  max-width: 128px; /* up to 4 × 28px buttons (manager) + 3 × 2px gaps, with slack */
   margin-left: 0;
 }
 .pin { opacity: 0.55; }
@@ -307,6 +307,10 @@ html, body {
 .rs-sw { bottom: 0; left: 0; cursor: nesw-resize; }
 .rs-nw { top: 0; left: 0; cursor: nwse-resize; }
 .rs-se { bottom: 0; right: 0; cursor: nwse-resize; }
+/* A collapsed note only changes width. */
+.is-collapsed .rs-n, .is-collapsed .rs-s,
+.is-collapsed .rs-ne, .is-collapsed .rs-nw, .is-collapsed .rs-se, .is-collapsed .rs-sw { display: none; }
+.is-collapsed .rs-e, .is-collapsed .rs-w { top: 0; bottom: 0; }
 
 /* Visible grip in the bottom-right corner. */
 .grip {

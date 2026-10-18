@@ -66,6 +66,31 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 .note-name.is-empty { color: var(--color-ash); font-weight: 400; }
 
+/* Pencil left of the name, only while hovering it (or focused by keyboard):
+   it opens the title field. Hidden it takes no room (the negative margin
+   cancels the .identity gap); shown it slides the name aside. */
+.frame .titlebar .identity .rename-btn {
+  flex: none;
+  width: 0;
+  height: 22px;
+  margin: 0 -8px 0 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 120ms ease, margin 120ms ease, opacity 120ms ease;
+}
+.frame .titlebar .identity:hover .rename-btn,
+.frame .titlebar .identity .rename-btn:focus-visible {
+  width: 22px;
+  margin: 0 -4px 0 -2px;
+  opacity: 1;
+}
+.rename-btn svg { width: 13px; height: 13px; }
+.rename-btn[hidden] { display: none; }
+
+/* Collapsed (double-click on the titlebar): only the titlebar is left. */
+.is-collapsed .body,
+.is-collapsed .statusbar { display: none; }
+
 /* Field shown on double click to name the note. */
 .title-input {
   flex: 1;
@@ -176,7 +201,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .code-lang {
   position: absolute;
   top: 3px;
-  right: 4px;
+  left: 4px;
   max-width: 60%;
   height: 18px;
   padding: 0 16px 0 6px;
@@ -206,6 +231,44 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .code-hl.is-hovered .code-lang,
 .code-lang:hover,
 .code-lang:focus { visibility: visible; }
+
+/* Copy button in the block's top-right corner, shown with the language
+   picker while the mouse is over the block. */
+.code-copy {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-badge);
+  background: var(--color-obsidian);
+  box-shadow: var(--shadow-popover);
+  color: var(--color-ash);
+  pointer-events: auto;
+  cursor: default;
+  visibility: hidden;
+}
+.code-copy svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.code-hl.is-hovered .code-copy,
+.code-copy:hover,
+.code-copy:focus-visible,
+.code-copy.copied { visibility: visible; }
+.code-copy:hover,
+.code-copy:focus-visible,
+.code-copy.copied { color: var(--color-mist); }
+.code-copy:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
 .code-lang:hover,
 .code-lang:focus-visible { color: var(--color-mist); }
 .code-lang option {
@@ -323,7 +386,38 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   white-space: nowrap;
   overflow: hidden;
 }
-#edited { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.foot-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  height: 22px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-badge);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.foot-btn:hover,
+.foot-btn[aria-expanded="true"] { background: var(--overlay-hover); color: var(--color-mist); }
+#edited { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* In a group: its name instead of "new memory" / "edited …". */
+.foot-folder {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+.foot-btn.has-group { color: var(--color-mist); }
+.foot-folder[data-color]:not([data-color=""]) { stroke: var(--note-color); }
 
 /* ------------------------------------------------------------------ menu */
 
@@ -349,6 +443,42 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   width: auto;
   max-width: calc(100% - 36px);
 }
+
+/* Group picker: opens above the footer, on the left. */
+.group-menu {
+  top: auto;
+  bottom: 30px;
+  left: 8px;
+  right: auto;
+  width: 200px;
+  max-width: calc(100% - 16px);
+}
+.menu-items {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-mist);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  text-align: left;
+  cursor: default;
+}
+.menu-item span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.menu-item:hover { background: var(--overlay-hover); color: var(--color-paper); }
+.menu-item[aria-checked="true"] { color: var(--color-paper); }
+.menu-item[aria-checked="true"]::after { content: "✓"; margin-left: auto; color: var(--color-fog); }
+.menu-item.muted { color: var(--color-fog); }
+.menu-sep { height: 1px; margin: 4px 2px; background: var(--color-graphite); }
 
 .menu-label {
   padding: 4px 8px 6px;

@@ -5,7 +5,7 @@ mod store;
 mod welcome;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread,
@@ -13,8 +13,8 @@ use std::{
 };
 
 use store::{
-    is_valid_color, now_ms, Config, ManagerState, Note, Store, DEFAULT_H, DEFAULT_TEXT_MAX,
-    DEFAULT_W, LANGUAGES, THEMES, TITLEBAR_H, TITLE_MAX,
+    is_valid_color, now_ms, Config, Group, ManagerState, Note, Store, DEFAULT_H, DEFAULT_TEXT_MAX,
+    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, THEMES, TITLEBAR_H, TITLE_MAX,
 };
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -42,9 +42,13 @@ const SNAP_DISTANCE: f64 = 16.0;
 /// Gap (logical) between two snapped notes, the same on all four sides; also
 /// the gap between a new note and the note that created it.
 const SNAP_GAP: f64 = 6.0;
-/// Minimum widths (logical) of a note and of the manager.
+/// Minimum widths (logical) of a note, the manager and a group bar.
 const MIN_W: f64 = 180.0;
 const MANAGER_MIN_W: f64 = 380.0;
+const GROUP_MIN_W: f64 = MIN_W;
+/// Group animation: notes slide out of / into their group in this many steps.
+const SLIDE_STEPS: u32 = 10;
+const SLIDE_STEP: Duration = Duration::from_millis(14);
 /// Label of the manager window (notes and trash).
 const MANAGER: &str = "manager";
 /// Label of the Snap preview: a transparent, click-through window showing
@@ -75,22 +79,33 @@ fn is_note(window: &WebviewWindow) -> bool {
     window.label().starts_with("note-")
 }
 
-/// The app's real windows (notes and manager), i.e. not the Snap preview.
-fn is_app_window(window: &WebviewWindow) -> bool {
-    window.label() != SNAP_PREVIEW
+fn group_label(id: &str) -> String {
+    format!("group-{id}")
 }
 
-/// Open note windows (excluding the manager).
-fn note_windows(app: &AppHandle) -> Vec<WebviewWindow> {
-    app.webview_windows()
-        .into_values()
-        .filter(is_note)
-        .collect()
+fn group_id_of(window: &WebviewWindow) -> String {
+    window.label().trim_start_matches("group-").to_string()
+}
+
+fn is_group(window: &WebviewWindow) -> bool {
+    window.label().starts_with("group-")
+}
+
+/// The app's real windows (notes, groups and manager), i.e. not the Snap
+/// preview.
+fn is_app_window(window: &WebviewWindow) -> bool {
+    window.label() != SNAP_PREVIEW
 }
 
 /// Tells the windows (the manager) that the note list changed.
 fn notify(app: &AppHandle) {
     let _ = app.emit("notes-changed", ());
+}
+
+/// Tells every window that groups (names, members, open state) changed: the
+/// notes' footers, the group bars and the manager refresh on it.
+fn groups_changed(app: &AppHandle) {
+    let _ = app.emit("groups-changed", ());
 }
 
 // ---------------------------------------------------------------------------
@@ -99,17 +114,30 @@ fn notify(app: &AppHandle) {
 
 /// Opens a note's window (or brings it to the front if it is already open).
 fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow> {
-    let label = label_for(&note.id);
-    if let Some(existing) = app.get_webview_window(&label) {
+    if let Some(existing) = app.get_webview_window(&label_for(&note.id)) {
         let _ = existing.unminimize();
         let _ = existing.show();
         let _ = existing.set_focus();
         return Ok(existing);
     }
+    let window = build_note_window(app, note)?;
+    window.show()?;
+    Ok(window)
+}
 
+/// Creates a note's window, hidden, at its saved place.
+fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow> {
+    let label = label_for(&note.id);
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("Memo")
-        .inner_size(note.width, note.height)
+        .inner_size(
+            note.width,
+            if note.collapsed {
+                TITLEBAR_H
+            } else {
+                note.height
+            },
+        )
         .decorations(false)
         // Resized through the page's handles (resize_to), with snapping.
         .resizable(false)
@@ -129,7 +157,6 @@ fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow
 
     apply_background(&window, &app.state::<Shared>().theme());
     track_geometry(app, &window);
-    window.show()?;
     Ok(window)
 }
 
@@ -147,7 +174,14 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     let state = store.manager();
     let window = WebviewWindowBuilder::new(app, MANAGER, WebviewUrl::App("manager.html".into()))
         .title(manager_title(store.effective_language()))
-        .inner_size(state.width, state.height)
+        .inner_size(
+            state.width,
+            if state.collapsed {
+                TITLEBAR_H
+            } else {
+                state.height
+            },
+        )
         .decorations(false)
         // Resized through the page's handles (resize_to), with snapping.
         .resizable(false)
@@ -257,13 +291,26 @@ fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
     }
 }
 
+/// Which saved object a window's geometry belongs to.
+enum Kind {
+    Note(String),
+    Group(String),
+    Manager,
+}
+
 /// Saves position and size whenever the user moves or resizes a window
-/// (note or manager).
+/// (note, group or manager). Moves made by a group animation are skipped,
+/// so a note keeps its own place.
 fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
     let app = app.clone();
     let win = window.clone();
-    let id = id_of(window);
-    let note = is_note(window);
+    let kind = if is_note(window) {
+        Kind::Note(id_of(window))
+    } else if is_group(window) {
+        Kind::Group(group_id_of(window))
+    } else {
+        Kind::Manager
+    };
     window.on_window_event(move |event| {
         let store = app.state::<Shared>();
         match event {
@@ -272,11 +319,26 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 if pos.x <= -30_000 || pos.y <= -30_000 {
                     return;
                 }
+                if app
+                    .state::<Sliding>()
+                    .0
+                    .lock()
+                    .unwrap()
+                    .contains(win.label())
+                {
+                    return;
+                }
                 let (x, y) = (Some(pos.x), Some(pos.y));
-                if note {
-                    store.update(&id, |n| (n.x, n.y) = (x, y));
-                } else {
-                    store.update_manager(|m| (m.x, m.y) = (x, y));
+                match &kind {
+                    Kind::Note(id) => {
+                        store.update(id, |n| (n.x, n.y) = (x, y));
+                    }
+                    Kind::Group(id) => {
+                        store.update_group(id, |g| (g.x, g.y) = (x, y));
+                    }
+                    Kind::Manager => {
+                        store.update_manager(|m| (m.x, m.y) = (x, y));
+                    }
                 }
             }
             WindowEvent::Resized(size) => {
@@ -285,15 +347,34 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 }
                 let scale = win.scale_factor().unwrap_or(1.0);
                 let logical = size.to_logical::<f64>(scale);
-                if note {
-                    store.update(&id, |n| {
-                        (n.width, n.height) = (logical.width, logical.height)
-                    });
-                } else {
-                    store.update_manager(|m| (m.width, m.height) = (logical.width, logical.height));
+                match &kind {
+                    Kind::Note(id) => {
+                        // While collapsed, the saved height stays the expanded one.
+                        store.update(id, |n| {
+                            n.width = logical.width;
+                            if !n.collapsed && logical.height > TITLEBAR_H + 8.0 {
+                                n.height = logical.height;
+                            }
+                        });
+                    }
+                    Kind::Group(id) => {
+                        store.update_group(id, |g| g.width = logical.width);
+                    }
+                    Kind::Manager => {
+                        // While collapsed, the saved height stays the expanded one.
+                        store.update_manager(|m| {
+                            m.width = logical.width;
+                            if !m.collapsed && logical.height > TITLEBAR_H + 8.0 {
+                                m.height = logical.height;
+                            }
+                        });
+                    }
                 }
             }
             WindowEvent::ThemeChanged(_) => apply_background(&win, &store.theme()),
+            WindowEvent::Destroyed => {
+                app.state::<Sliding>().0.lock().unwrap().remove(win.label());
+            }
             _ => {}
         }
     });
@@ -481,8 +562,12 @@ struct Rect {
 struct Drag {
     /// Cursor offset from the window's outer corner, physical pixels.
     grab: (f64, f64),
+    /// Outer position where the drag started.
+    start: (i32, i32),
     /// Snap zone under the cursor at the last move.
     zone: Option<Rect>,
+    /// Group bar under the cursor (a note dropped there joins that group).
+    drop: Option<String>,
 }
 
 #[derive(Default)]
@@ -497,7 +582,9 @@ struct Drags {
 /// Whether the note (or the manager) is pinned, to put back after a drag.
 fn pinned(window: &WebviewWindow) -> bool {
     let store = window.state::<Shared>();
-    if is_note(window) {
+    if is_group(window) {
+        store.group(&group_id_of(window)).is_some_and(|g| g.pinned)
+    } else if is_note(window) {
         store.get(&id_of(window)).is_some_and(|n| n.pinned)
     } else {
         store.manager().pinned
@@ -619,11 +706,15 @@ fn drag_start(window: WebviewWindow, drags: State<'_, Drags>) {
     };
     let grab = (cursor.x - outer.x as f64, cursor.y - outer.y as f64);
     let _ = window.set_always_on_top(true);
-    drags
-        .active
-        .lock()
-        .unwrap()
-        .insert(window.label().into(), Drag { grab, zone: None });
+    drags.active.lock().unwrap().insert(
+        window.label().into(),
+        Drag {
+            grab,
+            start: (outer.x, outer.y),
+            zone: None,
+            drop: None,
+        },
+    );
 }
 
 /// Moves the window under the cursor, with the magnet, and updates the Snap
@@ -672,8 +763,58 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
     );
     let _ = window.set_position(PhysicalPosition::new(vx - dx, vy - dy));
 
-    drag.zone = snap_zone(window, cursor);
-    show_snap_preview(window.app_handle(), drag.zone);
+    // A note over a group bar can be dropped into it (the bar lights up);
+    // group bars themselves don't Snap.
+    let app = window.app_handle();
+    if is_note(window) {
+        let target = group_under(window, cursor);
+        if target != drag.drop {
+            if let Some(old) = &drag.drop {
+                let _ = app.emit("drop-hover", (old, false));
+            }
+            if let Some(new) = &target {
+                let _ = app.emit("drop-hover", (new, true));
+            }
+            drag.drop = target;
+        }
+    }
+    // Group bars and collapsed windows don't Snap (a half-screen titlebar).
+    let store = window.state::<Shared>();
+    let collapsed = if is_note(window) {
+        store.get(&id_of(window)).is_some_and(|n| n.collapsed)
+    } else {
+        !is_group(window) && store.manager().collapsed
+    };
+    drag.zone = if is_group(window) || collapsed || drag.drop.is_some() {
+        None
+    } else {
+        snap_zone(window, cursor)
+    };
+    show_snap_preview(app, drag.zone);
+}
+
+/// The group bar under `cursor` (not the note's own group), by id.
+fn group_under(note: &WebviewWindow, cursor: PhysicalPosition<f64>) -> Option<String> {
+    let own = note
+        .state::<Shared>()
+        .get(&id_of(note))
+        .map(|n| n.group_id)
+        .unwrap_or_default();
+    note.app_handle()
+        .webview_windows()
+        .into_values()
+        .filter(|w| is_group(w) && w.is_visible().unwrap_or(false))
+        .find(|w| {
+            let (Ok(p), Ok(s)) = (w.inner_position(), w.inner_size()) else {
+                return false;
+            };
+            cursor.x >= p.x as f64
+                && cursor.x < (p.x + s.width as i32) as f64
+                && cursor.y >= p.y as f64
+                && cursor.y < (p.y + s.height as i32) as f64
+        })
+        .map(|w| group_id_of(&w))
+        .filter(|id| *id != own)
 }
 
 /// End of the drag: final move, then, if released in a Snap zone, the window
@@ -684,10 +825,18 @@ fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
     let drag = drags.active.lock().unwrap().remove(window.label());
     show_snap_preview(window.app_handle(), None);
     let _ = window.set_always_on_top(pinned(&window));
-    let Some(Drag {
-        zone: Some(zone), ..
-    }) = drag
-    else {
+    let Some(drag) = drag else {
+        return;
+    };
+    // Dropped on a group bar: the note joins it, going back to where the drag
+    // started (open group) or into the bar (closed group).
+    if let Some(group) = drag.drop {
+        let app = window.app_handle();
+        let _ = app.emit("drop-hover", (&group, false));
+        join_group(app, &id_of(&window), &group, Some(drag.start));
+        return;
+    }
+    let Some(zone) = drag.zone else {
         return;
     };
     let (Some((dx, dy)), Ok(size), Ok(scale)) = (
@@ -745,6 +894,8 @@ fn resize_to(
     // Minimum size (the same as when the window was resizable).
     let min_w = if is_note(&window) {
         MIN_W
+    } else if is_group(&window) {
+        GROUP_MIN_W
     } else {
         MANAGER_MIN_W
     };
@@ -787,10 +938,14 @@ fn show_all(app: &AppHandle) {
     }
 }
 
-/// Brings every open note window to the front (restoring minimised ones).
-/// Returns `false` if there is none.
+/// Brings every open note window and group bar to the front (restoring
+/// minimised ones). Returns `false` if there is none.
 fn raise_notes(app: &AppHandle) -> bool {
-    let windows = note_windows(app);
+    let windows: Vec<WebviewWindow> = app
+        .webview_windows()
+        .into_values()
+        .filter(|w| is_note(w) || is_group(w))
+        .collect();
     for window in &windows {
         let _ = window.unminimize();
         let _ = window.show();
@@ -880,6 +1035,8 @@ fn set_pinned(
         .map_err(|e| e.to_string())?;
     if is_note(&window) {
         store.update(&id_of(&window), |n| n.pinned = pinned);
+    } else if is_group(&window) {
+        store.update_group(&group_id_of(&window), |g| g.pinned = pinned);
     } else {
         store.update_manager(|m| m.pinned = pinned);
     }
@@ -899,6 +1056,29 @@ fn set_color(
     store.update(&id_of(&window), |n| n.color = color);
     notify(&app);
     Ok(())
+}
+
+/// Double-click on a note's (or the manager's) titlebar: collapses it to the
+/// titlebar or expands it back to its saved height.
+#[tauri::command]
+fn set_collapsed(
+    window: WebviewWindow,
+    collapsed: bool,
+    store: State<'_, Shared>,
+) -> Result<(), String> {
+    let (width, expanded) = if is_note(&window) {
+        let note = store
+            .update(&id_of(&window), |n| n.collapsed = collapsed)
+            .ok_or("note not found")?;
+        (note.width, note.height)
+    } else {
+        let state = store.update_manager(|m| m.collapsed = collapsed);
+        (state.width, state.height)
+    };
+    let height = if collapsed { TITLEBAR_H } else { expanded };
+    window
+        .set_size(LogicalSize::new(width, height))
+        .map_err(|e| e.to_string())
 }
 
 // Creating and destroying windows from sync commands can deadlock on
@@ -1026,7 +1206,13 @@ async fn open_note(app: AppHandle, id: String) -> Result<(), String> {
         .get(&id)
         .filter(|n| n.trashed_at.is_none())
         .ok_or("note not found")?;
-    open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    // Inside a closed group: take the whole group out.
+    match app.state::<Shared>().group(&note.group_id) {
+        Some(group) if !group.open => take_out(&app, &group.id),
+        _ => {
+            open_note_window(&app, &note).map_err(|e| e.to_string())?;
+        }
+    }
     Ok(())
 }
 
@@ -1035,15 +1221,19 @@ async fn move_to_trash(app: AppHandle, id: String) {
     trash(&app, &id);
 }
 
-/// Takes the note out of the trash and opens its window.
+/// Takes the note out of the trash and opens its window (unless it goes back
+/// into a closed group).
 #[tauri::command]
 async fn restore_note(app: AppHandle, id: String) -> Result<(), String> {
-    let note = app
-        .state::<Shared>()
+    let store = app.state::<Shared>();
+    let note = store
         .update(&id, |n| n.trashed_at = None)
         .ok_or("note not found")?;
-    open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    if store.group(&note.group_id).map_or(true, |g| g.open) {
+        open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    }
     notify(&app);
+    groups_changed(&app);
     Ok(())
 }
 
@@ -1118,6 +1308,26 @@ fn set_default_title(title: String, store: State<'_, Shared>) {
     store.set_default_title(title.trim().chars().take(TITLE_MAX).collect());
 }
 
+/// Colour and name new groups start with, for the manager's Settings.
+#[tauri::command]
+fn get_group_defaults(store: State<'_, Shared>) -> (String, String) {
+    store.group_defaults()
+}
+
+#[tauri::command]
+fn set_default_group_color(color: String, store: State<'_, Shared>) -> Result<(), String> {
+    if !is_valid_color(&color) {
+        return Err(format!("unknown color: {color}"));
+    }
+    store.set_default_group_color(&color);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_default_group_title(title: String, store: State<'_, Shared>) {
+    store.set_default_group_title(title.trim().chars().take(GROUP_NAME_MAX).collect());
+}
+
 /// Default content for new notes, edited in the manager with the same note
 /// editor (index.html?defaults): plain text and HTML, as a note stores them.
 #[tauri::command]
@@ -1139,6 +1349,355 @@ fn set_default_color(
     store.set_default_color(&color);
     notify(&app);
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Groups
+// ---------------------------------------------------------------------------
+//
+// A group is a compact bar (`group.html`, label `group-{id}`). Double-click
+// takes its notes out — each window slides from the bar to the note's saved
+// place — or puts them back in: they slide into the bar and their windows
+// close. Notes join a group by being dropped on its bar, from the picker in
+// their footer or from the manager's list. Deleting a group sends its notes
+// to the trash.
+
+/// Windows being moved by a group animation: their `Moved` events are not
+/// saved, so a note keeps its own place. A label is removed when its window
+/// is destroyed, or shortly after a slide-out ends.
+#[derive(Default)]
+struct Sliding(Mutex<HashSet<String>>);
+
+/// Slides `window` (outer position) from `from` to `to` on a worker thread,
+/// easing out, then runs `done` there.
+fn slide(
+    window: WebviewWindow,
+    from: (i32, i32),
+    to: (i32, i32),
+    done: impl FnOnce(&WebviewWindow) + Send + 'static,
+) {
+    thread::spawn(move || {
+        for i in 1..=SLIDE_STEPS {
+            let t = i as f64 / SLIDE_STEPS as f64;
+            let e = 1.0 - (1.0 - t).powi(3);
+            let x = from.0 + ((to.0 - from.0) as f64 * e).round() as i32;
+            let y = from.1 + ((to.1 - from.1) as f64 * e).round() as i32;
+            let _ = window.set_position(PhysicalPosition::new(x, y));
+            thread::sleep(SLIDE_STEP);
+        }
+        done(&window);
+    });
+}
+
+/// Native window title of a group bar (taskbar): its name, or the app's.
+fn group_title(name: &str) -> &str {
+    if name.is_empty() {
+        "Memo"
+    } else {
+        name
+    }
+}
+
+/// Opens a group's bar (or brings it to the front if already open).
+fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWindow> {
+    let label = group_label(&group.id);
+    if let Some(existing) = app.get_webview_window(&label) {
+        let _ = existing.unminimize();
+        let _ = existing.show();
+        return Ok(existing);
+    }
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("group.html".into()))
+        .title(group_title(&group.name))
+        .inner_size(group.width, TITLEBAR_H)
+        .decorations(false)
+        .resizable(false)
+        .always_on_top(group.pinned)
+        .background_color(CARBON)
+        .visible(false)
+        .build()?;
+    match (group.x, group.y) {
+        (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
+            let _ = window.set_position(PhysicalPosition::new(x, y));
+        }
+        _ => {
+            let _ = window.center();
+        }
+    }
+    apply_background(&window, &app.state::<Shared>().theme());
+    track_geometry(app, &window);
+    window.show()?;
+    Ok(window)
+}
+
+/// Where notes come out of / go into: the group bar's outer corner.
+fn group_anchor(app: &AppHandle, id: &str) -> Option<(i32, i32)> {
+    if let Some(p) = app
+        .get_webview_window(&group_label(id))
+        .and_then(|w| w.outer_position().ok())
+    {
+        return Some((p.x, p.y));
+    }
+    let group = app.state::<Shared>().group(id)?;
+    Some((group.x?, group.y?))
+}
+
+/// Takes the group's notes out: each window appears at the bar and slides to
+/// the note's saved place.
+fn take_out(app: &AppHandle, id: &str) {
+    let store = app.state::<Shared>();
+    store.update_group(id, |g| g.open = true);
+    let anchor = group_anchor(app, id);
+    for note in store.members(id) {
+        let label = label_for(&note.id);
+        if app.get_webview_window(&label).is_some() {
+            continue;
+        }
+        app.state::<Sliding>()
+            .0
+            .lock()
+            .unwrap()
+            .insert(label.clone());
+        let Ok(window) = build_note_window(app, &note) else {
+            app.state::<Sliding>().0.lock().unwrap().remove(&label);
+            continue;
+        };
+        let target = window.outer_position().map(|p| (p.x, p.y));
+        match (anchor, target) {
+            (Some(from), Ok(to)) => {
+                let _ = window.set_position(PhysicalPosition::new(from.0, from.1));
+                let _ = window.show();
+                let app = app.clone();
+                slide(window, from, to, move |w| {
+                    // Late `Moved` events of the slide are still ignored.
+                    thread::sleep(Duration::from_millis(150));
+                    app.state::<Sliding>().0.lock().unwrap().remove(w.label());
+                });
+            }
+            _ => {
+                let _ = window.show();
+                app.state::<Sliding>().0.lock().unwrap().remove(&label);
+            }
+        }
+    }
+    store.flush();
+    groups_changed(app);
+    notify(app);
+}
+
+/// Puts the group's notes in: each window slides into the bar and closes.
+fn put_in(app: &AppHandle, id: &str) {
+    let store = app.state::<Shared>();
+    store.update_group(id, |g| g.open = false);
+    store.flush();
+    let anchor = group_anchor(app, id);
+    for note in store.members(id) {
+        if let Some(window) = app.get_webview_window(&label_for(&note.id)) {
+            slide_in(app, window, anchor);
+        }
+    }
+    groups_changed(app);
+    notify(app);
+}
+
+/// Slides a note window into its group bar at `anchor` and closes it (its
+/// saved place is kept: the slide's moves are not recorded).
+fn slide_in(app: &AppHandle, window: WebviewWindow, anchor: Option<(i32, i32)>) {
+    app.state::<Sliding>()
+        .0
+        .lock()
+        .unwrap()
+        .insert(window.label().into());
+    match (anchor, window.outer_position()) {
+        (Some(to), Ok(from)) => slide(window, (from.x, from.y), to, |w| {
+            let _ = w.destroy();
+        }),
+        _ => {
+            let _ = window.destroy();
+        }
+    }
+}
+
+/// Puts a note in a group. With the group open the note stays out (sliding
+/// back to `back_to`, where a drag onto the bar started); with it closed the
+/// note slides into the bar.
+fn join_group(app: &AppHandle, note_id: &str, group_id: &str, back_to: Option<(i32, i32)>) {
+    let store = app.state::<Shared>();
+    let Some(group) = store.group(group_id) else {
+        return;
+    };
+    store.update(note_id, |n| n.group_id = group_id.to_string());
+    store.flush();
+    if let Some(window) = app.get_webview_window(&label_for(note_id)) {
+        if !group.open {
+            slide_in(app, window, group_anchor(app, group_id));
+        } else if let (Some(to), Ok(from)) = (back_to, window.outer_position()) {
+            slide(window, (from.x, from.y), to, |_| {});
+        }
+    }
+    groups_changed(app);
+    notify(app);
+}
+
+/// Takes a note out of its group; a note that was inside a closed group
+/// comes out on screen.
+fn leave_group(app: &AppHandle, note_id: &str) {
+    let store = app.state::<Shared>();
+    let Some(note) = store.update(note_id, |n| n.group_id.clear()) else {
+        return;
+    };
+    store.flush();
+    if note.trashed_at.is_none() && app.get_webview_window(&label_for(note_id)).is_none() {
+        let _ = open_note_window(app, &note);
+    }
+    groups_changed(app);
+    notify(app);
+}
+
+/// Moves a note to `group_id`: "" = no group, "new" = a new group whose bar
+/// opens beside `anchor` (the note's window, or the manager).
+fn assign_group(app: &AppHandle, note_id: &str, group_id: &str, anchor: &WebviewWindow) {
+    match group_id {
+        "" => leave_group(app, note_id),
+        "new" => {
+            let group = app.state::<Shared>().create_group(beside(anchor));
+            let _ = open_group_window(app, &group);
+            join_group(app, note_id, &group.id, None);
+        }
+        id => join_group(app, note_id, id, None),
+    }
+}
+
+/// All groups, for the notes' footer picker and the manager.
+#[tauri::command]
+fn list_groups(store: State<'_, Shared>) -> Vec<Group> {
+    store.groups()
+}
+
+/// The calling note's group id ("" = none).
+#[tauri::command]
+fn get_note_group(window: WebviewWindow, store: State<'_, Shared>) -> String {
+    store
+        .get(&id_of(&window))
+        .map(|n| n.group_id)
+        .unwrap_or_default()
+}
+
+/// Footer picker of a note: moves it to `group_id` ("" = none, "new").
+#[tauri::command]
+async fn set_note_group(app: AppHandle, window: WebviewWindow, group_id: String) {
+    assign_group(&app, &id_of(&window), &group_id, &window);
+}
+
+/// Manager list: moves note `id` to `group_id` ("" = none, "new").
+#[tauri::command]
+async fn move_note_to_group(app: AppHandle, window: WebviewWindow, id: String, group_id: String) {
+    assign_group(&app, &id, &group_id, &window);
+}
+
+/// The calling group bar's data and how many notes it holds.
+#[tauri::command]
+fn load_group(window: WebviewWindow, store: State<'_, Shared>) -> Option<(Group, usize)> {
+    let id = group_id_of(&window);
+    let group = store.group(&id)?;
+    Some((group, store.members(&id).len()))
+}
+
+/// Renames the calling group (empty = unnamed, as for notes). Returns the
+/// name as saved.
+#[tauri::command]
+fn rename_group(app: AppHandle, window: WebviewWindow, name: String) -> String {
+    let store = app.state::<Shared>();
+    let id = group_id_of(&window);
+    let name: String = name.trim().chars().take(GROUP_NAME_MAX).collect();
+    let group = store.update_group(&id, |g| g.name = name.clone());
+    let saved = group.map(|g| g.name).unwrap_or_default();
+    let _ = window.set_title(group_title(&saved));
+    groups_changed(&app);
+    notify(&app);
+    saved
+}
+
+/// Colour of the calling group (same labels as notes).
+#[tauri::command]
+fn set_group_color(app: AppHandle, window: WebviewWindow, color: String) -> Result<(), String> {
+    if !is_valid_color(&color) {
+        return Err(format!("unknown color: {color}"));
+    }
+    app.state::<Shared>()
+        .update_group(&group_id_of(&window), |g| g.color = color);
+    groups_changed(&app);
+    Ok(())
+}
+
+/// The bar is only a titlebar tall: while its colour picker is open the
+/// window grows to `height` (logical), then shrinks back. Not saved — a
+/// group's height is always `TITLEBAR_H`.
+#[tauri::command]
+fn set_group_height(window: WebviewWindow, height: f64) -> Result<(), String> {
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    let width = size.to_logical::<f64>(scale).width;
+    window
+        .set_size(LogicalSize::new(width, height.max(TITLEBAR_H)))
+        .map_err(|e| e.to_string())
+}
+
+/// Double-click on the bar: takes the notes out, or puts them back in.
+#[tauri::command]
+async fn toggle_group(app: AppHandle, window: WebviewWindow) {
+    let id = group_id_of(&window);
+    match app.state::<Shared>().group(&id) {
+        Some(group) if group.open => put_in(&app, &id),
+        Some(_) => take_out(&app, &id),
+        None => {}
+    }
+}
+
+/// Manager's "new group" button: an empty, unnamed group bar beside the
+/// manager.
+#[tauri::command]
+async fn new_group(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    let group = app.state::<Shared>().create_group(beside(&window));
+    open_group_window(&app, &group).map_err(|e| e.to_string())?;
+    groups_changed(&app);
+    Ok(())
+}
+
+/// "+" on a group bar (or Mod+N there): a new note already in the group,
+/// opened beside the bar. A closed group is taken out first, so the new note
+/// doesn't come out alone.
+#[tauri::command]
+async fn new_note_in_group(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    let id = group_id_of(&window);
+    let store = app.state::<Shared>();
+    let group = store.group(&id).ok_or("group not found")?;
+    if !group.open {
+        take_out(&app, &id);
+    }
+    let note = store.create(beside(&window));
+    let note = store
+        .update(&note.id, |n| n.group_id = id.clone())
+        .unwrap_or(note);
+    let note_window = open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    let _ = note_window.set_focus();
+    groups_changed(&app);
+    notify(&app);
+    Ok(())
+}
+
+/// Deletes the calling group; its notes go to the trash.
+#[tauri::command]
+async fn delete_group(app: AppHandle, window: WebviewWindow) {
+    let id = group_id_of(&window);
+    let store = app.state::<Shared>();
+    for note in store.members(&id) {
+        trash(&app, &note.id);
+    }
+    store.remove_group(&id);
+    store.flush();
+    let _ = window.destroy();
+    groups_changed(&app);
+    notify(&app);
 }
 
 // ---------------------------------------------------------------------------
@@ -1269,11 +1828,16 @@ fn move_data_dir(app: &AppHandle, window: &WebviewWindow, dir: PathBuf) -> Resul
 /// active notes of the new file and applies its theme and language. The
 /// manager reloads itself on "store-replaced".
 fn reload_windows(app: &AppHandle) {
-    for window in note_windows(app) {
-        let _ = window.destroy();
+    for window in app.webview_windows().into_values() {
+        if is_note(&window) || is_group(&window) {
+            let _ = window.destroy();
+        }
     }
     let store = app.state::<Shared>();
-    for note in store.active() {
+    for group in store.groups() {
+        let _ = open_group_window(app, &group);
+    }
+    for note in store.visible() {
         let _ = open_note_window(app, &note);
     }
     let theme = store.theme();
@@ -1543,6 +2107,7 @@ fn main() {
             save_text,
             set_pinned,
             set_color,
+            set_collapsed,
             set_title,
             new_note,
             trash_note,
@@ -1564,12 +2129,27 @@ fn main() {
             set_default_color,
             get_new_note_defaults,
             set_default_title,
+            get_group_defaults,
+            set_default_group_color,
+            set_default_group_title,
             set_default_content,
             get_data_dir,
             choose_data_dir,
             reset_data_dir,
             export_notes,
-            import_notes
+            import_notes,
+            list_groups,
+            get_note_group,
+            set_note_group,
+            move_note_to_group,
+            load_group,
+            rename_group,
+            set_group_color,
+            set_group_height,
+            toggle_group,
+            new_note_in_group,
+            new_group,
+            delete_group
         ])
         .setup(|app| {
             let default_dir = default_data_dir(app.handle())?;
@@ -1579,6 +2159,7 @@ fn main() {
             let store: Shared = Arc::new(Store::load(dir.join("notes.json")));
             app.manage(store.clone());
             app.manage(Drags::default());
+            app.manage(Sliding::default());
 
             // Writes pending changes and, every hour, purges from the trash
             // whatever is older than 30 days.
@@ -1604,14 +2185,17 @@ fn main() {
             // note opens beside it.
             build_snap_preview(&handle)?;
             open_manager(&handle)?;
-            let notes = store.active();
+            for group in store.groups() {
+                open_group_window(&handle, &group)?;
+            }
             if store.is_first_run() {
                 let pos = handle.get_webview_window(MANAGER).and_then(|m| beside(&m));
                 open_welcome(&handle, pos, false)?;
-            } else if notes.is_empty() {
+            } else if store.active().is_empty() && store.groups().is_empty() {
                 create_and_open(&handle, None)?;
             } else {
-                for note in &notes {
+                // Notes inside closed groups stay in them.
+                for note in &store.visible() {
                     open_note_window(&handle, note)?;
                 }
             }

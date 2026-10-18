@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     fs, io,
     path::{Path, PathBuf},
     sync::{
@@ -46,6 +47,13 @@ pub const DEFAULT_TEXT_MAX: usize = 5000;
 /// Maximum length of a note's name, in characters.
 pub const TITLE_MAX: usize = 80;
 
+/// Default logical width of a group bar: the same as a new note (its height
+/// is always `TITLEBAR_H`).
+pub const GROUP_W: f64 = DEFAULT_W;
+
+/// Maximum length of a group's name, in characters.
+pub const GROUP_NAME_MAX: usize = 60;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Note {
@@ -62,11 +70,13 @@ pub struct Note {
     /// Physical position (screen pixels) of the top-left corner.
     pub x: Option<i32>,
     pub y: Option<i32>,
-    /// Logical size.
+    /// Logical size; `height` is always the expanded height.
     pub width: f64,
     pub height: f64,
     pub pinned: bool,
     pub color: String,
+    /// Collapsed to its titlebar (double-click on the titlebar toggles it).
+    pub collapsed: bool,
     pub created_at: u64,
     pub updated_at: u64,
     /// When it was trashed; `None` = active note.
@@ -74,6 +84,8 @@ pub struct Note {
     /// A welcome note reopened from the Help tab (not the first-run one):
     /// closing it deletes it instead of trashing it.
     pub welcome_copy: bool,
+    /// Group the note belongs to (`Group.id`); empty = none.
+    pub group_id: String,
 }
 
 impl Note {
@@ -96,10 +108,12 @@ impl Default for Note {
             height: DEFAULT_H,
             pinned: false,
             color: DEFAULT_COLOR.to_string(),
+            collapsed: false,
             created_at: 0,
             updated_at: 0,
             trashed_at: None,
             welcome_copy: false,
+            group_id: String::new(),
         }
     }
 }
@@ -123,7 +137,53 @@ struct FileData {
     default_text: String,
     /// The same default text with formatting (HTML from the note editor).
     default_html: String,
+    /// Colour new groups start with, set in the manager; `None` =
+    /// `DEFAULT_COLOR` (yellow, as for notes).
+    default_group_color: Option<String>,
+    /// Name new groups start with; empty = unnamed.
+    default_group_title: String,
     notes: Vec<Note>,
+    /// Groups of notes (compact bars that show or hide their notes).
+    groups: Vec<Group>,
+    next_group_seq: u32,
+}
+
+/// A group of notes: a compact bar on screen. Double-clicking it takes its
+/// notes out (each back where it was) or puts them back in (their windows
+/// are closed). Notes point to it with `Note.group_id`.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Group {
+    pub id: String,
+    pub name: String,
+    /// Physical position of the outer top-left corner; `None` = not placed.
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    /// Logical width; the height is always the titlebar's.
+    pub width: f64,
+    /// `true` = its notes are out on screen, `false` = inside the group.
+    pub open: bool,
+    /// Kept above other apps, like a pinned note.
+    pub pinned: bool,
+    /// Colour label, as for notes (see `COLORS`); empty = none.
+    pub color: String,
+    pub created_at: u64,
+}
+
+impl Default for Group {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            x: None,
+            y: None,
+            width: GROUP_W,
+            open: true,
+            pinned: false,
+            color: DEFAULT_COLOR.to_string(),
+            created_at: 0,
+        }
+    }
 }
 
 /// State of the manager window, stored like a note's.
@@ -133,10 +193,12 @@ pub struct ManagerState {
     /// Physical position of the top-left corner; `None` = centred.
     pub x: Option<i32>,
     pub y: Option<i32>,
-    /// Logical size.
+    /// Logical size; `height` is always the expanded height.
     pub width: f64,
     pub height: f64,
     pub pinned: bool,
+    /// Collapsed to its titlebar (double-click on the titlebar, as for notes).
+    pub collapsed: bool,
 }
 
 impl Default for ManagerState {
@@ -147,6 +209,7 @@ impl Default for ManagerState {
             width: 560.0,
             height: 640.0,
             pinned: false,
+            collapsed: false,
         }
     }
 }
@@ -202,11 +265,20 @@ fn read(path: &Path) -> io::Result<FileData> {
     serde_json::from_str(&raw).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
 }
 
-/// Ensures unique ids and continuous numbering even with hand-edited files.
+/// Ensures unique ids and continuous numbering even with hand-edited files,
+/// and drops links to groups that no longer exist.
 fn normalize(data: &mut FileData) {
     data.notes.retain(|n| !n.id.is_empty());
     let max_seq = data.notes.iter().map(|n| n.seq).max().unwrap_or(0);
     data.next_seq = data.next_seq.max(max_seq + 1).max(1);
+    data.groups.retain(|g| !g.id.is_empty());
+    data.next_group_seq = data.next_group_seq.max(data.groups.len() as u32 + 1);
+    let groups: HashSet<String> = data.groups.iter().map(|g| g.id.clone()).collect();
+    for note in &mut data.notes {
+        if !note.group_id.is_empty() && !groups.contains(&note.group_id) {
+            note.group_id.clear();
+        }
+    }
 }
 
 pub fn now_ms() -> u64 {
@@ -304,13 +376,18 @@ impl Store {
 
     /// Merges the notes of another notes file (an export or a `notes.json`):
     /// unknown ids are added and known ones replaced only if the imported copy
-    /// is newer. Settings in the file are ignored. Returns the ids added or
-    /// replaced.
+    /// is newer; its groups are added when unknown. Settings in the file are
+    /// ignored. Returns the ids added or replaced.
     pub fn import_from(&self, path: &Path) -> io::Result<Vec<String>> {
         let imported = read(path)?;
         let mut changed = Vec::new();
         {
             let mut data = self.data.lock().unwrap();
+            for group in imported.groups {
+                if !group.id.is_empty() && !data.groups.iter().any(|g| g.id == group.id) {
+                    data.groups.push(group);
+                }
+            }
             for note in imported.notes.into_iter().filter(|n| !n.id.is_empty()) {
                 match data.notes.iter_mut().find(|n| n.id == note.id) {
                     Some(existing) if note.updated_at > existing.updated_at => {
@@ -331,6 +408,95 @@ impl Store {
             self.purge_trash(now_ms());
         }
         Ok(changed)
+    }
+
+    // ------------------------------------------------------------- groups
+
+    pub fn groups(&self) -> Vec<Group> {
+        self.data.lock().unwrap().groups.clone()
+    }
+
+    pub fn group(&self, id: &str) -> Option<Group> {
+        self.data
+            .lock()
+            .unwrap()
+            .groups
+            .iter()
+            .find(|g| g.id == id)
+            .cloned()
+    }
+
+    /// New open group with the default colour and name chosen in the manager
+    /// (by default none: unnamed, like a new note).
+    pub fn create_group(&self, pos: Option<(i32, i32)>) -> Group {
+        let group = {
+            let mut data = self.data.lock().unwrap();
+            let seq = data.next_group_seq.max(1);
+            data.next_group_seq = seq + 1;
+            let color = match &data.default_group_color {
+                Some(c) if is_valid_color(c) => c.clone(),
+                _ => DEFAULT_COLOR.to_string(),
+            };
+            let group = Group {
+                id: format!("{:x}-g{}", now_nanos(), seq),
+                name: data.default_group_title.clone(),
+                color,
+                x: pos.map(|p| p.0),
+                y: pos.map(|p| p.1),
+                created_at: now_ms(),
+                ..Default::default()
+            };
+            data.groups.push(group.clone());
+            group
+        };
+        self.mark_dirty();
+        group
+    }
+
+    /// Applies `f` to the group and returns an updated copy.
+    pub fn update_group<F: FnOnce(&mut Group)>(&self, id: &str, f: F) -> Option<Group> {
+        let updated = {
+            let mut data = self.data.lock().unwrap();
+            let group = data.groups.iter_mut().find(|g| g.id == id)?;
+            f(group);
+            group.clone()
+        };
+        self.mark_dirty();
+        Some(updated)
+    }
+
+    /// Removes the group and unlinks its notes (trashed ones included).
+    pub fn remove_group(&self, id: &str) {
+        {
+            let mut data = self.data.lock().unwrap();
+            data.groups.retain(|g| g.id != id);
+            for note in data.notes.iter_mut().filter(|n| n.group_id == id) {
+                note.group_id.clear();
+            }
+        }
+        self.mark_dirty();
+    }
+
+    /// The group's notes that are not in the trash.
+    pub fn members(&self, id: &str) -> Vec<Note> {
+        self.active()
+            .into_iter()
+            .filter(|n| n.group_id == id)
+            .collect()
+    }
+
+    /// Active notes that are on screen: not inside a closed group.
+    pub fn visible(&self) -> Vec<Note> {
+        let closed: HashSet<String> = self
+            .groups()
+            .into_iter()
+            .filter(|g| !g.open)
+            .map(|g| g.id)
+            .collect();
+        self.active()
+            .into_iter()
+            .filter(|n| !closed.contains(&n.group_id))
+            .collect()
     }
 
     /// Notes not in the trash.
@@ -429,6 +595,27 @@ impl Store {
 
     pub fn set_default_title(&self, title: String) {
         self.data.lock().unwrap().default_title = title;
+        self.mark_dirty();
+    }
+
+    /// Colour (yellow unless chosen, as for notes) and name new groups start
+    /// with.
+    pub fn group_defaults(&self) -> (String, String) {
+        let data = self.data.lock().unwrap();
+        let color = match &data.default_group_color {
+            Some(c) if is_valid_color(c) => c.clone(),
+            _ => DEFAULT_COLOR.to_string(),
+        };
+        (color, data.default_group_title.clone())
+    }
+
+    pub fn set_default_group_color(&self, color: &str) {
+        self.data.lock().unwrap().default_group_color = Some(color.to_string());
+        self.mark_dirty();
+    }
+
+    pub fn set_default_group_title(&self, title: String) {
+        self.data.lock().unwrap().default_group_title = title;
         self.mark_dirty();
     }
 

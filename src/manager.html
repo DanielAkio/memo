@@ -27,6 +27,9 @@
         <button class="icon-btn" id="raiseBtn" type="button" data-i18n-attr="aria-label=bringAllToFront,title=bringAllToFront">
           <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.25" y="2.75" width="8" height="7" rx="1.5"/><path d="M2.75 6.25v5.5a1.5 1.5 0 0 0 1.5 1.5h5.5"/></svg>
         </button>
+        <button class="icon-btn" id="newGroupBtn" type="button" data-i18n-attr="aria-label=newGroup,title=newGroup">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/></svg>
+        </button>
         <button class="icon-btn" id="newBtn" type="button" data-i18n-attr="aria-label=newNote">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
         </button>
@@ -130,6 +133,30 @@
                     data-i18n-attr="title=text"></iframe>
           </div>
         </div>
+        <h2 class="settings-title">
+          <span data-i18n="groupDefaults"></span>
+          <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=groupDefaultsTip,data-tip=groupDefaultsTip">i</span>
+        </h2>
+        <div class="setting">
+          <span class="setting-label" data-i18n="color"></span>
+          <div class="swatches" id="groupSwatches">
+            <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
+            <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
+            <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
+            <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
+            <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
+            <button type="button" class="swatch" data-color="lavender" data-i18n-attr="aria-label=lavender,title=lavender"></button>
+            <button type="button" class="swatch" data-color="mono"></button>
+            <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+            <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+          </div>
+        </div>
+        <div class="setting">
+          <label class="setting-label" for="groupDefaultTitle" data-i18n="title"></label>
+          <input class="field" id="groupDefaultTitle" type="text" maxlength="60" spellcheck="false"
+                 autocomplete="off" data-i18n-attr="placeholder=untitled">
+        </div>
+        <input type="color" class="custom-color" id="groupCustomColor" tabindex="-1" aria-hidden="true">
         <h2 class="settings-title">
           <span data-i18n="storage"></span>
           <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=storageTip,data-tip=storageTip">i</span>
