@@ -64,10 +64,10 @@
       <header class="mgr-head">
         <div class="tabs" role="tablist">
           <button type="button" class="tab" role="tab" id="tabNotes" data-view="notes" aria-selected="true">
-            <span data-i18n="tabNotes"></span> <span class="tab-count" id="countNotes">0</span>
+            <span data-i18n="tabNotes"></span>
           </button>
-          <button type="button" class="tab" role="tab" id="tabTrash" data-view="trash" aria-selected="false">
-            <span data-i18n="tabTrash"></span> <span class="tab-count" id="countTrash">0</span>
+          <button type="button" class="tab" role="tab" id="tabGroups" data-view="groups" aria-selected="false">
+            <span data-i18n="tabGroups"></span>
           </button>
           <button type="button" class="tab" role="tab" id="tabSettings" data-view="settings" aria-selected="false">
             <span data-i18n="tabSettings"></span>
@@ -80,22 +80,27 @@
              the window is too narrow for them (manager.css). -->
         <select class="field select view-select" id="viewSelect" data-i18n-attr="aria-label=sections">
           <option value="notes"></option>
-          <option value="trash"></option>
+          <option value="groups"></option>
           <option value="settings"></option>
           <option value="help"></option>
         </select>
       </header>
 
-      <!-- Search: only in the Memories and Trash tabs. -->
+      <!-- Only in the Memories and Groups tabs: what to list (the current
+           ones or the trash), search and sort. -->
       <div class="list-tools" id="searchBox">
+        <div class="segmented scope" id="scopeSwitch" role="radiogroup" data-i18n-attr="aria-label=scopeLabel">
+          <button type="button" class="seg" role="radio" data-scope="current" aria-checked="true" data-i18n="scopeCurrent"></button>
+          <button type="button" class="seg" role="radio" data-scope="trash" aria-checked="false" data-i18n="tabTrash"></button>
+        </div>
         <label class="search">
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/></svg>
           <input type="search" id="search" data-i18n-attr="placeholder=search,aria-label=searchNotes" spellcheck="false" autocomplete="off">
         </label>
         <!-- Sort order of the list: most recent first or alphabetical by title. -->
-        <label class="sort" data-i18n-attr="title=sortBy">
+        <label class="sort">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M2.75 10.75 5 13l2.25-2.25M11 13V3M8.75 5.25 11 3l2.25 2.25"/></svg>
-          <select id="sortSelect" data-i18n-attr="aria-label=sortBy">
+          <select id="sortSelect">
             <option value="updated" data-i18n="sortRecent"></option>
             <option value="title" data-i18n="sortTitle"></option>
           </select>
@@ -103,7 +108,7 @@
       </div>
 
       <div class="trash-bar" id="trashBar" hidden>
-        <span data-i18n="trashInfo"></span>
+        <span id="trashInfo"></span>
         <button type="button" class="btn danger" id="emptyTrash" data-i18n="emptyTrash"></button>
       </div>
 
@@ -223,6 +228,12 @@
           </div>
         </div>
         <h2 class="settings-title" data-i18n="application"></h2>
+        <div class="setting">
+          <span class="setting-label" id="autostartLabel" data-i18n="autostart"></span>
+          <!-- On/off switch: opens Memo when the user logs in (only its
+               memories; the manager stays closed). -->
+          <button type="button" class="switch" id="autostartSwitch" role="switch" aria-checked="false" aria-labelledby="autostartLabel"></button>
+        </div>
         <div class="setting">
           <span class="setting-label" data-i18n="exit"></span>
           <div class="app-actions">

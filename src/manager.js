@@ -30,8 +30,12 @@
   const TRASH_DAYS = 30;
 
   let notes = [];
-  let groups = [];
+  let groups = []; // active groups
+  let trashedGroups = [];
   let view = 'notes';
+  // Memories and Groups each list either the current ones or the trash.
+  const scopes = { notes: 'current', groups: 'current' };
+  const inTrash = () => scopes[view] === 'trash';
   let defaultColor = 'yellow';
   let reloadTimer = null;
   // State of this window itself (pinned), saved by Rust.
@@ -114,31 +118,40 @@
       .map((k) => k.n);
   }
 
+  // The sort button shows only its icon: the tooltip says the current order.
   function renderSort() {
-    $('sortSelect').value = sort;
+    const select = $('sortSelect');
+    select.value = sort;
+    const label = `${t('sortBy')}: ${select.selectedOptions[0].textContent}`;
+    select.closest('.sort').title = label;
+    select.setAttribute('aria-label', label);
   }
 
   function render() {
+    renderSort();
     const active = sortNotes(notes.filter((n) => !n.trashedAt), 'updatedAt');
     const trashed = sortNotes(notes.filter((n) => n.trashedAt), 'trashedAt');
-    $('countNotes').textContent = active.length;
-    $('countTrash').textContent = trashed.length;
     for (const tab of document.querySelectorAll('.tab')) {
       tab.setAttribute('aria-selected', String(tab.dataset.view === view));
     }
-    // The narrow-window select mirrors the tabs (labels with the counts).
+    // The narrow-window select mirrors the tabs.
     const labels = {
-      notes: `${t('tabNotes')} (${active.length})`,
-      trash: `${t('tabTrash')} (${trashed.length})`,
+      notes: t('tabNotes'),
+      groups: t('tabGroups'),
       settings: t('tabSettings'),
       help: t('tabHelp'),
     };
     for (const option of $('viewSelect').options) option.textContent = labels[option.value];
     $('viewSelect').value = view;
     fitTabs();
-    trashBar.hidden = view !== 'trash';
-    emptyTrashBtn.disabled = trashed.length === 0;
-    document.body.classList.toggle('notes-view', view === 'notes');
+    const listView = view === 'notes' || view === 'groups';
+    for (const seg of document.querySelectorAll('#scopeSwitch .seg')) {
+      seg.setAttribute('aria-checked', String(listView && seg.dataset.scope === scopes[view]));
+    }
+    trashBar.hidden = !(listView && inTrash());
+    $('trashInfo').textContent = t(view === 'groups' ? 'groupTrashInfo' : 'trashInfo');
+    emptyTrashBtn.disabled = (view === 'groups' ? trashedGroups : trashed).length === 0;
+    document.body.classList.toggle('notes-view', listView && !inTrash());
 
     // Settings and Help tabs: no list and no search.
     const panel = view === 'settings' || view === 'help';
@@ -151,16 +164,25 @@
     if (panel) return;
 
     const q = fold(search.value.trim());
-    const source = view === 'notes' ? active : trashed;
+    if (view === 'groups') {
+      const source = inTrash() ? trashedGroups : groups;
+      const shownGroups = sortGroups(source.filter((g) => !q || fold(g.name || t('untitled')).includes(q)));
+      list.replaceChildren(...shownGroups.map((g) => (inTrash() ? groupTrashRow(g, trashed) : groupRow(g, active))));
+      empty.hidden = shownGroups.length > 0;
+      if (q) empty.textContent = t('nothingFound', { q: search.value.trim() });
+      else empty.textContent = t(inTrash() ? 'trashIsEmpty' : 'noGroups');
+      return;
+    }
+    const source = inTrash() ? trashed : active;
     // The group's name counts for the search too.
     const shown = q
       ? source.filter((n) => fold(`${n.title}\n${plain(n.text)}\n${groupName(n)}`).includes(q))
       : source;
 
-    list.replaceChildren(...shown.map(view === 'notes' ? noteRow : trashRow));
+    list.replaceChildren(...shown.map(inTrash() ? trashRow : noteRow));
     empty.hidden = shown.length > 0;
     if (q) empty.textContent = t('nothingFound', { q: search.value.trim() });
-    else empty.textContent = t(view === 'notes' ? 'noNotes' : 'trashIsEmpty');
+    else empty.textContent = t(inTrash() ? 'trashIsEmpty' : 'noNotes');
   }
 
   function baseRow(note) {
@@ -177,7 +199,7 @@
     return row;
   }
 
-  const groupName = (note) => (groups.find((g) => g.id === note.groupId) || {}).name || '';
+  const groupName = (note) => ([...groups, ...trashedGroups].find((g) => g.id === note.groupId) || {}).name || '';
 
   // Group of a memory, changed right in the list: no group, a group or a new
   // one. Rust moves it (move_note_to_group) and emits "groups-changed".
@@ -200,8 +222,101 @@
     return select;
   }
 
+  // -------------------------------------------------------- groups tab
+  // Groups listed like memories: same search, same sort box, a row per group
+  // (folder in its colour, name, how many memories, out or put away), click
+  // to bring its bar to the front, and its actions always visible.
+
+  function sortGroups(items) {
+    const list = items.slice();
+    if (sort === 'title') {
+      return list.sort((a, b) => {
+        if (Boolean(a.name) !== Boolean(b.name)) return a.name ? -1 : 1; // unnamed last
+        return a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true });
+      });
+    }
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+
+  function groupRow(group, active) {
+    const count = active.filter((n) => n.groupId === group.id).length;
+    const row = el('li', `row group-row${group.hidden ? ' is-closed' : ''}`);
+    row.dataset.gid = group.id;
+    row.title = t('showGroup');
+    row.tabIndex = 0;
+    const main = el('div', 'row-main');
+    main.append(el('div', `row-title${group.name ? '' : ' is-empty'}`, group.name || t('untitled')));
+    const state = t(group.hidden ? 'stateClosed' : group.open ? 'groupStateOut' : 'groupStateIn');
+    main.append(el('div', 'row-preview', `${t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count })} · ${state}`));
+    const toggle = el('button', `icon-btn out-in${group.open ? ' is-open' : ''}`);
+    toggle.type = 'button';
+    toggle.dataset.gact = 'toggle';
+    const toggleLabel = t(group.open ? 'groupHideHint' : 'groupShowHint');
+    toggle.title = toggleLabel;
+    toggle.setAttribute('aria-label', toggleLabel);
+    toggle.append(icon(OUT_IN_ICON));
+    const del = el('button', 'icon-btn');
+    del.type = 'button';
+    del.dataset.gact = 'trash';
+    del.title = t('groupToTrash');
+    del.setAttribute('aria-label', t('groupToTrash'));
+    del.append(icon(TRASH_ICON));
+    const actions = el('div', 'row-actions');
+    actions.append(toggle, del);
+    row.append(groupFolder(group), main, actions);
+    return row;
+  }
+
+  function groupFolder(group) {
+    const folder = icon(FOLDER_ICON);
+    folder.classList.add('row-folder', 'group-row-folder');
+    folder.dataset.color = isCustomColor(group.color) ? 'custom' : group.color || '';
+    if (isCustomColor(group.color)) folder.style.setProperty('--note-color', group.color);
+    return folder;
+  }
+
+  // A group in the trash, as a trashed memory's row: the memories that went
+  // with it (they come back when it is restored), days left, restore / delete.
+  function groupTrashRow(group, trashed) {
+    const count = trashed.filter((n) => n.groupId === group.id && n.trashedAt >= group.trashedAt).length;
+    const row = el('li', 'row group-row');
+    row.dataset.gid = group.id;
+    const main = el('div', 'row-main');
+    main.append(el('div', `row-title${group.name ? '' : ' is-empty'}`, group.name || t('untitled')));
+    main.append(el('div', 'row-preview', t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count })));
+    const restore = el('button', 'btn', t('restore'));
+    restore.type = 'button';
+    restore.dataset.gact = 'restore';
+    const del = el('button', 'btn danger', t('delete'));
+    del.type = 'button';
+    del.dataset.gact = 'forever';
+    del.title = t('deleteGroupForever');
+    const actions = el('div', 'row-actions');
+    actions.append(restore, del);
+    row.append(groupFolder(group), main, el('span', 'row-meta', purgeLabel(group.trashedAt)), actions);
+    return row;
+  }
+
+  const OUT_IN_ICON = '<path d="M4.5 9.75 8 6.25l3.5 3.5"/>';
+
+  async function groupAct(btn, id) {
+    try {
+      const action = btn.dataset.gact;
+      if (action === 'toggle') await invoke('toggle_group_id', { id });
+      else if (action === 'trash') await invoke('trash_group_id', { id });
+      else if (action === 'restore') await invoke('restore_group', { id });
+      else if (action === 'forever') await invoke('delete_group_forever', { id });
+    } catch (err) {
+      console.error(btn.dataset.gact, err);
+    }
+  }
+
+  const showGroup = (id) => invoke('focus_group', { id }).catch((err) => console.error('focus_group', err));
+
   function noteRow(note) {
     const row = baseRow(note);
+    // Closed with ✕: dimmed, a click reopens it.
+    row.classList.toggle('is-closed', Boolean(note.hidden));
     row.title = t('openNote');
     row.tabIndex = 0;
     const trashBtn = el('button', 'icon-btn');
@@ -265,9 +380,12 @@
 
   async function load() {
     try {
-      [notes, defaultColor, groups] = await Promise.all([
+      let all;
+      [notes, defaultColor, all] = await Promise.all([
         invoke('list_notes'), invoke('get_default_color'), invoke('list_groups'),
       ]);
+      groups = all.filter((g) => !g.trashedAt);
+      trashedGroups = all.filter((g) => g.trashedAt);
     } catch (err) {
       console.error('list_notes', err);
     }
@@ -463,6 +581,13 @@
     });
   }
 
+  $('scopeSwitch').addEventListener('click', (e) => {
+    const seg = e.target.closest('.seg');
+    if (!seg || !(view in scopes)) return;
+    scopes[view] = seg.dataset.scope;
+    render();
+  });
+
   search.addEventListener('input', render);
 
   $('sortSelect').addEventListener('change', (e) => {
@@ -476,22 +601,31 @@
 
   list.addEventListener('click', (e) => {
     const row = e.target.closest('.row');
+    if (row && row.dataset.gid) {
+      const btn = e.target.closest('[data-gact]');
+      if (btn) groupAct(btn, row.dataset.gid);
+      else if (!inTrash()) showGroup(row.dataset.gid);
+      return;
+    }
     if (!row || e.target.closest('select')) return;
     const btn = e.target.closest('[data-act]');
     if (btn) act(btn.dataset.act, row.dataset.id);
-    else if (view === 'notes') act('open', row.dataset.id);
+    else if (!inTrash()) act('open', row.dataset.id);
   });
   list.addEventListener('keydown', (e) => {
     const row = e.target.closest('.row');
-    if (row && e.target === row && e.key === 'Enter' && view === 'notes') act('open', row.dataset.id);
+    if (!row || e.target !== row || e.key !== 'Enter' || inTrash()) return;
+    if (view === 'groups') showGroup(row.dataset.gid);
+    else act('open', row.dataset.id);
   });
 
   emptyTrashBtn.addEventListener('click', async () => {
     if (!confirmFirst(emptyTrashBtn, t('emptyTrashConfirm'))) return;
+    const command = view === 'groups' ? 'empty_group_trash' : 'empty_trash';
     try {
-      await invoke('empty_trash');
+      await invoke(command);
     } catch (err) {
-      console.error('empty_trash', err);
+      console.error(command, err);
     }
   });
 
@@ -828,6 +962,24 @@
   $('zoomIn').addEventListener('click', () => stepZoom(1));
   $('zoomReset').addEventListener('click', () => stepZoom(0));
   window.MemoZoom.attach(invoke);
+
+  // Start with the system (the Windows installer asks; elsewhere it starts on).
+  const autostartSwitch = $('autostartSwitch');
+  const renderAutostart = (on) => autostartSwitch.setAttribute('aria-checked', String(on));
+  autostartSwitch.addEventListener('click', async () => {
+    const on = autostartSwitch.getAttribute('aria-checked') !== 'true';
+    renderAutostart(on);
+    try {
+      renderAutostart(await invoke('set_autostart', { on }));
+    } catch (err) {
+      renderAutostart(!on);
+      console.error('set_autostart', err);
+    }
+  });
+  invoke('get_autostart').then(renderAutostart).catch((err) => {
+    autostartSwitch.disabled = true;
+    console.error('get_autostart', err);
+  });
 
   async function init() {
     win = await invoke('load_manager');

@@ -89,6 +89,9 @@ pub struct Note {
     pub welcome_copy: bool,
     /// Group the note belongs to (`Group.id`); empty = none.
     pub group_id: String,
+    /// Closed with ✕: still active (listed in the manager, which reopens it)
+    /// but its window is not opened.
+    pub hidden: bool,
 }
 
 impl Note {
@@ -116,6 +119,7 @@ impl Default for Note {
             trashed_at: None,
             welcome_copy: false,
             group_id: String::new(),
+            hidden: false,
         }
     }
 }
@@ -172,6 +176,11 @@ pub struct Group {
     /// Colour label, as for notes (see `COLORS`); empty = none.
     pub color: String,
     pub created_at: u64,
+    /// When it was trashed (with its notes); `None` = active group.
+    pub trashed_at: Option<u64>,
+    /// Closed with ✕: its bar (and its notes) are not opened until the
+    /// manager reopens it.
+    pub hidden: bool,
 }
 
 impl Default for Group {
@@ -186,6 +195,8 @@ impl Default for Group {
             pinned: false,
             color: DEFAULT_COLOR.to_string(),
             created_at: 0,
+            trashed_at: None,
+            hidden: false,
         }
     }
 }
@@ -239,6 +250,8 @@ pub struct Store {
 pub struct Config {
     /// Folder chosen for `notes.json`; `None` = the app data folder.
     pub data_dir: Option<PathBuf>,
+    /// Start-with-the-system has been set up once (see `init_autostart`).
+    pub autostart_init: bool,
 }
 
 impl Config {
@@ -373,6 +386,8 @@ impl Store {
             let mut copy = self.data.lock().unwrap().clone();
             copy.version = 1;
             copy.notes.retain(|n| n.trashed_at.is_none());
+            copy.groups.retain(|g| g.trashed_at.is_none());
+            normalize(&mut copy);
             serde_json::to_string_pretty(&copy)
         };
         write_atomic(path, &json.map_err(io::Error::other)?)
@@ -470,6 +485,28 @@ impl Store {
     }
 
     /// Removes the group and unlinks its notes (trashed ones included).
+    /// Groups not in the trash.
+    pub fn active_groups(&self) -> Vec<Group> {
+        self.groups()
+            .into_iter()
+            .filter(|g| g.trashed_at.is_none())
+            .collect()
+    }
+
+    /// Permanently deletes every group in the trash (their notes stay, as
+    /// ungrouped notes).
+    pub fn empty_group_trash(&self) {
+        let ids: Vec<String> = self
+            .groups()
+            .into_iter()
+            .filter(|g| g.trashed_at.is_some())
+            .map(|g| g.id)
+            .collect();
+        for id in ids {
+            self.remove_group(&id);
+        }
+    }
+
     pub fn remove_group(&self, id: &str) {
         {
             let mut data = self.data.lock().unwrap();
@@ -489,17 +526,18 @@ impl Store {
             .collect()
     }
 
-    /// Active notes that are on screen: not inside a closed group.
+    /// Active notes that are on screen: not closed with ✕ and not inside a
+    /// group that is put away or closed.
     pub fn visible(&self) -> Vec<Note> {
         let closed: HashSet<String> = self
-            .groups()
+            .active_groups()
             .into_iter()
-            .filter(|g| !g.open)
+            .filter(|g| !g.open || g.hidden)
             .map(|g| g.id)
             .collect();
         self.active()
             .into_iter()
-            .filter(|n| !closed.contains(&n.group_id))
+            .filter(|n| !n.hidden && !closed.contains(&n.group_id))
             .collect()
     }
 
@@ -513,17 +551,22 @@ impl Store {
             .collect()
     }
 
-    /// Permanently deletes notes that have been in the trash for over 30 days.
+    /// Permanently deletes notes and groups that have been in the trash for
+    /// over 30 days.
     /// Returns `true` if any was removed.
     pub fn purge_trash(&self, now: u64) -> bool {
         let removed = {
             let mut data = self.data.lock().unwrap();
-            let before = data.notes.len();
-            data.notes.retain(|n| {
-                n.trashed_at
-                    .map_or(true, |t| now.saturating_sub(t) < TRASH_TTL_MS)
-            });
-            data.notes.len() != before
+            let kept = |t: Option<u64>| t.map_or(true, |t| now.saturating_sub(t) < TRASH_TTL_MS);
+            let before = (data.notes.len(), data.groups.len());
+            data.notes.retain(|n| kept(n.trashed_at));
+            data.groups.retain(|g| kept(g.trashed_at));
+            let changed = before != (data.notes.len(), data.groups.len());
+            if changed {
+                // Notes of purged groups become ungrouped.
+                normalize(&mut data);
+            }
+            changed
         };
         if removed {
             self.mark_dirty();

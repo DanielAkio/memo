@@ -1228,12 +1228,13 @@
     invoke('set_color', { color }).catch((err) => console.error('set_color', err));
   }
 
-  // Closing moves the note to the trash (recoverable from the manager for 30 days).
+  // Closing only closes the window: the note stays among the current ones
+  // and the manager reopens it (the trash is the manager's trash button).
   async function closeNote() {
     closeColors();
     if (renaming) await finishRename(true);
     await flushText();
-    invoke('trash_note').catch((err) => console.error('trash_note', err));
+    invoke('close_note').catch((err) => console.error('close_note', err));
   }
 
   // ------------------------------------------------------------- title
@@ -1392,6 +1393,7 @@
     if (EMBED || !note) return;
     try {
       [groups, note.groupId] = await Promise.all([invoke('list_groups'), invoke('get_note_group')]);
+      groups = groups.filter((g) => !g.trashedAt);
     } catch (err) {
       console.error('list_groups', err);
     }
@@ -1516,7 +1518,7 @@
     editor.lang = I18n.locale();
     editor.dataset.placeholder = EMBED ? t('defaultTextPlaceholder') : I18n.placeholder();
     $('newBtn').title = `${t('newNote')} (${keys('Mod', 'N')})`;
-    $('closeBtn').title = t('closeToTrash');
+    $('closeBtn').title = t('close');
     for (const btn of formatBar.querySelectorAll('[data-key]')) {
       const combo = btn.dataset.shift ? keys('Mod', 'Shift', btn.dataset.key) : keys('Mod', btn.dataset.key);
       btn.title = `${btn.getAttribute('aria-label')} (${combo})`;

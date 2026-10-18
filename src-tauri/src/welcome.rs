@@ -39,7 +39,7 @@ pub const PT: Welcome = Welcome {
         r#"<div><b>Gerenciador do Memo</b></div>"#,
         r#"<div>Abre com o app ou pelo ícone do Memo na bandeja. Lá você:</div>"#,
         r#"<div class="bullet">busca e ordena as memórias (mais recentes ou A–Z)</div>"#,
-        r#"<div class="bullet">recupera da lixeira o que fechou no ✕ (fica lá por 30 dias)</div>"#,
+        r#"<div class="bullet">reabre o que fechou no ✕ e recupera o que mandou para a lixeira (fica lá por 30 dias)</div>"#,
         r#"<div class="bullet">em Configurações, escolhe tema, idioma e o padrão das memórias novas</div>"#,
         r#"<div class="bullet">em Armazenamento, muda a pasta das memórias e exporta ou importa um backup</div>"#,
         r#"<div><br></div>"#,
@@ -67,7 +67,7 @@ select * from memorias where fixada = true
 Gerenciador do Memo
 Abre com o app ou pelo ícone do Memo na bandeja. Lá você:
 - busca e ordena as memórias (mais recentes ou A–Z)
-- recupera da lixeira o que fechou no ✕ (fica lá por 30 dias)
+- reabre o que fechou no ✕ e recupera o que mandou para a lixeira (fica lá por 30 dias)
 - em Configurações, escolhe tema, idioma e o padrão das memórias novas
 - em Armazenamento, muda a pasta das memórias e exporta ou importa um backup
 
@@ -97,7 +97,7 @@ pub const EN: Welcome = Welcome {
         r#"<div><b>Memo Manager</b></div>"#,
         r#"<div>Opens with the app or from the Memo icon in the system tray. There you can:</div>"#,
         r#"<div class="bullet">search and sort all memories (most recent or A–Z)</div>"#,
-        r#"<div class="bullet">restore from the trash what you closed with ✕ (kept for 30 days)</div>"#,
+        r#"<div class="bullet">reopen what you closed with ✕ and restore what you sent to the trash (kept for 30 days)</div>"#,
         r#"<div class="bullet">in Settings, choose the theme, language and defaults for new memories</div>"#,
         r#"<div class="bullet">in Storage, change the memories folder and export or import a backup</div>"#,
         r#"<div><br></div>"#,
@@ -125,7 +125,7 @@ select * from memories where pinned = true
 Memo Manager
 Opens with the app or from the Memo icon in the system tray. There you can:
 - search and sort all memories (most recent or A–Z)
-- restore from the trash what you closed with ✕ (kept for 30 days)
+- reopen what you closed with ✕ and restore what you sent to the trash (kept for 30 days)
 - in Settings, choose the theme, language and defaults for new memories
 - in Storage, change the memories folder and export or import a backup
 

@@ -20,6 +20,12 @@
     "category": "Productivity",
     "shortDescription": "Sticky memories that stay on top of everything",
     "longDescription": "Memo keeps your memories in sticky notes for Windows, macOS and Linux. Each memory is its own window, and one click on the pin keeps it on top of every other app.",
+    "windows": {
+      "nsis": {
+        "languages": ["English", "PortugueseBR"],
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

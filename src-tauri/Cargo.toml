@@ -22,6 +22,7 @@ tauri-plugin-dialog = "2"
 # Native window handles, to tell whether a note is covered by other windows
 # (`shows_on_screen` in main.rs): the magnet ignores notes not on screen.
 raw-window-handle = "0.6"
+tauri-plugin-autostart = "2"
 
 # Windows: which window is shown at a point (WindowFromPoint).
 [target.'cfg(windows)'.dependencies]

@@ -59,6 +59,8 @@ const SNAP_PREVIEW: &str = "snap-preview";
 const SNAP_EDGE: f64 = 4.0;
 /// App config (custom data folder), always in the default data folder.
 const CONFIG: &str = "config.json";
+/// Argument of a start with the system (autostart): no manager on screen.
+const AUTOSTART_ARG: &str = "--autostart";
 /// Name of the default data folder, inside the OS data folder (`%APPDATA%`,
 /// `~/Library/Application Support`, `~/.local/share`). Not the app
 /// identifier's folder, so the identifier can stay as it is.
@@ -1305,10 +1307,23 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     Some((x, y))
 }
 
-/// Closes the note (✕ button or middle click) by moving it to the trash.
+/// Closes the note (✕ button or middle click): it stays among the current
+/// ones and the manager reopens it. A note nobody touched (or a welcome copy)
+/// goes the way `trash` sends it: deleted outright.
 #[tauri::command]
-async fn trash_note(app: AppHandle, window: WebviewWindow) {
-    trash(&app, &id_of(&window));
+async fn close_note(app: AppHandle, window: WebviewWindow) {
+    let id = id_of(&window);
+    let store = app.state::<Shared>();
+    match store.get(&id) {
+        Some(note) if note.welcome_copy || store.is_pristine(&note) => trash(&app, &id),
+        Some(_) => {
+            store.update(&id, |n| n.hidden = true);
+            store.flush();
+            let _ = window.destroy();
+            notify(&app);
+        }
+        None => {}
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1356,13 +1371,21 @@ async fn open_note(app: AppHandle, id: String) -> Result<(), String> {
         .get(&id)
         .filter(|n| n.trashed_at.is_none())
         .ok_or("note not found")?;
-    // Inside a closed group: take the whole group out.
-    match app.state::<Shared>().group(&note.group_id) {
-        Some(group) if !group.open => take_out(&app, &group.id),
+    let store = app.state::<Shared>();
+    let note = store.update(&id, |n| n.hidden = false).unwrap_or(note);
+    // Inside a closed group: reopen it and take the whole group out.
+    match store.group(&note.group_id) {
+        Some(group) if group.hidden || !group.open => {
+            if group.hidden {
+                show_group(&app, &group.id);
+            }
+            take_out(&app, &group.id);
+        }
         _ => {
             open_note_window(&app, &note).map_err(|e| e.to_string())?;
         }
     }
+    notify(&app);
     Ok(())
 }
 
@@ -1377,9 +1400,22 @@ async fn move_to_trash(app: AppHandle, id: String) {
 async fn restore_note(app: AppHandle, id: String) -> Result<(), String> {
     let store = app.state::<Shared>();
     let note = store
-        .update(&id, |n| n.trashed_at = None)
+        .update(&id, |n| {
+            n.trashed_at = None;
+            n.hidden = false;
+        })
         .ok_or("note not found")?;
-    if store.group(&note.group_id).map_or(true, |g| g.open) {
+    // Its group is in the trash: the note comes back ungrouped.
+    let note = match store.group(&note.group_id) {
+        Some(group) if group.trashed_at.is_some() => {
+            store.update(&id, |n| n.group_id.clear()).unwrap_or(note)
+        }
+        _ => note,
+    };
+    if store
+        .group(&note.group_id)
+        .map_or(true, |g| g.open && !g.hidden)
+    {
         open_note_window(&app, &note).map_err(|e| e.to_string())?;
     }
     notify(&app);
@@ -1631,6 +1667,8 @@ fn take_out(app: &AppHandle, id: &str) {
     store.update_group(id, |g| g.open = true);
     let anchor = group_anchor(app, id);
     for note in store.members(id) {
+        // Taking out shows all of them, those closed with ✕ too.
+        let note = store.update(&note.id, |n| n.hidden = false).unwrap_or(note);
         let label = label_for(&note.id);
         if app.get_webview_window(&label).is_some() {
             continue;
@@ -1711,7 +1749,9 @@ fn join_group(app: &AppHandle, note_id: &str, group_id: &str, back_to: Option<(i
     store.update(note_id, |n| n.group_id = group_id.to_string());
     store.flush();
     if let Some(window) = app.get_webview_window(&label_for(note_id)) {
-        if !group.open {
+        if group.hidden {
+            let _ = window.destroy();
+        } else if !group.open {
             slide_in(app, window, group_anchor(app, group_id));
         } else if let (Some(to), Ok(from)) = (back_to, window.outer_position()) {
             slide(window, (from.x, from.y), to, |_| {});
@@ -1725,7 +1765,10 @@ fn join_group(app: &AppHandle, note_id: &str, group_id: &str, back_to: Option<(i
 /// comes out on screen.
 fn leave_group(app: &AppHandle, note_id: &str) {
     let store = app.state::<Shared>();
-    let Some(note) = store.update(note_id, |n| n.group_id.clear()) else {
+    let Some(note) = store.update(note_id, |n| {
+        n.group_id.clear();
+        n.hidden = false;
+    }) else {
         return;
     };
     store.flush();
@@ -1789,14 +1832,19 @@ fn load_group(window: WebviewWindow, store: State<'_, Shared>) -> Option<(Group,
 /// name as saved.
 #[tauri::command]
 fn rename_group(app: AppHandle, window: WebviewWindow, name: String) -> String {
+    rename_group_by_id(&app, &group_id_of(&window), &name)
+}
+
+fn rename_group_by_id(app: &AppHandle, id: &str, name: &str) -> String {
     let store = app.state::<Shared>();
-    let id = group_id_of(&window);
     let name: String = name.trim().chars().take(GROUP_NAME_MAX).collect();
-    let group = store.update_group(&id, |g| g.name = name.clone());
+    let group = store.update_group(id, |g| g.name = name.clone());
     let saved = group.map(|g| g.name).unwrap_or_default();
-    let _ = window.set_title(group_title(&saved));
-    groups_changed(&app);
-    notify(&app);
+    if let Some(window) = app.get_webview_window(&group_label(id)) {
+        let _ = window.set_title(group_title(&saved));
+    }
+    groups_changed(app);
+    notify(app);
     saved
 }
 
@@ -1842,10 +1890,77 @@ fn set_group_height(window: WebviewWindow, height: f64) -> Result<(), String> {
 /// Double-click on the bar: takes the notes out, or puts them back in.
 #[tauri::command]
 async fn toggle_group(app: AppHandle, window: WebviewWindow) {
+    toggle_group_by_id(&app, &group_id_of(&window));
+}
+
+/// Manager's Groups tab: shows group `id`'s bar and brings it to the front.
+#[tauri::command]
+async fn focus_group(app: AppHandle, id: String) -> Result<(), String> {
+    let group = app
+        .state::<Shared>()
+        .group(&id)
+        .filter(|g| g.trashed_at.is_none())
+        .ok_or("group not found")?;
+    if group.hidden {
+        show_group(&app, &id);
+    }
+    let group = app.state::<Shared>().group(&id).unwrap_or(group);
+    let window = open_group_window(&app, &group).map_err(|e| e.to_string())?;
+    let _ = window.set_focus();
+    Ok(())
+}
+
+/// Reopens a group closed with ✕: its bar, and its notes if it is out.
+fn show_group(app: &AppHandle, id: &str) {
+    let store = app.state::<Shared>();
+    let Some(group) = store.update_group(id, |g| g.hidden = false) else {
+        return;
+    };
+    let _ = open_group_window(app, &group);
+    if group.open {
+        for note in store.members(id).iter().filter(|n| !n.hidden) {
+            let _ = open_note_window(app, note);
+        }
+    }
+    store.flush();
+    groups_changed(app);
+    notify(app);
+}
+
+/// ✕ or middle click on a group bar: closes the bar and its notes' windows.
+/// The group stays among the current ones and the manager reopens it; an
+/// empty group without a name is just removed.
+#[tauri::command]
+async fn close_group(app: AppHandle, window: WebviewWindow) {
     let id = group_id_of(&window);
-    match app.state::<Shared>().group(&id) {
-        Some(group) if group.open => put_in(&app, &id),
-        Some(_) => take_out(&app, &id),
+    let store = app.state::<Shared>();
+    let members = store.members(&id);
+    if members.is_empty() && store.group(&id).is_some_and(|g| g.name.trim().is_empty()) {
+        store.remove_group(&id);
+    } else {
+        store.update_group(&id, |g| g.hidden = true);
+        for note in members {
+            if let Some(note_window) = app.get_webview_window(&label_for(&note.id)) {
+                let _ = note_window.destroy();
+            }
+        }
+    }
+    store.flush();
+    let _ = window.destroy();
+    groups_changed(&app);
+    notify(&app);
+}
+
+/// Manager's Groups tab: takes group `id`'s notes out, or puts them in.
+#[tauri::command]
+async fn toggle_group_id(app: AppHandle, id: String) {
+    toggle_group_by_id(&app, &id);
+}
+
+fn toggle_group_by_id(app: &AppHandle, id: &str) {
+    match app.state::<Shared>().group(id) {
+        Some(group) if group.open => put_in(app, id),
+        Some(_) => take_out(app, id),
         None => {}
     }
 }
@@ -1882,17 +1997,91 @@ async fn new_note_in_group(app: AppHandle, window: WebviewWindow) -> Result<(), 
     Ok(())
 }
 
-/// Deletes the calling group; its notes go to the trash.
+/// Manager's Groups tab: sends group `id` to the trash, with its notes.
 #[tauri::command]
-async fn delete_group(app: AppHandle, window: WebviewWindow) {
-    let id = group_id_of(&window);
+async fn trash_group_id(app: AppHandle, id: String) {
+    trash_group_by_id(&app, &id);
+}
+
+/// An empty group without a name is removed outright. Otherwise the group
+/// is marked trashed first, so its notes (trashed right after)
+/// have a later `trashed_at`: that is how `restore_group` finds the notes
+/// that went to the trash with it.
+fn trash_group_by_id(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
-    for note in store.members(&id) {
-        trash(&app, &note.id);
+    let members = store.members(id);
+    // Like a blank note: an empty group without a name is just removed.
+    if members.is_empty() && store.group(id).is_some_and(|g| g.name.trim().is_empty()) {
+        store.remove_group(id);
+    } else {
+        store.update_group(id, |g| g.trashed_at = Some(now_ms()));
+        for note in members {
+            trash(app, &note.id);
+        }
     }
-    store.remove_group(&id);
     store.flush();
-    let _ = window.destroy();
+    if let Some(window) = app.get_webview_window(&group_label(id)) {
+        let _ = window.destroy();
+    }
+    groups_changed(app);
+    notify(app);
+}
+
+/// Manager's Groups trash: brings group `id` back with the notes that went to
+/// the trash with it; its bar opens, and its notes too if it is open.
+#[tauri::command]
+async fn restore_group(app: AppHandle, id: String) -> Result<(), String> {
+    let store = app.state::<Shared>();
+    let since = store
+        .group(&id)
+        .and_then(|g| g.trashed_at)
+        .ok_or("group not in the trash")?;
+    let group = store
+        .update_group(&id, |g| {
+            g.trashed_at = None;
+            g.hidden = false;
+        })
+        .ok_or("group not found")?;
+    let together: Vec<String> = store
+        .all()
+        .into_iter()
+        .filter(|n| n.group_id == id && n.trashed_at.is_some_and(|t| t >= since))
+        .map(|n| n.id)
+        .collect();
+    for note_id in together {
+        if let Some(note) = store.update(&note_id, |n| {
+            n.trashed_at = None;
+            n.hidden = false;
+        }) {
+            if group.open {
+                let _ = open_note_window(&app, &note);
+            }
+        }
+    }
+    store.flush();
+    open_group_window(&app, &group).map_err(|e| e.to_string())?;
+    groups_changed(&app);
+    notify(&app);
+    Ok(())
+}
+
+/// Manager's Groups trash: permanently deletes group `id` (its notes stay in
+/// the memories' trash, ungrouped).
+#[tauri::command]
+fn delete_group_forever(app: AppHandle, id: String, store: State<'_, Shared>) {
+    if store.group(&id).is_some_and(|g| g.trashed_at.is_some()) {
+        store.remove_group(&id);
+        store.flush();
+        groups_changed(&app);
+        notify(&app);
+    }
+}
+
+/// Manager's Groups trash: "Empty trash".
+#[tauri::command]
+fn empty_group_trash(app: AppHandle, store: State<'_, Shared>) {
+    store.empty_group_trash();
+    store.flush();
     groups_changed(&app);
     notify(&app);
 }
@@ -2001,9 +2190,8 @@ fn move_data_dir(app: &AppHandle, window: &WebviewWindow, dir: PathBuf) -> Resul
             _ => return Ok(false),
         };
     }
-    let config = Config {
-        data_dir: (dir != default).then(|| dir.clone()),
-    };
+    let mut config = Config::load(&default.join(CONFIG));
+    config.data_dir = (dir != default).then(|| dir.clone());
     let result = store
         .relocate(target, load_existing)
         .and_then(|loaded| config.save(&default.join(CONFIG)).map(|()| loaded));
@@ -2031,8 +2219,8 @@ fn reload_windows(app: &AppHandle) {
         }
     }
     let store = app.state::<Shared>();
-    for group in store.groups() {
-        let _ = open_group_window(app, &group);
+    for group in store.active_groups().iter().filter(|g| !g.hidden) {
+        let _ = open_group_window(app, group);
     }
     for note in store.visible() {
         let _ = open_note_window(app, &note);
@@ -2049,6 +2237,43 @@ fn reload_windows(app: &AppHandle) {
 }
 
 /// Folder where the notes are saved and whether it is the default one.
+/// Start with the system, set up once: on Windows the installer asked
+/// (windows/hooks.nsh); on macOS and Linux, which have no installer step for
+/// it, it is turned on by the first run of a release build.
+fn init_autostart(app: &AppHandle, default_dir: &Path) {
+    use tauri_plugin_autostart::ManagerExt;
+    let path = default_dir.join(CONFIG);
+    let mut config = Config::load(&path);
+    if config.autostart_init {
+        return;
+    }
+    if cfg!(not(windows)) && !cfg!(debug_assertions) {
+        let _ = app.autolaunch().enable();
+    }
+    config.autostart_init = true;
+    let _ = config.save(&path);
+}
+
+/// Configurações → "Start with the system".
+#[tauri::command]
+fn get_autostart(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    if on {
+        manager.enable()
+    } else {
+        manager.disable()
+    }
+    .map_err(|e| e.to_string())?;
+    manager.is_enabled().map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn get_data_dir(app: AppHandle, store: State<'_, Shared>) -> (String, bool) {
     let path = store.path();
@@ -2291,6 +2516,14 @@ fn main() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // Start with the system: same name and argument as the Windows
+        // installer's Run value (windows/hooks.nsh).
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name("Memo")
+                .arg(AUTOSTART_ARG)
+                .build(),
+        )
         // Launching the app again brings the notes to the front and opens the manager.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_all(app);
@@ -2308,7 +2541,7 @@ fn main() {
             set_color,
             set_title,
             new_note,
-            trash_note,
+            close_note,
             load_manager,
             close_manager,
             bring_notes_to_front,
@@ -2344,13 +2577,21 @@ fn main() {
             move_note_to_group,
             load_group,
             rename_group,
+            focus_group,
+            toggle_group_id,
+            trash_group_id,
+            restore_group,
+            delete_group_forever,
+            get_autostart,
+            set_autostart,
+            empty_group_trash,
             set_group_color,
             set_manager_color,
             set_group_height,
             toggle_group,
             new_note_in_group,
             new_group,
-            delete_group
+            close_group
         ])
         .setup(|app| {
             let default_dir = default_data_dir(app.handle())?;
@@ -2381,18 +2622,23 @@ fn main() {
 
             let handle = app.handle().clone();
             build_tray(&handle)?;
+            init_autostart(&handle, &default_dir);
 
-            // The manager opens on every launch; on the first one, the welcome
-            // note opens beside it.
+            // The manager opens on every launch (but a start with the system
+            // only reopens the notes); on the first one, the welcome note
+            // opens beside it.
+            let at_login = std::env::args().any(|a| a == AUTOSTART_ARG);
             build_snap_preview(&handle)?;
-            open_manager(&handle)?;
-            for group in store.groups() {
-                open_group_window(&handle, &group)?;
+            if !at_login || store.is_first_run() {
+                open_manager(&handle)?;
+            }
+            for group in store.active_groups().iter().filter(|g| !g.hidden) {
+                open_group_window(&handle, group)?;
             }
             if store.is_first_run() {
                 let pos = handle.get_webview_window(MANAGER).and_then(|m| beside(&m));
                 open_welcome(&handle, pos, false)?;
-            } else if store.active().is_empty() && store.groups().is_empty() {
+            } else if store.active().is_empty() && store.active_groups().is_empty() && !at_login {
                 create_and_open(&handle, None)?;
             } else {
                 // Notes inside closed groups stay in them.

@@ -44,6 +44,9 @@
   --overlay-strong: rgba(255, 255, 255, 0.12);
   --selection: rgba(208, 214, 224, 0.18);
   --highlight: rgba(242, 201, 76, 0.42);
+  /* Destructive actions (delete, empty trash, quit). */
+  --danger: #eb5757;
+  --danger-bg: rgba(235, 87, 87, 0.14);
 
   /* Syntax highlighting in code blocks (muted, readable on Carbon). */
   --code-comment: var(--color-ash);
@@ -81,6 +84,8 @@
     --overlay-strong: rgba(0, 0, 0, 0.1);
     --selection: rgba(35, 37, 42, 0.14);
     --highlight: rgba(242, 201, 76, 0.5);
+    --danger: #d93f3f;
+    --danger-bg: rgba(217, 63, 63, 0.1);
     --code-keyword: #6a4bd1;
     --code-string: #23843b;
     --code-number: #b85e1d;
@@ -108,6 +113,8 @@
   --overlay-strong: rgba(0, 0, 0, 0.1);
   --selection: rgba(35, 37, 42, 0.14);
   --highlight: rgba(242, 201, 76, 0.5);
+  --danger: #d93f3f;
+  --danger-bg: rgba(217, 63, 63, 0.1);
   --code-keyword: #6a4bd1;
   --code-string: #23843b;
   --code-number: #b85e1d;

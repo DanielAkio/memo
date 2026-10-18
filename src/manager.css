@@ -119,37 +119,39 @@ body {
 }
 .tab:hover { background: var(--overlay-hover); color: var(--color-mist); }
 .tab[aria-selected="true"] { background: var(--overlay-active); color: var(--color-paper); }
-.tab-count {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-ash);
-}
 
-/* Search row, at the top of the Memories and Trash tabs. */
+/* Search row, at the top of the Memories and Groups tabs: current / trash
+   switch, search box, sort box. */
 .list-tools {
   flex: none;
   padding: 12px 16px 4px;
 }
 .list-tools[hidden] { display: none; }
 .list-tools:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-/* The search keeps a usable width; the sort box drops below it if needed. */
+/* The search keeps a usable width; the sort button stays on its right. */
 .list-tools .search { flex: 1 1 140px; }
-/* Sort select next to the search box: same box as the search, with a sort
-   icon on the left and a custom arrow on the right. */
+.scope { flex: none; }
+
+/* Memories and groups closed with ✕ (still current): dimmed until reopened. */
+.row.is-closed .row-main,
+.row.is-closed .row-dot,
+.row.is-closed .group-row-folder { opacity: 0.5; }
+/* Sort: an icon-only button on the right of the search box, same height;
+   the select is stretched over it, invisible, and opens the native list. */
 .sort {
   position: relative;
   flex: none;
-  display: flex;
-  align-items: center;
+  display: grid;
+  place-items: center;
+  width: 30px;
   height: 30px;
   border-radius: var(--radius-button);
   background: var(--overlay-subtle);
   box-shadow: var(--hairline);
 }
 .sort:hover, .sort:focus-within { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.sort:hover svg { stroke: var(--color-mist); }
 .sort svg {
-  position: absolute;
-  left: 8px;
   width: 14px;
   height: 14px;
   fill: none;
@@ -160,20 +162,13 @@ body {
   pointer-events: none;
 }
 .sort select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  padding: 0 26px 0 28px;
   border: 0;
   outline: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  /* Chevron drawn like the language select's. */
-  background-color: transparent;
-  background-image: linear-gradient(45deg, transparent 50%, var(--color-fog) 50%),
-                    linear-gradient(135deg, var(--color-fog) 50%, transparent 50%);
-  background-position: calc(100% - 14px) 13px, calc(100% - 10px) 13px;
-  background-size: 4px 4px, 4px 4px;
-  background-repeat: no-repeat;
-  color: var(--color-mist);
+  opacity: 0;
   font: inherit;
   cursor: default;
 }
@@ -357,6 +352,12 @@ body {
 
 .row-actions { align-items: center; }
 
+/* Groups tab: the folder takes the place of a memory's colour dot. */
+.group-row-folder { width: 16px; height: 16px; margin: 0 -4px; }
+.out-in svg { transition: transform 160ms ease; }
+.out-in:not(.is-open) svg { transform: rotate(180deg); }
+
+
 
 .btn {
   height: 26px;
@@ -373,9 +374,13 @@ body {
 }
 .btn:hover { background: var(--overlay-active); color: var(--color-paper); }
 .btn:disabled { opacity: 0.4; background: var(--overlay-hover); color: var(--color-mist); }
-.btn.danger { color: var(--color-fog); }
+/* Delete, empty trash, quit: red text, a red tint on hover, solid red while
+   waiting for the confirming second click. */
+.btn.danger { color: var(--danger); }
+.btn.danger:hover { background: var(--danger-bg); color: var(--danger); }
+.btn.danger:disabled { background: var(--overlay-hover); color: var(--danger); }
 .btn.danger.confirming,
-.btn.danger.confirming:hover { background: rgba(235, 87, 87, 0.16); box-shadow: none; color: var(--color-paper); }
+.btn.danger.confirming:hover { background: var(--danger); box-shadow: none; color: #fff; }
 
 .btn:focus-visible,
 .tab:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
@@ -564,6 +569,36 @@ textarea.field { resize: vertical; min-height: 84px; }
 .seg:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
 
 .app-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* On/off switch: a pill with a knob, filled when on. */
+.switch {
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--overlay-active);
+  box-shadow: var(--hairline);
+  cursor: default;
+  transition: background 120ms ease;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-fog);
+  transition: transform 120ms ease, background 120ms ease;
+}
+.switch[aria-checked="true"] { background: var(--color-paper); }
+.switch[aria-checked="true"]::after { transform: translateX(14px); background: var(--color-carbon); }
+.switch:disabled { opacity: 0.4; }
+.switch:focus-visible { outline: 1px solid var(--color-mist); outline-offset: 2px; }
 
 /* Global zoom: − 100% + (and "reset" when not at 100%). */
 .zoom-control { display: flex; align-items: center; gap: 6px; }
@@ -820,6 +855,28 @@ textarea.field { resize: vertical; min-height: 84px; }
   font-size: 12px;
   font-weight: 500;
 }
+/* The on/off switch, as in Configurações. */
+.demo-switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--overlay-active);
+  box-shadow: var(--hairline);
+}
+.demo-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-fog);
+}
+.demo-switch.on { background: var(--color-paper); }
+.demo-switch.on::after { transform: translateX(14px); background: var(--color-carbon); }
 .demo-seg .on { background: var(--overlay-active); color: var(--color-paper); }
 
 .help-list kbd {

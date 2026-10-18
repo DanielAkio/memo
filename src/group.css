@@ -114,11 +114,3 @@
   background: var(--color-obsidian);
   box-shadow: inset 0 0 0 1.5px var(--color-mist);
 }
-
-/* ✕ asks for a second click: the group and its notes go away. */
-.close.confirming,
-.close.confirming:hover {
-  opacity: 1;
-  background: rgba(235, 87, 87, 0.16);
-  color: var(--color-paper);
-}

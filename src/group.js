@@ -36,7 +36,6 @@
   let group = null;
   let count = 0;
   let renaming = false;
-  let confirmTimer = null;
 
   function render() {
     if (!group) return;
@@ -67,7 +66,7 @@
     colorBtn.title = t('groupColor');
     $('newBtn').title = `${t('newNoteInGroup')} (${newKeys})`;
     document.title = group.name ? `${group.name} — Memo` : 'Memo';
-    if (!closeBtn.classList.contains('confirming')) closeBtn.title = t('deleteGroup');
+    closeBtn.title = t('close');
   }
 
   async function load() {
@@ -215,23 +214,15 @@
   }
   systemLight.addEventListener('change', renderMonoName);
 
-  // ------------------------------------------------------------- delete
+  // -------------------------------------------------------------- close
 
-  // An empty group goes at once; otherwise a second click within 3 s.
-  function deleteGroup() {
-    if (count > 0 && !closeBtn.classList.contains('confirming')) {
-      closeBtn.classList.add('confirming');
-      closeBtn.title = t('deleteGroupConfirm');
-      clearTimeout(confirmTimer);
-      confirmTimer = setTimeout(() => {
-        closeBtn.classList.remove('confirming');
-        render();
-      }, 3000);
-      return;
-    }
-    invoke('delete_group').catch((err) => console.error('delete_group', err));
+  // Like a note's ✕: closes the bar and its memories' windows; the group stays
+  // among the current ones and the manager reopens it. An empty unnamed group
+  // is just removed.
+  function closeGroup() {
+    invoke('close_group').catch((err) => console.error('close_group', err));
   }
-  closeBtn.addEventListener('click', deleteGroup);
+  closeBtn.addEventListener('click', closeGroup);
 
   // ------------------------------------------------------------- window
 
@@ -240,7 +231,7 @@
     titlebar,
     resizeEdges: ['e', 'w'],
     onDoubleClick: startRename,
-    onClose: deleteGroup,
+    onClose: closeGroup,
   });
 
   document.addEventListener('contextmenu', (e) => {
