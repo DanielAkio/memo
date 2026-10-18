@@ -471,10 +471,13 @@ impl SnapTargets {
             t_.top.push(a.position.y + gap);
             t_.bottom.push(a.position.y + a.size.height as i32 - gap);
         }
+        // Other windows pull only when they are really on the user's screen:
+        // shown, not minimised, and on the monitor where this window is.
         for other in window.app_handle().webview_windows().into_values() {
             if other.label() == window.label()
                 || !is_app_window(&other)
                 || !other.is_visible().unwrap_or(false)
+                || other.is_minimized().unwrap_or(false)
             {
                 continue;
             }
@@ -483,6 +486,20 @@ impl SnapTargets {
             };
             let (ol, ot) = (p.x, p.y);
             let (or, ob) = (ol + s.width as i32, ot + s.height as i32);
+            // Covered by other apps' windows: not on screen either.
+            if !shows_on_screen(&other, (ol, ot, or, ob)) {
+                continue;
+            }
+            if let Some(m) = &monitor {
+                let (mp, ms) = (m.position(), m.size());
+                let on_monitor = ol < mp.x + ms.width as i32
+                    && or > mp.x
+                    && ot < mp.y + ms.height as i32
+                    && ob > mp.y;
+                if !on_monitor {
+                    continue;
+                }
+            }
             // Only snap to a window in the same row/column (with the reach as slack).
             if t < ob + reach && b > ot - reach {
                 t_.left.extend([or + gap, ol]);
@@ -505,6 +522,182 @@ impl SnapTargets {
             .min_by_key(|t| (t - v).abs())
             .unwrap_or(v)
     }
+}
+
+/// Whether any part of `window` (visible rect `l`,`t`,`r`,`b`, physical) is
+/// actually seen on screen, i.e. not covered by other windows: a covered note
+/// must not pull with the magnet. Each system answers in its own way (below);
+/// when it can't tell, the window counts as shown.
+///
+/// Windows and Linux sample the same points: a 3×3 grid over the window,
+/// slightly inset; it is shown if the top window at any of them is itself.
+fn sample_points((l, t, r, b): (i32, i32, i32, i32)) -> impl Iterator<Item = (i32, i32)> {
+    let inset = 4;
+    let xs = [l + inset, (l + r) / 2, r - 1 - inset];
+    let ys = [t + inset, (t + b) / 2, b - 1 - inset];
+    ys.into_iter()
+        .flat_map(move |y| xs.into_iter().map(move |x| (x, y)))
+}
+
+/// Windows: asks which top-level window is shown at each point.
+#[cfg(windows)]
+fn shows_on_screen(window: &WebviewWindow, rect: (i32, i32, i32, i32)) -> bool {
+    use windows_sys::Win32::{
+        Foundation::POINT,
+        UI::WindowsAndMessaging::{GetAncestor, WindowFromPoint, GA_ROOT},
+    };
+    let Ok(hwnd) = window.hwnd() else {
+        return true;
+    };
+    let own = hwnd.0 as windows_sys::Win32::Foundation::HWND;
+    sample_points(rect).any(|(x, y)| {
+        // SAFETY: plain Win32 queries with no pointers kept; a null result
+        // just doesn't match.
+        let top = unsafe { GetAncestor(WindowFromPoint(POINT { x, y }), GA_ROOT) };
+        top == own
+    })
+}
+
+/// macOS: the window server tracks this itself — `occlusionState` has the
+/// "visible" flag while any part of the window can be seen.
+#[cfg(target_os = "macos")]
+fn shows_on_screen(window: &WebviewWindow, _rect: (i32, i32, i32, i32)) -> bool {
+    use objc2_app_kit::{NSView, NSWindowOcclusionState};
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    let Ok(handle) = window.window_handle() else {
+        return true;
+    };
+    let RawWindowHandle::AppKit(appkit) = handle.as_raw() else {
+        return true;
+    };
+    // SAFETY: the handle's view lives as long as the window, which is held
+    // here; this runs on the main thread (sync commands do).
+    let view: &NSView = unsafe { appkit.ns_view.cast().as_ref() };
+    match view.window() {
+        Some(ns_window) => ns_window
+            .occlusionState()
+            .contains(NSWindowOcclusionState::Visible),
+        None => true,
+    }
+}
+
+/// Linux (X11 — Memo forces XWayland, see `main`): the root window's children
+/// in stacking order; at each point the top-most viewable one must be this
+/// window's top-level (usually the window manager's frame around it).
+#[cfg(target_os = "linux")]
+fn shows_on_screen(window: &WebviewWindow, rect: (i32, i32, i32, i32)) -> bool {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    let Ok(handle) = window.window_handle() else {
+        return true;
+    };
+    let xid = match handle.as_raw() {
+        RawWindowHandle::Xlib(h) => h.window,
+        RawWindowHandle::Xcb(h) => h.window.get().into(),
+        _ => return true, // native Wayland: no way to tell
+    };
+    X11.with(|x11| match x11 {
+        // SAFETY: a private Xlib connection used only on this thread.
+        Some((xlib, display)) => unsafe { x11_shows(xlib, *display, xid, rect) },
+        None => true,
+    })
+}
+
+#[cfg(target_os = "linux")]
+thread_local! {
+    /// Memo's own Xlib connection (libX11 loaded at run time), opened once
+    /// per thread on first use; `None` without X11.
+    static X11: Option<(x11_dl::xlib::Xlib, *mut x11_dl::xlib::Display)> = {
+        let xlib = x11_dl::xlib::Xlib::open().ok();
+        xlib.and_then(|xlib| {
+            // SAFETY: opens the default display; null when there is none.
+            let display = unsafe { (xlib.XOpenDisplay)(std::ptr::null()) };
+            (!display.is_null()).then_some((xlib, display))
+        })
+    };
+}
+
+/// See `shows_on_screen` (Linux).
+///
+/// # Safety
+/// `display` must be a live connection opened with `xlib`.
+#[cfg(target_os = "linux")]
+unsafe fn x11_shows(
+    xlib: &x11_dl::xlib::Xlib,
+    display: *mut x11_dl::xlib::Display,
+    xid: x11_dl::xlib::Window,
+    rect: (i32, i32, i32, i32),
+) -> bool {
+    use std::{mem, os::raw::c_int, ptr};
+    use x11_dl::xlib;
+
+    // A window can vanish between two queries: Xlib's default handler would
+    // end the process on that error, so errors are ignored meanwhile.
+    unsafe extern "C" fn ignore(_: *mut xlib::Display, _: *mut xlib::XErrorEvent) -> c_int {
+        0
+    }
+    let previous = (xlib.XSetErrorHandler)(Some(ignore));
+
+    // Children of `w` (stacking order, bottom first) and its parent.
+    let query = |w: xlib::Window| -> Option<(Vec<xlib::Window>, xlib::Window)> {
+        let (mut root, mut parent) = (0, 0);
+        let (mut kids, mut n): (*mut xlib::Window, u32) = (ptr::null_mut(), 0);
+        if (xlib.XQueryTree)(display, w, &mut root, &mut parent, &mut kids, &mut n) == 0 {
+            return None;
+        }
+        let list = if kids.is_null() {
+            Vec::new()
+        } else {
+            let list = std::slice::from_raw_parts(kids, n as usize).to_vec();
+            (xlib.XFree)(kids.cast());
+            list
+        };
+        Some((list, parent))
+    };
+
+    let root = (xlib.XDefaultRootWindow)(display);
+    let shown = (|| {
+        // This window's top-level: its ancestor that is a child of the root.
+        let mut top = xid;
+        loop {
+            let (_, parent) = query(top)?;
+            if parent == root || parent == 0 {
+                break;
+            }
+            top = parent;
+        }
+        // Viewable top-levels with their rects, top of the stack first.
+        let (stack, _) = query(root)?;
+        let rects: Vec<(xlib::Window, i32, i32, i32, i32)> = stack
+            .into_iter()
+            .rev()
+            .filter_map(|w| {
+                let mut a: xlib::XWindowAttributes = mem::zeroed();
+                if (xlib.XGetWindowAttributes)(display, w, &mut a) == 0
+                    || a.map_state != xlib::IsViewable
+                {
+                    return None;
+                }
+                let border = 2 * a.border_width;
+                Some((w, a.x, a.y, a.x + a.width + border, a.y + a.height + border))
+            })
+            .collect();
+        Some(sample_points(rect).any(|(x, y)| {
+            rects
+                .iter()
+                .find(|&&(_, l, t, r, b)| x >= l && x < r && y >= t && y < b)
+                .is_some_and(|&(w, ..)| w == top)
+        }))
+    })();
+
+    (xlib.XSync)(display, xlib::False);
+    (xlib.XSetErrorHandler)(previous);
+    shown.unwrap_or(true)
+}
+
+/// Other systems: no check.
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+fn shows_on_screen(_window: &WebviewWindow, _rect: (i32, i32, i32, i32)) -> bool {
+    true
 }
 
 /// Snapped position for the window being dragged (visible corner `x`,`y`,
@@ -803,7 +996,9 @@ fn group_under(note: &WebviewWindow, cursor: PhysicalPosition<f64>) -> Option<St
     note.app_handle()
         .webview_windows()
         .into_values()
-        .filter(|w| is_group(w) && w.is_visible().unwrap_or(false))
+        .filter(|w| {
+            is_group(w) && w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false)
+        })
         .find(|w| {
             let (Ok(p), Ok(s)) = (w.inner_position(), w.inner_size()) else {
                 return false;

@@ -11,12 +11,29 @@ rust-version = "1.77"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# macos-private-api: transparent windows on macOS (the Snap preview, snap.html).
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sys-locale = "0.3"
 tauri-plugin-dialog = "2"
+
+# Native window handles, to tell whether a note is covered by other windows
+# (`shows_on_screen` in main.rs): the magnet ignores notes not on screen.
+raw-window-handle = "0.6"
+
+# Windows: which window is shown at a point (WindowFromPoint).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+
+# macOS: the window's occlusion state (NSWindow.occlusionState).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSResponder", "NSView", "NSWindow"] }
+
+# Linux (X11, forced through XWayland): the stacking order of top-level windows.
+[target.'cfg(target_os = "linux")'.dependencies]
+x11-dl = "2.21"
 
 [profile.release]
 codegen-units = 1
