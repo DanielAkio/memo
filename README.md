@@ -1,107 +1,117 @@
 # Memo
 
-Memórias adesivas para Windows, macOS e Linux, inspiradas no [Stickies](https://www.zhornsoftware.co.uk/stickies/).
-Cada memória é uma janela própria, e **um clique na tachinha** a mantém por cima de todos os outros aplicativos.
+Sticky memories for Windows, macOS and Linux, inspired by [Stickies](https://www.zhornsoftware.co.uk/stickies/).
+Each memory is its own window, and **one click on the pin** keeps it on top of every other app.
 
-## Como usar
+The interface is available in English and Portuguese.
 
-| Ação | Como |
-|------|------|
-| Fixar / desafixar por cima de tudo | Clique na tachinha, à esquerda na barra de título, ou `Ctrl+Shift+P` (`⌘⇧P` no Mac) |
-| Dar um título à memória | Clique duplo na barra de título; `Enter` salva, `Esc` cancela |
-| Checklist | Digite `[]` no começo de uma linha; clique na caixa para marcar (o texto fica tachado) |
-| Lista com marcadores | Digite `- ` no começo de uma linha; `Tab` / `Shift+Tab` recuam e voltam o item (também no checklist) |
-| Código | `` `texto` `` (ou `Ctrl+E` / botão `</>` na barrinha) para código na linha; ` ```sql ` + `Enter` abre um bloco de código (`Enter` numa linha vazia no fim sai do bloco) |
-| Negrito, itálico, sublinhado, marca-texto | `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` (`⌘` no Mac), ou selecione o texto e use a barrinha que aparece acima da seleção |
-| Tamanho do texto (pequeno, normal, grande) | Botões "A" na barrinha da seleção, ou `Ctrl+Shift+>` / `Ctrl+Shift+<` (`⌘⇧` no Mac) |
-| Nova memória | Botão `+`, `Ctrl+N` (`⌘N`) ou o ícone do Memo na bandeja |
-| Fechar | Botão `✕` ou clique do meio (rodinha) na barra de título: a memória vai para a lixeira |
-| Ver todas as memórias, buscar, recuperar da lixeira | Gerenciador de Memórias: abre junto com o app, ou pelo ícone na bandeja → Gerenciador de Memórias. Memórias há mais de 30 dias na lixeira são apagadas |
-| Cor, título e texto das novas memórias | Gerenciador de Memórias → Configurações → Padrão (o texto usa o mesmo editor da memória: checklist, marcadores, código e formatação) |
-| Mover | Arraste pela barra de título; perto de uma borda da tela ou de outra memória, ela gruda |
-| Redimensionar | Pelas bordas ou pelo canto inferior direito; perto de uma borda da tela ou de outra memória, a borda gruda |
-| Recolher / expandir até a barra de título | Botão de seta, ao lado do `✕` |
-| Mudar a cor (padrão: amarela) | Clique na bolinha colorida à esquerda do título e escolha a cor, ou "Personalizada" para qualquer cor |
-| Idioma (português / inglês) | Gerenciador de Memórias → Configurações → Idioma: Sistema (padrão), Português ou English |
-| Tema claro / escuro | Gerenciador de Memórias → Configurações → Tema: Sistema (padrão), Claro ou Escuro |
-| Rever as dicas da primeira memória | Gerenciador de Memórias → Configurações → Como usar o Memo |
-| Mostrar todas as memórias | Ícone na bandeja (barra de menus no macOS) |
-| Sair | Ícone na bandeja → Sair do Memo, ou Gerenciador de Memórias → Configurações → Sair do Memo |
+## How to use
 
-Ao abrir, o Memo mostra o Gerenciador de Memórias junto com as memórias que estavam abertas (na primeira vez, com a memória de
-boas-vindas). As memórias abertas aparecem na barra de tarefas (no Dock, no macOS). Fechar a última memória não encerra o app: ele
-continua na bandeja. Texto, título, posição, tamanho, cor e estado de fixação são salvos automaticamente em
-`notes.json`, na pasta de dados do app:
+| Action | How |
+|--------|-----|
+| Pin / unpin on top of everything | Click the pin on the left of the titlebar, or `Ctrl+Shift+P` (`⌘⇧P` on Mac) |
+| Give the memory a title | Double-click the titlebar; `Enter` saves, `Esc` cancels |
+| Checklist | Type `[]` at the start of a line; click the box to check it (the text gets struck through) |
+| Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` indent and outdent the item (also in checklists) |
+| Code | `` `text` `` (or `Ctrl+E` / the `</>` button in the format bar) for inline code; ` ```sql ` + `Enter` opens a code block (`Enter` on an empty last line leaves the block) |
+| Bold, italic, underline, highlight | `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` (`⌘` on Mac), or select text and use the bar that appears above the selection |
+| Text size (small, normal, large) | The "A" buttons in the format bar, or `Ctrl+Shift+>` / `Ctrl+Shift+<` (`⌘⇧` on Mac) |
+| New memory | The `+` button, `Ctrl+N` (`⌘N`) or the Memo tray icon |
+| Close | The `✕` button or a middle click (wheel) on the titlebar: the memory goes to the trash |
+| See all memories, search, sort, restore from the trash | Memory Manager: opens with the app, or from the tray icon → Memory Manager. The sort box next to the search orders the list by most recent or by title (A–Z). Memories in the trash for over 30 days are deleted |
+| Colour, title and text for new memories | Memory Manager → Settings → Defaults (the text uses the same editor as a memory: checklist, bullets, code and formatting) |
+| Move | Drag by the titlebar; near a screen edge or another memory, it snaps |
+| Resize | By the edges or the bottom-right corner; near a screen edge or another memory, the edge snaps |
+| Collapse / expand to the titlebar | The arrow button next to `✕` |
+| Change the colour (default: yellow) | Click the coloured dot left of the title and pick a colour, or "Custom" for any colour |
+| Language (Portuguese / English) | Memory Manager → Settings → Language: System (default), Português or English |
+| Folder where memories are saved | Memory Manager → Settings → Storage → Change… |
+| Back up / restore memories | Memory Manager → Settings → Storage → Export… (a `.json` with every memory not in the trash) / Import… (adds the file's memories; an existing one is only replaced if the file's copy is newer) |
+| Light / dark theme | Memory Manager → Settings → Theme: System (default), Light or Dark |
+| See the first memory's tips again | Memory Manager → Settings → How to use Memo |
+| Show all memories | Tray icon (menu bar on macOS) |
+| Quit | Tray icon → Quit Memo, or Memory Manager → Settings → Quit Memo |
 
-- Windows: `%APPDATA%\br.memo.notas\`
-- macOS: `~/Library/Application Support/br.memo.notas/`
-- Linux: `~/.local/share/br.memo.notas/`
+On launch, Memo shows the Memory Manager together with the memories that were open (the first time, with the welcome
+memory). Open memories appear in the taskbar (in the Dock, on macOS). Closing the last memory doesn't quit the app: it
+stays in the tray. Text, title, position, size, colour and pin state are saved automatically to `notes.json`, in the
+app data folder:
 
-O app se chamava Taxinha: na primeira vez que o Memo abre, ele copia as memórias da pasta antiga (`br.taxinha.notas`),
-que fica intacta como backup.
+- Windows: `%APPDATA%\memo\`
+- macOS: `~/Library/Application Support/memo/`
+- Linux: `~/.local/share/memo/`
 
-## Rodar a partir do código
+You can pick another folder in Memory Manager → Settings → Storage (for example a Dropbox or OneDrive folder, to share
+memories between computers). The current memories are copied there and the old file is kept as a backup; if the folder
+already has Memo memories, Memo asks whether to open those or replace them with the current ones. "Use default folder"
+moves them back.
 
-Pré-requisitos: [Rust](https://rustup.rs), Node.js 18+ e as dependências de sistema do Tauri
-([guia oficial](https://v2.tauri.app/start/prerequisites/)). No Linux (Debian/Ubuntu):
+Older versions saved to a folder named `br.memo.notas` (or `br.taxinha.notas`, when the app was called Taxinha):
+the first time this version opens, it copies the memories and settings from there into `memo`, leaving the old folder
+intact as a backup.
+
+## Running from source
+
+Prerequisites: [Rust](https://rustup.rs), Node.js 18+ and Tauri's system dependencies
+([official guide](https://v2.tauri.app/start/prerequisites/)). On Linux (Debian/Ubuntu):
 
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev build-essential
 ```
 
-Depois:
+Then:
 
 ```bash
 npm install
-npm run dev      # abre o app em modo desenvolvimento
-npm run build    # gera o instalador do sistema atual em src-tauri/target/release/bundle/
+npm run dev      # opens the app in development mode
+npm run build    # builds the installer for the current OS in src-tauri/target/release/bundle/
 ```
 
-No VS Code, o mesmo `npm run dev` está em **Run and Debug** → **Rodar em modo dev**.
+In VS Code, the same `npm run dev` is under **Run and Debug** → **Run in dev mode**.
 
-## Instalador do Windows via Docker
+## Windows installer via Docker
 
-Para gerar o instalador do Windows sem instalar Rust, Node ou o Visual Studio, basta ter o
-[Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto. No VS Code, vá em **Run and Debug**,
-escolha **Gerar instalador do Windows (Docker)** e clique em ▶. Pelo terminal:
+To build the Windows installer without installing Rust, Node or Visual Studio, you only need
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) running. In VS Code, go to **Run and Debug**,
+choose **Build Windows installer (Docker)** and click ▶. From the terminal:
 
 ```bash
 docker compose -f docker/compose.yml run --build --rm windows
 ```
 
-O `*-setup.exe` (NSIS) aparece em `dist/`. O primeiro build demora mais, porque monta a imagem e baixa o SDK do
-Windows; os seguintes reaproveitam os caches. O `.msi` só sai pela CI, porque o WiX exige Windows.
+The `*-setup.exe` (NSIS) shows up in `dist/`. The first build takes longer, because it builds the image and downloads
+the Windows SDK; later builds reuse the caches. The `.msi` only comes out of CI, because WiX requires Windows.
 
-## Instaladores para os três sistemas
+## Installers for all three platforms
 
-O workflow em `.github/workflows/build.yml` compila no GitHub Actions para Windows (`.msi` e `.exe`),
-macOS Apple Silicon e Intel (`.dmg`) e Linux (`.deb`, `.rpm`, `.AppImage`). Ele roda só manualmente, em
-Actions → Build → Run workflow, e gera os instaladores como artefatos. Rodando a partir de uma tag `v0.1.0`,
-cria também um rascunho de release.
+The workflow in `.github/workflows/build.yml` builds on GitHub Actions for Windows (`.msi` and `.exe`),
+macOS Apple Silicon and Intel (`.dmg`) and Linux (`.deb`, `.rpm`, `.AppImage`). It only runs manually, from
+Actions → Build → Run workflow, and uploads the installers as artifacts. Run from a `v0.1.0` tag, it also
+creates a draft release.
 
-Os builds não são assinados. No macOS, abra pela primeira vez com clique direito → Abrir; no Windows, o
-SmartScreen pode pedir "Executar assim mesmo".
+Builds are unsigned. On macOS, open the app the first time with right-click → Open; on Windows,
+SmartScreen may ask you to "Run anyway".
 
-## Linux e Wayland
+## Linux and Wayland
 
-Compositores Wayland não permitem que um app se coloque "sempre no topo". Por isso o Memo roda via
-XWayland automaticamente quando detecta Wayland, e o botão de fixar funciona no GNOME, KDE e afins.
-Para forçar outro backend, defina `GDK_BACKEND` antes de abrir o app.
+Wayland compositors don't let an app put itself "always on top". So Memo automatically runs through
+XWayland when it detects Wayland, and the pin button works on GNOME, KDE and the like.
+To force a different backend, set `GDK_BACKEND` before launching the app.
 
-## Estrutura
+## Layout
 
 ```
-src/                 interface (HTML, CSS e JS puros, sem build)
-  styles.css         tokens e componentes do docs/style.md
+src/                 interface (plain HTML, CSS and JS, no build step)
+  styles.css         tokens and components from docs/style.md
 src-tauri/src/
-  main.rs            janelas, comandos, bandeja
-  store.rs           persistência em notes.json
-src-tauri/icons/     ícones gerados a partir de assets/icon.svg
+  main.rs            windows, commands, tray
+  store.rs           persistence to notes.json
+src-tauri/icons/     icons generated from assets/icon.svg
 ```
 
-Visual baseado no [`docs/style.md`](docs/style.md) do projeto: superfícies quase pretas, a fonte do sistema (Segoe UI, SF Pro…), bordas hairline e, como
-única cor, a etiqueta da memória (amarela por padrão).
+The look follows the project's [`docs/style.md`](docs/style.md): near-black surfaces, the system font (Segoe UI,
+SF Pro…), hairline borders and, as the only colour, the memory's label (yellow by default).
 
-## Licença
+## License
 
 [MIT](LICENSE).

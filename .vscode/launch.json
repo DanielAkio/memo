@@ -2,14 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Rodar em modo dev",
+      "name": "Run in dev mode",
       "type": "node-terminal",
       "request": "launch",
       "cwd": "${workspaceFolder}",
       "command": "npm install --no-audit --no-fund; npm run dev"
     },
     {
-      "name": "Gerar instalador do Windows (Docker)",
+      "name": "Build Windows installer (Docker)",
       "type": "node-terminal",
       "request": "launch",
       "cwd": "${workspaceFolder}",

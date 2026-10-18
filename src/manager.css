@@ -1,6 +1,6 @@
-/* Memo — janela "Gerenciador" (gerenciamento das notas e da lixeira).
-   Tokens, temas, cores das etiquetas, o seletor de cor e a moldura comum
-   (barra de título, botões, tachinha, alça) vêm do base.css. */
+/* Memo — manager window (notes and trash management).
+   Tokens, themes, label colours, the colour picker and the shared frame
+   (titlebar, buttons, pin, grip) come from base.css. */
 
 body {
   font-size: 13px;
@@ -8,7 +8,7 @@ body {
   -webkit-user-select: none;
 }
 
-/* Título fixo na barra (a janela "Gerenciador" não tem título editável). */
+/* Fixed title in the titlebar (the manager has no editable title). */
 .mgr-title {
   flex: 1;
   min-width: 0;
@@ -19,7 +19,7 @@ body {
   color: var(--color-mist);
 }
 
-/* Tudo abaixo da barra de título; some com a janela recolhida. */
+/* Everything below the titlebar; hidden when the window is collapsed. */
 .mgr-body {
   flex: 1;
   min-height: 0;
@@ -30,7 +30,7 @@ body {
 .is-collapsed .mgr-body,
 .is-collapsed .grip { display: none; }
 
-/* ------------------------------------------------------------------ topo */
+/* ------------------------------------------------------------------- top */
 
 .mgr-head {
   flex: none;
@@ -66,12 +66,58 @@ body {
   color: var(--color-ash);
 }
 
-/* Linha da busca, no alto das abas Notas e Lixeira. */
+/* Search row, at the top of the Memories and Trash tabs. */
 .list-tools {
   flex: none;
   padding: 12px 16px 4px;
 }
 .list-tools[hidden] { display: none; }
+.list-tools:not([hidden]) { display: flex; align-items: center; gap: 8px; }
+.list-tools .search { flex: 1; }
+/* Sort select next to the search box: same box as the search, with a sort
+   icon on the left and a custom arrow on the right. */
+.sort {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 30px;
+  border-radius: var(--radius-button);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+}
+.sort:hover, .sort:focus-within { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.sort svg {
+  position: absolute;
+  left: 8px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--color-ash);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.sort select {
+  height: 100%;
+  padding: 0 26px 0 28px;
+  border: 0;
+  outline: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  /* Chevron drawn like the language select's. */
+  background-color: transparent;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-fog) 50%),
+                    linear-gradient(135deg, var(--color-fog) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 13px, calc(100% - 10px) 13px;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  color: var(--color-mist);
+  font: inherit;
+  cursor: default;
+}
+.sort option { background: var(--color-obsidian); color: var(--color-mist); }
 
 .search {
   display: flex;
@@ -106,7 +152,7 @@ body {
 .search input::placeholder { color: var(--color-ash); }
 .search:focus-within { box-shadow: inset 0 0 0 1px var(--color-smoke); }
 
-/* --------------------------------------------------------------- lixeira */
+/* ----------------------------------------------------------------- trash */
 
 .trash-bar {
   flex: none;
@@ -120,7 +166,7 @@ body {
 .trash-bar[hidden] { display: none; }
 .trash-bar span { flex: 1; }
 
-/* ---------------------------------------------------------------- lista */
+/* ----------------------------------------------------------------- list */
 
 .list-wrap[hidden],
 .search[hidden] { display: none; }
@@ -130,9 +176,13 @@ body {
   min-height: 0;
   overflow-y: auto;
 }
-.list-wrap::-webkit-scrollbar { width: 10px; }
-.list-wrap::-webkit-scrollbar-track { background: transparent; }
-.list-wrap::-webkit-scrollbar-thumb {
+/* Same thin scrollbar in the list and in the Settings tab. */
+.list-wrap::-webkit-scrollbar,
+.settings::-webkit-scrollbar { width: 10px; }
+.list-wrap::-webkit-scrollbar-track,
+.settings::-webkit-scrollbar-track { background: transparent; }
+.list-wrap::-webkit-scrollbar-thumb,
+.settings::-webkit-scrollbar-thumb {
   background: var(--color-graphite);
   border: 3px solid var(--color-carbon);
   border-radius: 9999px;
@@ -198,7 +248,7 @@ body {
   display: flex;
   gap: 4px;
 }
-/* Nas notas, o botão da lixeira só aparece sob o mouse. */
+/* In the notes list, the trash button only shows on hover. */
 .notes-view .row-actions { opacity: 0; }
 .notes-view .row:hover .row-actions,
 .notes-view .row:focus-within .row-actions { opacity: 1; }
@@ -233,7 +283,7 @@ body {
 }
 .empty[hidden] { display: none; }
 
-/* ------------------------------------------------- aba "Configuração" */
+/* ---------------------------------------------------------- Settings tab */
 
 .settings {
   flex: 1;
@@ -251,6 +301,13 @@ body {
   text-transform: uppercase;
   color: var(--color-ash);
 }
+/* Dividers only between groups: a hairline above every section title but
+   the first, none between the settings of a group. */
+.settings > .settings-title:not(:first-child) {
+  margin-top: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-graphite);
+}
 
 .setting {
   display: flex;
@@ -258,15 +315,12 @@ body {
   gap: 12px;
   min-height: 44px;
   padding: 6px 0;
-  border-bottom: 1px solid var(--color-graphite);
 }
 .setting-label { width: 132px; flex: none; color: var(--color-mist); font-size: 13px; }
-/* Sem linha depois do último ajuste da aba. */
-.settings > .setting:last-of-type { border-bottom: 0; }
 .setting-top { align-items: flex-start; }
 .setting-top .setting-label { padding-top: 6px; }
 
-/* Campos de texto (título e texto padrão das notas novas). */
+/* Text fields (default title and text for new notes). */
 .field-wrap { flex: 1; min-width: 0; }
 .field {
   box-sizing: border-box;
@@ -290,7 +344,7 @@ body {
 }
 textarea.field { resize: vertical; min-height: 84px; }
 
-/* Editor do texto padrão: a página da nota embutida (index.html?defaults). */
+/* Default text editor: the embedded note page (index.html?defaults). */
 .note-frame {
   display: block;
   height: 180px;
@@ -300,7 +354,7 @@ textarea.field { resize: vertical; min-height: 84px; }
   overflow: hidden;
 }
 
-/* Lista de escolha (idioma): mesmo visual dos campos, com seta própria. */
+/* Select (language): same look as the fields, with a custom arrow. */
 .select {
   flex: none;
   width: auto;
@@ -320,7 +374,7 @@ textarea.field { resize: vertical; min-height: 84px; }
 .select option { background: var(--color-obsidian); color: var(--color-mist); }
 .field::placeholder { color: var(--color-ash); }
 .field:focus { box-shadow: inset 0 0 0 1px var(--color-smoke); }
-/* Ícone "i" ao lado de um título de seção; o texto aparece num tooltip. */
+/* "i" icon next to a section title; the text shows in a tooltip. */
 .settings-title { display: flex; align-items: center; gap: 6px; }
 .info {
   position: relative;
@@ -364,7 +418,7 @@ textarea.field { resize: vertical; min-height: 84px; }
 .info:hover::after, .info:focus-visible::after { opacity: 1; }
 .settings .swatches { padding: 0; }
 
-/* Seletor de tema: botões lado a lado, o escolhido destacado. */
+/* Theme switch: buttons side by side, the chosen one highlighted. */
 .segmented {
   display: flex;
   gap: 2px;
@@ -389,3 +443,33 @@ textarea.field { resize: vertical; min-height: 84px; }
 .seg:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
 
 .app-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Result of the last export/import, under the buttons. */
+.storage-status {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-fog);
+}
+.storage-status[hidden] { display: none; }
+.setting-label .info { margin-left: 4px; vertical-align: 1px; }
+
+/* Current data folder: full path, selectable so it can be copied. */
+.data-dir-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+.data-dir-row .btn { flex: none; }
+.reset-dir { margin-top: 8px; }
+.data-dir {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-fog);
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}

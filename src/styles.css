@@ -1,14 +1,15 @@
-/* Memo — janela da nota (título, editor, barra de status, menus). Fontes,
-   tokens, temas, cores das etiquetas, seletor de cor e a moldura comum às
-   janelas (barra de título, botões, tachinha, alça) ficam no base.css.
-   Estilo segundo o docs/style.md ("midnight precision instrument").
-   Superfícies quase pretas, texto em escala de cinza e bordas hairline; a
-   única cor na tela é a etiqueta da nota. O tema claro inverte a escala de
-   cinza (mesmos nomes de token) e é escolhido no ícone da bandeja:
-   <html data-theme="light|dark">, ou sem atributo para seguir o sistema. */
+/* Memo — note window (title, editor, status bar, menus). Fonts, tokens,
+   themes, label colours, the colour picker and the frame shared by the
+   windows (titlebar, buttons, pin, grip) live in base.css.
+   Styled after docs/style.md ("midnight precision instrument").
+   Near-black surfaces, grey-scale text and hairline borders; the only colour
+   on screen is the note's label. The light theme inverts the grey scale
+   (same token names) and is chosen in the manager:
+   <html data-theme="light|dark">, or no attribute to follow the OS. */
 
-/* Modo embutido (index.html?defaults, dentro do Gerenciador): só o editor,
-   sem barra, rodapé nem fio de cor, com o fundo do campo do Gerenciador. */
+/* Embedded mode (index.html?defaults, inside the manager): just the editor,
+   with no titlebar, status bar or colour stripe, on the manager field's
+   background. */
 html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .embedded .frame { box-shadow: none; }
 .embedded .frame::before,
@@ -17,7 +18,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .embedded .body { border-top: 0; }
 .embedded .editor { padding: 8px 12px; }
 
-/* ------------------------------------------- identidade (título, cor) */
+/* ------------------------------------------- identity (title, colour) */
 
 .identity {
   display: flex;
@@ -27,7 +28,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   flex: 1;
 }
 
-/* Bolinha da cor; clicar abre o seletor. Sem cor, vira só um contorno. */
+/* Colour dot; clicking opens the picker. With no colour, just an outline. */
 .color-btn {
   flex: none;
   display: grid;
@@ -65,7 +66,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 .note-name.is-empty { color: var(--color-ash); font-weight: 400; }
 
-/* Campo que aparece no clique duplo para dar nome à nota. */
+/* Field shown on double click to name the note. */
 .title-input {
   flex: 1;
   min-width: 0;
@@ -98,8 +99,8 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .is-collapsed .body,
 .is-collapsed .statusbar { display: none; }
 
-/* Editor de texto rico: cada linha é um <div>; itens de checklist são
-   <div class="check"> (marcado: .done) com a caixa desenhada no ::before. */
+/* Rich text editor: each line is a <div>; checklist items are
+   <div class="check"> (checked: .done) with the box drawn in ::before. */
 .editor {
   position: relative;
   flex: 1;
@@ -120,11 +121,11 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   tab-size: 4;
 }
 .editor ::selection { background: var(--selection); color: var(--color-paper); }
-/* Negrito em 600: o Chromium só reconhece negrito (queryCommandState e o
-   desligar do Ctrl+B) a partir de 600. */
+/* Bold at 600: Chromium only recognises bold (queryCommandState and
+   toggling Ctrl+B off) from 600 up. */
 .editor b, .editor strong { font-weight: 600; color: var(--color-bone); }
 .editor u { text-decoration-thickness: 1px; text-underline-offset: 2px; }
-/* Código na linha (`texto`) e bloco de código (```linguagem). */
+/* Inline code (`text`) and code block (```lang). */
 .editor code {
   padding: 1px 5px;
   border-radius: var(--radius-badge);
@@ -160,14 +161,14 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   pointer-events: none;
 }
 
-/* Marca-texto: o HTML guarda uma cor-sentinela; aqui vale a cor do tema. */
+/* Highlight: the HTML stores a sentinel colour; the theme colour applies here. */
 .editor span[style*="rgb(255, 230, 0)"] {
   background-color: var(--highlight) !important;
   border-radius: 2px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
-/* Tamanhos do <font size> gerado pelo editor (ver SIZES no app.js). */
+/* Sizes for the editor's <font size> (see SIZES in app.js). */
 .editor font[size="2"] { font-size: 13px; }
 .editor font[size="3"] { font-size: inherit; }
 .editor font[size="5"] { font-size: 20px; }
@@ -186,13 +187,13 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   position: relative;
   padding-left: 24px;
 }
-/* Item todo num tamanho (data-size, do app.js): a linha assume o tamanho,
-   então a caixa (0.8em) e o risco ficam no meio do texto. Mesmos px do
-   .editor font[size]. */
+/* Item all in one size (data-size, from app.js): the line takes that size,
+   so the box (0.8em) and the strike-through stay centred on the text. Same
+   px as .editor font[size]. */
 .check[data-size="2"], .bullet[data-size="2"] { font-size: 13px; }
 .check[data-size="5"], .bullet[data-size="5"] { font-size: 20px; }
 
-/* Item com marcador ("- "): bolinha preenchida no lugar da caixa. */
+/* Bulleted item ("- "): a filled dot instead of the box. */
 .bullet {
   position: relative;
   padding-left: 24px;
@@ -208,7 +209,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   background: var(--color-fog);
 }
 
-/* Recuo (Tab): 20px por nível, para checklist e marcador. */
+/* Indent (Tab): 20px per level, for checklist and bullet items. */
 .check[data-level="1"], .bullet[data-level="1"] { margin-left: 20px; }
 .check[data-level="2"], .bullet[data-level="2"] { margin-left: 40px; }
 .check[data-level="3"], .bullet[data-level="3"] { margin-left: 60px; }
@@ -288,7 +289,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 .menu[hidden] { display: none; }
 
-/* Seletor de cor: abre sob a bolinha, à esquerda da barra. */
+/* Colour picker: opens under the dot, on the left of the titlebar. */
 .color-menu {
   left: 30px;
   right: auto;
@@ -303,7 +304,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   color: var(--color-ash);
 }
 
-/* Barra de formatação: flutua acima do texto selecionado. */
+/* Format bar: floats above the selected text. */
 .format-bar {
   position: absolute;
   z-index: 20;

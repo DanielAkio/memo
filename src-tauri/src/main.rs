@@ -1,14 +1,19 @@
-// Sem janela de console no Windows em builds de release.
+// No console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod store;
 mod welcome;
 
-use std::{sync::Arc, thread, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    thread,
+    time::Duration,
+};
 
 use store::{
-    is_valid_color, now_ms, ManagerState, Note, Store, COLLAPSED_H, DEFAULT_H, DEFAULT_TEXT_MAX,
-    DEFAULT_W, LANGUAGES, THEMES, TITLE_MAX,
+    is_valid_color, now_ms, Config, ManagerState, Note, Store, COLLAPSED_H, DEFAULT_H,
+    DEFAULT_TEXT_MAX, DEFAULT_W, LANGUAGES, THEMES, TITLE_MAX,
 };
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -17,27 +22,39 @@ use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
     Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
+use tauri_plugin_dialog::{
+    DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult,
+};
 
 type Shared = Arc<Store>;
 
-/// Cor do fundo da nota no tema escuro (Carbon) e no claro — usada como fundo
-/// nativo da janela para evitar um clarão enquanto a página carrega.
+/// Note background in the dark (Carbon) and light themes — used as the native
+/// window background to avoid a flash while the page loads.
 const CARBON: Color = Color(15, 16, 17, 255);
 const PAPER: Color = Color(251, 251, 250, 255);
-/// De quanto em quanto tempo a lixeira é verificada com o app aberto (1 h).
+/// How often the trash is checked while the app is running (1 h).
 const PURGE_EVERY: Duration = Duration::from_secs(3600);
 const SAVE_EVERY: Duration = Duration::from_millis(800);
-/// Distância (lógica) de uma borda do monitor ou de outra janela em que a
-/// nota gruda nela durante o arraste.
+/// Distance (logical) from a monitor edge or another window at which the note
+/// snaps to it while being dragged.
 const SNAP_DISTANCE: f64 = 16.0;
-/// Espaço (lógico) entre duas notas grudadas, igual nos quatro lados; também
-/// é o espaço entre uma nota nova e a nota que a criou.
+/// Gap (logical) between two snapped notes, the same on all four sides; also
+/// the gap between a new note and the note that created it.
 const SNAP_GAP: f64 = 6.0;
-/// Larguras mínimas (lógicas) de uma nota e do "Gerenciador".
+/// Minimum widths (logical) of a note and of the manager.
 const MIN_W: f64 = 180.0;
 const MANAGER_MIN_W: f64 = 380.0;
-/// Rótulo da janela "Gerenciador" (gerenciador de notas e lixeira).
+/// Label of the manager window (notes and trash).
 const MANAGER: &str = "manager";
+/// App config (custom data folder), always in the default data folder.
+const CONFIG: &str = "config.json";
+/// Name of the default data folder, inside the OS data folder (`%APPDATA%`,
+/// `~/Library/Application Support`, `~/.local/share`). Not the app
+/// identifier's folder, so the identifier can stay as it is.
+const DATA_FOLDER: &str = "memo";
+/// Earlier default data folders, newest first: the app identifier's folder
+/// and, before that, Taxinha's (the app's former name).
+const OLD_DATA_FOLDERS: [&str; 2] = ["br.memo.notas", "br.taxinha.notas"];
 
 fn label_for(id: &str) -> String {
     format!("note-{id}")
@@ -51,7 +68,7 @@ fn is_note(window: &WebviewWindow) -> bool {
     window.label().starts_with("note-")
 }
 
-/// Janelas de nota abertas (sem o gerenciador).
+/// Open note windows (excluding the manager).
 fn note_windows(app: &AppHandle) -> Vec<WebviewWindow> {
     app.webview_windows()
         .into_values()
@@ -59,16 +76,16 @@ fn note_windows(app: &AppHandle) -> Vec<WebviewWindow> {
         .collect()
 }
 
-/// Avisa as janelas (o gerenciador) que a lista de notas mudou.
+/// Tells the windows (the manager) that the note list changed.
 fn notify(app: &AppHandle) {
     let _ = app.emit("notes-changed", ());
 }
 
 // ---------------------------------------------------------------------------
-// Janelas
+// Windows
 // ---------------------------------------------------------------------------
 
-/// Abre a janela de uma nota (ou traz para frente, se já estiver aberta).
+/// Opens a note's window (or brings it to the front if it is already open).
 fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow> {
     let label = label_for(&note.id);
     if let Some(existing) = app.get_webview_window(&label) {
@@ -87,7 +104,7 @@ fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow
         .title("Memo")
         .inner_size(note.width, height)
         .decorations(false)
-        // Redimensiona pelas alças da página (resize_to), com ímã.
+        // Resized through the page's handles (resize_to), with snapping.
         .resizable(false)
         .always_on_top(note.pinned)
         .background_color(CARBON)
@@ -109,9 +126,9 @@ fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow
     Ok(window)
 }
 
-/// Abre a janela "Gerenciador", onde se gerenciam as notas e a lixeira. Ela se
-/// comporta como uma nota (sem moldura, barra própria, ímã, fixar, recolher),
-/// mas sem título nem texto. Também é onde ficam o tema, a ajuda e o "Sair".
+/// Opens the manager window, where notes and the trash are managed. It behaves
+/// like a note (frameless, own titlebar, snapping, pin, collapse) but has no
+/// title or text. It also holds the theme, help and "Quit".
 fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     if let Some(existing) = app.get_webview_window(MANAGER) {
         let _ = existing.unminimize();
@@ -130,7 +147,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
         .title(manager_title(store.effective_language()))
         .inner_size(state.width, height)
         .decorations(false)
-        // Redimensiona pelas alças da página (resize_to), com ímã.
+        // Resized through the page's handles (resize_to), with snapping.
         .resizable(false)
         .always_on_top(state.pinned)
         .background_color(CARBON)
@@ -151,7 +168,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Título da janela "Gerenciador" (barra de tarefas) no idioma da interface.
+/// Manager window title (taskbar) in the UI language.
 fn manager_title(lang: &str) -> &'static str {
     if lang == "en" {
         "Memory Manager — Memo"
@@ -160,10 +177,15 @@ fn manager_title(lang: &str) -> &'static str {
     }
 }
 
-/// Textos do menu da bandeja no idioma da interface.
+/// Tray menu labels in the UI language.
 fn tray_labels(lang: &str) -> [&'static str; 4] {
     if lang == "en" {
-        ["New memory", "Show all memories", "Memory Manager", "Quit Memo"]
+        [
+            "New memory",
+            "Show all memories",
+            "Memory Manager",
+            "Quit Memo",
+        ]
     } else {
         [
             "Nova memória",
@@ -174,7 +196,7 @@ fn tray_labels(lang: &str) -> [&'static str; 4] {
     }
 }
 
-/// Troca o idioma de todas as janelas (escolhido na Configuração).
+/// Changes the language of every window (chosen in Settings).
 fn set_language(app: &AppHandle, language: &str) {
     let store = app.state::<Shared>();
     store.set_language(language);
@@ -187,8 +209,8 @@ fn set_language(app: &AppHandle, language: &str) {
     refresh_tray(app);
 }
 
-/// Remonta o menu da bandeja (o idioma mudou). Menus só podem ser alterados
-/// na thread principal (exigência do macOS).
+/// Rebuilds the tray menu (the language changed). Menus can only be changed
+/// on the main thread (a macOS requirement).
 fn refresh_tray(app: &AppHandle) {
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
@@ -198,7 +220,7 @@ fn refresh_tray(app: &AppHandle) {
     });
 }
 
-/// Fundo nativo da janela no tema efetivo ("system" segue o sistema).
+/// Native window background for the effective theme ("system" follows the OS).
 fn apply_background(window: &WebviewWindow, theme: &str) {
     let light = match theme {
         "light" => true,
@@ -208,7 +230,7 @@ fn apply_background(window: &WebviewWindow, theme: &str) {
     let _ = window.set_background_color(Some(if light { PAPER } else { CARBON }));
 }
 
-/// Troca o tema de todas as janelas (escolhido na janela "Gerenciador").
+/// Changes the theme of every window (chosen in the manager).
 fn set_theme(app: &AppHandle, theme: &str) {
     let store = app.state::<Shared>();
     store.set_theme(theme);
@@ -219,8 +241,8 @@ fn set_theme(app: &AppHandle, theme: &str) {
     let _ = app.emit("theme-changed", theme);
 }
 
-/// Uma posição salva só é usada se a barra de título continuar visível em
-/// algum monitor (evita notas "perdidas" depois de desconectar uma tela).
+/// A saved position is only used if the titlebar is still visible on some
+/// monitor (avoids "lost" notes after a display is disconnected).
 fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
     match window.available_monitors() {
         Ok(monitors) if !monitors.is_empty() => monitors.iter().any(|m| {
@@ -233,8 +255,8 @@ fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
     }
 }
 
-/// Guarda posição e tamanho sempre que o usuário move ou redimensiona uma
-/// janela (nota ou "Gerenciador").
+/// Saves position and size whenever the user moves or resizes a window
+/// (note or manager).
 fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
     let app = app.clone();
     let win = window.clone();
@@ -244,7 +266,7 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
         let store = app.state::<Shared>();
         match event {
             WindowEvent::Moved(pos) => {
-                // O Windows reporta -32000 ao minimizar; ignora.
+                // Windows reports -32000 when minimising; ignore it.
                 if pos.x <= -30_000 || pos.y <= -30_000 {
                     return;
                 }
@@ -261,7 +283,7 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 }
                 let scale = win.scale_factor().unwrap_or(1.0);
                 let logical = size.to_logical::<f64>(scale);
-                // Enquanto recolhida, a altura salva continua sendo a expandida.
+                // While collapsed, the saved height stays the expanded one.
                 let keep = |collapsed: bool| !collapsed && logical.height > COLLAPSED_H + 8.0;
                 if note {
                     store.update(&id, |n| {
@@ -285,10 +307,10 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
     });
 }
 
-/// Abre a nota de boas-vindas (primeira execução ou "Como usar o Memo" na
-/// janela "Gerenciador"). Se uma cópia intacta já estiver aberta, só traz ela para frente.
+/// Opens the welcome note (first run, or "How to use Memo" in the manager).
+/// If an untouched copy is already open, just brings it to the front.
 ///
-/// `pos` posiciona a nota quando ela é criada (ao lado do Gerenciador).
+/// `pos` places the note when it is created (beside the manager).
 fn open_welcome(app: &AppHandle, pos: Option<(i32, i32)>) -> tauri::Result<()> {
     let store = app.state::<Shared>();
     let existing = store
@@ -318,22 +340,23 @@ fn open_welcome(app: &AppHandle, pos: Option<(i32, i32)>) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Alvos do "ímã" para cada borda de uma janela com a área visível
-/// `l`,`t`,`r`,`b` (esquerda, topo, direita, base, em pixels físicos):
-/// - as bordas da área útil do monitor (sem a barra de tarefas) onde está o
-///   centro da janela;
-/// - as bordas das outras janelas visíveis (notas e "Gerenciador") que
-///   estejam na mesma faixa: lado a lado, com `SNAP_GAP` entre elas, ou
-///   alinhada com elas.
+/// Snap targets for each edge of a window whose visible area is
+/// `l`,`t`,`r`,`b` (left, top, right, bottom, in physical pixels):
+/// - the edges of the work area (without the taskbar) of the monitor under the
+///   window's centre;
+/// - the edges of the other visible windows (notes and manager) in the same
+///   row/column: side by side, with `SNAP_GAP` between them, or aligned with
+///   them.
 ///
-/// Tudo usa a área visível (`inner_*`): no Windows, a janela sem moldura tem
-/// uma borda invisível nas laterais e embaixo, que deixaria vãos desiguais.
+/// Everything uses the visible area (`inner_*`): on Windows an undecorated
+/// window has an invisible border on the sides and bottom, which would leave
+/// uneven gaps.
 struct SnapTargets {
     left: Vec<i32>,
     right: Vec<i32>,
     top: Vec<i32>,
     bottom: Vec<i32>,
-    /// Alcance do ímã, em pixels físicos.
+    /// Snap reach, in physical pixels.
     reach: i32,
     scale: f64,
 }
@@ -364,7 +387,7 @@ impl SnapTargets {
             reach,
             scale,
         };
-        // Bordas do monitor: mesmo espaço (`SNAP_GAP`) que fica entre as notas.
+        // Monitor edges: the same gap (`SNAP_GAP`) left between notes.
         if let Some(m) = &monitor {
             let a = m.work_area();
             t_.left.push(a.position.x + gap);
@@ -381,7 +404,7 @@ impl SnapTargets {
             };
             let (ol, ot) = (p.x, p.y);
             let (or, ob) = (ol + s.width as i32, ot + s.height as i32);
-            // Só gruda numa janela que esteja na mesma faixa (com folga do alcance).
+            // Only snap to a window in the same row/column (with the reach as slack).
             if t < ob + reach && b > ot - reach {
                 t_.left.extend([or + gap, ol]);
                 t_.right.extend([ol - gap, or]);
@@ -394,7 +417,7 @@ impl SnapTargets {
         t_
     }
 
-    /// O alvo mais próximo de `v` dentro do alcance, ou o próprio `v`.
+    /// The target nearest to `v` within reach, or `v` itself.
     fn pick(&self, v: i32, targets: &[i32]) -> i32 {
         targets
             .iter()
@@ -405,9 +428,9 @@ impl SnapTargets {
     }
 }
 
-/// Posição com "ímã" para a janela (canto visível `x`,`y`, tamanho `w`×`h`)
-/// sendo arrastada: em cada eixo, a borda (de qualquer lado) que estiver mais
-/// perto de um alvo puxa a janela.
+/// Snapped position for the window being dragged (visible corner `x`,`y`,
+/// size `w`×`h`): on each axis, whichever edge is closest to a target pulls
+/// the window.
 fn snapped(window: &WebviewWindow, x: i32, y: i32, w: i32, h: i32) -> (i32, i32) {
     let t = SnapTargets::new(window, x, y, x + w, y + h);
     let xs: Vec<i32> = t
@@ -425,23 +448,23 @@ fn snapped(window: &WebviewWindow, x: i32, y: i32, w: i32, h: i32) -> (i32, i32)
     (t.pick(x, &xs), t.pick(y, &ys))
 }
 
-/// Diferença entre o canto visível e o canto da janela (borda invisível).
+/// Offset between the visible corner and the window corner (invisible border).
 fn frame_offset(window: &WebviewWindow) -> Option<(i32, i32)> {
     let outer = window.outer_position().ok()?;
     let inner = window.inner_position().ok()?;
     Some((inner.x - outer.x, inner.y - outer.y))
 }
 
-/// Arraste feito pela página: move a janela para (`x`, `y`) físicos, já com o
-/// ímã das bordas do monitor e das outras janelas. O arraste nativo
-/// (`startDragging`) não permite isso, porque o sistema controla a janela até
-/// o botão ser solto.
+/// Drag driven by the page: moves the window to physical (`x`, `y`), snapping
+/// to monitor edges and other windows. The native drag (`startDragging`)
+/// can't do this, because the OS owns the window until the button is
+/// released.
 #[tauri::command]
 fn drag_to(window: WebviewWindow, x: i32, y: i32) {
     let (Some((dx, dy)), Ok(size)) = (frame_offset(&window), window.inner_size()) else {
         return;
     };
-    // `x`,`y` são do canto da janela; o ímã trabalha com a área visível.
+    // `x`,`y` are the window corner; snapping works on the visible area.
     let (vx, vy) = snapped(
         &window,
         x + dx,
@@ -452,11 +475,11 @@ fn drag_to(window: WebviewWindow, x: i32, y: i32) {
     let _ = window.set_position(PhysicalPosition::new(vx - dx, vy - dy));
 }
 
-/// Redimensionamento feito pela página (alças nas bordas e cantos): a área
-/// visível pedida (`x`,`y`,`w`,`h` físicos) tem as bordas que se mexem
-/// (`edges`: "n", "s", "e", "w" ou combinações) puxadas pelo mesmo ímã do
-/// arraste. O redimensionamento nativo fica desligado (`resizable(false)`):
-/// o sistema não deixaria ajustar o tamanho no meio do movimento.
+/// Resize driven by the page (handles on the edges and corners): the moving
+/// edges (`edges`: "n", "s", "e", "w" or combinations) of the requested
+/// visible area (physical `x`,`y`,`w`,`h`) are pulled by the same snapping as
+/// dragging. Native resizing is off (`resizable(false)`): the OS wouldn't let
+/// us adjust the size mid-gesture.
 #[tauri::command]
 fn resize_to(window: WebviewWindow, x: i32, y: i32, w: i32, h: i32, edges: String) {
     let Some((dx, dy)) = frame_offset(&window) else {
@@ -477,7 +500,7 @@ fn resize_to(window: WebviewWindow, x: i32, y: i32, w: i32, h: i32, edges: Strin
         b = targets.pick(b, &targets.bottom);
     }
 
-    // Tamanho mínimo (o mesmo de quando a janela era redimensionável).
+    // Minimum size (the same as when the window was resizable).
     let min_w = if is_note(&window) {
         MIN_W
     } else {
@@ -527,9 +550,9 @@ fn show_all(app: &AppHandle) {
     }
 }
 
-/// Manda uma nota para a lixeira (fechando a janela, se aberta). Uma nota que
-/// ninguém mexeu (vazia, ou só com o título e o texto padrão) é apagada de
-/// vez, para não lotar a lixeira.
+/// Moves a note to the trash (closing its window, if open). A note nobody
+/// touched (empty, or only the default title and text) is deleted outright so
+/// it doesn't clutter the trash.
 fn trash(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
     match store.get(id) {
@@ -547,7 +570,7 @@ fn trash(app: &AppHandle, id: &str) {
 }
 
 // ---------------------------------------------------------------------------
-// Comandos chamados pelas notas
+// Commands called by notes
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
@@ -560,7 +583,7 @@ fn load_note(window: WebviewWindow, store: State<'_, Shared>) -> Option<Note> {
     store.get(&id_of(&window))
 }
 
-/// Dá um nome à nota; devolve o nome como ficou salvo.
+/// Names the note; returns the name as saved.
 #[tauri::command]
 fn set_title(
     app: AppHandle,
@@ -596,7 +619,7 @@ fn save_text(
     }
 }
 
-/// O recurso principal: mantém (ou não) a nota por cima de todos os aplicativos.
+/// The headline feature: keeps (or stops keeping) the note above every other app.
 #[tauri::command]
 fn set_pinned(
     window: WebviewWindow,
@@ -622,14 +645,14 @@ fn set_color(
     store: State<'_, Shared>,
 ) -> Result<(), String> {
     if !is_valid_color(&color) {
-        return Err(format!("cor desconhecida: {color}"));
+        return Err(format!("unknown color: {color}"));
     }
     store.update(&id_of(&window), |n| n.color = color);
     notify(&app);
     Ok(())
 }
 
-/// Recolhe a nota (ou a janela "Gerenciador") até ficar só a barra de título.
+/// Collapses the note (or the manager) down to its titlebar.
 #[tauri::command]
 fn set_collapsed(
     window: WebviewWindow,
@@ -639,7 +662,7 @@ fn set_collapsed(
     let (width, expanded) = if is_note(&window) {
         let note = store
             .update(&id_of(&window), |n| n.collapsed = collapsed)
-            .ok_or("nota não encontrada")?;
+            .ok_or("note not found")?;
         (note.width, note.height)
     } else {
         let state = store.update_manager(|m| m.collapsed = collapsed);
@@ -651,22 +674,22 @@ fn set_collapsed(
         .map_err(|e| e.to_string())
 }
 
-// Criar e destruir janelas a partir de comandos síncronos pode travar no
-// Windows, por isso os comandos que fazem isso são assíncronos.
+// Creating and destroying windows from sync commands can deadlock on
+// Windows, so the commands that do so are async.
 #[tauri::command]
 async fn new_note(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     create_and_open(&app, beside(&window)).map_err(|e| e.to_string())
 }
 
-/// Posição (física) para uma nota nova ao lado da nota `parent`, sem
-/// sobrepor: à direita se couber na área útil do monitor, senão à esquerda.
-/// Sobrepor faria a nota nova sumir atrás de uma nota fixada. Sem espaço
-/// dos dois lados, encosta na borda do lado com mais espaço. Se o lugar já
-/// estiver ocupado por outra nota (vários "+" seguidos), desce em degraus.
+/// Position (physical) for a new note beside the `parent` note, without
+/// overlapping: on the right if it fits in the monitor work area, else on the
+/// left. Overlapping would hide the new note behind a pinned one. With no room
+/// on either side, it sits against the edge of the roomier side. If the spot
+/// is already taken by another note (several "+" in a row), it steps down.
 ///
-/// Como no ímã do arraste, as contas usam a área visível (`inner_*`), para o
-/// espaço entre as notas ser o `SNAP_GAP` de verdade, sem a borda invisível
-/// do Windows. A nota nova tem as mesmas bordas da nota pai.
+/// As with drag snapping, the maths uses the visible area (`inner_*`), so the
+/// gap between notes is a real `SNAP_GAP`, without Windows' invisible border.
+/// The new note has the same borders as its parent.
 fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     let outer = parent.outer_position().ok()?;
     let pos = parent.inner_position().ok()?;
@@ -676,7 +699,7 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     let scale = monitor.scale_factor();
     let area = monitor.work_area();
     let gap = (SNAP_GAP * scale).round() as i32;
-    // Área útil recuada do mesmo espaço do ímã: a nota nova não encosta na borda.
+    // Work area inset by the snap gap: the new note doesn't touch the edge.
     let (left_edge, top_edge) = (area.position.x + gap, area.position.y + gap);
     let right_edge = area.position.x + area.size.width as i32 - gap;
     let bottom_edge = area.position.y + area.size.height as i32 - gap;
@@ -685,7 +708,7 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     let h = (DEFAULT_H * scale).round() as i32;
     let parent_right = pos.x + size.width as i32;
 
-    // Canto visível da nota nova.
+    // Visible corner of the new note.
     let vx = if parent_right + gap + w <= right_edge {
         parent_right + gap
     } else if pos.x - gap - w >= left_edge {
@@ -698,14 +721,14 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     let vx = vx.max(left_edge);
     let vy = pos.y.clamp(top_edge, (bottom_edge - h).max(top_edge));
 
-    // Canto da janela (com as bordas invisíveis), que é o que se posiciona.
+    // Window corner (with the invisible borders), which is what gets positioned.
     let x = vx - dx;
     let max_y = (bottom_edge - h).max(top_edge) - dy;
     let mut y = vy - dy;
 
-    // Vários "+" seguidos na mesma nota cairiam todos no mesmo lugar: se já
-    // há uma nota ali, desce um degrau (barra de título + folga) até achar
-    // um lugar livre, para todas continuarem visíveis.
+    // Several "+" in a row on the same note would all land on the same spot:
+    // if a note is already there, step down (titlebar + slack) until a free
+    // spot is found, so they all stay visible.
     let step = ((COLLAPSED_H + 8.0) * scale).round() as i32;
     let taken: Vec<PhysicalPosition<i32>> = parent
         .app_handle()
@@ -725,30 +748,30 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     Some((x, y))
 }
 
-/// Fecha a nota (botão ✕ ou clique do meio) mandando-a para a lixeira.
+/// Closes the note (✕ button or middle click) by moving it to the trash.
 #[tauri::command]
 async fn trash_note(app: AppHandle, window: WebviewWindow) {
     trash(&app, &id_of(&window));
 }
 
 // ---------------------------------------------------------------------------
-// Comandos do gerenciador ("Gerenciador")
+// Manager commands
 // ---------------------------------------------------------------------------
 
-/// Estado da janela "Gerenciador" (fixada, recolhida) ao abrir.
+/// Manager window state (pinned, collapsed) on open.
 #[tauri::command]
 fn load_manager(store: State<'_, Shared>) -> ManagerState {
     store.manager()
 }
 
-/// Fecha a janela "Gerenciador" (✕ ou clique do meio na barra).
+/// Closes the manager window (✕ or middle click on the titlebar).
 #[tauri::command]
 async fn close_manager(window: WebviewWindow) -> Result<(), String> {
     window.destroy().map_err(|e| e.to_string())
 }
 
-/// Todas as notas, ativas e na lixeira, sem o HTML (o gerenciador só mostra
-/// título, prévia do texto, cor e datas).
+/// All notes, active and trashed, without the HTML (the manager only shows
+/// title, text preview, colour and dates).
 #[tauri::command]
 fn list_notes(store: State<'_, Shared>) -> Vec<Note> {
     store
@@ -761,14 +784,14 @@ fn list_notes(store: State<'_, Shared>) -> Vec<Note> {
         .collect()
 }
 
-/// Abre uma nota ativa (ou traz para frente, se já estiver aberta).
+/// Opens an active note (or brings it to the front if already open).
 #[tauri::command]
 async fn open_note(app: AppHandle, id: String) -> Result<(), String> {
     let note = app
         .state::<Shared>()
         .get(&id)
         .filter(|n| n.trashed_at.is_none())
-        .ok_or("nota não encontrada")?;
+        .ok_or("note not found")?;
     open_note_window(&app, &note).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -778,19 +801,19 @@ async fn move_to_trash(app: AppHandle, id: String) {
     trash(&app, &id);
 }
 
-/// Tira a nota da lixeira e abre a janela dela.
+/// Takes the note out of the trash and opens its window.
 #[tauri::command]
 async fn restore_note(app: AppHandle, id: String) -> Result<(), String> {
     let note = app
         .state::<Shared>()
         .update(&id, |n| n.trashed_at = None)
-        .ok_or("nota não encontrada")?;
+        .ok_or("note not found")?;
     open_note_window(&app, &note).map_err(|e| e.to_string())?;
     notify(&app);
     Ok(())
 }
 
-/// Exclui de vez uma nota da lixeira.
+/// Permanently deletes a note from the trash.
 #[tauri::command]
 fn delete_forever(app: AppHandle, id: String, store: State<'_, Shared>) {
     if store.get(&id).is_some_and(|n| n.trashed_at.is_some()) {
@@ -807,18 +830,17 @@ fn empty_trash(app: AppHandle, store: State<'_, Shared>) {
     notify(&app);
 }
 
-/// Troca o tema de todas as janelas (escolhido na janela "Gerenciador").
-/// Idioma escolhido e o efetivo ("pt" ou "en"), para as páginas.
+/// Chosen language and the effective one ("pt" or "en"), for the pages.
 #[tauri::command]
 fn get_language(store: State<'_, Shared>) -> (String, &'static str) {
     (store.language(), store.effective_language())
 }
 
-/// Troca o idioma da interface (escolhido no "Gerenciador").
+/// Changes the UI language (chosen in the manager).
 #[tauri::command]
 fn change_language(app: AppHandle, language: String) -> Result<(), String> {
     if !LANGUAGES.contains(&language.as_str()) {
-        return Err(format!("idioma desconhecido: {language}"));
+        return Err(format!("unknown language: {language}"));
     }
     set_language(&app, &language);
     Ok(())
@@ -827,19 +849,19 @@ fn change_language(app: AppHandle, language: String) -> Result<(), String> {
 #[tauri::command]
 fn change_theme(app: AppHandle, theme: String) -> Result<(), String> {
     if !THEMES.contains(&theme.as_str()) {
-        return Err(format!("tema desconhecido: {theme}"));
+        return Err(format!("unknown theme: {theme}"));
     }
     set_theme(&app, &theme);
     Ok(())
 }
 
-/// Reabre a nota de boas-vindas ("Como usar o Memo").
+/// Reopens the welcome note ("How to use Memo").
 #[tauri::command]
 async fn show_welcome(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     open_welcome(&app, beside(&window)).map_err(|e| e.to_string())
 }
 
-/// Encerra o app (o único jeito de sair: fechar as notas não encerra).
+/// Quits the app (the only way out: closing the notes doesn't quit).
 #[tauri::command]
 fn quit_app(app: AppHandle, store: State<'_, Shared>) {
     store.flush();
@@ -851,7 +873,7 @@ fn get_default_color(store: State<'_, Shared>) -> String {
     store.default_color()
 }
 
-/// Título, texto e HTML padrão das notas novas, para o gerenciador.
+/// Default title, text and HTML for new notes, for the manager.
 #[tauri::command]
 fn get_new_note_defaults(store: State<'_, Shared>) -> (String, String, String) {
     store.new_note_defaults()
@@ -862,8 +884,8 @@ fn set_default_title(title: String, store: State<'_, Shared>) {
     store.set_default_title(title.trim().chars().take(TITLE_MAX).collect());
 }
 
-/// Conteúdo padrão das notas novas, editado no Gerenciador com o mesmo editor
-/// da nota (index.html?defaults): texto puro e HTML, como uma nota guarda.
+/// Default content for new notes, edited in the manager with the same note
+/// editor (index.html?defaults): plain text and HTML, as a note stores them.
 #[tauri::command]
 fn set_default_content(text: String, html: String, store: State<'_, Shared>) {
     let text = text.chars().take(DEFAULT_TEXT_MAX).collect();
@@ -878,7 +900,7 @@ fn set_default_color(
     store: State<'_, Shared>,
 ) -> Result<(), String> {
     if !is_valid_color(&color) {
-        return Err(format!("cor desconhecida: {color}"));
+        return Err(format!("unknown color: {color}"));
     }
     store.set_default_color(&color);
     notify(&app);
@@ -886,10 +908,281 @@ fn set_default_color(
 }
 
 // ---------------------------------------------------------------------------
-// Ícone na bandeja / barra de menus
+// Data folder
 // ---------------------------------------------------------------------------
 
-/// Menu da bandeja: atalhos e "Sair". Tema e ajuda ficam no "Gerenciador".
+/// Default data folder: `<OS data folder>/memo`.
+fn default_data_dir(app: &AppHandle) -> tauri::Result<PathBuf> {
+    Ok(app.path().data_dir()?.join(DATA_FOLDER))
+}
+
+/// Folder holding `notes.json`: the one set in `config.json`, or the default
+/// data folder. A custom folder that can't be created (e.g. on an
+/// unplugged drive) falls back to the default for this session.
+fn data_dir(default: &Path) -> PathBuf {
+    match Config::load(&default.join(CONFIG)).data_dir {
+        Some(dir) => match std::fs::create_dir_all(&dir) {
+            Ok(()) => dir,
+            Err(err) => {
+                eprintln!("memo: data folder {dir:?} unavailable ({err}); using {default:?}");
+                default.to_path_buf()
+            }
+        },
+        None => default.to_path_buf(),
+    }
+}
+
+/// Texts of the data folder dialogs in the UI language.
+struct StorageText {
+    pick_title: &'static str,
+    existing: &'static str,
+    open_existing: &'static str,
+    replace_existing: &'static str,
+    cancel: &'static str,
+    failed: &'static str,
+    export_title: &'static str,
+    export_failed: &'static str,
+    import_title: &'static str,
+    import_failed: &'static str,
+}
+
+fn storage_text(lang: &str) -> StorageText {
+    if lang == "en" {
+        StorageText {
+            pick_title: "Choose the memories folder",
+            existing: "This folder already has Memo memories.\n\nOpen them in place of the current ones (which stay saved in the previous folder), or replace them with the current memories (the file there is kept as a backup)?",
+            open_existing: "Open those",
+            replace_existing: "Replace with current",
+            cancel: "Cancel",
+            failed: "Couldn't use this folder.",
+            export_title: "Export memories",
+            export_failed: "Couldn't export the memories.",
+            import_title: "Import memories",
+            import_failed: "Couldn't import this file. It must be a Memo export or notes.json.",
+        }
+    } else {
+        StorageText {
+            pick_title: "Escolha a pasta das memórias",
+            existing: "Esta pasta já tem memórias do Memo.\n\nAbrir essas memórias no lugar das atuais (que continuam salvas na pasta anterior) ou substituí-las pelas memórias atuais (o arquivo de lá fica como backup)?",
+            open_existing: "Abrir as de lá",
+            replace_existing: "Substituir pelas atuais",
+            cancel: "Cancelar",
+            failed: "Não foi possível usar esta pasta.",
+            export_title: "Exportar memórias",
+            export_failed: "Não foi possível exportar as memórias.",
+            import_title: "Importar memórias",
+            import_failed: "Não foi possível importar este arquivo. Ele precisa ser uma exportação do Memo ou um notes.json.",
+        }
+    }
+}
+
+/// Moves the notes to `dir`. If it already has a `notes.json`, asks whether to
+/// switch to those notes (reopening the windows with them) or to replace them
+/// with the current ones; otherwise the current notes are copied there. The
+/// old file stays as a backup. Returns `false` if nothing changed (same folder
+/// or cancelled).
+fn move_data_dir(app: &AppHandle, window: &WebviewWindow, dir: PathBuf) -> Result<bool, String> {
+    let store = app.state::<Shared>();
+    let default = default_data_dir(app).map_err(|e| e.to_string())?;
+    let text = storage_text(store.effective_language());
+    let target = dir.join("notes.json");
+    if store.path() == target {
+        return Ok(false);
+    }
+    let mut load_existing = false;
+    if target.exists() {
+        let choice = app
+            .dialog()
+            .message(text.existing)
+            .title("Memo")
+            .parent(window)
+            .buttons(MessageDialogButtons::YesNoCancelCustom(
+                text.open_existing.into(),
+                text.replace_existing.into(),
+                text.cancel.into(),
+            ))
+            .blocking_show_with_result();
+        // Depending on the OS, custom buttons come back as Yes/No or as their label.
+        load_existing = match choice {
+            MessageDialogResult::Yes => true,
+            MessageDialogResult::No => false,
+            MessageDialogResult::Custom(label) if label == text.open_existing => true,
+            MessageDialogResult::Custom(label) if label == text.replace_existing => false,
+            _ => return Ok(false),
+        };
+    }
+    let config = Config {
+        data_dir: (dir != default).then(|| dir.clone()),
+    };
+    let result = store
+        .relocate(target, load_existing)
+        .and_then(|loaded| config.save(&default.join(CONFIG)).map(|()| loaded));
+    let loaded = match result {
+        Ok(loaded) => loaded,
+        Err(err) => {
+            storage_error(app, window, text.failed, &err);
+            return Err(err.to_string());
+        }
+    };
+    if loaded {
+        reload_windows(app);
+    }
+    notify(app);
+    Ok(true)
+}
+
+/// After switching to another notes file: closes the note windows, opens the
+/// active notes of the new file and applies its theme and language. The
+/// manager reloads itself on "store-replaced".
+fn reload_windows(app: &AppHandle) {
+    for window in note_windows(app) {
+        let _ = window.destroy();
+    }
+    let store = app.state::<Shared>();
+    for note in store.active() {
+        let _ = open_note_window(app, &note);
+    }
+    let theme = store.theme();
+    for window in app.webview_windows().values() {
+        apply_background(window, &theme);
+    }
+    if let Some(manager) = app.get_webview_window(MANAGER) {
+        let _ = manager.set_title(manager_title(store.effective_language()));
+    }
+    refresh_tray(app);
+    let _ = app.emit("store-replaced", ());
+}
+
+/// Folder where the notes are saved and whether it is the default one.
+#[tauri::command]
+fn get_data_dir(app: AppHandle, store: State<'_, Shared>) -> (String, bool) {
+    let path = store.path();
+    let dir = path.parent().unwrap_or(&path);
+    let is_default = default_data_dir(&app).is_ok_and(|d| d == dir);
+    (dir.display().to_string(), is_default)
+}
+
+/// Lets the user pick another folder for the notes and moves them there.
+/// Returns `false` if cancelled or unchanged.
+#[tauri::command]
+async fn choose_data_dir(app: AppHandle, window: WebviewWindow) -> Result<bool, String> {
+    let store = app.state::<Shared>();
+    let text = storage_text(store.effective_language());
+    let current = store.path();
+    let mut picker = app
+        .dialog()
+        .file()
+        .set_title(text.pick_title)
+        .set_parent(&window);
+    if let Some(dir) = current.parent() {
+        picker = picker.set_directory(dir);
+    }
+    let Some(picked) = picker.blocking_pick_folder() else {
+        return Ok(false);
+    };
+    let dir = picked.into_path().map_err(|e| e.to_string())?;
+    move_data_dir(&app, &window, dir)
+}
+
+/// Moves the notes back to the default data folder.
+#[tauri::command]
+async fn reset_data_dir(app: AppHandle, window: WebviewWindow) -> Result<bool, String> {
+    let dir = default_data_dir(&app).map_err(|e| e.to_string())?;
+    move_data_dir(&app, &window, dir)
+}
+
+/// Native error dialog for a failed storage action, with the OS error below.
+fn storage_error(app: &AppHandle, window: &WebviewWindow, message: &str, err: &std::io::Error) {
+    app.dialog()
+        .message(format!("{message}\n\n{err}"))
+        .title("Memo")
+        .kind(MessageDialogKind::Error)
+        .parent(window)
+        .blocking_show();
+}
+
+/// Exports the notes not in the trash to a `.json` file picked by the user.
+/// `file_name` is the suggested name (the page knows the local date).
+/// Returns `false` if cancelled.
+#[tauri::command]
+async fn export_notes(
+    app: AppHandle,
+    window: WebviewWindow,
+    file_name: String,
+) -> Result<bool, String> {
+    let store = app.state::<Shared>();
+    let text = storage_text(store.effective_language());
+    let Some(picked) = app
+        .dialog()
+        .file()
+        .set_title(text.export_title)
+        .set_parent(&window)
+        .set_file_name(file_name)
+        .add_filter("JSON", &["json"])
+        .blocking_save_file()
+    else {
+        return Ok(false);
+    };
+    let path = picked.into_path().map_err(|e| e.to_string())?;
+    store.export_to(&path).map_err(|err| {
+        storage_error(&app, &window, text.export_failed, &err);
+        err.to_string()
+    })?;
+    Ok(true)
+}
+
+/// Imports the notes of a `.json` file picked by the user (see
+/// `Store::import_from`) and opens or refreshes the windows of the notes that
+/// changed. Returns how many notes were added or replaced; `None` if
+/// cancelled.
+#[tauri::command]
+async fn import_notes(app: AppHandle, window: WebviewWindow) -> Result<Option<usize>, String> {
+    let store = app.state::<Shared>();
+    let text = storage_text(store.effective_language());
+    let Some(picked) = app
+        .dialog()
+        .file()
+        .set_title(text.import_title)
+        .set_parent(&window)
+        .add_filter("JSON", &["json"])
+        .blocking_pick_file()
+    else {
+        return Ok(None);
+    };
+    let path = picked.into_path().map_err(|e| e.to_string())?;
+    let ids = store.import_from(&path).map_err(|err| {
+        storage_error(&app, &window, text.import_failed, &err);
+        err.to_string()
+    })?;
+    store.flush();
+    for id in &ids {
+        let note = store.get(id);
+        let open = app.get_webview_window(&label_for(id));
+        match (note, open) {
+            // Window already open: reload it with the imported content.
+            (Some(note), Some(w)) if note.trashed_at.is_none() => {
+                let _ = w.set_always_on_top(note.pinned);
+                let _ = w.reload();
+            }
+            (Some(note), None) if note.trashed_at.is_none() => {
+                let _ = open_note_window(&app, &note);
+            }
+            // Imported as trashed (or purged): close its window.
+            (_, Some(w)) => {
+                let _ = w.destroy();
+            }
+            _ => {}
+        }
+    }
+    notify(&app);
+    Ok(Some(ids.len()))
+}
+
+// ---------------------------------------------------------------------------
+// Tray / menu bar icon
+// ---------------------------------------------------------------------------
+
+/// Tray menu: shortcuts and "Quit". Theme and help live in the manager.
 fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let [new_label, show_label, manager_label, quit_label] =
         tray_labels(app.state::<Shared>().effective_language());
@@ -915,7 +1208,7 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = build_tray_menu(app)?;
 
-    // No macOS o ícone é "template" (monocromático, se adapta ao tema da barra).
+    // On macOS the icon is a "template" (monochrome, adapts to the menu bar theme).
     #[cfg(target_os = "macos")]
     let icon = tauri::include_image!("icons/tray-template.png");
     #[cfg(not(target_os = "macos"))]
@@ -957,30 +1250,39 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 
 // ---------------------------------------------------------------------------
 
-/// O app se chamava Taxinha, com o identificador `br.taxinha.notas`, que dá
-/// nome à pasta de dados. Na primeira execução como Memo, sem `notes.json`
-/// na pasta nova, copia o da pasta antiga (que fica intacta, como backup).
-fn migrate_from_taxinha(dir: &std::path::Path) {
-    let new = dir.join("notes.json");
-    if new.exists() {
+/// The default data folder used to be named after the app identifier
+/// (`br.memo.notas`, and `br.taxinha.notas` when the app was called Taxinha).
+/// On the first run with the `memo` folder (no `notes.json` or `config.json`
+/// there yet), copies both files from the newest old folder that has them.
+/// The old folders are left intact, as a backup.
+fn migrate_old_data(dir: &Path) {
+    let files = ["notes.json", CONFIG];
+    if files.iter().any(|f| dir.join(f).exists()) {
         return;
     }
-    let Some(old) = dir
-        .parent()
-        .map(|p| p.join("br.taxinha.notas").join("notes.json"))
+    let Some(parent) = dir.parent() else {
+        return;
+    };
+    let Some(old) = OLD_DATA_FOLDERS
+        .iter()
+        .map(|name| parent.join(name))
+        .find(|old| files.iter().any(|f| old.join(f).exists()))
     else {
         return;
     };
-    if old.exists() {
-        if let Err(err) = std::fs::copy(&old, &new) {
-            eprintln!("memo: não foi possível copiar as notas da Taxinha: {err}");
+    for file in files {
+        let from = old.join(file);
+        if from.exists() {
+            if let Err(err) = std::fs::copy(&from, dir.join(file)) {
+                eprintln!("memo: could not copy {from:?}: {err}");
+            }
         }
     }
 }
 
 fn main() {
-    // No Wayland o compositor ignora "sempre no topo". Rodando via XWayland o
-    // recurso de fixar funciona em GNOME, KDE e afins.
+    // On Wayland the compositor ignores "always on top". Running through
+    // XWayland, pinning works on GNOME, KDE and the like.
     #[cfg(target_os = "linux")]
     {
         if std::env::var_os("WAYLAND_DISPLAY").is_some()
@@ -991,7 +1293,8 @@ fn main() {
     }
 
     let app = tauri::Builder::default()
-        // Abrir o app de novo traz as notas para frente e abre o Gerenciador.
+        .plugin(tauri_plugin_dialog::init())
+        // Launching the app again brings the notes to the front and opens the manager.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_all(app);
             let _ = open_manager(app);
@@ -1025,17 +1328,23 @@ fn main() {
             set_default_color,
             get_new_note_defaults,
             set_default_title,
-            set_default_content
+            set_default_content,
+            get_data_dir,
+            choose_data_dir,
+            reset_data_dir,
+            export_notes,
+            import_notes
         ])
         .setup(|app| {
-            let dir = app.path().app_data_dir()?;
-            std::fs::create_dir_all(&dir)?;
-            migrate_from_taxinha(&dir);
+            let default_dir = default_data_dir(app.handle())?;
+            std::fs::create_dir_all(&default_dir)?;
+            migrate_old_data(&default_dir);
+            let dir = data_dir(&default_dir);
             let store: Shared = Arc::new(Store::load(dir.join("notes.json")));
             app.manage(store.clone());
 
-            // Grava as mudanças pendentes e, de hora em hora, esvazia da
-            // lixeira o que passou de 30 dias.
+            // Writes pending changes and, every hour, purges from the trash
+            // whatever is older than 30 days.
             let saver = store.clone();
             let saver_app = app.handle().clone();
             thread::spawn(move || {
@@ -1054,8 +1363,8 @@ fn main() {
             let handle = app.handle().clone();
             build_tray(&handle)?;
 
-            // O Gerenciador abre em toda inicialização; na primeira, a nota de
-            // boas-vindas abre ao lado dele.
+            // The manager opens on every launch; on the first one, the welcome
+            // note opens beside it.
             open_manager(&handle)?;
             let notes = store.active();
             if store.is_first_run() {
@@ -1071,17 +1380,17 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("não foi possível iniciar o Memo");
+        .expect("could not start Memo");
 
     app.run(|app, event| match event {
-        // Fechar a última nota não encerra o app: ele continua na bandeja.
+        // Closing the last note doesn't quit the app: it stays in the tray.
         RunEvent::ExitRequested { code, api, .. } => {
             if code.is_none() {
                 api.prevent_exit();
             }
         }
         RunEvent::Exit => app.state::<Shared>().flush(),
-        // Clique no ícone do Dock traz as notas para frente e abre o Gerenciador.
+        // Clicking the Dock icon brings the notes to the front and opens the manager.
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => {
             show_all(app);

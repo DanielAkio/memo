@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="manager.css">
 </head>
 <body>
-  <!-- Janela "Gerenciador": gerenciamento das notas e da lixeira. Mesma barra das
-       notas (tachinha, nova nota, recolher, fechar), sem título editável. -->
+  <!-- Manager window: notes and trash management. Same titlebar as the notes
+       (pin, new note, collapse, close), with no editable title. -->
   <div class="frame" id="frame" data-color="">
     <header class="titlebar" id="titlebar">
       <button class="icon-btn pin" id="pinBtn" type="button" aria-pressed="false">
@@ -51,11 +51,19 @@
         </div>
       </header>
 
-      <!-- Busca: só nas abas Notas e Lixeira. -->
+      <!-- Search: only in the Memories and Trash tabs. -->
       <div class="list-tools" id="searchBox">
         <label class="search">
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/></svg>
           <input type="search" id="search" data-i18n-attr="placeholder=search,aria-label=searchNotes" spellcheck="false" autocomplete="off">
+        </label>
+        <!-- Sort order of the list: most recent first or alphabetical by title. -->
+        <label class="sort" data-i18n-attr="title=sortBy">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M2.75 10.75 5 13l2.25-2.25M11 13V3M8.75 5.25 11 3l2.25 2.25"/></svg>
+          <select id="sortSelect" data-i18n-attr="aria-label=sortBy">
+            <option value="updated" data-i18n="sortRecent"></option>
+            <option value="title" data-i18n="sortTitle"></option>
+          </select>
         </label>
       </div>
 
@@ -81,7 +89,7 @@
         </div>
         <div class="setting">
           <label class="setting-label" for="languageSelect" data-i18n="language"></label>
-          <!-- Os nomes dos idiomas ficam sempre no próprio idioma. -->
+          <!-- Language names are always shown in their own language. -->
           <select class="field select" id="languageSelect">
             <option value="system" data-i18n="system"></option>
             <option value="pt-BR" lang="pt-BR">Português</option>
@@ -114,9 +122,37 @@
         <div class="setting setting-top">
           <label class="setting-label" for="defaultTextFrame" data-i18n="text"></label>
           <div class="field-wrap">
-            <!-- O mesmo editor da nota, em modo embutido: renderiza igual à nota. -->
+            <!-- The note editor itself, in embedded mode: renders exactly like a note. -->
             <iframe class="field note-frame" id="defaultTextFrame" src="index.html?defaults"
                     data-i18n-attr="title=text"></iframe>
+          </div>
+        </div>
+        <h2 class="settings-title">
+          <span data-i18n="storage"></span>
+          <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=storageTip,data-tip=storageTip">i</span>
+        </h2>
+        <div class="setting setting-top">
+          <span class="setting-label" data-i18n="dataFolder"></span>
+          <div class="field-wrap">
+            <!-- "Change…" on the left, the current path beside it. -->
+            <div class="data-dir-row">
+              <button type="button" class="btn" id="chooseDirBtn" data-i18n="changeFolder"></button>
+              <div class="data-dir" id="dataDir"></div>
+            </div>
+            <button type="button" class="btn reset-dir" id="resetDirBtn" data-i18n="useDefaultFolder" hidden></button>
+          </div>
+        </div>
+        <div class="setting setting-top">
+          <span class="setting-label">
+            <span data-i18n="backup"></span>
+            <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=backupTip,data-tip=backupTip">i</span>
+          </span>
+          <div class="field-wrap">
+            <div class="app-actions">
+              <button type="button" class="btn" id="exportBtn" data-i18n="exportNotes"></button>
+              <button type="button" class="btn" id="importBtn" data-i18n="importNotes"></button>
+            </div>
+            <p class="storage-status" id="storageStatus" role="status" hidden></p>
           </div>
         </div>
         <h2 class="settings-title" data-i18n="application"></h2>

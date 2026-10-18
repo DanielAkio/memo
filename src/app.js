@@ -1,11 +1,11 @@
-// Memo — lógica de uma janela de nota.
-// Cada nota é uma janela própria; o Rust guarda texto, posição, tamanho e estado.
+// Memo — logic for one note window.
+// Each note is its own window; Rust stores text, position, size and state.
 
 (() => {
-  // Modo embutido (index.html?defaults): a mesma página serve de editor do
-  // texto padrão das notas novas, dentro do Gerenciador. Sem barra de título
-  // nem rodapé; lê e salva o padrão em vez de uma nota. Num <iframe>, a API do
-  // Tauri vem da janela de cima.
+  // Embedded mode (index.html?defaults): the same page doubles as the editor
+  // for the new-note default text, inside the manager. No titlebar or status
+  // bar; it loads and saves the defaults instead of a note. Inside an
+  // <iframe>, the Tauri API comes from the parent window.
   const EMBED = new URLSearchParams(location.search).has('defaults');
   const TAURI = window.__TAURI__ || window.parent.__TAURI__;
   if (EMBED) document.documentElement.classList.add('embedded');
@@ -48,11 +48,10 @@
 
   const colorName = (color) => document.querySelector(`.swatch[data-color="${color}"]`).getAttribute('aria-label');
 
-  // Item de checklist no texto puro: "[ ]" ou "[x]" no começo da linha.
-  // Também aceita "[]" (digitado no texto padrão das notas novas).
-  // Os parâmetros não se chamam "t", que é a função de tradução.
-  // Linha de lista no texto puro: recuo (2 espaços por nível) seguido de
-  // "[ ]"/"[]"/"[x]" (checklist) ou "-" (marcador).
+  // List line in plain text: indent (2 spaces per level) followed by
+  // "[ ]"/"[]"/"[x]" (checklist) or "-" (bullet). "[]" is accepted because
+  // it can be typed in the new-note default text.
+  // Parameters are never named "t", which is the translation function.
   const LIST_RE = /^( *)(?:\[([ xX]?)\]|(-))(?= |$) ?/;
   const plain = (text) => text.replace(/^(\s*)(?:\[[ xX]?\]|-)(?= |$) ?/gm, '$1');
   const MAX_LEVEL = 4;
@@ -75,7 +74,7 @@
   // ------------------------------------------------------------- render
 
   function render() {
-    // Cor personalizada (#rrggbb) vai direto na variável --note-color.
+    // A custom colour (#rrggbb) goes straight into the --note-color variable.
     const custom = isCustomColor(note.color);
     frame.dataset.color = custom ? 'custom' : note.color || '';
     if (custom) frame.style.setProperty('--note-color', note.color);
@@ -110,13 +109,13 @@
     renderName();
   }
 
-  // Nome na barra: o título, ou "Sem título" (mesmo com a nota recolhida).
+  // Name in the titlebar: the title, or "Untitled" (even when collapsed).
   function renderName() {
     nameEl.textContent = note.title || t('untitled');
     nameEl.classList.toggle('is-empty', !note.title);
 
     if (EMBED) return;
-    // O título da janela nativa aparece na taskbar; atualiza sem pressa.
+    // The native window title shows in the taskbar; update it lazily.
     const title = `${displayName()} — Memo`;
     if (document.title === title) return;
     document.title = title;
@@ -126,22 +125,22 @@
     }, 400);
   }
 
-  // ------------------------------------------------- conteúdo do editor
+  // ---------------------------------------------------- editor content
   //
-  // O editor é um contenteditable em que cada linha é um <div>. Formatação
-  // fica em <b>, <i> e <u>; um item de checklist é <div class="check">
-  // (marcado: "check done") e um item com marcador é <div class="bullet">,
-  // os dois com data-level (1–4) quando recuados com Tab. Além do HTML, a
-  // nota guarda o texto puro, com os itens como "[ ] " / "[x] " / "- "
-  // precedidos de 2 espaços por nível.
+  // The editor is a contenteditable where each line is a <div>. Formatting
+  // lives in <b>, <i> and <u>; a checklist item is <div class="check">
+  // (checked: "check done") and a bulleted item is <div class="bullet">,
+  // both with data-level (1–4) when indented with Tab. Besides the HTML, the
+  // note stores the plain text, with items as "[ ] " / "[x] " / "- "
+  // preceded by 2 spaces per level.
 
   const isBlock = (n) => n !== editor && n.nodeType === 1 && (n.nodeName === 'DIV' || n.nodeName === 'P');
   const INLINE = { B: 'b', STRONG: 'b', I: 'i', EM: 'i', U: 'u', CODE: 'code' };
   const LANG_RE = /[^\w+#.-]/g;
-  const ZWSP = /\u200b/g; // separador invisível depois de um `código`
+  const ZWSP = /\u200b/g; // invisible separator after an inline `code`
 
-  // Texto de um bloco de código (ou de um pedaço dele): texto e <br> (= quebra
-  // de linha). Range.toString() ignora os <br>, por isso esta função.
+  // Text of a code block (or part of one): text and <br> (= line break).
+  // Range.toString() ignores <br>, hence this function.
   function preText(pre) {
     let out = '';
     const walk = (node) => {
@@ -158,7 +157,7 @@
 
   const levelOf = (block) => Number(block.dataset.level) || 0;
 
-  // Começo da linha no texto puro: recuo + marcador do item de lista.
+  // Start of the line in plain text: indent + list item marker.
   function listPrefix(block) {
     const indent = '  '.repeat(levelOf(block));
     if (block.classList.contains('check')) return indent + (block.classList.contains('done') ? '[x] ' : '[ ] ');
@@ -166,7 +165,7 @@
     return '';
   }
 
-  // Texto puro a partir do HTML do editor.
+  // Plain text from the editor's HTML.
   function toPlain() {
     const lines = [];
     let cur = null;
@@ -187,7 +186,7 @@
         } else if (n.nodeName === 'CODE') {
           cur = `${cur ?? ''}\`${n.textContent.replace(ZWSP, '')}\``;
         } else if (n.nodeName === 'BR') {
-          // O <br> final de um bloco só segura a altura de uma linha vazia.
+          // A block's trailing <br> only holds the height of an empty line.
           if (n.nextSibling || !isBlock(n.parentNode)) { lines.push(cur ?? ''); cur = ''; } else cur = cur ?? '';
         } else if (isBlock(n)) {
           flush();
@@ -204,7 +203,7 @@
     return lines.join('\n');
   }
 
-  // HTML para notas que só têm texto puro (criadas antes da formatação).
+  // HTML for notes that only have plain text (created before formatting).
   function fromPlain(text) {
     if (!text) return '<div><br></div>';
     const inline = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -212,7 +211,7 @@
     const out = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      // Bloco de código: ```linguagem ... ```
+      // Code block: ```lang ... ```
       const fence = /^```([\w+#.-]*)\s*$/.exec(line);
       if (fence) {
         const end = lines.findIndex((l, j) => j > i && /^```\s*$/.test(l));
@@ -238,8 +237,9 @@
     return out.join('');
   }
 
-  // Remonta o HTML salvo só com o que o editor usa: linhas, <br>, <b>, <i>,
-  // <u> e as classes do checklist. Qualquer outra coisa vira texto.
+  // Rebuilds saved HTML with only what the editor uses: lines, <br>, <b>,
+  // <i>, <u>, <code>, <pre>, sizes, highlight and the list classes.
+  // Anything else becomes text.
   function sanitize(html) {
     const src = new DOMParser().parseFromString(html, 'text/html').body;
     const out = document.createDocumentFragment();
@@ -291,7 +291,7 @@
     };
     copy(src, out);
 
-    // Garante que tudo esteja dentro de linhas (<div>).
+    // Ensures everything is inside lines (<div>).
     const wrapped = document.createDocumentFragment();
     let run = null;
     for (const n of [...out.childNodes]) {
@@ -304,8 +304,8 @@
         run.appendChild(n);
       }
     }
-    // Sempre há uma linha comum depois de um bloco de código no fim, para o
-    // cursor ter onde ir.
+    // There is always a regular line after a trailing code block, so the
+    // caret has somewhere to go.
     if (!wrapped.lastChild || wrapped.lastChild.nodeName === 'PRE') {
       wrapped.appendChild(document.createElement('div')).appendChild(document.createElement('br'));
     }
@@ -317,9 +317,9 @@
     syncCheckSizes();
   }
 
-  // Item de lista (checklist ou marcador) com todo o texto num só tamanho
-  // (<font size>): marca a linha com data-size, para o CSS dar esse tamanho à
-  // linha inteira e a caixa/bolinha e o risco ficarem no meio do texto.
+  // List item (checklist or bullet) whose text is all in one size
+  // (<font size>): tags the line with data-size so CSS gives the whole line
+  // that size and the box/dot and strike-through stay centred on the text.
   function syncCheckSizes() {
     for (const block of editor.querySelectorAll('.check, .bullet')) {
       const sizes = new Set();
@@ -333,13 +333,13 @@
       if (sizes.size === 1 && size !== '3') block.dataset.size = size;
       else delete block.dataset.size;
 
-      // Tamanhos misturados: a caixa vai para o meio da primeira linha medida.
+      // Mixed sizes: the box goes to the middle of the measured first line.
       if (sizes.size > 1) {
         const r = document.createRange();
         r.selectNodeContents(block);
         const rects = [...r.getClientRects()].filter((rect) => rect.width > 0);
         if (rects.length) {
-          // Retângulos da primeira linha: os que se sobrepõem ao primeiro.
+          // Rects of the first line: those overlapping the first one.
           const line = rects.filter((rect) => rect.top < rects[0].bottom && rect.bottom > rects[0].top);
           const lineTop = Math.min(...line.map((rect) => rect.top));
           const lineBottom = Math.max(...line.map((rect) => rect.bottom));
@@ -353,8 +353,8 @@
     }
   }
 
-  // HTML salvo: o do editor sem os ajustes de exibição do syncCheckSizes
-  // (data-size e --check-mid), que são recalculados ao abrir.
+  // Saved HTML: the editor's, without syncCheckSizes' display tweaks
+  // (data-size and --check-mid), which are recomputed on load.
   function contentHtml() {
     const copy = editor.cloneNode(true);
     for (const b of copy.querySelectorAll('[data-size]')) delete b.dataset.size;
@@ -365,7 +365,7 @@
     return copy.innerHTML;
   }
 
-  // A linha (filha direta do editor) onde está o cursor.
+  // The line (direct child of the editor) holding the caret.
   function currentBlock() {
     const sel = getSelection();
     if (!sel.rangeCount) return null;
@@ -374,7 +374,7 @@
     return n && n.nodeName === 'DIV' ? n : null;
   }
 
-  // Texto entre o começo da linha e o cursor.
+  // Range from the start of the line to the caret.
   function textBeforeCaret(block) {
     const sel = getSelection();
     const r = document.createRange();
@@ -415,7 +415,7 @@
 
   // ---------------------------------------------------------- checklist
 
-  // "[]" digitado no começo de uma linha transforma a linha em item.
+  // "[]" typed at the start of a line turns it into an item.
   function expandCheckbox() {
     const sel = getSelection();
     if (!sel.isCollapsed) return false;
@@ -426,15 +426,15 @@
     }
     if (!block || block.classList.contains('check')) return false;
     const before = textBeforeCaret(block);
-    // "[]", "[ ]" ou "[x]" (este já marcado).
+    // "[]", "[ ]" or "[x]" (the latter already checked).
     const m = /^\s*\[([  xX]?)\]$/.exec(before.toString());
     if (!m) return false;
     const done = /x/i.test(m[1]);
     sel.removeAllRanges();
     sel.addRange(before);
-    document.execCommand('delete'); // entra no desfazer
-    // Se a linha ficou vazia e era a única, o Chromium remove o próprio <div>;
-    // nesse caso recria a linha no lugar do cursor.
+    document.execCommand('delete'); // goes into the undo stack
+    // If the line became empty and was the only one, Chromium removes the
+    // <div> itself; in that case recreate the line at the caret.
     if (!block.isConnected) {
       document.execCommand('formatBlock', false, 'div');
       block = currentBlock();
@@ -450,14 +450,14 @@
     onContentChanged();
   }
 
-  // Clique na caixa (à esquerda do item) marca/desmarca sem mover o cursor.
+  // Clicking the box (left of the item) toggles it without moving the caret.
   function checkAt(e) {
     const block = e.target.closest && e.target.closest('.check');
     if (!block || !editor.contains(block)) return null;
     return e.clientX < block.getBoundingClientRect().left + 22 ? block : null;
   }
 
-  // ------------------------------------------------------------- código
+  // --------------------------------------------------------------- code
 
   function currentPre() {
     const sel = getSelection();
@@ -477,7 +477,7 @@
     return code && editor.contains(code) ? code : null;
   }
 
-  // Põe o cursor no começo (ou no fim) de um elemento.
+  // Puts the caret at the start (or end) of an element.
   function caretIn(el, atEnd = false) {
     const r = document.createRange();
     r.selectNodeContents(el);
@@ -502,8 +502,9 @@
     onContentChanged();
   }
 
-  // Dentro do bloco: Enter quebra a linha, Tab recua; Enter numa linha vazia
-  // no fim sai do bloco; Backspace num bloco vazio volta a ser linha comum.
+  // Inside the block: Enter breaks the line, Tab indents; Enter on an empty
+  // last line leaves the block; Backspace in an empty block turns it back
+  // into a regular line.
   function onCodeBlockKeydown(e, pre, mod) {
     if (e.key === 'Tab' && !mod && !e.altKey) {
       e.preventDefault();
@@ -522,7 +523,7 @@
       const atEnd = !preText(after.cloneContents());
       const emptyLine = rawText(before.cloneContents()).endsWith('\n');
       if (atEnd && emptyLine) {
-        // Sai: tira a linha vazia do fim e vai para a linha seguinte.
+        // Leave: drop the trailing empty line and move to the next line.
         pre.textContent = preText(pre).replace(/\n$/, '');
         if (!pre.textContent) pre.appendChild(document.createElement('br'));
         let next = pre.nextElementSibling;
@@ -548,7 +549,7 @@
     }
   }
 
-  // `texto` digitado numa linha vira código na linha.
+  // `text` typed in a line becomes inline code.
   function expandInlineCode() {
     const sel = getSelection();
     if (!sel.isCollapsed) return false;
@@ -568,9 +569,9 @@
     return true;
   }
 
-  // Troca o trecho `range` por <code>texto</code>, com um separador invisível
-  // depois (deixa o cursor fora do código). Direto no DOM: o insertHTML do
-  // Chromium copiaria estilos para dentro.
+  // Replaces `range` with <code>text</code>, followed by an invisible
+  // separator (keeps the caret outside the code). Straight in the DOM:
+  // Chromium's insertHTML would copy styles into it.
   function insertCode(range, text) {
     range.deleteContents();
     const code = document.createElement('code');
@@ -586,7 +587,7 @@
     getSelection().addRange(after);
   }
 
-  // Texto bruto de um fragmento, com <br> como quebra (sem cortar a última).
+  // Raw text of a fragment, with <br> as a line break (keeps the last one).
   function rawText(node) {
     let out = '';
     for (const n of node.childNodes) {
@@ -597,14 +598,14 @@
     return out.replace(ZWSP, '');
   }
 
-  // Ctrl+E / botão </>: põe ou tira o código na linha do trecho selecionado.
+  // Ctrl+E / </> button: toggles inline code on the selection.
   function toggleCode() {
     editor.focus();
     const code = currentCode();
     const sel = getSelection();
     if (code) {
-      // Desembrulha direto no DOM (o insertText do Chromium recria o <code>)
-      // e tira o separador invisível que vinha depois dele.
+      // Unwrap straight in the DOM (Chromium's insertText recreates the
+      // <code>) and remove the invisible separator that followed it.
       const next = code.nextSibling;
       if (next && next.nodeType === 3 && next.data.startsWith('​')) next.deleteData(0, 1);
       const text = document.createTextNode(code.textContent.replace(ZWSP, ''));
@@ -627,7 +628,7 @@
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const key = e.key.toLowerCase();
 
-    // Atalhos de formatação no padrão de mercado.
+    // Standard formatting shortcuts.
     if (mod && !e.shiftKey && !e.altKey && FORMAT_KEYS[key]) {
       e.preventDefault();
       format(FORMAT_KEYS[key]);
@@ -650,7 +651,7 @@
       return;
     }
 
-    // "```linguagem" + Enter numa linha comum abre um bloco de código.
+    // "```lang" + Enter on a regular line opens a code block.
     if (e.key === 'Enter' && !e.shiftKey && !mod && !e.altKey) {
       const line = currentBlock();
       const fence = line && !isListItem(line) && /^```([\w+#.-]*)$/.exec(line.textContent.trim());
@@ -666,7 +667,7 @@
       return;
     }
 
-    // Tab / Shift+Tab: recua ou volta um nível os itens de lista selecionados.
+    // Tab / Shift+Tab: indents or outdents the selected list items.
     if (e.key === 'Tab' && !mod && !e.altKey) {
       const items = selectedBlocks().filter(isListItem);
       if (!items.length) return;
@@ -680,8 +681,8 @@
     if (!block || !isListItem(block)) return;
     const atStart = getSelection().isCollapsed && textBeforeCaret(block).toString() === '';
 
-    // Enter num item vazio, ou Backspace no começo do item: volta um nível
-    // se estiver recuado; senão, sai da lista.
+    // Enter on an empty item, or Backspace at its start: outdent if indented;
+    // otherwise leave the list.
     if ((e.key === 'Enter' && !e.shiftKey && !mod && !e.altKey && block.textContent.trim() === '')
         || (e.key === 'Backspace' && !mod && atStart)) {
       e.preventDefault();
@@ -703,7 +704,7 @@
     else delete block.dataset.level;
   }
 
-  // Linhas (filhas diretas do editor) que a seleção toca.
+  // Lines (direct children of the editor) touched by the selection.
   function selectedBlocks() {
     const sel = getSelection();
     if (!sel.rangeCount) return [];
@@ -711,7 +712,7 @@
     return [...editor.children].filter((b) => range.intersectsNode(b));
   }
 
-  // "- " digitado no começo de uma linha transforma a linha em marcador.
+  // "- " typed at the start of a line turns it into a bullet.
   function expandBullet() {
     const sel = getSelection();
     if (!sel.isCollapsed) return false;
@@ -725,7 +726,7 @@
     if (!/^\s*-[ \u00a0]$/.test(before.toString())) return false;
     sel.removeAllRanges();
     sel.addRange(before);
-    document.execCommand('delete'); // entra no desfazer
+    document.execCommand('delete'); // goes into the undo stack
     if (!block.isConnected) {
       document.execCommand('formatBlock', false, 'div');
       block = currentBlock();
@@ -735,7 +736,7 @@
     return true;
   }
 
-  // Espaço digitado logo no começo de um item é descartado ("[] tarefa").
+  // A space typed right at the start of an item is dropped ("[] task").
   function swallowLeadingSpace() {
     const block = currentBlock();
     if (!block || !block.classList.contains('check')) return;
@@ -751,19 +752,19 @@
     if (e.inputType === 'insertText' && e.data === '`') expandInlineCode();
     if (e.inputType === 'insertText' && e.data === ']') expandCheckbox();
     if (e.inputType === 'insertText' && e.data === ' ' && !expandBullet()) swallowLeadingSpace();
-    // Enter num item cria o próximo item (o navegador copia a linha), desmarcado.
+    // Enter on an item creates the next item (the browser clones the line), unchecked.
     if (e.inputType === 'insertParagraph') currentBlock()?.classList.remove('done');
     onContentChanged();
   }
 
-  // Colar sempre como texto puro: evita trazer estilos de outros apps.
+  // Always paste as plain text: avoids bringing in styles from other apps.
   function onPaste(e) {
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
     if (text) document.execCommand('insertText', false, text);
   }
 
-  // ---------------------------------------------------------- formatação
+  // ---------------------------------------------------------- formatting
 
   const FORMAT_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
 
@@ -774,12 +775,13 @@
     scheduleFormatBar();
   }
 
-  // Tamanhos de texto: o execCommand gera <font size="N"> e o CSS define o
-  // tamanho real de cada N. "3" é o normal.
+  // Text sizes: execCommand produces <font size="N"> and CSS sets the real
+  // size of each N. "3" is normal.
   const SIZES = ['2', '3', '5'];
 
-  // Marca-texto: o Chromium (hiliteColor) gera <span style="background-color">.
-  // A cor gravada é uma sentinela fixa; a cor real vem do tema (--highlight).
+  // Highlight: Chromium (hiliteColor) produces <span style="background-color">.
+  // The stored colour is a fixed sentinel; the real one comes from the theme
+  // (--highlight).
   const HIGHLIGHT = 'rgb(255, 230, 0)';
   const isHighlight = (n) => Boolean(n.style) && n.style.backgroundColor === HIGHLIGHT;
 
@@ -805,8 +807,8 @@
   function currentSize() {
     const sel = getSelection();
     if (!sel.rangeCount) return '3';
-    // Desce até o primeiro texto da seleção (uma linha inteira selecionada
-    // começa no <div>, não dentro do <font>).
+    // Walk down to the first text of the selection (a fully selected line
+    // starts at the <div>, not inside the <font>).
     const range = sel.getRangeAt(0);
     let n = range.startContainer.childNodes[range.startOffset] || range.startContainer;
     while (n.firstChild) n = n.firstChild;
@@ -822,17 +824,17 @@
     scheduleFormatBar();
   }
 
-  // Ctrl+Shift+> / Ctrl+Shift+< sobem ou descem um tamanho.
+  // Ctrl+Shift+> / Ctrl+Shift+< step one size up or down.
   function stepSize(dir) {
     const i = SIZES.indexOf(currentSize());
     const next = SIZES[Math.max(0, Math.min(SIZES.length - 1, (i < 0 ? 1 : i) + dir))];
     if (next !== currentSize()) setSize(next);
   }
 
-  // ------------------------------------------- barra de formatação
+  // ------------------------------------------------- format bar
 
-  // Ao selecionar texto, uma barrinha com negrito/itálico/sublinhado aparece
-  // logo acima da seleção (ou abaixo, se não couber acima).
+  // When text is selected, a small bar with bold/italic/underline/etc.
+  // appears just above the selection (or below, if it doesn't fit above).
   let selecting = false;
   let barFrame = 0;
 
@@ -867,7 +869,7 @@
     const w = formatBar.offsetWidth;
     const h = formatBar.offsetHeight;
     const center = rects.length === 1 ? (first.left + first.right) / 2 : first.left + 24;
-    // Acima da seleção (pode cobrir a barra de título); sem espaço, abaixo.
+    // Above the selection (may cover the titlebar); below if there's no room.
     let top = first.top - h - 6;
     if (top < 4) top = last.bottom + 6;
     top = Math.max(4, Math.min(top, bounds.bottom - h));
@@ -889,7 +891,7 @@
 
   async function togglePin() {
     const next = !note.pinned;
-    note.pinned = next; // resposta imediata; reverte se o sistema recusar
+    note.pinned = next; // immediate feedback; reverts if the OS refuses
     render();
     try {
       note.pinned = await invoke('set_pinned', { pinned: next });
@@ -925,7 +927,7 @@
     invoke('set_color', { color }).catch((err) => console.error('set_color', err));
   }
 
-  // Fechar manda a nota para a lixeira (recuperável pela bandeja por 30 dias).
+  // Closing moves the note to the trash (recoverable from the manager for 30 days).
   async function closeNote() {
     closeColors();
     if (renaming) await finishRename(true);
@@ -933,7 +935,7 @@
     invoke('trash_note').catch((err) => console.error('trash_note', err));
   }
 
-  // ------------------------------------------------------------ título
+  // ------------------------------------------------------------- title
 
   function startRename() {
     if (renaming) return;
@@ -965,10 +967,10 @@
     if (!note.collapsed) editor.focus();
   }
 
-  // -------------------------------------------------------- seletor de cor
+  // ------------------------------------------------------- colour picker
 
-  // Recolhida, a janela só tem a altura da barra de título: enquanto o
-  // seletor estiver aberto ela cresce o suficiente para mostrá-lo.
+  // When collapsed, the window is only as tall as the titlebar: while the
+  // picker is open it grows enough to show it.
   const resizeWindow = (height) => appWindow
     .setSize(new LogicalSize(window.innerWidth, height))
     .catch((err) => console.error('setSize', err));
@@ -984,7 +986,7 @@
     }
   }
 
-  // `shrink = false` quando outra ação já vai redimensionar a janela.
+  // `shrink = false` when another action is about to resize the window anyway.
   function closeColors(shrink = true) {
     if (colorMenu.hidden) return;
     colorMenu.hidden = true;
@@ -1015,7 +1017,7 @@
     editor.style.cursor = checkAt(e) ? 'default' : '';
   });
 
-  // Durante o arraste da seleção a barra fica escondida; aparece ao soltar.
+  // The bar stays hidden while a selection is being dragged; it shows on release.
   editor.addEventListener('mousedown', (e) => {
     if (e.button === 0) { selecting = true; hideFormatBar(); }
   });
@@ -1027,7 +1029,7 @@
   document.addEventListener('selectionchange', scheduleFormatBar);
   new ResizeObserver(scheduleFormatBar).observe(editor);
 
-  // mousedown com preventDefault: o clique na barra não tira a seleção do texto.
+  // mousedown with preventDefault: clicking the bar keeps the text selection.
   formatBar.addEventListener('mousedown', (e) => e.preventDefault());
   formatBar.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-cmd], [data-size]');
@@ -1057,7 +1059,7 @@
     const sw = e.target.closest('.swatch');
     if (!sw) return;
     if (sw === customSwatch) {
-      // Abre o seletor do sistema já na cor atual da nota.
+      // Open the system picker on the note's current colour.
       customColor.value = isCustomColor(note.color)
         ? note.color
         : (getComputedStyle(frame).getPropertyValue('--note-color').trim().match(/^#[0-9a-f]{6}$/i) || ['#f2c94c'])[0];
@@ -1067,7 +1069,7 @@
     setColor(sw.dataset.color);
     closeColors();
   });
-  // Só aplica ao confirmar no seletor; cancelar não muda nada.
+  // Only applied when confirmed in the picker; cancelling changes nothing.
   customColor.addEventListener('change', () => {
     setColor(customColor.value.toLowerCase());
     closeColors();
@@ -1076,8 +1078,8 @@
     if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) closeColors();
   });
 
-  // Barra de título (chrome.js): arrastar com ímã, clique duplo edita o
-  // título, clique do meio fecha; alça de redimensionar no canto.
+  // Titlebar (chrome.js): drag with snapping, double-click edits the title,
+  // middle click closes; resize grip in the corner.
   if (!EMBED) {
     window.MemoChrome.attach({
       frame,
@@ -1097,8 +1099,8 @@
     else if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); }
   });
 
-  // Menu de contexto nativo só no texto e no campo de título (copiar, colar,
-  // ortografia); no resto da nota ele não faz sentido.
+  // Native context menu only in the text and the title field (copy, paste,
+  // spellcheck); elsewhere in the note it makes no sense.
   document.addEventListener('contextmenu', (e) => {
     if (!e.target.closest('input, #editor')) e.preventDefault();
   });
@@ -1107,7 +1109,7 @@
   window.addEventListener('blur', () => {
     frame.classList.remove('is-focused');
     hideFormatBar();
-    // Recolhida, o seletor aberto deixa a janela maior; fecha ao sair da nota.
+    // When collapsed, an open picker enlarges the window; close it on blur.
     if (colorsGrown) closeColors();
     flushText();
   });
@@ -1115,7 +1117,7 @@
     if (textDirty) invoke(EMBED ? 'set_default_content' : 'save_text', { text: note.text, html: note.html });
   });
 
-  // Atualiza o "editada às…" na virada do dia.
+  // Refreshes the "edited at…" label when the day rolls over.
   setInterval(() => note && renderMeta(), 60_000);
 
   // --------------------------------------------------------------- init
@@ -1126,7 +1128,7 @@
     renderMonoName();
   }
 
-  // A cor "mono" é branca no tema escuro e preta no claro; o nome acompanha.
+  // The "mono" colour is white in the dark theme and black in the light one; its name follows.
   const systemLight = matchMedia('(prefers-color-scheme: light)');
   function renderMonoName() {
     const theme = document.documentElement.dataset.theme;
@@ -1139,8 +1141,8 @@
   }
   systemLight.addEventListener('change', renderMonoName);
 
-  // Textos que dependem do idioma e não estão só no HTML (tooltips com
-  // atalhos, placeholder, ortografia). Chamado ao abrir e ao trocar o idioma.
+  // Language-dependent text that isn't just in the HTML (tooltips with
+  // shortcuts, placeholder, spellcheck). Called on load and on language change.
   function applyLanguage(lang) {
     I18n.set(lang);
     editor.lang = I18n.locale();
@@ -1166,11 +1168,11 @@
     applyLanguage(lang);
     TAURI.event.listen('language-changed', (e) => applyLanguage(e.payload));
 
-    // Formatação em tags (<b>, <i>, <u>), não em style="…".
+    // Formatting as tags (<b>, <i>, <u>), not style="…".
     document.execCommand('styleWithCSS', false, false);
     document.execCommand('defaultParagraphSeparator', false, 'div');
 
-    // Tema escolhido na bandeja ("system" = segue o sistema, via CSS).
+    // Theme chosen in the manager ("system" = follow the OS, via CSS).
     applyTheme(await invoke('get_theme'));
     TAURI.event.listen('theme-changed', (e) => applyTheme(e.payload));
 

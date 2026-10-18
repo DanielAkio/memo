@@ -1,10 +1,10 @@
-//! Nota de boas-vindas, criada na primeira vez que o app abre (e reaberta por
-//! "Como usar o Memo"), no idioma do app.
+//! Welcome note, created the first time the app opens (and reopened by
+//! "How to use Memo"), in the app's language.
 //!
-//! O conteúdo vem nos dois formatos que a nota guarda: `html` (o que o
-//! editor mostra, só com as tags que o `sanitize` do app.js aceita) e `text`
-//! (o mesmo conteúdo em texto puro, como o `toPlain` do app.js geraria).
-//! Mudou um, mude o outro.
+//! The content comes in both formats a note stores: `html` (what the editor
+//! shows, using only tags that app.js's `sanitize` keeps) and `text` (the same
+//! content as plain text, as app.js's `toPlain` would produce it).
+//! Change one, change the other.
 
 pub struct Welcome {
     pub title: &'static str,
@@ -12,7 +12,7 @@ pub struct Welcome {
     pub text: &'static str,
 }
 
-/// Um pouco maior que uma nota comum, para caber o texto todo.
+/// A bit larger than a regular note, so the whole text fits.
 pub const WIDTH: f64 = 340.0;
 pub const HEIGHT: f64 = 560.0;
 
@@ -72,7 +72,7 @@ Quick memories that stay on top of everything. Try it:
 The ✕ moves the memory to the trash. All memories and the trash are in the Memory Manager, which opens with the app or from the Memo icon in the system tray.",
 };
 
-/// A nota de boas-vindas no idioma efetivo ("pt" ou "en").
+/// The welcome note in the effective language ("pt" or "en").
 pub fn for_lang(lang: &str) -> &'static Welcome {
     if lang == "en" {
         &EN
@@ -81,7 +81,7 @@ pub fn for_lang(lang: &str) -> &'static Welcome {
     }
 }
 
-/// `true` se a nota é uma das versões intactas da nota de boas-vindas.
+/// `true` if the note is one of the untouched versions of the welcome note.
 pub fn is_untouched(title: &str, html: &str) -> bool {
     [&PT, &EN]
         .iter()

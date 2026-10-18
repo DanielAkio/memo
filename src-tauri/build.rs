@@ -1,7 +1,7 @@
 fn main() {
-    // Os ícones entram no executável (ícone da janela/taskbar e recurso .ico do
-    // Windows), mas o tauri-build não observa a pasta: sem isto, trocar um
-    // ícone não recompila o app e ele continua com o antigo.
+    // The icons are embedded in the executable (window/taskbar icon and the
+    // Windows .ico resource), but tauri-build doesn't watch the folder: without
+    // this, changing an icon doesn't rebuild the app and it keeps the old one.
     println!("cargo:rerun-if-changed=icons");
     tauri_build::build()
 }

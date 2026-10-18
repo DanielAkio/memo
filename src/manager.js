@@ -1,8 +1,8 @@
-// Memo — janela "Gerenciador": lista as notas e a lixeira, com busca, e define a
-// cor das notas novas e o tema. A janela se comporta como uma nota (barra com
-// tachinha, nova nota, recolher e fechar; arraste com ímã; alça), sem título
-// editável nem texto. Os dados vêm do Rust (list_notes) e a lista é
-// recarregada sempre que alguma nota muda (evento "notes-changed").
+// Memo — manager window: lists notes and the trash, with search, and holds
+// the settings (theme, language, new-note defaults). The window behaves like a
+// note (titlebar with pin, new note, collapse and close; drag with snapping;
+// grip), with no editable title or text. Data comes from Rust (list_notes)
+// and the list reloads whenever a note changes ("notes-changed" event).
 
 (() => {
   const { invoke } = window.__TAURI__.core;
@@ -34,15 +34,15 @@
   let view = 'notes';
   let defaultColor = 'yellow';
   let reloadTimer = null;
-  // Estado da própria janela (fixada por cima, recolhida), salvo pelo Rust.
+  // State of this window itself (pinned, collapsed), saved by Rust.
   let win = { pinned: false, collapsed: false };
 
   // ------------------------------------------------------------ helpers
 
   const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
-  // Texto puro sem os marcadores de checklist ("[ ] " / "[x] ").
+  // Plain text without the list markers ("[ ] " / "[x] " / "- ").
   const plain = (text) => (text || '').replace(/^(\s*)(?:\[[ xX]?\]|-)(?= |$) ?/gm, '$1');
-  // Para a busca: minúsculas e sem acentos.
+  // For search: lower case, without accents.
   const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 
@@ -65,7 +65,7 @@
     return plain(note.text).split('\n').map((s) => s.trim()).filter(Boolean);
   }
 
-  // Título: o nome da nota, senão a primeira linha; a prévia é o resto do texto.
+  // Title: the note's name, else its first line; the preview is the rest of the text.
   function titleAndPreview(note) {
     const ls = lines(note);
     if (note.title) return { title: note.title, preview: ls.join(' · '), named: true };
@@ -91,9 +91,34 @@
 
   // ------------------------------------------------------------- render
 
+  // Sort order of both lists: "updated" (most recent first — by edit date, or
+  // by trash date in the trash) or "title" (alphabetical, empty memories
+  // last). Remembered on this machine.
+  let sort = 'updated';
+  try {
+    if (localStorage.getItem('memo.sort') === 'title') sort = 'title';
+  } catch { /* storage unavailable: use the default */ }
+
+  function sortNotes(items, dateKey) {
+    const byDate = (a, b) => b[dateKey] - a[dateKey];
+    if (sort !== 'title') return items.sort(byDate);
+    const collator = new Intl.Collator(I18n.locale(), { sensitivity: 'base', numeric: true });
+    return items
+      .map((n) => ({ n, ...titleAndPreview(n) }))
+      .sort((a, b) => {
+        if (a.named !== b.named) return a.named ? -1 : 1;
+        return collator.compare(a.title, b.title) || byDate(a.n, b.n);
+      })
+      .map((k) => k.n);
+  }
+
+  function renderSort() {
+    $('sortSelect').value = sort;
+  }
+
   function render() {
-    const active = notes.filter((n) => !n.trashedAt).sort((a, b) => b.updatedAt - a.updatedAt);
-    const trashed = notes.filter((n) => n.trashedAt).sort((a, b) => b.trashedAt - a.trashedAt);
+    const active = sortNotes(notes.filter((n) => !n.trashedAt), 'updatedAt');
+    const trashed = sortNotes(notes.filter((n) => n.trashedAt), 'trashedAt');
     $('countNotes').textContent = active.length;
     $('countTrash').textContent = trashed.length;
     for (const tab of document.querySelectorAll('.tab')) {
@@ -103,7 +128,7 @@
     emptyTrashBtn.disabled = trashed.length === 0;
     document.body.classList.toggle('notes-view', view === 'notes');
 
-    // Aba "Configuração": sem lista e sem busca.
+    // Settings tab: no list and no search.
     const settings = view === 'settings';
     $('settingsView').hidden = !settings;
     $('listWrap').hidden = settings;
@@ -165,7 +190,7 @@
     return row;
   }
 
-  // ----------------------------------------------------- cor padrão
+  // ---------------------------------------------------- default colour
 
   function renderDefaultColor() {
     const custom = isCustomColor(defaultColor);
@@ -187,7 +212,7 @@
     }
   }
 
-  // ---------------------------------------------------------------- dados
+  // ----------------------------------------------------------------- data
 
   async function load() {
     try {
@@ -198,9 +223,10 @@
     render();
   }
 
-  // ------------------------------------------- título e texto padrão
-  // O texto padrão é editado no próprio editor da nota, embutido num <iframe>
-  // (index.html?defaults), que lê e salva o conteúdo sozinho. Aqui só o título.
+  // ------------------------------------------- default title and text
+  // The default text is edited with the note editor itself, embedded in an
+  // <iframe> (index.html?defaults) that loads and saves the content on its
+  // own. Only the title is handled here.
 
   const defaultTitle = $('defaultTitle');
   let defaultsTimer = null;
@@ -219,20 +245,20 @@
       .catch((err) => console.error('set_default_title', err));
   }
 
-  // Salva sozinho, um pouco depois de parar de digitar, e ao sair do campo.
+  // Saves on its own, shortly after typing stops, and when leaving the field.
   defaultTitle.addEventListener('input', () => {
     clearTimeout(defaultsTimer);
     defaultsTimer = setTimeout(flushDefaults, 400);
   });
   defaultTitle.addEventListener('change', flushDefaults);
 
-  // Várias mudanças seguidas (digitação numa nota) viram um só recarregamento.
+  // Several changes in a row (typing in a note) become a single reload.
   function scheduleLoad() {
     clearTimeout(reloadTimer);
     reloadTimer = setTimeout(load, 150);
   }
 
-  // "Esvaziar lixeira" e "Sair" pedem um segundo clique em até 3 s.
+  // "Empty trash" and "Quit" require a second click within 3 s.
   function confirmFirst(btn, label) {
     if (btn.classList.contains('confirming')) return true;
     const original = btn.textContent;
@@ -256,7 +282,7 @@
     }
   }
 
-  // --------------------------------------------------------------- tema
+  // -------------------------------------------------------------- theme
 
   const systemLight = matchMedia('(prefers-color-scheme: light)');
 
@@ -269,7 +295,7 @@
     renderMonoName();
   }
 
-  // A cor "mono" é branca no tema escuro e preta no claro; o nome acompanha.
+  // The "mono" colour is white in the dark theme and black in the light one; its name follows.
   function renderMonoName() {
     const theme = document.documentElement.dataset.theme;
     const light = theme ? theme === 'light' : systemLight.matches;
@@ -280,7 +306,7 @@
   }
   systemLight.addEventListener('change', renderMonoName);
 
-  // ------------------------------------------------------------- eventos
+  // -------------------------------------------------------------- events
 
   for (const tab of document.querySelectorAll('.tab')) {
     tab.addEventListener('click', () => {
@@ -290,6 +316,15 @@
   }
 
   search.addEventListener('input', render);
+
+  $('sortSelect').addEventListener('change', (e) => {
+    sort = e.target.value;
+    try {
+      localStorage.setItem('memo.sort', sort);
+    } catch { /* not remembered, still applied */ }
+    render();
+  });
+  renderSort();
 
   list.addEventListener('click', (e) => {
     const row = e.target.closest('.row');
@@ -327,13 +362,13 @@
   $('helpBtn').addEventListener('click', () => {
     invoke('show_welcome').catch((err) => console.error('show_welcome', err));
   });
-  // Sair fecha o app inteiro (todas as notas); pede um segundo clique.
+  // Quit closes the whole app (every note); requires a second click.
   $('quitBtn').addEventListener('click', () => {
     if (!confirmFirst($('quitBtn'), t('quitConfirm'))) return;
     invoke('quit_app').catch((err) => console.error('quit_app', err));
   });
 
-  // Tema: vale para todas as janelas; o Rust avisa todas com "theme-changed".
+  // Theme: applies to every window; Rust notifies them all with "theme-changed".
   $('themeSwitch').addEventListener('click', (e) => {
     const seg = e.target.closest('.seg');
     if (!seg) return;
@@ -357,12 +392,12 @@
     }
   });
 
-  // Menu de contexto nativo só nos campos de texto.
+  // Native context menu only in text fields.
   document.addEventListener('contextmenu', (e) => {
     if (!e.target.closest('input, textarea')) e.preventDefault();
   });
 
-  // ----------------------------------------------- janela (como uma nota)
+  // ------------------------------------------- window (like a note)
 
   function renderWindow() {
     frame.classList.toggle('is-collapsed', win.collapsed);
@@ -377,7 +412,7 @@
 
   async function togglePin() {
     const next = !win.pinned;
-    win.pinned = next; // resposta imediata; reverte se o sistema recusar
+    win.pinned = next; // immediate feedback; reverts if the OS refuses
     renderWindow();
     try {
       win.pinned = await invoke('set_pinned', { pinned: next });
@@ -410,7 +445,70 @@
   window.addEventListener('focus', () => frame.classList.add('is-focused'));
   window.addEventListener('blur', () => frame.classList.remove('is-focused'));
 
-  // -------------------------------------------------------------- idioma
+  // --------------------------------------------------------- data folder
+  // The folder picker and the "folder already has notes" question are native
+  // dialogs opened by Rust; here we only show the current folder.
+
+  async function loadDataDir() {
+    try {
+      const [dir, isDefault] = await invoke('get_data_dir');
+      $('dataDir').textContent = dir;
+      $('resetDirBtn').hidden = isDefault;
+    } catch (err) {
+      console.error('get_data_dir', err);
+    }
+  }
+
+  async function changeDataDir(cmd) {
+    try {
+      if (await invoke(cmd)) await loadDataDir();
+    } catch (err) {
+      console.error(cmd, err);
+    }
+  }
+
+  $('chooseDirBtn').addEventListener('click', () => changeDataDir('choose_data_dir'));
+  $('resetDirBtn').addEventListener('click', () => changeDataDir('reset_data_dir'));
+
+  // ---------------------------------------------------------- backup
+  // Save/open dialogs and error messages are native (Rust); the outcome is
+  // shown here, under the buttons, for a few seconds.
+
+  let statusTimer = null;
+  function showStatus(message) {
+    const status = $('storageStatus');
+    status.textContent = message;
+    status.hidden = false;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => { status.hidden = true; }, 6000);
+  }
+
+  // Suggested file name with the local date: memo-2026-10-17.json.
+  function exportFileName() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `memo-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.json`;
+  }
+
+  $('exportBtn').addEventListener('click', async () => {
+    try {
+      if (await invoke('export_notes', { fileName: exportFileName() })) showStatus(t('exported'));
+    } catch (err) {
+      console.error('export_notes', err);
+    }
+  });
+
+  $('importBtn').addEventListener('click', async () => {
+    try {
+      const n = await invoke('import_notes');
+      if (n === null) return;
+      showStatus(n === 0 ? t('importedNone') : t(n === 1 ? 'importedOne' : 'importedMany', { n }));
+    } catch (err) {
+      console.error('import_notes', err);
+    }
+  });
+
+  // ------------------------------------------------------------ language
 
   function applyLanguage(setting, lang) {
     I18n.set(lang);
@@ -442,7 +540,10 @@
     applyTheme(await invoke('get_theme'));
     listen('theme-changed', (e) => applyTheme(e.payload));
     listen('notes-changed', scheduleLoad);
-    await Promise.all([load(), loadDefaults()]);
+    // Switched to another folder's notes file: its theme, language and
+    // defaults may differ, so start over.
+    listen('store-replaced', () => location.reload());
+    await Promise.all([load(), loadDefaults(), loadDataDir()]);
     if (!win.collapsed) search.focus();
   }
 

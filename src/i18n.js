@@ -1,14 +1,14 @@
-// Memo — textos da interface em português (padrão) e inglês.
+// Memo — UI strings in Portuguese (default) and English.
 //
-// O idioma efetivo ("pt" ou "en") vem do Rust (get_language), que resolve a
-// escolha da Configuração ("system" segue o idioma do sistema). No HTML, os
-// textos fixos usam data-i18n="chave" (conteúdo) e
-// data-i18n-attr="atributo=chave,outro=chave"; no JS, MemoI18n.t("chave").
+// The effective language ("pt" or "en") comes from Rust (get_language), which
+// resolves the Settings choice ("system" follows the OS language). In HTML,
+// static text uses data-i18n="key" (content) and
+// data-i18n-attr="attr=key,other=key"; in JS, MemoI18n.t("key").
 
 window.MemoI18n = (() => {
   const STRINGS = {
     pt: {
-      // Barra de título
+      // Titlebar
       pin: 'Fixar acima de tudo',
       unpin: 'Desafixar',
       newNote: 'Nova memória',
@@ -19,7 +19,7 @@ window.MemoI18n = (() => {
       closeNote: 'Fechar memória',
       closeToTrash: 'Fechar (vai para a lixeira)',
       close: 'Fechar',
-      // Nota
+      // Note
       noteColor: 'Cor da memória',
       colorIs: 'Cor: {name}',
       colorCustomIs: 'Cor: Personalizada ({hex})',
@@ -33,7 +33,7 @@ window.MemoI18n = (() => {
       newNoteStatus: 'memória nova',
       wordOne: '{n} palavra',
       wordMany: '{n} palavras',
-      // Cores
+      // Colours
       yellow: 'Amarelo',
       green: 'Verde',
       coral: 'Coral',
@@ -45,7 +45,7 @@ window.MemoI18n = (() => {
       custom: 'Personalizada',
       customMore: 'Personalizada…',
       noColor: 'Sem cor',
-      // Formatação
+      // Formatting
       formatting: 'Formatação',
       bold: 'Negrito',
       italic: 'Itálico',
@@ -61,13 +61,16 @@ window.MemoI18n = (() => {
       largeText: 'Texto grande',
       smaller: '{keys} diminui',
       larger: '{keys} aumenta',
-      // Gerenciador
+      // Manager
       manager: 'Gerenciador de Memórias',
       tabNotes: 'Memórias',
       tabTrash: 'Lixeira',
       tabSettings: 'Configurações',
       search: 'Buscar',
       searchNotes: 'Buscar memórias',
+      sortBy: 'Ordenar por',
+      sortRecent: 'Mais recentes',
+      sortTitle: 'Título (A–Z)',
       trashInfo: 'Memórias na lixeira são excluídas de vez depois de 30 dias.',
       emptyTrash: 'Esvaziar lixeira',
       emptyTrashConfirm: 'Clique de novo para esvaziar',
@@ -92,6 +95,19 @@ window.MemoI18n = (() => {
       title: 'Título',
       text: 'Texto',
       defaultTextPlaceholder: 'Vazio (a memória mostra uma frase aleatória)',
+      storage: 'Armazenamento',
+      storageTip: 'As memórias atuais são copiadas para a nova pasta; o arquivo antigo fica como backup. Uma pasta sincronizada (Dropbox, OneDrive…) leva as memórias para outros computadores.',
+      dataFolder: 'Pasta das memórias',
+      changeFolder: 'Alterar…',
+      useDefaultFolder: 'Usar a pasta padrão',
+      backup: 'Backup',
+      backupTip: 'Exportar salva as memórias (as da lixeira ficam de fora) num arquivo .json. Importar junta as memórias do arquivo às atuais: uma memória que já existe só é trocada se a do arquivo for mais recente.',
+      exportNotes: 'Exportar…',
+      importNotes: 'Importar…',
+      exported: 'Memórias exportadas.',
+      importedNone: 'Nenhuma memória nova ou mais recente no arquivo.',
+      importedOne: '1 memória importada.',
+      importedMany: '{n} memórias importadas.',
       application: 'Aplicativo',
       helpAndQuit: 'Ajuda e saída',
       howTo: 'Como usar o Memo',
@@ -154,6 +170,9 @@ window.MemoI18n = (() => {
       tabSettings: 'Settings',
       search: 'Search',
       searchNotes: 'Search memories',
+      sortBy: 'Sort by',
+      sortRecent: 'Most recent',
+      sortTitle: 'Title (A–Z)',
       trashInfo: 'Memories in the trash are permanently deleted after 30 days.',
       emptyTrash: 'Empty trash',
       emptyTrashConfirm: 'Click again to empty',
@@ -178,6 +197,19 @@ window.MemoI18n = (() => {
       title: 'Title',
       text: 'Text',
       defaultTextPlaceholder: 'Empty (the memory shows a random phrase)',
+      storage: 'Storage',
+      storageTip: 'The current memories are copied to the new folder; the old file is kept as a backup. A synced folder (Dropbox, OneDrive…) brings your memories to other computers.',
+      dataFolder: 'Memories folder',
+      changeFolder: 'Change…',
+      useDefaultFolder: 'Use default folder',
+      backup: 'Backup',
+      backupTip: 'Export saves your memories (not the ones in the trash) to a .json file. Import merges the file’s memories into the current ones: an existing memory is only replaced if the file’s copy is newer.',
+      exportNotes: 'Export…',
+      importNotes: 'Import…',
+      exported: 'Memories exported.',
+      importedNone: 'No new or newer memories in the file.',
+      importedOne: '1 memory imported.',
+      importedMany: '{n} memories imported.',
       application: 'App',
       helpAndQuit: 'Help and quit',
       howTo: 'How to use Memo',
@@ -186,7 +218,7 @@ window.MemoI18n = (() => {
     },
   };
 
-  // Placeholder da memória vazia: uma frase sorteada a cada memória aberta.
+  // Placeholder for an empty memory: a random phrase each time one opens.
   const PLACEHOLDERS = {
     pt: [
       'Escreva antes que esqueça…',
@@ -242,7 +274,7 @@ window.MemoI18n = (() => {
     return s;
   }
 
-  // Aplica os textos fixos do HTML (data-i18n e data-i18n-attr).
+  // Applies the static HTML text (data-i18n and data-i18n-attr).
   function apply(root = document) {
     for (const el of root.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
     for (const el of root.querySelectorAll('[data-i18n-attr]')) {
@@ -253,7 +285,7 @@ window.MemoI18n = (() => {
     }
   }
 
-  // `next` é o idioma efetivo vindo do Rust: "pt" ou "en".
+  // `next` is the effective language from Rust: "pt" or "en".
   function set(next) {
     lang = next === 'en' ? 'en' : 'pt';
     document.documentElement.lang = locale();

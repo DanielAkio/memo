@@ -1,8 +1,8 @@
 name: Build
 
-# Roda só manualmente (Actions → Build → Run workflow). Executado a partir de
-# uma tag v*, publica um rascunho de release com os instaladores de Windows,
-# macOS (Apple Silicon e Intel) e Linux.
+# Manual runs only (Actions → Build → Run workflow). Run from a v* tag, it
+# publishes a draft release with the Windows, macOS (Apple Silicon and Intel)
+# and Linux installers.
 on:
   workflow_dispatch:
 
@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Dependências do Linux
+      - name: Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
@@ -57,7 +57,7 @@ jobs:
           releaseDraft: true
           args: ${{ matrix.args }}
 
-      - name: Guardar instaladores
+      - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: memo-${{ matrix.platform }}${{ matrix.args != '' && '-' || '' }}${{ contains(matrix.args, 'aarch64') && 'arm64' || contains(matrix.args, 'x86_64') && 'x64' || '' }}

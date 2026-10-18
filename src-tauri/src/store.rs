@@ -1,13 +1,13 @@
-//! Persistência das notas: um único `notes.json` na pasta de dados do app.
+//! Note persistence: a single `notes.json` in the app data folder.
 //!
-//! As mudanças ficam em memória e uma thread grava no disco quando há algo
-//! pendente, assim arrastar ou redimensionar uma nota não escreve no disco a
-//! cada pixel. A gravação é atômica (arquivo temporário + rename).
+//! Changes are kept in memory and a thread writes to disk when something is
+//! pending, so dragging or resizing a note doesn't hit the disk on every
+//! pixel. Writes are atomic (temporary file + rename).
 
 use serde::{Deserialize, Serialize};
 use std::{
     fs, io,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
         Mutex,
@@ -19,13 +19,13 @@ pub const DEFAULT_W: f64 = 300.0;
 pub const DEFAULT_H: f64 = 320.0;
 pub const COLLAPSED_H: f64 = 36.0;
 
-/// Etiquetas de cor aceitas (vazio = sem cor).
+/// Accepted colour labels (empty = no colour).
 pub const COLORS: [&str; 8] = [
     "", "yellow", "green", "coral", "teal", "iris", "lavender", "mono",
 ];
 
-/// Uma cor é válida se for uma das etiquetas acima ou uma cor personalizada
-/// no formato `#rrggbb`.
+/// A colour is valid if it is one of the labels above or a custom colour in
+/// `#rrggbb` form.
 pub fn is_valid_color(color: &str) -> bool {
     COLORS.contains(&color)
         || (color.len() == 7
@@ -33,16 +33,16 @@ pub fn is_valid_color(color: &str) -> bool {
             && color[1..].chars().all(|c| c.is_ascii_hexdigit()))
 }
 
-/// Cor com que toda nota nova nasce.
+/// Colour every new note starts with.
 pub const DEFAULT_COLOR: &str = "yellow";
 
-/// Tempo que uma nota fica na lixeira antes de ser apagada de vez (30 dias).
+/// How long a note stays in the trash before being permanently deleted (30 days).
 pub const TRASH_TTL_MS: u64 = 30 * 86_400_000;
 
-/// Tamanho máximo do texto padrão das notas novas, em caracteres.
+/// Maximum length of the new-note default text, in characters.
 pub const DEFAULT_TEXT_MAX: usize = 5000;
 
-/// Tamanho máximo do nome de uma nota, em caracteres.
+/// Maximum length of a note's name, in characters.
 pub const TITLE_MAX: usize = 80;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -50,18 +50,18 @@ pub const TITLE_MAX: usize = 80;
 pub struct Note {
     pub id: String,
     pub seq: u32,
-    /// Nome dado pelo usuário (vazio = sem nome).
+    /// Name given by the user (empty = unnamed).
     pub title: String,
-    /// Texto puro (itens de checklist como "[ ] " / "[x] "): usado na
-    /// bandeja, na contagem de palavras e para reconstruir notas antigas.
+    /// Plain text (checklist items as "[ ] " / "[x] "): used for the word
+    /// count, the manager list and to rebuild old notes.
     pub text: String,
-    /// Conteúdo formatado (negrito, itálico, sublinhado, checklist) gerado
-    /// pelo editor. Vazio em notas anteriores à formatação.
+    /// Formatted content (bold, italic, underline, checklist) produced by the
+    /// editor. Empty in notes that predate formatting.
     pub html: String,
-    /// Posição física (pixels de tela) do canto superior esquerdo.
+    /// Physical position (screen pixels) of the top-left corner.
     pub x: Option<i32>,
     pub y: Option<i32>,
-    /// Tamanho lógico; `height` é sempre a altura expandida.
+    /// Logical size; `height` is always the expanded height.
     pub width: f64,
     pub height: f64,
     pub pinned: bool,
@@ -69,7 +69,7 @@ pub struct Note {
     pub collapsed: bool,
     pub created_at: u64,
     pub updated_at: u64,
-    /// Quando foi para a lixeira; `None` = nota ativa.
+    /// When it was trashed; `None` = active note.
     pub trashed_at: Option<u64>,
 }
 
@@ -101,36 +101,36 @@ impl Default for Note {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase", default)]
 struct FileData {
     version: u32,
     next_seq: u32,
-    /// Tema escolhido na janela "Gerenciador" (ver `THEMES`); vazio = "system".
+    /// Theme chosen in the manager (see `THEMES`); empty = "system".
     theme: String,
-    /// Idioma escolhido na Configuração (ver `LANGUAGES`); vazio = "system".
+    /// Language chosen in Settings (see `LANGUAGES`); empty = "system".
     language: String,
-    /// Posição, tamanho e estado da janela "Gerenciador".
+    /// Position, size and state of the manager window.
     manager: ManagerState,
-    /// Cor das notas novas, escolhida no gerenciador; `None` = `DEFAULT_COLOR`.
+    /// Colour for new notes, chosen in the manager; `None` = `DEFAULT_COLOR`.
     default_color: Option<String>,
-    /// Título e texto (puro, com "[ ] " para checklist) das notas novas,
-    /// definidos no gerenciador. Vazios = nota em branco.
+    /// Title and text (plain, with "[ ] " for checklist items) of new notes,
+    /// set in the manager. Empty = blank note.
     default_title: String,
     default_text: String,
-    /// O mesmo texto padrão com a formatação (HTML do editor da nota).
+    /// The same default text with formatting (HTML from the note editor).
     default_html: String,
     notes: Vec<Note>,
 }
 
-/// Estado da janela "Gerenciador" (o gerenciador), guardado como o de uma nota.
+/// State of the manager window, stored like a note's.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ManagerState {
-    /// Posição física do canto superior esquerdo; `None` = centralizada.
+    /// Physical position of the top-left corner; `None` = centred.
     pub x: Option<i32>,
     pub y: Option<i32>,
-    /// Tamanho lógico; `height` é sempre a altura expandida.
+    /// Logical size; `height` is always the expanded height.
     pub width: f64,
     pub height: f64,
     pub pinned: bool,
@@ -150,16 +150,62 @@ impl Default for ManagerState {
     }
 }
 
-/// Idiomas aceitos: seguir o sistema operacional, português ou inglês.
+/// Accepted languages: follow the OS, Portuguese or English.
 pub const LANGUAGES: [&str; 3] = ["system", "pt-BR", "en"];
 
-/// Temas aceitos: seguir o sistema operacional, claro ou escuro.
+/// Accepted themes: follow the OS, light or dark.
 pub const THEMES: [&str; 3] = ["system", "light", "dark"];
 
 pub struct Store {
-    path: PathBuf,
+    /// Where `notes.json` lives; changes when the user picks another folder.
+    /// Locked before `data` whenever both are needed.
+    path: Mutex<PathBuf>,
     data: Mutex<FileData>,
     dirty: AtomicBool,
+}
+
+/// App config, kept in the default app data folder (never in the custom
+/// one, since it says where that is).
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Config {
+    /// Folder chosen for `notes.json`; `None` = the app data folder.
+    pub data_dir: Option<PathBuf>,
+}
+
+impl Config {
+    pub fn load(path: &Path) -> Self {
+        fs::read_to_string(path)
+            .ok()
+            .and_then(|raw| serde_json::from_str(&raw).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn save(&self, path: &Path) -> io::Result<()> {
+        let json = serde_json::to_string_pretty(self).map_err(io::Error::other)?;
+        write_atomic(path, &json)
+    }
+}
+
+/// Writes through a temporary file + rename, so a crash never leaves a
+/// half-written file.
+fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, contents)?;
+    fs::rename(&tmp, path)
+}
+
+/// Reads and parses a notes file.
+fn read(path: &Path) -> io::Result<FileData> {
+    let raw = fs::read_to_string(path)?;
+    serde_json::from_str(&raw).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
+}
+
+/// Ensures unique ids and continuous numbering even with hand-edited files.
+fn normalize(data: &mut FileData) {
+    data.notes.retain(|n| !n.id.is_empty());
+    let max_seq = data.notes.iter().map(|n| n.seq).max().unwrap_or(0);
+    data.next_seq = data.next_seq.max(max_seq + 1).max(1);
 }
 
 pub fn now_ms() -> u64 {
@@ -178,27 +224,21 @@ fn now_nanos() -> u128 {
 
 impl Store {
     pub fn load(path: PathBuf) -> Self {
-        let mut data = match fs::read_to_string(&path) {
-            Ok(raw) => match serde_json::from_str::<FileData>(&raw) {
-                Ok(data) => data,
-                Err(err) => {
-                    // Nunca sobrescreve um arquivo ilegível: guarda uma cópia antes.
-                    let backup = path.with_extension(format!("corrompido-{}.json", now_ms()));
-                    let _ = fs::copy(&path, &backup);
-                    eprintln!("memo: notes.json ilegível ({err}); cópia em {backup:?}");
-                    FileData::default()
-                }
-            },
+        let mut data = match read(&path) {
+            Ok(data) => data,
+            Err(err) if err.kind() == io::ErrorKind::InvalidData => {
+                // Never overwrite an unreadable file: keep a copy first.
+                let backup = path.with_extension(format!("corrupted-{}.json", now_ms()));
+                let _ = fs::copy(&path, &backup);
+                eprintln!("memo: unreadable notes.json ({err}); copy at {backup:?}");
+                FileData::default()
+            }
             Err(_) => FileData::default(),
         };
-
-        // Garante ids únicos e numeração contínua mesmo com arquivos editados à mão.
-        data.notes.retain(|n| !n.id.is_empty());
-        let max_seq = data.notes.iter().map(|n| n.seq).max().unwrap_or(0);
-        data.next_seq = data.next_seq.max(max_seq + 1).max(1);
+        normalize(&mut data);
 
         let store = Self {
-            path,
+            path: Mutex::new(path),
             data: Mutex::new(data),
             dirty: AtomicBool::new(false),
         };
@@ -206,7 +246,93 @@ impl Store {
         store
     }
 
-    /// Notas fora da lixeira.
+    /// Path of the current `notes.json`.
+    pub fn path(&self) -> PathBuf {
+        self.path.lock().unwrap().clone()
+    }
+
+    /// Moves the store to `path` (a `notes.json` in another folder). If a
+    /// notes file already exists there and `load_existing` is set, it is
+    /// loaded in place of the notes in memory and `true` is returned;
+    /// otherwise the current notes are written there (an existing file is
+    /// first copied to `notes.backup-<ms>.json`). The old file is left
+    /// untouched, as a backup. An unreadable file to load is an error
+    /// (nothing changes).
+    pub fn relocate(&self, path: PathBuf, load_existing: bool) -> io::Result<bool> {
+        let mut current = self.path.lock().unwrap();
+        // Pending changes still belong to the old file.
+        if self.dirty.swap(false, Ordering::SeqCst) {
+            if let Err(err) = self.write(&current) {
+                self.mark_dirty();
+                return Err(err);
+            }
+        }
+        if path.exists() && load_existing {
+            let mut data = read(&path)?;
+            normalize(&mut data);
+            *self.data.lock().unwrap() = data;
+            *current = path;
+            drop(current);
+            self.purge_trash(now_ms());
+            Ok(true)
+        } else {
+            if path.exists() {
+                fs::copy(
+                    &path,
+                    path.with_extension(format!("backup-{}.json", now_ms())),
+                )?;
+            }
+            self.write(&path)?;
+            *current = path;
+            Ok(false)
+        }
+    }
+
+    /// Writes a copy of the data to `path` without the trashed notes, in the
+    /// same format as `notes.json` (so an export can also serve as a data
+    /// folder's file).
+    pub fn export_to(&self, path: &Path) -> io::Result<()> {
+        let json = {
+            let mut copy = self.data.lock().unwrap().clone();
+            copy.version = 1;
+            copy.notes.retain(|n| n.trashed_at.is_none());
+            serde_json::to_string_pretty(&copy)
+        };
+        write_atomic(path, &json.map_err(io::Error::other)?)
+    }
+
+    /// Merges the notes of another notes file (an export or a `notes.json`):
+    /// unknown ids are added and known ones replaced only if the imported copy
+    /// is newer. Settings in the file are ignored. Returns the ids added or
+    /// replaced.
+    pub fn import_from(&self, path: &Path) -> io::Result<Vec<String>> {
+        let imported = read(path)?;
+        let mut changed = Vec::new();
+        {
+            let mut data = self.data.lock().unwrap();
+            for note in imported.notes.into_iter().filter(|n| !n.id.is_empty()) {
+                match data.notes.iter_mut().find(|n| n.id == note.id) {
+                    Some(existing) if note.updated_at > existing.updated_at => {
+                        changed.push(note.id.clone());
+                        *existing = note;
+                    }
+                    Some(_) => {}
+                    None => {
+                        changed.push(note.id.clone());
+                        data.notes.push(note);
+                    }
+                }
+            }
+            normalize(&mut data);
+        }
+        if !changed.is_empty() {
+            self.mark_dirty();
+            self.purge_trash(now_ms());
+        }
+        Ok(changed)
+    }
+
+    /// Notes not in the trash.
     pub fn active(&self) -> Vec<Note> {
         let data = self.data.lock().unwrap();
         data.notes
@@ -216,8 +342,8 @@ impl Store {
             .collect()
     }
 
-    /// Apaga de vez as notas que estão na lixeira há mais de 30 dias.
-    /// Devolve `true` se alguma foi removida.
+    /// Permanently deletes notes that have been in the trash for over 30 days.
+    /// Returns `true` if any was removed.
     pub fn purge_trash(&self, now: u64) -> bool {
         let removed = {
             let mut data = self.data.lock().unwrap();
@@ -248,7 +374,7 @@ impl Store {
         self.mark_dirty();
     }
 
-    /// Idioma escolhido ("system", "pt-BR" ou "en").
+    /// Chosen language ("system", "pt-BR" or "en").
     pub fn language(&self) -> String {
         let language = self.data.lock().unwrap().language.clone();
         if LANGUAGES.contains(&language.as_str()) {
@@ -263,8 +389,8 @@ impl Store {
         self.mark_dirty();
     }
 
-    /// Idioma efetivo da interface: "pt" ou "en". "system" usa o idioma do
-    /// sistema operacional (português se for pt-*, inglês nos demais casos).
+    /// Effective UI language: "pt" or "en". "system" uses the OS language
+    /// (Portuguese for pt-*, English otherwise).
     pub fn effective_language(&self) -> &'static str {
         match self.language().as_str() {
             "pt-BR" => "pt",
@@ -276,7 +402,7 @@ impl Store {
         }
     }
 
-    /// Cor com que as notas novas nascem.
+    /// Colour new notes start with.
     pub fn default_color(&self) -> String {
         let data = self.data.lock().unwrap();
         match &data.default_color {
@@ -290,7 +416,7 @@ impl Store {
         self.mark_dirty();
     }
 
-    /// Título, texto e HTML com que as notas novas nascem.
+    /// Title, text and HTML new notes start with.
     pub fn new_note_defaults(&self) -> (String, String, String) {
         let data = self.data.lock().unwrap();
         (
@@ -313,7 +439,7 @@ impl Store {
         self.mark_dirty();
     }
 
-    /// A nota está como nasceu: sem nada além do título e do texto padrão.
+    /// The note is as it was created: nothing beyond the default title and text.
     pub fn is_pristine(&self, note: &Note) -> bool {
         if note.is_blank() {
             return true;
@@ -326,7 +452,7 @@ impl Store {
         self.data.lock().unwrap().manager.clone()
     }
 
-    /// Aplica `f` ao estado da janela "Gerenciador" e devolve uma cópia.
+    /// Applies `f` to the manager window state and returns a copy.
     pub fn update_manager<F: FnOnce(&mut ManagerState)>(&self, f: F) -> ManagerState {
         let state = {
             let mut data = self.data.lock().unwrap();
@@ -337,7 +463,7 @@ impl Store {
         state
     }
 
-    /// Todas as notas, ativas e na lixeira (para o gerenciador).
+    /// All notes, active and trashed (for the manager).
     pub fn all(&self) -> Vec<Note> {
         self.data.lock().unwrap().notes.clone()
     }
@@ -361,7 +487,7 @@ impl Store {
             .cloned()
     }
 
-    /// Nenhuma nota foi criada até hoje (primeira execução do app).
+    /// No note has ever been created (first run of the app).
     pub fn is_first_run(&self) -> bool {
         let data = self.data.lock().unwrap();
         data.notes.is_empty() && data.next_seq <= 1
@@ -395,7 +521,7 @@ impl Store {
         note
     }
 
-    /// Aplica `f` à nota e devolve uma cópia atualizada.
+    /// Applies `f` to the note and returns an updated copy.
     pub fn update<F: FnOnce(&mut Note)>(&self, id: &str, f: F) -> Option<Note> {
         let updated = {
             let mut data = self.data.lock().unwrap();
@@ -416,24 +542,24 @@ impl Store {
         self.dirty.store(true, Ordering::SeqCst);
     }
 
-    /// Grava no disco se houver mudanças pendentes.
+    /// Writes to disk if there are pending changes.
     pub fn flush(&self) {
+        let path = self.path.lock().unwrap();
         if !self.dirty.swap(false, Ordering::SeqCst) {
             return;
         }
+        if let Err(err) = self.write(&path) {
+            eprintln!("memo: failed to save notes: {err}");
+            self.mark_dirty();
+        }
+    }
+
+    fn write(&self, path: &Path) -> io::Result<()> {
         let json = {
             let mut data = self.data.lock().unwrap();
             data.version = 1;
             serde_json::to_string_pretty(&*data)
         };
-        let result = json.map_err(io::Error::other).and_then(|json| {
-            let tmp = self.path.with_extension("json.tmp");
-            fs::write(&tmp, json)?;
-            fs::rename(&tmp, &self.path)
-        });
-        if let Err(err) = result {
-            eprintln!("memo: falha ao salvar notas: {err}");
-            self.mark_dirty();
-        }
+        write_atomic(path, &json.map_err(io::Error::other)?)
     }
 }

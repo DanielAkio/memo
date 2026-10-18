@@ -1,8 +1,8 @@
-/* Memo — base compartilhada pelas janelas (nota e "Gerenciador"): tokens
-   de cor e tipografia (fonte do sistema), temas claro/escuro, cores das
-   etiquetas e o seletor de cor. O tema claro inverte a escala de cinza (mesmos
-   nomes de token) e é escolhido no Gerenciador: <html data-theme="light|dark">,
-   ou sem atributo para seguir o sistema. */
+/* Memo — base shared by the windows (note and manager): colour and type
+   tokens (system font), light/dark themes, label colours and the colour
+   picker. The light theme inverts the grey scale (same token names) and is
+   chosen in the manager: <html data-theme="light|dark">, or no attribute to
+   follow the OS. */
 
 :root {
   --color-void: #08090a;
@@ -20,10 +20,10 @@
   --color-signal-teal: #02b8cc;
   --color-iris-violet: #6366f1;
   --color-lavender: #8b5cf6;
-  /* Cor padrão das notas. */
+  /* Default note colour. */
   --color-sun-yellow: #f2c94c;
 
-  /* Fonte do sistema: Segoe UI no Windows, SF Pro no macOS, a padrão no Linux. */
+  /* System font: Segoe UI on Windows, SF Pro on macOS, the default on Linux. */
   --font-ui: system-ui, "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Ubuntu, Cantarell, "Noto Sans", sans-serif;
   --font-mono: "Berkeley Mono", ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
 
@@ -37,7 +37,7 @@
   --shadow-popover: rgba(255, 255, 255, 0.03) 0px 0px 0px 1px inset, rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset,
                     rgba(0, 0, 0, 0.6) 0px 0px 0px 1px, rgba(8, 9, 10, 0.6) 0px 4px 24px 0px;
 
-  /* Realces sobre a superfície (hover, pressionado, seleção). */
+  /* Overlays on the surface (hover, pressed, selection). */
   --overlay-subtle: rgba(255, 255, 255, 0.03);
   --overlay-hover: rgba(255, 255, 255, 0.05);
   --overlay-active: rgba(255, 255, 255, 0.08);
@@ -51,7 +51,7 @@
   color-scheme: dark;
 }
 
-/* Tema claro: pelo sistema (sem escolha na bandeja) ou escolhido. */
+/* Light theme: from the OS (no explicit choice) or chosen. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --color-void: #ffffff;
@@ -99,7 +99,7 @@
 
 button { font: inherit; color: inherit; }
 
-/* ------------------------------------------------------ cores das etiquetas */
+/* ------------------------------------------------------------ label colours */
 
 [data-color="green"]    { --note-color: var(--color-pulse-green); }
 [data-color="coral"]    { --note-color: var(--color-coral-red); }
@@ -107,10 +107,10 @@ button { font: inherit; color: inherit; }
 [data-color="iris"]     { --note-color: var(--color-iris-violet); }
 [data-color="lavender"] { --note-color: var(--color-lavender); }
 [data-color="yellow"]   { --note-color: var(--color-sun-yellow); }
-/* "mono": o tom de maior contraste do tema (branco no escuro, preto no claro). */
+/* "mono": the theme's highest-contrast tone (white in dark, black in light). */
 [data-color="mono"]     { --note-color: var(--color-paper); }
 
-/* ------------------------------------------------------ seletor de cor */
+/* ------------------------------------------------------ colour picker */
 
 .swatches {
   display: flex;
@@ -143,8 +143,8 @@ button { font: inherit; color: inherit; }
 .swatch[data-color="iris"]     { --sw: var(--color-iris-violet); }
 .swatch[data-color="lavender"] { --sw: var(--color-lavender); }
 .swatch[data-color="mono"]     { --sw: var(--color-paper); }
-/* Personalizada: arco-íris até ser escolhida; depois mostra a cor da nota
-   (--sw vem do app.js). */
+/* Custom: a rainbow until one is picked; then shows the note's colour
+   (--sw comes from app.js). */
 .swatch[data-color="custom"]::after {
   background: var(--sw, conic-gradient(#eb5757, #f2c94c, #27a644, #02b8cc, #6366f1, #8b5cf6, #eb5757));
 }
@@ -160,7 +160,7 @@ button { font: inherit; color: inherit; }
 .swatch:hover { background: var(--overlay-hover); }
 .swatch[aria-checked="true"] { box-shadow: inset 0 0 0 1px var(--color-fog); }
 
-/* ------------------------------------------------- página e moldura comuns */
+/* ------------------------------------------------- shared page and frame */
 
 html, body {
   margin: 0;
@@ -182,7 +182,7 @@ html, body {
   box-shadow: var(--hairline);
 }
 
-/* Etiqueta de cor: um fio vertical de 2px na borda esquerda. */
+/* Colour label: a 2px vertical stripe on the left edge. */
 .frame::before {
   content: "";
   position: absolute;
@@ -239,7 +239,7 @@ html, body {
 .icon-btn:active { background: var(--overlay-active); }
 .icon-btn:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
 
-/* Botões secundários da barra só aparecem com a janela em foco ou sob o mouse. */
+/* Secondary titlebar buttons only show when the window is focused or hovered. */
 .titlebar .icon-btn:not(.pin) { opacity: 0; }
 .is-focused .titlebar .icon-btn,
 .frame:hover .titlebar .icon-btn,
@@ -247,7 +247,7 @@ html, body {
 .pin { opacity: 0.55; }
 .is-focused .pin, .frame:hover .pin { opacity: 1; }
 
-/* Fixada: tachinha preenchida em branco sobre um fundo cinza sutil, sem cor. */
+/* Pinned: filled white pin on a subtle grey background, no colour. */
 .pin[aria-pressed="true"] {
   opacity: 1;
   background: var(--overlay-active);
@@ -257,13 +257,13 @@ html, body {
 .pin[aria-pressed="true"] .pin-body { fill: currentColor; }
 .pin .pin-needle { stroke-width: 1.6; }
 
-/* Seta para cima = recolher; recolhida, aponta para baixo = expandir. */
+/* Up arrow = collapse; when collapsed it points down = expand. */
 .collapse svg { transition: transform 160ms ease; }
 .is-collapsed .collapse svg { transform: rotate(180deg); }
 
-/* Alças de redimensionar (criadas pelo chrome.js): faixas finas nas bordas e
-   quadrados nos cantos, invisíveis, só com o cursor. Recolhida, a janela só
-   muda de largura. */
+/* Resize handles (created by chrome.js): thin strips on the edges and squares
+   in the corners, invisible, cursor only. When collapsed, the window only
+   changes width. */
 .rs { position: absolute; z-index: 30; }
 .rs-n, .rs-s { left: 8px; right: 8px; height: 4px; cursor: ns-resize; }
 .rs-e, .rs-w { top: 8px; bottom: 8px; width: 4px; cursor: ew-resize; }
@@ -280,7 +280,7 @@ html, body {
 .is-collapsed .rs-ne, .is-collapsed .rs-nw, .is-collapsed .rs-se, .is-collapsed .rs-sw { display: none; }
 .is-collapsed .rs-e, .is-collapsed .rs-w { top: 0; bottom: 0; }
 
-/* Alça visível no canto inferior direito. */
+/* Visible grip in the bottom-right corner. */
 .grip {
   position: absolute;
   right: 0;

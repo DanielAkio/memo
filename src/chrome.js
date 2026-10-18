@@ -1,21 +1,21 @@
-// Memo — comportamento comum às janelas sem moldura (nota e "Gerenciador"):
-// arrastar pela barra de título e redimensionar pelas bordas, os dois com ímã
-// nas bordas do monitor e das outras janelas; clique duplo e clique do meio
-// (fechar) na barra.
+// Memo — behaviour shared by the frameless windows (note and manager):
+// dragging by the titlebar and resizing by the edges, both snapping to the
+// monitor edges and other windows; double click and middle click (close) on
+// the titlebar.
 
 window.MemoChrome = {
   attach({ frame, titlebar, grip, onDoubleClick, onClose }) {
     const { invoke } = window.__TAURI__.core;
     const appWindow = window.__TAURI__.window.getCurrentWindow();
 
-    // Arraste feito aqui (e não pelo sistema, com startDragging) para a janela
-    // ir grudando nas bordas do monitor e nas outras janelas durante o
-    // movimento: cada posição passa pelo drag_to do Rust, que aplica o ímã.
+    // Dragging is done here (not by the OS, with startDragging) so the window
+    // snaps to monitor edges and other windows during the move: each position
+    // goes through Rust's drag_to, which applies the snapping.
     let drag = null;
     const cancelDrag = () => { drag = null; };
 
-    // Uma chamada ao Rust por vez; se o mouse andou nesse meio-tempo, vai só a
-    // posição mais recente. A última posição é enviada mesmo depois de soltar.
+    // One call to Rust at a time; if the mouse moved meanwhile, only the latest
+    // position is sent. The final position is sent even after release.
     function pumpDrag(d) {
       if (d.busy || !d.origin || !d.target) return;
       const [dx, dy] = d.target;
@@ -30,7 +30,7 @@ window.MemoChrome = {
     }
 
     titlebar.addEventListener('mousedown', (e) => {
-      if (e.button === 1) { e.preventDefault(); return; } // sem rolagem automática
+      if (e.button === 1) { e.preventDefault(); return; } // no autoscroll
       if (e.button !== 0 || e.target.closest('button, input')) return;
       e.preventDefault();
       if (e.detail === 2 && onDoubleClick) { cancelDrag(); onDoubleClick(); }
@@ -38,7 +38,7 @@ window.MemoChrome = {
 
     titlebar.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || e.target.closest('button, input')) return;
-      titlebar.setPointerCapture(e.pointerId); // segue o mouse mesmo fora da janela
+      titlebar.setPointerCapture(e.pointerId); // follow the mouse even outside the window
       const d = { sx: e.screenX, sy: e.screenY, origin: null, scale: 1, target: null, busy: false, moved: false };
       drag = d;
       Promise.all([appWindow.outerPosition(), appWindow.scaleFactor()]).then(([pos, scale]) => {
@@ -52,7 +52,7 @@ window.MemoChrome = {
       if (!drag) return;
       const dx = e.screenX - drag.sx;
       const dy = e.screenY - drag.sy;
-      if (!drag.moved && Math.hypot(dx, dy) < 3) return; // clique, não arraste
+      if (!drag.moved && Math.hypot(dx, dy) < 3) return; // a click, not a drag
       drag.moved = true;
       drag.target = [dx, dy];
       pumpDrag(drag);
@@ -62,17 +62,16 @@ window.MemoChrome = {
     titlebar.addEventListener('pointercancel', cancelDrag);
     titlebar.addEventListener('lostpointercapture', cancelDrag);
 
-    // Clique do meio (botão da rodinha) fecha, como uma aba do navegador.
+    // Middle click (wheel button) closes, like a browser tab.
     titlebar.addEventListener('auxclick', (e) => {
       if (e.button !== 1 || e.target.closest('input')) return;
       e.preventDefault();
       onClose();
     });
 
-    // Redimensionar: alças finas nas bordas e cantos (mais a alça visível do
-    // canto inferior direito). O redimensionamento nativo está desligado, e
-    // cada tamanho passa pelo resize_to do Rust, que aplica o ímã nas bordas
-    // que estão se mexendo.
+    // Resizing: thin handles on the edges and corners (plus the visible grip
+    // in the bottom-right corner). Native resizing is off, and each size goes
+    // through Rust's resize_to, which snaps the edges being moved.
     let resize = null;
 
     function pumpResize(r) {

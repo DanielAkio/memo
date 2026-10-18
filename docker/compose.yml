@@ -1,7 +1,7 @@
-# Gera o instalador do Windows em dist/:
+# Builds the Windows installer into dist/:
 #   docker compose -f docker/compose.yml run --rm windows
-# node_modules, target e os caches ficam em volumes, para não misturar com os
-# arquivos do Windows e para os builds seguintes não recompilarem tudo.
+# node_modules, target and the caches live in volumes, so they don't mix with
+# the host's files and later builds don't recompile everything.
 name: memo
 
 services:
@@ -26,7 +26,7 @@ services:
         npx tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
         mkdir -p dist
         cp src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe dist/
-        echo "Instalador em dist/:" && ls dist/*-setup.exe
+        echo "Installer in dist/:" && ls dist/*-setup.exe
 
 volumes:
   node_modules:
