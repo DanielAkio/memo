@@ -12,10 +12,6 @@ window.MemoI18n = (() => {
       pin: 'Fixar acima de tudo',
       unpin: 'Desafixar',
       newNote: 'Nova memória',
-      collapseNote: 'Recolher memória',
-      expandNote: 'Expandir memória',
-      collapse: 'Recolher',
-      expand: 'Expandir',
       closeNote: 'Fechar memória',
       closeToTrash: 'Fechar (vai para a lixeira)',
       close: 'Fechar',
@@ -111,8 +107,10 @@ window.MemoI18n = (() => {
       importedOne: '1 memória importada.',
       importedMany: '{n} memórias importadas.',
       application: 'Aplicativo',
-      helpAndQuit: 'Ajuda e saída',
-      howTo: 'Como usar o Memo',
+      exit: 'Saída',
+      tabHelp: 'Ajuda',
+      helpIntro: 'Como usar o Memo.',
+      openWelcome: 'Abrir a memória de boas-vindas',
       quit: 'Sair do Memo',
       quitConfirm: 'Clique de novo para sair',
     },
@@ -120,10 +118,6 @@ window.MemoI18n = (() => {
       pin: 'Keep on top',
       unpin: 'Unpin',
       newNote: 'New memory',
-      collapseNote: 'Collapse memory',
-      expandNote: 'Expand memory',
-      collapse: 'Collapse',
-      expand: 'Expand',
       closeNote: 'Close memory',
       closeToTrash: 'Close (moves to trash)',
       close: 'Close',
@@ -215,8 +209,10 @@ window.MemoI18n = (() => {
       importedOne: '1 memory imported.',
       importedMany: '{n} memories imported.',
       application: 'App',
-      helpAndQuit: 'Help and quit',
-      howTo: 'How to use Memo',
+      exit: 'Exit',
+      tabHelp: 'Help',
+      helpIntro: 'How to use Memo.',
+      openWelcome: 'Open the welcome memory',
       quit: 'Quit Memo',
       quitConfirm: 'Click again to quit',
     },
@@ -270,6 +266,160 @@ window.MemoI18n = (() => {
     ],
   };
 
+  // Help tab content: groups of [topic, how, demo?]. In "how", {{…}} is a key
+  // or something to type (shown as <kbd>; Mod = Ctrl, or ⌘ on macOS). "demo"
+  // is an optional example drawn like the real thing (manager.js, renderHelp):
+  // static HTML using the note editor's markup (b, i, u, .hl, .sz-2/.sz-5,
+  // .check, .bullet, code, pre.code[data-lang] — highlighted with Prism),
+  // <i data-icon="…"> for titlebar icons and the .demo-* classes in
+  // manager.css for small mock-ups of the window chrome.
+  const HELP = {
+    pt: [
+      {
+        title: 'Básico',
+        items: [
+          ['Fixar por cima', 'Clique na tachinha, à esquerda na barra de título, ou {{Mod+Shift+P}}.',
+            '<span class="demo-row"><span class="demo-pair"><i data-icon="pin"></i><span class="demo-note">solta</span></span>'
+            + '<span class="demo-pair"><i data-icon="pin-on"></i><span class="demo-note">fixada por cima de tudo</span></span></span>'],
+          ['Nova memória', 'Botão + na barra, {{Mod+N}} ou o ícone do Memo na bandeja.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
+            + '<span class="demo-name">Lista de compras</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
+          ['Título', 'Clique duplo na barra de título; {{Enter}} salva e {{Esc}} cancela.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
+            + '<span class="demo-input">Lista de compras</span></span>'],
+          ['Cor', 'Clique na bolinha colorida ao lado do título. "Personalizada" abre qualquer cor.',
+            '<span class="demo-dots"><span class="demo-dot" data-color="yellow"></span><span class="demo-dot" data-color="green"></span>'
+            + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
+            + '<span class="demo-dot" data-color="iris"></span><span class="demo-dot" data-color="lavender"></span>'
+            + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot demo-rainbow"></span><span class="demo-dot" data-color=""></span></span>'],
+          ['Mover e redimensionar', 'Arraste pela barra de título ou pelas bordas. Perto da borda da tela ou de outra memória, ela gruda.'],
+          ['Fechar', 'Botão ✕ ou clique do meio na barra de título: a memória vai para a lixeira.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
+            + '<span class="demo-name">Lista de compras</span><i data-icon="plus"></i><i data-icon="close" class="demo-hot"></i></span>'],
+        ],
+      },
+      {
+        title: 'Escrever',
+        items: [
+          ['Formatação', 'Selecione um trecho e use a barrinha que aparece, ou {{Mod+B}}, {{Mod+I}} e {{Mod+U}}.',
+            '<b>negrito</b>, <i>itálico</i> e <u>sublinhado</u>'],
+          ['Marca-texto', '{{Mod+Shift+H}} ou o marcador na barrinha.',
+            'Um <span class="hl">trecho importante</span> no meio do texto.'],
+          ['Tamanho do texto', 'Botões "A" na barrinha, ou {{Mod+Shift+>}} e {{Mod+Shift+<}}.',
+            '<span class="sz-2">pequeno</span> · normal · <span class="sz-5">grande</span>'],
+          ['Checklist', 'Digite {{[]}} no começo da linha. Clique na caixa para marcar.',
+            '<div class="check done">Comprar café</div><div class="check">Ligar para o dentista</div>'],
+          ['Marcadores', 'Digite {{-}} e espaço no começo da linha.',
+            '<div class="bullet">Frutas</div><div class="bullet">Verduras</div>'],
+          ['Recuo de itens', '{{Tab}} recua e {{Shift+Tab}} volta. {{Enter}} num item vazio sai da lista.',
+            '<div class="bullet">Viagem</div><div class="check done" data-level="1">reservar hotel</div>'
+            + '<div class="check" data-level="1">renovar passaporte</div>'],
+          ['Código na linha', 'Texto entre crases, como {{`código`}}, ou {{Mod+E}}.',
+            'Rode <code>npm run dev</code> no terminal.'],
+          ['Bloco de código', 'Digite {{```}} (ou {{```sql}}) e {{Enter}}. Passe o mouse sobre o bloco para escolher a linguagem. {{Enter}} numa linha vazia no fim sai do bloco.',
+            '<pre class="code" data-lang="sql">select titulo\nfrom memorias\nwhere fixada = true; -- só as fixadas</pre>'],
+          ['Colar', 'O texto colado entra sempre sem formatação.'],
+        ],
+      },
+      {
+        title: 'Gerenciador de Memórias',
+        items: [
+          ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
+          ['Buscar', 'Campo de busca nas abas Memórias e Lixeira, ou {{Mod+F}}.',
+            '<span class="demo-field"><i data-icon="search"></i>compras</span>'],
+          ['Ordenar', 'Caixa ao lado da busca: mais recentes ou título (A–Z).',
+            '<span class="demo-field"><i data-icon="sort"></i>Mais recentes</span>'
+            + '<span class="demo-field"><i data-icon="sort"></i>Título (A–Z)</span>'],
+          ['Lixeira', 'Restaure ou exclua de vez. Memórias com mais de 30 dias na lixeira são apagadas.',
+            '<span class="demo-list-row"><span class="demo-dot" data-color="coral"></span>'
+            + '<span class="demo-name">Rascunho antigo</span><span class="demo-meta">some em 29 dias</span></span>'],
+        ],
+      },
+      {
+        title: 'Configurações',
+        items: [
+          ['Aparência', 'Tema (sistema, claro ou escuro) e idioma.',
+            '<span class="demo-seg"><span>Sistema</span><span class="on">Claro</span><span>Escuro</span></span>'],
+          ['Padrão', 'Cor, título e texto com que as memórias novas começam.'],
+          ['Armazenamento', 'Pasta onde as memórias ficam salvas (uma pasta do Dropbox ou OneDrive leva para outros computadores) e backup: exportar e importar.'],
+          ['Sair', 'Fechar as memórias não encerra o app, que continua na bandeja. Use "Sair do Memo" na bandeja ou em Configurações.'],
+        ],
+      },
+    ],
+    en: [
+      {
+        title: 'Basics',
+        items: [
+          ['Keep on top', 'Click the pin on the left of the titlebar, or {{Mod+Shift+P}}.',
+            '<span class="demo-row"><span class="demo-pair"><i data-icon="pin"></i><span class="demo-note">loose</span></span>'
+            + '<span class="demo-pair"><i data-icon="pin-on"></i><span class="demo-note">pinned on top of everything</span></span></span>'],
+          ['New memory', 'The + button in the titlebar, {{Mod+N}} or the Memo tray icon.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
+            + '<span class="demo-name">Shopping list</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
+          ['Title', 'Double-click the titlebar; {{Enter}} saves and {{Esc}} cancels.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
+            + '<span class="demo-input">Shopping list</span></span>'],
+          ['Color', 'Click the colored dot next to the title. "Custom" opens any color.',
+            '<span class="demo-dots"><span class="demo-dot" data-color="yellow"></span><span class="demo-dot" data-color="green"></span>'
+            + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
+            + '<span class="demo-dot" data-color="iris"></span><span class="demo-dot" data-color="lavender"></span>'
+            + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot demo-rainbow"></span><span class="demo-dot" data-color=""></span></span>'],
+          ['Move and resize', 'Drag by the titlebar or the edges. Near a screen edge or another memory, it snaps.'],
+          ['Close', 'The ✕ button or a middle click on the titlebar: the memory goes to the trash.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
+            + '<span class="demo-name">Shopping list</span><i data-icon="plus"></i><i data-icon="close" class="demo-hot"></i></span>'],
+        ],
+      },
+      {
+        title: 'Writing',
+        items: [
+          ['Formatting', 'Select some text and use the bar that appears, or {{Mod+B}}, {{Mod+I}} and {{Mod+U}}.',
+            '<b>bold</b>, <i>italic</i> and <u>underline</u>'],
+          ['Highlight', '{{Mod+Shift+H}} or the marker in the bar.',
+            'An <span class="hl">important bit</span> in the middle of the text.'],
+          ['Text size', 'The "A" buttons in the bar, or {{Mod+Shift+>}} and {{Mod+Shift+<}}.',
+            '<span class="sz-2">small</span> · normal · <span class="sz-5">large</span>'],
+          ['Checklist', 'Type {{[]}} at the start of a line. Click the box to check it.',
+            '<div class="check done">Buy coffee</div><div class="check">Call the dentist</div>'],
+          ['Bullets', 'Type {{-}} and a space at the start of a line.',
+            '<div class="bullet">Fruit</div><div class="bullet">Vegetables</div>'],
+          ['Indenting items', '{{Tab}} indents and {{Shift+Tab}} outdents. {{Enter}} on an empty item leaves the list.',
+            '<div class="bullet">Trip</div><div class="check done" data-level="1">book the hotel</div>'
+            + '<div class="check" data-level="1">renew passport</div>'],
+          ['Inline code', 'Text between backticks, like {{`code`}}, or {{Mod+E}}.',
+            'Run <code>npm run dev</code> in the terminal.'],
+          ['Code block', 'Type {{```}} (or {{```sql}}) and {{Enter}}. Hover over the block to pick its language. {{Enter}} on an empty last line leaves the block.',
+            '<pre class="code" data-lang="sql">select title\nfrom memories\nwhere pinned = true; -- pinned only</pre>'],
+          ['Paste', 'Pasted text always comes in without formatting.'],
+        ],
+      },
+      {
+        title: 'Memory Manager',
+        items: [
+          ['Open', 'Opens with the app, or from the Memo tray icon.'],
+          ['Search', 'The search box in the Memories and Trash tabs, or {{Mod+F}}.',
+            '<span class="demo-field"><i data-icon="search"></i>shopping</span>'],
+          ['Sort', 'The box next to the search: most recent or title (A–Z).',
+            '<span class="demo-field"><i data-icon="sort"></i>Most recent</span>'
+            + '<span class="demo-field"><i data-icon="sort"></i>Title (A–Z)</span>'],
+          ['Trash', 'Restore or delete for good. Memories in the trash for over 30 days are deleted.',
+            '<span class="demo-list-row"><span class="demo-dot" data-color="coral"></span>'
+            + '<span class="demo-name">Old draft</span><span class="demo-meta">deleted in 29 days</span></span>'],
+        ],
+      },
+      {
+        title: 'Settings',
+        items: [
+          ['Appearance', 'Theme (system, light or dark) and language.',
+            '<span class="demo-seg"><span>System</span><span class="on">Light</span><span>Dark</span></span>'],
+          ['Defaults', 'Color, title and text that new memories start with.'],
+          ['Storage', 'Folder where memories are saved (a Dropbox or OneDrive folder takes them to other computers) and backup: export and import.'],
+          ['Quit', 'Closing memories doesn’t quit the app, which stays in the tray. Use "Quit Memo" in the tray or in Settings.'],
+        ],
+      },
+    ],
+  };
+
   let lang = 'pt';
 
   function t(key, vars) {
@@ -302,5 +452,7 @@ window.MemoI18n = (() => {
     return list[Math.floor(Math.random() * list.length)];
   };
 
-  return { t, set, apply, locale, placeholder, get lang() { return lang; } };
+  const help = () => HELP[lang];
+
+  return { t, set, apply, locale, placeholder, help, get lang() { return lang; } };
 })();

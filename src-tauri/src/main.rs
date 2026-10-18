@@ -12,15 +12,15 @@ use std::{
 };
 
 use store::{
-    is_valid_color, now_ms, Config, ManagerState, Note, Store, COLLAPSED_H, DEFAULT_H,
-    DEFAULT_TEXT_MAX, DEFAULT_W, LANGUAGES, THEMES, TITLE_MAX,
+    is_valid_color, now_ms, Config, ManagerState, Note, Store, DEFAULT_H, DEFAULT_TEXT_MAX,
+    DEFAULT_W, LANGUAGES, THEMES, TITLEBAR_H, TITLE_MAX,
 };
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
-    Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, RunEvent, State, Theme,
+    WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::{
     DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult,
@@ -95,14 +95,9 @@ fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow
         return Ok(existing);
     }
 
-    let height = if note.collapsed {
-        COLLAPSED_H
-    } else {
-        note.height
-    };
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("Memo")
-        .inner_size(note.width, height)
+        .inner_size(note.width, note.height)
         .decorations(false)
         // Resized through the page's handles (resize_to), with snapping.
         .resizable(false)
@@ -127,7 +122,7 @@ fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow
 }
 
 /// Opens the manager window, where notes and the trash are managed. It behaves
-/// like a note (frameless, own titlebar, snapping, pin, collapse) but has no
+/// like a note (frameless, own titlebar, snapping, pin) but has no
 /// title or text. It also holds the theme, help and "Quit".
 fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     if let Some(existing) = app.get_webview_window(MANAGER) {
@@ -138,14 +133,9 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     }
     let store = app.state::<Shared>();
     let state = store.manager();
-    let height = if state.collapsed {
-        COLLAPSED_H
-    } else {
-        state.height
-    };
     let window = WebviewWindowBuilder::new(app, MANAGER, WebviewUrl::App("manager.html".into()))
         .title(manager_title(store.effective_language()))
-        .inner_size(state.width, height)
+        .inner_size(state.width, state.height)
         .decorations(false)
         // Resized through the page's handles (resize_to), with snapping.
         .resizable(false)
@@ -283,22 +273,12 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 }
                 let scale = win.scale_factor().unwrap_or(1.0);
                 let logical = size.to_logical::<f64>(scale);
-                // While collapsed, the saved height stays the expanded one.
-                let keep = |collapsed: bool| !collapsed && logical.height > COLLAPSED_H + 8.0;
                 if note {
                     store.update(&id, |n| {
-                        n.width = logical.width;
-                        if keep(n.collapsed) {
-                            n.height = logical.height;
-                        }
+                        (n.width, n.height) = (logical.width, logical.height)
                     });
                 } else {
-                    store.update_manager(|m| {
-                        m.width = logical.width;
-                        if keep(m.collapsed) {
-                            m.height = logical.height;
-                        }
-                    });
+                    store.update_manager(|m| (m.width, m.height) = (logical.width, logical.height));
                 }
             }
             WindowEvent::ThemeChanged(_) => apply_background(&win, &store.theme()),
@@ -307,11 +287,13 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
     });
 }
 
-/// Opens the welcome note (first run, or "How to use Memo" in the manager).
+/// Opens the welcome note (first run, or the button in the manager's Help tab).
 /// If an untouched copy is already open, just brings it to the front.
 ///
-/// `pos` places the note when it is created (beside the manager).
-fn open_welcome(app: &AppHandle, pos: Option<(i32, i32)>) -> tauri::Result<()> {
+/// `pos` places the note when it is created (beside the manager). `copy` marks
+/// a note reopened from Help: only the first-run one goes to the trash when
+/// closed, copies are deleted (Help can always open another).
+fn open_welcome(app: &AppHandle, pos: Option<(i32, i32)>, copy: bool) -> tauri::Result<()> {
     let store = app.state::<Shared>();
     let existing = store
         .active()
@@ -329,6 +311,7 @@ fn open_welcome(app: &AppHandle, pos: Option<(i32, i32)>) -> tauri::Result<()> {
                     n.html = content.html.into();
                     n.width = welcome::WIDTH;
                     n.height = welcome::HEIGHT;
+                    n.welcome_copy = copy;
                 })
                 .unwrap_or(note)
         }
@@ -507,7 +490,7 @@ fn resize_to(window: WebviewWindow, x: i32, y: i32, w: i32, h: i32, edges: Strin
         MANAGER_MIN_W
     };
     let min_w = (min_w * targets.scale).round() as i32;
-    let min_h = (COLLAPSED_H * targets.scale).round() as i32;
+    let min_h = (TITLEBAR_H * targets.scale).round() as i32;
     if r - l < min_w {
         if edges.contains('w') {
             l = r - min_w;
@@ -551,12 +534,12 @@ fn show_all(app: &AppHandle) {
 }
 
 /// Moves a note to the trash (closing its window, if open). A note nobody
-/// touched (empty, or only the default title and text) is deleted outright so
-/// it doesn't clutter the trash.
+/// touched (empty, or only the default title and text) and a welcome note
+/// reopened from Help are deleted outright so they don't clutter the trash.
 fn trash(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
     match store.get(id) {
-        Some(note) if store.is_pristine(&note) => store.remove(id),
+        Some(note) if note.welcome_copy || store.is_pristine(&note) => store.remove(id),
         Some(_) => {
             store.update(id, |n| n.trashed_at = Some(now_ms()));
         }
@@ -652,28 +635,6 @@ fn set_color(
     Ok(())
 }
 
-/// Collapses the note (or the manager) down to its titlebar.
-#[tauri::command]
-fn set_collapsed(
-    window: WebviewWindow,
-    collapsed: bool,
-    store: State<'_, Shared>,
-) -> Result<(), String> {
-    let (width, expanded) = if is_note(&window) {
-        let note = store
-            .update(&id_of(&window), |n| n.collapsed = collapsed)
-            .ok_or("note not found")?;
-        (note.width, note.height)
-    } else {
-        let state = store.update_manager(|m| m.collapsed = collapsed);
-        (state.width, state.height)
-    };
-    let height = if collapsed { COLLAPSED_H } else { expanded };
-    window
-        .set_size(LogicalSize::new(width, height))
-        .map_err(|e| e.to_string())
-}
-
 // Creating and destroying windows from sync commands can deadlock on
 // Windows, so the commands that do so are async.
 #[tauri::command]
@@ -729,7 +690,7 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     // Several "+" in a row on the same note would all land on the same spot:
     // if a note is already there, step down (titlebar + slack) until a free
     // spot is found, so they all stay visible.
-    let step = ((COLLAPSED_H + 8.0) * scale).round() as i32;
+    let step = ((TITLEBAR_H + 8.0) * scale).round() as i32;
     let taken: Vec<PhysicalPosition<i32>> = parent
         .app_handle()
         .webview_windows()
@@ -758,7 +719,7 @@ async fn trash_note(app: AppHandle, window: WebviewWindow) {
 // Manager commands
 // ---------------------------------------------------------------------------
 
-/// Manager window state (pinned, collapsed) on open.
+/// Manager window state (pinned) on open.
 #[tauri::command]
 fn load_manager(store: State<'_, Shared>) -> ManagerState {
     store.manager()
@@ -855,10 +816,10 @@ fn change_theme(app: AppHandle, theme: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Reopens the welcome note ("How to use Memo").
+/// Reopens the welcome note (button in the manager's Help tab).
 #[tauri::command]
 async fn show_welcome(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
-    open_welcome(&app, beside(&window)).map_err(|e| e.to_string())
+    open_welcome(&app, beside(&window), true).map_err(|e| e.to_string())
 }
 
 /// Quits the app (the only way out: closing the notes doesn't quit).
@@ -1307,7 +1268,6 @@ fn main() {
             save_text,
             set_pinned,
             set_color,
-            set_collapsed,
             set_title,
             new_note,
             trash_note,
@@ -1369,7 +1329,7 @@ fn main() {
             let notes = store.active();
             if store.is_first_run() {
                 let pos = handle.get_webview_window(MANAGER).and_then(|m| beside(&m));
-                open_welcome(&handle, pos)?;
+                open_welcome(&handle, pos, false)?;
             } else if notes.is_empty() {
                 create_and_open(&handle, None)?;
             } else {

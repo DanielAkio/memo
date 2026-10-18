@@ -9,7 +9,7 @@
 </head>
 <body>
   <!-- Manager window: notes and trash management. Same titlebar as the notes
-       (pin, new note, collapse, close), with no editable title. -->
+       (pin, new note, close), with no editable title. -->
   <div class="frame" id="frame" data-color="">
     <header class="titlebar" id="titlebar">
       <button class="icon-btn pin" id="pinBtn" type="button" aria-pressed="false">
@@ -26,9 +26,6 @@
       <div class="actions">
         <button class="icon-btn" id="newBtn" type="button" data-i18n-attr="aria-label=newNote">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
-        </button>
-        <button class="icon-btn collapse" id="collapseBtn" type="button" aria-label="Recolher">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 9.75 8 6.25l3.5 3.5"/></svg>
         </button>
         <button class="icon-btn close" id="closeBtn" type="button" data-i18n-attr="aria-label=close,title=close">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
@@ -47,6 +44,9 @@
           </button>
           <button type="button" class="tab" role="tab" id="tabSettings" data-view="settings" aria-selected="false">
             <span data-i18n="tabSettings"></span>
+          </button>
+          <button type="button" class="tab" role="tab" id="tabHelp" data-view="help" aria-selected="false">
+            <span data-i18n="tabHelp"></span>
           </button>
         </div>
       </header>
@@ -157,13 +157,22 @@
         </div>
         <h2 class="settings-title" data-i18n="application"></h2>
         <div class="setting">
-          <span class="setting-label" data-i18n="helpAndQuit"></span>
+          <span class="setting-label" data-i18n="exit"></span>
           <div class="app-actions">
-            <button type="button" class="btn" id="helpBtn" data-i18n="howTo"></button>
             <button type="button" class="btn danger" id="quitBtn" data-i18n="quit"></button>
           </div>
         </div>
         <input type="color" class="custom-color" id="customColor" tabindex="-1" aria-hidden="true">
+      </section>
+
+      <!-- Help tab: how to use Memo, grouped by topic. The groups come from
+           MemoI18n.help() and are rendered by manager.js (renderHelp). -->
+      <section class="settings help" id="helpView" hidden>
+        <div class="help-top">
+          <p class="help-intro" data-i18n="helpIntro"></p>
+          <button type="button" class="btn" id="helpBtn" data-i18n="openWelcome"></button>
+        </div>
+        <div id="helpGroups"></div>
       </section>
     </div>
 
@@ -174,6 +183,7 @@
 
   <script src="i18n.js"></script>
   <script src="chrome.js"></script>
+  <script src="vendor/prism.js" data-manual></script>
   <script src="manager.js"></script>
 </body>
 </html>

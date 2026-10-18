@@ -19,7 +19,7 @@ body {
   color: var(--color-mist);
 }
 
-/* Everything below the titlebar; hidden when the window is collapsed. */
+/* Everything below the titlebar. */
 .mgr-body {
   flex: 1;
   min-height: 0;
@@ -27,8 +27,6 @@ body {
   flex-direction: column;
   border-top: 1px solid var(--color-graphite);
 }
-.is-collapsed .mgr-body,
-.is-collapsed .grip { display: none; }
 
 /* ------------------------------------------------------------------- top */
 
@@ -310,15 +308,25 @@ body {
 }
 
 .setting {
+  position: relative; /* anchors the tooltip of an "i" in its label */
   display: flex;
+  flex-wrap: wrap; /* on a narrow window the control drops below its label */
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   min-height: 44px;
   padding: 6px 0;
 }
-.setting-label { width: 132px; flex: none; color: var(--color-mist); font-size: 13px; }
+.setting-label { width: 104px; flex: none; color: var(--color-mist); font-size: 13px; }
 .setting-top { align-items: flex-start; }
 .setting-top .setting-label { padding-top: 6px; }
+/* Narrow window: same as the Help tab — the label goes above its control,
+   which gets the full width. */
+@media (max-width: 460px) {
+  .setting { flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 0; }
+  .setting-label { width: auto; font-weight: 500; }
+  .setting-top .setting-label { padding-top: 0; }
+  .setting .field-wrap { align-self: stretch; }
+}
 
 /* Text fields (default title and text for new notes). */
 .field-wrap { flex: 1; min-width: 0; }
@@ -374,10 +382,11 @@ textarea.field { resize: vertical; min-height: 84px; }
 .select option { background: var(--color-obsidian); color: var(--color-mist); }
 .field::placeholder { color: var(--color-ash); }
 .field:focus { box-shadow: inset 0 0 0 1px var(--color-smoke); }
-/* "i" icon next to a section title; the text shows in a tooltip. */
-.settings-title { display: flex; align-items: center; gap: 6px; }
+/* "i" icon next to a section title or a setting label; the text shows in a
+   tooltip that opens below the whole title/row (its positioned ancestor), as
+   wide as the row allows, so it never runs past the window's right edge. */
+.settings-title { position: relative; display: flex; align-items: center; gap: 6px; }
 .info {
-  position: relative;
   display: inline-grid;
   place-items: center;
   width: 14px;
@@ -396,12 +405,11 @@ textarea.field { resize: vertical; min-height: 84px; }
 .info::after {
   content: attr(data-tip);
   position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
+  left: 0;
+  top: calc(100% + 4px);
   z-index: 40;
   width: max-content;
-  max-width: 240px;
+  max-width: min(320px, 100%);
   padding: 6px 8px;
   border-radius: var(--radius-button);
   background: var(--color-obsidian);
@@ -443,6 +451,247 @@ textarea.field { resize: vertical; min-height: 84px; }
 .seg:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
 
 .app-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ------------------------------------------------------------ Help tab */
+
+.help { user-select: text; -webkit-user-select: text; }
+.help-top { /* the intro line, with the welcome-memory button below it */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+.help-intro {
+  margin: 0;
+  color: var(--color-fog);
+  line-height: 1.5;
+}
+/* Same dividers between groups as the Settings tab. */
+#helpGroups > .settings-title {
+  margin-top: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-graphite);
+}
+.help-list {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr); /* examples may shrink, never widen the tab */
+  gap: 10px 12px;
+  margin: 0;
+  padding: 6px 0;
+}
+.help-list dt { color: var(--color-mist); line-height: 1.5; }
+.help-list dd { min-width: 0; margin: 0; color: var(--color-fog); line-height: 1.5; }
+/* Narrow window: the topic goes above its text, and examples get the full
+   width instead of being squeezed into the right column. */
+@media (max-width: 460px) {
+  .help-list { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
+  .help-list dt { margin-top: 10px; font-weight: 500; }
+  .help-list dt:first-child { margin-top: 0; }
+}
+/* Examples under a help item, drawn like the note editor and window chrome
+   (same tokens as styles.css / base.css, at the manager's smaller scale). */
+.help-demo {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-button);
+  background: var(--color-carbon);
+  box-shadow: var(--hairline);
+  color: var(--color-mist);
+  font-size: 13px;
+  line-height: 1.6;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.help-demo b { font-weight: 700; color: var(--color-paper); }
+.help-demo u { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.help-demo .hl {
+  background: var(--highlight);
+  border-radius: 2px;
+}
+.help-demo .sz-2 { font-size: 11px; }
+.help-demo .sz-5 { font-size: 17px; }
+.help-demo code {
+  padding: 1px 5px;
+  border-radius: var(--radius-badge);
+  background: var(--overlay-active);
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+.help-demo pre.code {
+  position: relative;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-button);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.help-demo pre.code[data-lang]::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ash);
+}
+/* Checklist and bullets, as in the editor (styles.css .check / .bullet). */
+.help-demo .check,
+.help-demo .bullet { position: relative; padding-left: 22px; }
+.help-demo [data-level="1"] { margin-left: 20px; }
+.help-demo .check::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: calc(0.8em - 6px);
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-badge);
+  box-shadow: inset 0 0 0 1.5px var(--color-ash);
+}
+.help-demo .check.done::before { background: var(--color-fog); box-shadow: none; }
+.help-demo .check.done::after {
+  content: "";
+  position: absolute;
+  left: 5.5px;
+  top: calc(0.8em - 4px);
+  width: 3px;
+  height: 6px;
+  transform: rotate(45deg);
+  border: solid var(--color-void);
+  border-width: 0 1.5px 1.5px 0;
+}
+.help-demo .check.done {
+  color: var(--color-ash);
+  text-decoration: line-through;
+}
+.help-demo .bullet::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: calc(0.8em - 3px);
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--color-fog);
+}
+
+/* Window chrome mock-ups: a titlebar, colour dots, fields, a list row. */
+.help-demo .icon-btn { display: inline-grid; width: 26px; height: 26px; vertical-align: middle; }
+.help-demo .icon-btn svg { width: 15px; height: 15px; }
+.help-demo .pin { opacity: 1; }
+.help-demo .demo-hot { background: var(--overlay-active); color: var(--color-paper); }
+.demo-row,
+.demo-dots { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.demo-pair { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; }
+.demo-note { color: var(--color-fog); font-size: 12px; }
+.demo-bar,
+.demo-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+  height: 32px;
+  padding: 0 4px;
+}
+.demo-bar { border-radius: var(--radius-button); background: var(--color-obsidian); box-shadow: var(--hairline); }
+.demo-bar .demo-name { flex: 1; }
+.demo-list-row { padding: 0 6px; }
+.demo-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  color: var(--color-mist);
+}
+.demo-input {
+  flex: 1;
+  padding: 0 6px;
+  border-radius: var(--radius-badge);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+  color: var(--color-paper);
+  font-weight: 500;
+  line-height: 24px;
+}
+.demo-input::after { /* a caret after the text */
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  margin-left: 1px;
+  vertical-align: -2px;
+  background: var(--color-paper);
+}
+.demo-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--note-color);
+}
+.demo-dot[data-color=""] { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.demo-rainbow { background: conic-gradient(#eb5757, #f2c94c, #27a644, #02b8cc, #6366f1, #8b5cf6, #eb5757); }
+.demo-meta { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-ash); }
+.demo-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-right: 8px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-button);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+  color: var(--color-mist);
+}
+.demo-field .icon-btn { width: auto; height: auto; }
+.demo-field svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--color-ash);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.demo-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+}
+.demo-seg span {
+  padding: 2px 12px;
+  border-radius: var(--radius-button);
+  color: var(--color-fog);
+  font-size: 12px;
+  font-weight: 500;
+}
+.demo-seg .on { background: var(--overlay-active); color: var(--color-paper); }
+
+.help-list kbd {
+  padding: 1px 5px;
+  border-radius: var(--radius-badge);
+  background: var(--overlay-active);
+  box-shadow: var(--hairline);
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
 
 /* Result of the last export/import, under the buttons. */
 .storage-status {

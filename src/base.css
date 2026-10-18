@@ -277,7 +277,7 @@ html, body {
 .is-focused .titlebar .actions,
 .frame:hover .titlebar .actions,
 .menu-open .titlebar .actions {
-  max-width: 96px; /* 3 × 28px buttons + 2 × 2px gaps, with slack */
+  max-width: 64px; /* 2 × 28px buttons + 2px gap, with slack */
   margin-left: 0;
 }
 .pin { opacity: 0.55; }
@@ -293,13 +293,8 @@ html, body {
 .pin[aria-pressed="true"] .pin-body { fill: currentColor; }
 .pin .pin-needle { stroke-width: 1.6; }
 
-/* Up arrow = collapse; when collapsed it points down = expand. */
-.collapse svg { transition: transform 160ms ease; }
-.is-collapsed .collapse svg { transform: rotate(180deg); }
-
 /* Resize handles (created by chrome.js): thin strips on the edges and squares
-   in the corners, invisible, cursor only. When collapsed, the window only
-   changes width. */
+   in the corners, invisible, cursor only. */
 .rs { position: absolute; z-index: 30; }
 .rs-n, .rs-s { left: 8px; right: 8px; height: 4px; cursor: ns-resize; }
 .rs-e, .rs-w { top: 8px; bottom: 8px; width: 4px; cursor: ew-resize; }
@@ -312,9 +307,6 @@ html, body {
 .rs-sw { bottom: 0; left: 0; cursor: nesw-resize; }
 .rs-nw { top: 0; left: 0; cursor: nwse-resize; }
 .rs-se { bottom: 0; right: 0; cursor: nwse-resize; }
-.is-collapsed .rs-n, .is-collapsed .rs-s,
-.is-collapsed .rs-ne, .is-collapsed .rs-nw, .is-collapsed .rs-se, .is-collapsed .rs-sw { display: none; }
-.is-collapsed .rs-e, .is-collapsed .rs-w { top: 0; bottom: 0; }
 
 /* Visible grip in the bottom-right corner. */
 .grip {
@@ -330,3 +322,40 @@ html, body {
 }
 .grip svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; }
 .grip:hover { color: var(--color-fog); }
+
+/* ---------------------------------------------------- syntax highlighting */
+
+/* Prism tokens, in the note's code blocks and the Help tab's examples.
+   Colours only: in the note, bold/italic could change glyph widths and
+   misalign the highlighted copy with the text underneath. */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata { color: var(--code-comment); }
+.token.punctuation,
+.token.operator { color: var(--code-punct); }
+.token.keyword,
+.token.atrule,
+.token.important,
+.token.rule { color: var(--code-keyword); }
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex,
+.token.url,
+.token.inserted { color: var(--code-string); }
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol { color: var(--code-number); }
+.token.function,
+.token.class-name,
+.token.builtin { color: var(--code-function); }
+.token.tag,
+.token.selector,
+.token.property,
+.token.deleted { color: var(--code-tag); }
+.token.attr-name,
+.token.variable,
+.token.title,
+.token.key { color: var(--code-attr); }

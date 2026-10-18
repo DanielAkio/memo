@@ -1,5 +1,5 @@
 //! Welcome note, created the first time the app opens (and reopened by
-//! "How to use Memo"), in the app's language.
+//! the button in the manager's Help tab), in the app's language.
 //!
 //! The content comes in both formats a note stores: `html` (what the editor
 //! shows, using only tags that app.js's `sanitize` keeps) and `text` (the same

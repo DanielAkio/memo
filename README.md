@@ -22,13 +22,12 @@ The interface is available in English and Portuguese.
 | Colour, title and text for new memories | Memory Manager → Settings → Defaults (the text uses the same editor as a memory: checklist, bullets, code and formatting) |
 | Move | Drag by the titlebar; near a screen edge or another memory, it snaps |
 | Resize | By the edges or the bottom-right corner; near a screen edge or another memory, the edge snaps |
-| Collapse / expand to the titlebar | The arrow button next to `✕` |
 | Change the colour (default: yellow) | Click the coloured dot left of the title and pick a colour, or "Custom" for any colour |
 | Language (Portuguese / English) | Memory Manager → Settings → Language: System (default), Português or English |
 | Folder where memories are saved | Memory Manager → Settings → Storage → Change… |
 | Back up / restore memories | Memory Manager → Settings → Storage → Export… (a `.json` with every memory not in the trash) / Import… (adds the file's memories; an existing one is only replaced if the file's copy is newer) |
 | Light / dark theme | Memory Manager → Settings → Theme: System (default), Light or Dark |
-| See the first memory's tips again | Memory Manager → Settings → How to use Memo |
+| Help, shortcuts and the welcome memory | Memory Manager → Help: a guide to every feature, and a button that reopens the welcome memory |
 | Show all memories | Tray icon (menu bar on macOS) |
 | Quit | Tray icon → Quit Memo, or Memory Manager → Settings → Quit Memo |
 

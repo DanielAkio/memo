@@ -17,7 +17,8 @@ use std::{
 
 pub const DEFAULT_W: f64 = 300.0;
 pub const DEFAULT_H: f64 = 320.0;
-pub const COLLAPSED_H: f64 = 36.0;
+/// Titlebar height (matches `--titlebar-h` in CSS): the minimum window height.
+pub const TITLEBAR_H: f64 = 36.0;
 
 /// Accepted colour labels (empty = no colour).
 pub const COLORS: [&str; 8] = [
@@ -61,16 +62,18 @@ pub struct Note {
     /// Physical position (screen pixels) of the top-left corner.
     pub x: Option<i32>,
     pub y: Option<i32>,
-    /// Logical size; `height` is always the expanded height.
+    /// Logical size.
     pub width: f64,
     pub height: f64,
     pub pinned: bool,
     pub color: String,
-    pub collapsed: bool,
     pub created_at: u64,
     pub updated_at: u64,
     /// When it was trashed; `None` = active note.
     pub trashed_at: Option<u64>,
+    /// A welcome note reopened from the Help tab (not the first-run one):
+    /// closing it deletes it instead of trashing it.
+    pub welcome_copy: bool,
 }
 
 impl Note {
@@ -93,10 +96,10 @@ impl Default for Note {
             height: DEFAULT_H,
             pinned: false,
             color: DEFAULT_COLOR.to_string(),
-            collapsed: false,
             created_at: 0,
             updated_at: 0,
             trashed_at: None,
+            welcome_copy: false,
         }
     }
 }
@@ -130,11 +133,10 @@ pub struct ManagerState {
     /// Physical position of the top-left corner; `None` = centred.
     pub x: Option<i32>,
     pub y: Option<i32>,
-    /// Logical size; `height` is always the expanded height.
+    /// Logical size.
     pub width: f64,
     pub height: f64,
     pub pinned: bool,
-    pub collapsed: bool,
 }
 
 impl Default for ManagerState {
@@ -145,7 +147,6 @@ impl Default for ManagerState {
             width: 560.0,
             height: 640.0,
             pinned: false,
-            collapsed: false,
         }
     }
 }

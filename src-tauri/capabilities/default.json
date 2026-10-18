@@ -5,7 +5,6 @@
   "windows": ["note-*", "manager"],
   "permissions": [
     "core:default",
-    "core:window:allow-set-title",
-    "core:window:allow-set-size"
+    "core:window:allow-set-title"
   ]
 }

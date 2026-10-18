@@ -1,6 +1,6 @@
 // Memo — manager window: lists notes and the trash, with search, and holds
 // the settings (theme, language, new-note defaults). The window behaves like a
-// note (titlebar with pin, new note, collapse and close; drag with snapping;
+// note (titlebar with pin, new note and close; drag with snapping;
 // grip), with no editable title or text. Data comes from Rust (list_notes)
 // and the list reloads whenever a note changes ("notes-changed" event).
 
@@ -18,7 +18,6 @@
   const { t } = I18n;
   const frame = $('frame');
   const pinBtn = $('pinBtn');
-  const collapseBtn = $('collapseBtn');
   const list = $('list');
   const empty = $('empty');
   const search = $('search');
@@ -34,8 +33,8 @@
   let view = 'notes';
   let defaultColor = 'yellow';
   let reloadTimer = null;
-  // State of this window itself (pinned, collapsed), saved by Rust.
-  let win = { pinned: false, collapsed: false };
+  // State of this window itself (pinned), saved by Rust.
+  let win = { pinned: false };
 
   // ------------------------------------------------------------ helpers
 
@@ -128,13 +127,14 @@
     emptyTrashBtn.disabled = trashed.length === 0;
     document.body.classList.toggle('notes-view', view === 'notes');
 
-    // Settings tab: no list and no search.
-    const settings = view === 'settings';
-    $('settingsView').hidden = !settings;
-    $('listWrap').hidden = settings;
-    $('searchBox').hidden = settings;
+    // Settings and Help tabs: no list and no search.
+    const panel = view === 'settings' || view === 'help';
+    $('settingsView').hidden = view !== 'settings';
+    $('helpView').hidden = view !== 'help';
+    $('listWrap').hidden = panel;
+    $('searchBox').hidden = panel;
     renderDefaultColor();
-    if (settings) return;
+    if (panel) return;
 
     const q = fold(search.value.trim());
     const source = view === 'notes' ? active : trashed;
@@ -383,7 +383,7 @@
     if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); return; }
     if (mod && key === 'f') {
       e.preventDefault();
-      if (view === 'settings') { view = 'notes'; render(); }
+      if (view === 'settings' || view === 'help') { view = 'notes'; render(); }
       search.focus();
       search.select();
     } else if (e.key === 'Escape' && document.activeElement === search && search.value) {
@@ -400,14 +400,10 @@
   // ------------------------------------------- window (like a note)
 
   function renderWindow() {
-    frame.classList.toggle('is-collapsed', win.collapsed);
     pinBtn.setAttribute('aria-pressed', String(win.pinned));
     const pinLabel = t(win.pinned ? 'unpin' : 'pin');
     pinBtn.setAttribute('aria-label', pinLabel);
     pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
-    const collapseLabel = t(win.collapsed ? 'expand' : 'collapse');
-    collapseBtn.setAttribute('aria-label', collapseLabel);
-    collapseBtn.title = collapseLabel;
   }
 
   async function togglePin() {
@@ -423,22 +419,11 @@
     renderWindow();
   }
 
-  async function toggleCollapse() {
-    win.collapsed = !win.collapsed;
-    renderWindow();
-    try {
-      await invoke('set_collapsed', { collapsed: win.collapsed });
-    } catch (err) {
-      console.error('set_collapsed', err);
-    }
-  }
-
   const newNote = () => invoke('new_note').catch((err) => console.error('new_note', err));
   const closeWindow = () => invoke('close_manager').catch((err) => console.error('close_manager', err));
 
   window.MemoChrome.attach({ frame, titlebar: $('titlebar'), grip: $('grip'), onClose: closeWindow });
   pinBtn.addEventListener('click', togglePin);
-  collapseBtn.addEventListener('click', toggleCollapse);
   $('newBtn').addEventListener('click', newNote);
   $('closeBtn').addEventListener('click', closeWindow);
 
@@ -508,6 +493,71 @@
     }
   });
 
+  // ---------------------------------------------------------------- help
+  // Each group is a title and [topic, how, demo?] items. In "how", {{…}}
+  // marks a key or something to type, shown as <kbd>; "Mod"/"Shift" inside it
+  // become ⌘/⇧ on macOS and Ctrl/Shift elsewhere (keys()). "demo" is a static
+  // example from i18n.js, drawn like the real thing (see demoBox).
+
+  // Titlebar icons for <i data-icon="…"> in the demos (same paths as the
+  // windows' buttons).
+  const PIN_SVG = '<g transform="rotate(45 8 8)"><path class="pin-needle" d="M8 10.4V15"/>'
+    + '<path class="pin-body" d="M5.7 3.6h4.6l.7 5.1H5z"/>'
+    + '<rect class="pin-body" x="3.6" y="8.4" width="8.8" height="2" rx=".9"/>'
+    + '<rect class="pin-body" x="4.9" y="1.6" width="6.2" height="2" rx=".9"/></g>';
+  const DEMO_ICONS = {
+    pin: PIN_SVG,
+    'pin-on': PIN_SVG,
+    plus: '<path d="M8 3.25v9.5M3.25 8h9.5"/>',
+    close: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',
+    search: '<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>',
+    sort: '<path d="M5 3v10M2.75 10.75 5 13l2.25-2.25M11 13V3M8.75 5.25 11 3l2.25 2.25"/>',
+  };
+
+  function helpText(text) {
+    const out = document.createDocumentFragment();
+    text.split(/\{\{(.+?)\}\}/).forEach((part, i) => {
+      if (!part) return;
+      if (i % 2) out.append(el('kbd', '', keys(...part.split(/(?<=.)\+(?=.)/))));
+      else out.append(part);
+    });
+    return out;
+  }
+
+  // The demo HTML is a constant from i18n.js (never user content). Icons are
+  // filled in here, and code blocks are highlighted like in a note.
+  function demoBox(html) {
+    const box = el('div', 'help-demo');
+    box.setAttribute('aria-hidden', 'true');
+    box.innerHTML = html;
+    for (const slot of box.querySelectorAll('i[data-icon]')) {
+      const name = slot.dataset.icon;
+      const btn = el('span', `icon-btn${name.startsWith('pin') ? ' pin' : ''} ${slot.className}`.trim());
+      if (name === 'pin-on') btn.setAttribute('aria-pressed', 'true');
+      btn.append(icon(DEMO_ICONS[name] || ''));
+      slot.replaceWith(btn);
+    }
+    for (const pre of box.querySelectorAll('pre[data-lang]')) {
+      const grammar = window.Prism && window.Prism.languages[pre.dataset.lang];
+      if (grammar) pre.innerHTML = window.Prism.highlight(pre.textContent, grammar, pre.dataset.lang);
+    }
+    return box;
+  }
+
+  function renderHelp() {
+    const groups = I18n.help().map(({ title, items }) => {
+      const list = el('dl', 'help-list');
+      for (const [topic, how, demo] of items) {
+        const dd = el('dd');
+        dd.append(helpText(how));
+        if (demo) dd.append(demoBox(demo));
+        list.append(el('dt', '', topic), dd);
+      }
+      return [el('h2', 'settings-title', title), list];
+    });
+    $('helpGroups').replaceChildren(...groups.flat());
+  }
+
   // ------------------------------------------------------------ language
 
   function applyLanguage(setting, lang) {
@@ -517,6 +567,7 @@
     $('languageSelect').value = setting;
     renderWindow();
     renderMonoName();
+    renderHelp();
     render();
   }
 
@@ -544,7 +595,7 @@
     // defaults may differ, so start over.
     listen('store-replaced', () => location.reload());
     await Promise.all([load(), loadDefaults(), loadDataDir()]);
-    if (!win.collapsed) search.focus();
+    search.focus();
   }
 
   init().catch((err) => console.error('init', err));

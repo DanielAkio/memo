@@ -12,7 +12,6 @@
 
   const { invoke } = TAURI.core;
   const appWindow = TAURI.window.getCurrentWindow();
-  const { LogicalSize } = TAURI.dpi || {};
 
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   const keys = (...parts) => (isMac
@@ -28,7 +27,6 @@
   const pinBtn = $('pinBtn');
   const colorMenu = $('colorMenu');
   const formatBar = $('formatBar');
-  const collapseBtn = $('collapseBtn');
   const colorBtn = $('colorBtn');
   const nameEl = $('noteName');
   const titleInput = $('titleInput');
@@ -38,7 +36,6 @@
   let textDirty = false;
   let titleTimer = null;
   let renaming = false;
-  let colorsGrown = false;
 
   // ------------------------------------------------------------ helpers
 
@@ -81,7 +78,6 @@
     else frame.style.removeProperty('--note-color');
     customSwatch.style.setProperty('--sw', custom ? note.color : '');
     if (!custom) customSwatch.style.removeProperty('--sw');
-    frame.classList.toggle('is-collapsed', note.collapsed);
 
     pinBtn.setAttribute('aria-pressed', String(note.pinned));
     const pinLabel = t(note.pinned ? 'unpin' : 'pin');
@@ -92,9 +88,6 @@
       const checked = sw === customSwatch ? custom : sw.dataset.color === (note.color || '');
       sw.setAttribute('aria-checked', String(checked));
     }
-    const collapseLabel = t(note.collapsed ? 'expandNote' : 'collapseNote');
-    collapseBtn.setAttribute('aria-label', collapseLabel);
-    collapseBtn.title = collapseLabel;
     colorBtn.title = custom
       ? t('colorCustomIs', { hex: note.color })
       : t('colorIs', { name: colorName(note.color || '') });
@@ -109,7 +102,7 @@
     renderName();
   }
 
-  // Name in the titlebar: the title, or "Untitled" (even when collapsed).
+  // Name in the titlebar: the title, or "Untitled".
   function renderName() {
     nameEl.textContent = note.title || t('untitled');
     nameEl.classList.toggle('is-empty', !note.title);
@@ -316,6 +309,7 @@
     editor.replaceChildren(note.html ? sanitize(note.html) : sanitize(fromPlain(note.text)));
     syncCheckSizes();
     renderCode();
+    resetHistory();
   }
 
   // List item (checklist or bullet) whose text is all in one size
@@ -405,7 +399,14 @@
     }
   }
 
-  function onContentChanged() {
+  // After any edit: refresh what derives from the content, save it and record
+  // an undo step (`typing` merges consecutive typing into one step).
+  function onContentChanged(typing = false) {
+    applyContent();
+    recordHistory(typing);
+  }
+
+  function applyContent() {
     syncCheckSizes();
     renderCode();
     note.text = toPlain();
@@ -413,6 +414,109 @@
     note.updatedAt = Date.now();
     renderMeta();
     scheduleSave();
+  }
+
+  // ---------------------------------------------------------------- undo
+  //
+  // Many edits change the DOM directly (inline code, code blocks, checklist
+  // boxes, list levels), which the browser's undo stack never sees, so its
+  // Ctrl+Z skipped or garbled them. The editor keeps its own history instead:
+  // a snapshot (HTML + selection) after every change, restored by Mod+Z,
+  // Mod+Shift+Z / Mod+Y and the context menu's Undo/Redo. Typing within a
+  // second of the last keystroke extends the same step, up to the end of the
+  // word: a space or a line break closes the step (it belongs to the word
+  // before it), so undo goes back word by word.
+
+  const HISTORY_MAX = 200;
+  const TYPING_MS = 1000;
+  let history = [];
+  let historyAt = -1;
+  let lastTyping = 0;
+
+  // Child-index path from the editor to `node`, so a selection can be put
+  // back after the HTML is restored.
+  function nodePath(node) {
+    const path = [];
+    for (let n = node; n !== editor; n = n.parentNode) path.unshift([...n.parentNode.childNodes].indexOf(n));
+    return path;
+  }
+
+  function nodeAt(path) {
+    let n = editor;
+    for (const i of path) {
+      n = n && n.childNodes[i];
+    }
+    return n || null;
+  }
+
+  function snapshot() {
+    const sel = getSelection();
+    let range = null;
+    if (sel.rangeCount && editor.contains(sel.getRangeAt(0).startContainer) && editor.contains(sel.getRangeAt(0).endContainer)) {
+      const r = sel.getRangeAt(0);
+      range = [nodePath(r.startContainer), r.startOffset, nodePath(r.endContainer), r.endOffset];
+    }
+    return { html: editor.innerHTML, range, typing: false };
+  }
+
+  function resetHistory() {
+    history = [snapshot()];
+    historyAt = 0;
+    lastTyping = 0;
+  }
+
+  function recordHistory(typing = false) {
+    const state = snapshot();
+    const top = history[historyAt];
+    if (top && top.html === state.html) {
+      top.range = state.range;
+      return;
+    }
+    history.length = historyAt + 1; // a new edit drops what could be redone
+    const now = Date.now();
+    if (typing && top && top.typing && now - lastTyping < TYPING_MS) {
+      history[historyAt] = { ...state, typing: true };
+    } else {
+      history.push({ ...state, typing });
+      if (history.length > HISTORY_MAX) history.shift();
+      historyAt = history.length - 1;
+    }
+    lastTyping = typing ? now : 0;
+  }
+
+  // Keeps the current step's selection up to date as the caret moves, so
+  // undoing the next edit puts the caret back where it was just before it.
+  document.addEventListener('selectionchange', () => {
+    const top = history[historyAt];
+    if (!top || document.activeElement !== editor) return;
+    const state = snapshot();
+    if (state.range && state.html === top.html) top.range = state.range;
+  });
+
+  // step = -1 undoes, +1 redoes.
+  function restoreHistory(step) {
+    const target = historyAt + step;
+    if (target < 0 || target >= history.length) return;
+    historyAt = target;
+    lastTyping = 0;
+    const { html, range } = history[target];
+    editor.innerHTML = html;
+    const start = range && nodeAt(range[0]);
+    const end = range && nodeAt(range[2]);
+    let placed = false;
+    if (start && end) {
+      try {
+        const r = document.createRange();
+        r.setStart(start, range[1]);
+        r.setEnd(end, range[3]);
+        getSelection().removeAllRanges();
+        getSelection().addRange(r);
+        placed = true;
+      } catch { /* stale offsets: fall back below */ }
+    }
+    if (!placed) caretIn(editor, true);
+    applyContent();
+    scheduleFormatBar();
   }
 
   // ---------------------------------------------------------- checklist
@@ -744,6 +848,18 @@
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const key = e.key.toLowerCase();
 
+    // Undo / redo through the editor's own history (see "undo").
+    if (mod && !e.altKey && key === 'z') {
+      e.preventDefault();
+      restoreHistory(e.shiftKey ? 1 : -1);
+      return;
+    }
+    if (mod && !e.altKey && !e.shiftKey && key === 'y') {
+      e.preventDefault();
+      restoreHistory(1);
+      return;
+    }
+
     // Standard formatting shortcuts.
     if (mod && !e.shiftKey && !e.altKey && FORMAT_KEYS[key]) {
       e.preventDefault();
@@ -860,24 +976,54 @@
     document.execCommand('delete');
   }
 
+  const TYPING_RE = /^(insertText|insertCompositionText|insertParagraph|insertLineBreak|deleteContent)/;
+  let pasting = false;
+  let converting = false;
+
   function onEditorInput(e) {
+    // Edits made by a conversion below fire their own input events; the
+    // conversion records the result once.
+    if (converting) return;
+    const typing = !pasting && TYPING_RE.test(e.inputType);
+    const wordEnd = typing && (/^insert(Paragraph|LineBreak)$/.test(e.inputType) || /\s/.test(e.data || ''));
     if (currentPre()) {
-      onContentChanged();
+      onContentChanged(typing);
+      if (wordEnd) lastTyping = 0;
       return;
     }
-    if (e.inputType === 'insertText' && e.data === '`') expandInlineCode();
-    if (e.inputType === 'insertText' && e.data === ']') expandCheckbox();
-    if (e.inputType === 'insertText' && e.data === ' ' && !expandBullet()) swallowLeadingSpace();
+    let converted = false;
+    if (e.inputType === 'insertText' && ['`', ']', ' '].includes(e.data)) {
+      // Keep the text as typed, so undo after "[]" → box (or `x` → code,
+      // "- " → bullet) brings back the characters instead of skipping them.
+      recordHistory(typing);
+      converting = true;
+      try {
+        if (e.data === '`') converted = expandInlineCode();
+        else if (e.data === ']') converted = expandCheckbox();
+        else if (!(converted = expandBullet())) swallowLeadingSpace();
+      } finally {
+        converting = false;
+      }
+    }
     // Enter on an item creates the next item (the browser clones the line), unchecked.
     if (e.inputType === 'insertParagraph') currentBlock()?.classList.remove('done');
-    onContentChanged();
+    onContentChanged(typing && !converted);
+    // The next keystroke starts a new undo step.
+    if (wordEnd) lastTyping = 0;
   }
 
   // Always paste as plain text: avoids bringing in styles from other apps.
+  // A paste is its own undo step, never merged with typing.
   function onPaste(e) {
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
-    if (text) document.execCommand('insertText', false, text);
+    if (!text) return;
+    pasting = true;
+    try {
+      document.execCommand('insertText', false, text);
+    } finally {
+      pasting = false;
+    }
   }
 
   // ---------------------------------------------------------- formatting
@@ -962,7 +1108,7 @@
   }
 
   function updateFormatBar() {
-    const range = !selecting && note && !note.collapsed && document.activeElement === editor && selectionRange();
+    const range = !selecting && note && document.activeElement === editor && selectionRange();
     const rects = range ? [...range.getClientRects()].filter((r) => r.width || r.height) : [];
     if (!rects.length) { hideFormatBar(); return; }
 
@@ -1018,19 +1164,6 @@
     render();
   }
 
-  async function toggleCollapse() {
-    closeColors(false);
-    hideFormatBar();
-    note.collapsed = !note.collapsed;
-    render();
-    try {
-      await invoke('set_collapsed', { collapsed: note.collapsed });
-    } catch (err) {
-      console.error('set_collapsed', err);
-    }
-    if (!note.collapsed) editor.focus();
-  }
-
   async function newNote() {
     closeColors();
     await flushText();
@@ -1080,43 +1213,35 @@
       }
     }
     renderName();
-    if (!note.collapsed) editor.focus();
+    editor.focus();
   }
 
   // ------------------------------------------------------- colour picker
-
-  // When collapsed, the window is only as tall as the titlebar: while the
-  // picker is open it grows enough to show it.
-  const resizeWindow = (height) => appWindow
-    .setSize(new LogicalSize(window.innerWidth, height))
-    .catch((err) => console.error('setSize', err));
 
   function openColors() {
     hideFormatBar();
     colorMenu.hidden = false;
     frame.classList.add('menu-open');
     colorBtn.setAttribute('aria-expanded', 'true');
-    if (note.collapsed) {
-      colorsGrown = true;
-      resizeWindow(colorMenu.offsetTop + colorMenu.offsetHeight + 6);
-    }
   }
 
-  // `shrink = false` when another action is about to resize the window anyway.
-  function closeColors(shrink = true) {
+  function closeColors() {
     if (colorMenu.hidden) return;
     colorMenu.hidden = true;
     frame.classList.remove('menu-open');
     colorBtn.setAttribute('aria-expanded', 'false');
-    if (colorsGrown) {
-      colorsGrown = false;
-      if (shrink) resizeWindow(titlebar.offsetHeight);
-    }
   }
 
   // ------------------------------------------------------------- events
 
   editor.addEventListener('input', onEditorInput);
+  // Undo/Redo from the context menu (or any other source) also go through
+  // the editor's own history.
+  editor.addEventListener('beforeinput', (e) => {
+    if (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo') return;
+    e.preventDefault();
+    restoreHistory(e.inputType === 'historyUndo' ? -1 : 1);
+  });
   editor.addEventListener('keydown', onEditorKeydown);
   editor.addEventListener('paste', onPaste);
   editor.addEventListener('blur', flushText);
@@ -1167,7 +1292,6 @@
 
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
-  collapseBtn.addEventListener('click', toggleCollapse);
   $('closeBtn').addEventListener('click', closeNote);
 
   titleInput.addEventListener('keydown', (e) => {
@@ -1234,8 +1358,6 @@
   window.addEventListener('blur', () => {
     frame.classList.remove('is-focused');
     hideFormatBar();
-    // When collapsed, an open picker enlarges the window; close it on blur.
-    if (colorsGrown) closeColors();
     flushText();
   });
   window.addEventListener('beforeunload', () => {
@@ -1304,7 +1426,7 @@
 
     if (EMBED) {
       const [, text, html] = await invoke('get_new_note_defaults');
-      note = { id: 'defaults', title: '', text, html, color: '', pinned: false, collapsed: false, updatedAt: 0 };
+      note = { id: 'defaults', title: '', text, html, color: '', pinned: false, updatedAt: 0 };
     } else {
       note = await invoke('load_note');
     }
@@ -1312,7 +1434,7 @@
     loadContent();
     render();
     if (document.hasFocus()) frame.classList.add('is-focused');
-    if (!note.collapsed && !EMBED) {
+    if (!EMBED) {
       editor.focus();
       const r = document.createRange();
       r.selectNodeContents(editor);

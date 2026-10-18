@@ -97,8 +97,6 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   display: flex;
   border-top: 1px solid var(--color-graphite);
 }
-.is-collapsed .body,
-.is-collapsed .statusbar { display: none; }
 
 /* Rich text editor: each line is a <div>; checklist items are
    <div class="check"> (checked: .done) with the box drawn in ::before. */
@@ -122,9 +120,10 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   tab-size: 4;
 }
 .editor ::selection { background: var(--selection); color: var(--color-paper); }
-/* Bold at 600: Chromium only recognises bold (queryCommandState and
-   toggling Ctrl+B off) from 600 up. */
-.editor b, .editor strong { font-weight: 600; color: var(--color-bone); }
+/* Bold at 700, in the brightest text colour so it stands out from the
+   body text. Never below 600: Chromium only recognises bold
+   (queryCommandState and toggling Ctrl+B off) from 600 up. */
+.editor b, .editor strong { font-weight: 700; color: var(--color-paper); }
 .editor u { text-decoration-thickness: 1px; text-underline-offset: 2px; }
 /* Inline code (`text`) and code block (```lang). */
 .editor code {
@@ -214,40 +213,6 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   color: var(--color-mist);
   text-transform: none;
 }
-
-/* Prism tokens. Colours only: bold/italic could change glyph widths and
-   misalign the copy with the text underneath. */
-.code-hl-text .token.comment,
-.code-hl-text .token.prolog,
-.code-hl-text .token.doctype,
-.code-hl-text .token.cdata { color: var(--code-comment); }
-.code-hl-text .token.punctuation,
-.code-hl-text .token.operator { color: var(--code-punct); }
-.code-hl-text .token.keyword,
-.code-hl-text .token.atrule,
-.code-hl-text .token.important,
-.code-hl-text .token.rule { color: var(--code-keyword); }
-.code-hl-text .token.string,
-.code-hl-text .token.char,
-.code-hl-text .token.attr-value,
-.code-hl-text .token.regex,
-.code-hl-text .token.url,
-.code-hl-text .token.inserted { color: var(--code-string); }
-.code-hl-text .token.number,
-.code-hl-text .token.boolean,
-.code-hl-text .token.constant,
-.code-hl-text .token.symbol { color: var(--code-number); }
-.code-hl-text .token.function,
-.code-hl-text .token.class-name,
-.code-hl-text .token.builtin { color: var(--code-function); }
-.code-hl-text .token.tag,
-.code-hl-text .token.selector,
-.code-hl-text .token.property,
-.code-hl-text .token.deleted { color: var(--code-tag); }
-.code-hl-text .token.attr-name,
-.code-hl-text .token.variable,
-.code-hl-text .token.title,
-.code-hl-text .token.key { color: var(--code-attr); }
 
 /* Highlight: the HTML stores a sentinel colour; the theme colour applies here. */
 .editor span[style*="rgb(255, 230, 0)"] {
@@ -422,7 +387,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   line-height: 1;
   cursor: default;
 }
-.fmt-btn b { font-weight: 600; }
+.fmt-btn b { font-weight: 700; }
 .fmt-btn u { text-underline-offset: 2px; }
 .fmt-btn:hover { background: var(--overlay-hover); color: var(--color-mist); }
 .fmt-btn[aria-pressed="true"] { background: var(--overlay-active); color: var(--color-paper); }
