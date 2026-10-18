@@ -425,6 +425,9 @@
   window.MemoChrome.attach({ frame, titlebar: $('titlebar'), grip: $('grip'), onClose: closeWindow });
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
+  $('raiseBtn').addEventListener('click', () => {
+    invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err));
+  });
   $('closeBtn').addEventListener('click', closeWindow);
 
   window.addEventListener('focus', () => frame.classList.add('is-focused'));
@@ -509,6 +512,7 @@
     pin: PIN_SVG,
     'pin-on': PIN_SVG,
     plus: '<path d="M8 3.25v9.5M3.25 8h9.5"/>',
+    raise: '<rect x="5.25" y="2.75" width="8" height="7" rx="1.5"/><path d="M2.75 6.25v5.5a1.5 1.5 0 0 0 1.5 1.5h5.5"/>',
     close: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',
     search: '<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>',
     sort: '<path d="M5 3v10M2.75 10.75 5 13l2.25-2.25M11 13V3M8.75 5.25 11 3l2.25 2.25"/>',

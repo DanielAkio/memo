@@ -12,6 +12,7 @@ window.MemoI18n = (() => {
       pin: 'Fixar acima de tudo',
       unpin: 'Desafixar',
       newNote: 'Nova memória',
+      bringAllToFront: 'Trazer todas as memórias para a frente',
       closeNote: 'Fechar memória',
       closeToTrash: 'Fechar (vai para a lixeira)',
       close: 'Fechar',
@@ -118,6 +119,7 @@ window.MemoI18n = (() => {
       pin: 'Keep on top',
       unpin: 'Unpin',
       newNote: 'New memory',
+      bringAllToFront: 'Bring all memories to the front',
       closeNote: 'Close memory',
       closeToTrash: 'Close (moves to trash)',
       close: 'Close',
@@ -325,6 +327,9 @@ window.MemoI18n = (() => {
         title: 'Gerenciador de Memórias',
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
+          ['Trazer para a frente', 'O botão ao lado do + na barra do Gerenciador traz todas as memórias abertas para a frente das outras janelas, inclusive as minimizadas.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Gerenciador de Memórias</span>'
+            + '<i data-icon="raise" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Buscar', 'Campo de busca nas abas Memórias e Lixeira, ou {{Mod+F}}.',
             '<span class="demo-field"><i data-icon="search"></i>compras</span>'],
           ['Ordenar', 'Caixa ao lado da busca: mais recentes ou título (A–Z).',
@@ -397,6 +402,9 @@ window.MemoI18n = (() => {
         title: 'Memory Manager',
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
+          ['Bring to front', 'The button next to + in the Manager’s titlebar brings every open memory in front of other windows, minimized ones included.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Memory Manager</span>'
+            + '<i data-icon="raise" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Search', 'The search box in the Memories and Trash tabs, or {{Mod+F}}.',
             '<span class="demo-field"><i data-icon="search"></i>shopping</span>'],
           ['Sort', 'The box next to the search: most recent or title (A–Z).',

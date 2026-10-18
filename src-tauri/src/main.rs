@@ -520,17 +520,24 @@ fn create_and_open(app: &AppHandle, pos: Option<(i32, i32)>) -> tauri::Result<()
     Ok(())
 }
 
+/// Tray "Show all memories", relaunch and Dock reopen: brings every note to
+/// the front, or opens a new one when none is open.
 fn show_all(app: &AppHandle) {
-    let windows = note_windows(app);
-    if windows.is_empty() {
+    if !raise_notes(app) {
         let _ = create_and_open(app, None);
-        return;
     }
-    for window in windows {
+}
+
+/// Brings every open note window to the front (restoring minimised ones).
+/// Returns `false` if there is none.
+fn raise_notes(app: &AppHandle) -> bool {
+    let windows = note_windows(app);
+    for window in &windows {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
+    !windows.is_empty()
 }
 
 /// Moves a note to the trash (closing its window, if open). A note nobody
@@ -723,6 +730,13 @@ async fn trash_note(app: AppHandle, window: WebviewWindow) {
 #[tauri::command]
 fn load_manager(store: State<'_, Shared>) -> ManagerState {
     store.manager()
+}
+
+/// Manager's "bring all memories to front" button. Unlike the tray's "Show
+/// all memories", it doesn't create a note when none is open.
+#[tauri::command]
+async fn bring_notes_to_front(app: AppHandle) {
+    raise_notes(&app);
 }
 
 /// Closes the manager window (✕ or middle click on the titlebar).
@@ -1273,6 +1287,7 @@ fn main() {
             trash_note,
             load_manager,
             close_manager,
+            bring_notes_to_front,
             list_notes,
             open_note,
             move_to_trash,

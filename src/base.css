@@ -277,7 +277,7 @@ html, body {
 .is-focused .titlebar .actions,
 .frame:hover .titlebar .actions,
 .menu-open .titlebar .actions {
-  max-width: 64px; /* 2 × 28px buttons + 2px gap, with slack */
+  max-width: 96px; /* up to 3 × 28px buttons (manager) + 2 × 2px gaps, with slack */
   margin-left: 0;
 }
 .pin { opacity: 0.55; }

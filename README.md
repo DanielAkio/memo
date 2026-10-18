@@ -28,7 +28,7 @@ The interface is available in English and Portuguese.
 | Back up / restore memories | Memory Manager → Settings → Storage → Export… (a `.json` with every memory not in the trash) / Import… (adds the file's memories; an existing one is only replaced if the file's copy is newer) |
 | Light / dark theme | Memory Manager → Settings → Theme: System (default), Light or Dark |
 | Help, shortcuts and the welcome memory | Memory Manager → Help: a guide to every feature, and a button that reopens the welcome memory |
-| Show all memories | Tray icon (menu bar on macOS) |
+| Show all memories | Tray icon (menu bar on macOS), or the "bring all memories to the front" button next to `+` in the Memory Manager's titlebar |
 | Quit | Tray icon → Quit Memo, or Memory Manager → Settings → Quit Memo |
 
 On launch, Memo shows the Memory Manager together with the memories that were open (the first time, with the welcome
