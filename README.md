@@ -20,7 +20,7 @@ The interface is available in English and Portuguese.
 | Close | The `✕` button or a middle click (wheel) on the titlebar: the memory goes to the trash |
 | See all memories, search, sort, restore from the trash | Memory Manager: opens with the app, or from the tray icon → Memory Manager. The sort box next to the search orders the list by most recent or by title (A–Z). Memories in the trash for over 30 days are deleted |
 | Colour, title and text for new memories | Memory Manager → Settings → Defaults (the text uses the same editor as a memory: checklist, bullets, code and formatting) |
-| Move | Drag by the titlebar; near a screen edge or another memory, it snaps |
+| Move | Drag by the titlebar; near a screen edge or another memory, it snaps. Push the cursor against a screen edge to Snap it: a preview shows the left/right half, a quarter (near a corner) or the whole screen (top edge), and releasing there fits it; dragging it again restores its size |
 | Resize | By the edges or the bottom-right corner; near a screen edge or another memory, the edge snaps |
 | Change the colour (default: yellow) | Click the coloured dot left of the title and pick a colour, or "Custom" for any colour |
 | Language (Portuguese / English) | Memory Manager → Settings → Language: System (default), Português or English |

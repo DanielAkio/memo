@@ -295,6 +295,7 @@ window.MemoI18n = (() => {
             + '<span class="demo-dot" data-color="iris"></span><span class="demo-dot" data-color="lavender"></span>'
             + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot demo-rainbow"></span><span class="demo-dot" data-color=""></span></span>'],
           ['Mover e redimensionar', 'Arraste pela barra de título ou pelas bordas. Perto da borda da tela ou de outra memória, ela gruda.'],
+          ['Encaixar na tela', 'Arraste até encostar o cursor na borda da tela: aparece uma prévia da metade (laterais), de um quarto (cantos) ou da tela inteira (topo). Solte para encaixar; ao arrastar de novo, ela volta ao tamanho anterior.'],
           ['Fechar', 'Botão ✕ ou clique do meio na barra de título: a memória vai para a lixeira.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-name">Lista de compras</span><i data-icon="plus"></i><i data-icon="close" class="demo-hot"></i></span>'],
@@ -370,6 +371,7 @@ window.MemoI18n = (() => {
             + '<span class="demo-dot" data-color="iris"></span><span class="demo-dot" data-color="lavender"></span>'
             + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot demo-rainbow"></span><span class="demo-dot" data-color=""></span></span>'],
           ['Move and resize', 'Drag by the titlebar or the edges. Near a screen edge or another memory, it snaps.'],
+          ['Snap to the screen', 'Drag until the cursor touches a screen edge: a preview shows half the screen (sides), a quarter (corners) or the whole screen (top). Release to snap; drag it again to get its previous size back.'],
           ['Close', 'The ✕ button or a middle click on the titlebar: the memory goes to the trash.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-name">Shopping list</span><i data-icon="plus"></i><i data-icon="close" class="demo-hot"></i></span>'],

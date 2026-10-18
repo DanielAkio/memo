@@ -1,7 +1,7 @@
 // Memo — behaviour shared by the frameless windows (note and manager):
 // dragging by the titlebar and resizing by the edges, both snapping to the
-// monitor edges and other windows; double click and middle click (close) on
-// the titlebar.
+// monitor edges and other windows (and, when dragging, Snap to half, quarter
+// or full screen); double click and middle click (close) on the titlebar.
 
 window.MemoChrome = {
   attach({ frame, titlebar, grip, onDoubleClick, onClose }) {
@@ -9,25 +9,32 @@ window.MemoChrome = {
     const appWindow = window.__TAURI__.window.getCurrentWindow();
 
     // Dragging is done here (not by the OS, with startDragging) so the window
-    // snaps to monitor edges and other windows during the move: each position
-    // goes through Rust's drag_to, which applies the snapping.
+    // snaps to monitor edges and other windows during the move. Rust follows
+    // the cursor itself (main.rs, "Dragging and Snap"): drag_start once the
+    // pointer moves past the click threshold, drag_to on each move, drag_end
+    // on release, which also applies Snap if the cursor is in a Snap zone.
     let drag = null;
-    const cancelDrag = () => { drag = null; };
 
-    // One call to Rust at a time; if the mouse moved meanwhile, only the latest
-    // position is sent. The final position is sent even after release.
-    function pumpDrag(d) {
-      if (d.busy || !d.origin || !d.target) return;
-      const [dx, dy] = d.target;
-      d.target = null;
-      d.busy = true;
-      invoke('drag_to', { x: Math.round(d.origin.x + dx * d.scale), y: Math.round(d.origin.y + dy * d.scale) })
-        .catch((err) => console.error('drag_to', err))
-        .finally(() => {
-          d.busy = false;
-          pumpDrag(d);
-        });
+    // Calls run one after another. Moves made while a drag_to is waiting
+    // share it: Rust reads the latest cursor position anyway.
+    function send(d, cmd) {
+      d.chain = d.chain.then(() => invoke(cmd)).catch((err) => console.error(cmd, err));
     }
+    function moveDrag(d) {
+      if (d.queued) return;
+      d.queued = true;
+      d.chain = d.chain
+        .then(() => {
+          d.queued = false;
+          return invoke('drag_to');
+        })
+        .catch((err) => console.error('drag_to', err));
+    }
+    const cancelDrag = () => {
+      const d = drag;
+      drag = null;
+      if (d && d.started) send(d, 'drag_end');
+    };
 
     titlebar.addEventListener('mousedown', (e) => {
       if (e.button === 1) { e.preventDefault(); return; } // no autoscroll
@@ -39,23 +46,17 @@ window.MemoChrome = {
     titlebar.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || e.target.closest('button, input')) return;
       titlebar.setPointerCapture(e.pointerId); // follow the mouse even outside the window
-      const d = { sx: e.screenX, sy: e.screenY, origin: null, scale: 1, target: null, busy: false, moved: false };
-      drag = d;
-      Promise.all([appWindow.outerPosition(), appWindow.scaleFactor()]).then(([pos, scale]) => {
-        d.origin = pos;
-        d.scale = scale;
-        pumpDrag(d);
-      });
+      drag = { sx: e.screenX, sy: e.screenY, started: false, queued: false, chain: Promise.resolve() };
     });
 
     titlebar.addEventListener('pointermove', (e) => {
       if (!drag) return;
-      const dx = e.screenX - drag.sx;
-      const dy = e.screenY - drag.sy;
-      if (!drag.moved && Math.hypot(dx, dy) < 3) return; // a click, not a drag
-      drag.moved = true;
-      drag.target = [dx, dy];
-      pumpDrag(drag);
+      if (!drag.started) {
+        if (Math.hypot(e.screenX - drag.sx, e.screenY - drag.sy) < 3) return; // a click, not a drag
+        drag.started = true;
+        send(drag, 'drag_start');
+      }
+      moveDrag(drag);
     });
 
     titlebar.addEventListener('pointerup', cancelDrag);

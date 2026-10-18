@@ -5,8 +5,9 @@ mod store;
 mod welcome;
 
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -19,8 +20,8 @@ use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, RunEvent, State, Theme,
-    WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
+    Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::{
     DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult,
@@ -46,6 +47,12 @@ const MIN_W: f64 = 180.0;
 const MANAGER_MIN_W: f64 = 380.0;
 /// Label of the manager window (notes and trash).
 const MANAGER: &str = "manager";
+/// Label of the Snap preview: a transparent, click-through window showing
+/// where a dragged window will land (see "Snap").
+const SNAP_PREVIEW: &str = "snap-preview";
+/// How close (logical) the cursor must get to a screen edge to enter a Snap
+/// zone while dragging.
+const SNAP_EDGE: f64 = 4.0;
 /// App config (custom data folder), always in the default data folder.
 const CONFIG: &str = "config.json";
 /// Name of the default data folder, inside the OS data folder (`%APPDATA%`,
@@ -66,6 +73,11 @@ fn id_of(window: &WebviewWindow) -> String {
 
 fn is_note(window: &WebviewWindow) -> bool {
     window.label().starts_with("note-")
+}
+
+/// The app's real windows (notes and manager), i.e. not the Snap preview.
+fn is_app_window(window: &WebviewWindow) -> bool {
+    window.label() != SNAP_PREVIEW
 }
 
 /// Open note windows (excluding the manager).
@@ -225,7 +237,7 @@ fn set_theme(app: &AppHandle, theme: &str) {
     let store = app.state::<Shared>();
     store.set_theme(theme);
     store.flush();
-    for window in app.webview_windows().values() {
+    for window in app.webview_windows().values().filter(|w| is_app_window(w)) {
         apply_background(window, theme);
     }
     let _ = app.emit("theme-changed", theme);
@@ -379,7 +391,10 @@ impl SnapTargets {
             t_.bottom.push(a.position.y + a.size.height as i32 - gap);
         }
         for other in window.app_handle().webview_windows().into_values() {
-            if other.label() == window.label() || !other.is_visible().unwrap_or(false) {
+            if other.label() == window.label()
+                || !is_app_window(&other)
+                || !other.is_visible().unwrap_or(false)
+            {
                 continue;
             }
             let (Ok(p), Ok(s)) = (other.inner_position(), other.inner_size()) else {
@@ -438,24 +453,258 @@ fn frame_offset(window: &WebviewWindow) -> Option<(i32, i32)> {
     Some((inner.x - outer.x, inner.y - outer.y))
 }
 
-/// Drag driven by the page: moves the window to physical (`x`, `y`), snapping
-/// to monitor edges and other windows. The native drag (`startDragging`)
-/// can't do this, because the OS owns the window until the button is
-/// released.
-#[tauri::command]
-fn drag_to(window: WebviewWindow, x: i32, y: i32) {
-    let (Some((dx, dy)), Ok(size)) = (frame_offset(&window), window.inner_size()) else {
+// ---------------------------------------------------------------------------
+// Dragging and Snap
+// ---------------------------------------------------------------------------
+//
+// Dragging is driven by the page (chrome.js) but follows the cursor here:
+// `drag_start` records where the titlebar was grabbed, each `drag_to` moves
+// the window under the cursor (with the magnet of `snapped`) and `drag_end`
+// drops it. The native drag (`startDragging`) can't do any of this, because
+// the OS owns the window until the button is released.
+//
+// Snap, like Windows' Aero Snap: with the cursor against a screen edge, a
+// translucent preview (`SNAP_PREVIEW`) shows where the window will land —
+// left/right half, a quarter near a corner, the whole work area at the top —
+// and releasing there snaps it. Dragging a snapped window again restores its
+// previous size.
+
+/// Physical rectangle of a window's visible area.
+#[derive(Clone, Copy)]
+struct Rect {
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+}
+
+struct Drag {
+    /// Cursor offset from the window's outer corner, physical pixels.
+    grab: (f64, f64),
+    /// Snap zone under the cursor at the last move.
+    zone: Option<Rect>,
+}
+
+#[derive(Default)]
+struct Drags {
+    /// Drags in progress, by window label.
+    active: Mutex<HashMap<String, Drag>>,
+    /// Logical size of each snapped window before it was snapped, restored
+    /// when it is dragged again (not persisted).
+    restore: Mutex<HashMap<String, (f64, f64)>>,
+}
+
+/// Whether the note (or the manager) is pinned, to put back after a drag.
+fn pinned(window: &WebviewWindow) -> bool {
+    let store = window.state::<Shared>();
+    if is_note(window) {
+        store.get(&id_of(window)).is_some_and(|n| n.pinned)
+    } else {
+        store.manager().pinned
+    }
+}
+
+/// The Snap zone under `cursor`, as the visible rect the window would get:
+/// within `SNAP_EDGE` of the left/right edge of a monitor → that half of its
+/// work area, or a quarter in the top/bottom fifth (near a corner); of the
+/// top edge → the whole work area, or a quarter near a corner. Rects keep the
+/// magnet's `SNAP_GAP` from the edges and between halves.
+fn snap_zone(window: &WebviewWindow, cursor: PhysicalPosition<f64>) -> Option<Rect> {
+    let monitors = window.available_monitors().ok()?;
+    let m = monitors.iter().find(|m| {
+        let (p, s) = (m.position(), m.size());
+        cursor.x >= p.x as f64
+            && cursor.x < (p.x + s.width as i32) as f64
+            && cursor.y >= p.y as f64
+            && cursor.y < (p.y + s.height as i32) as f64
+    })?;
+    let scale = m.scale_factor();
+    let edge = SNAP_EDGE * scale;
+    let (p, s) = (m.position(), m.size());
+    let (l, t) = (p.x as f64, p.y as f64);
+    let (r, b) = (l + s.width as f64, t + s.height as f64);
+    let at_left = cursor.x <= l + edge;
+    let at_right = cursor.x >= r - 1.0 - edge;
+    let at_top = cursor.y <= t + edge;
+    // Corner bands: a fifth of the height on the sides, a tenth of the width
+    // along the top.
+    let near_top = cursor.y < t + (b - t) / 5.0;
+    let near_bottom = cursor.y > b - (b - t) / 5.0;
+    let near_left = cursor.x < l + (r - l) / 10.0;
+    let near_right = cursor.x > r - (r - l) / 10.0;
+
+    let area = m.work_area();
+    let gap = (SNAP_GAP * scale).round() as i32;
+    let (x0, y0) = (area.position.x + gap, area.position.y + gap);
+    let x1 = area.position.x + area.size.width as i32 - gap;
+    let y1 = area.position.y + area.size.height as i32 - gap;
+    let (mx, my) = ((x0 + x1) / 2, (y0 + y1) / 2);
+    let half = gap / 2;
+    let left = (x0, mx - half);
+    let right = (mx + gap - half, x1);
+    let upper = (y0, my - half);
+    let lower = (my + gap - half, y1);
+    let whole_h = (y0, y1);
+    let rect = |(xa, xb): (i32, i32), (ya, yb): (i32, i32)| Rect {
+        x: xa,
+        y: ya,
+        w: xb - xa,
+        h: yb - ya,
+    };
+
+    let side = if at_left || (at_top && near_left) {
+        Some(left)
+    } else if at_right || (at_top && near_right) {
+        Some(right)
+    } else {
+        None
+    };
+    match side {
+        Some(cols) if near_top => Some(rect(cols, upper)),
+        Some(cols) if near_bottom => Some(rect(cols, lower)),
+        Some(cols) => Some(rect(cols, whole_h)),
+        None if at_top => Some(rect((x0, x1), whole_h)),
+        None => None,
+    }
+}
+
+/// Creates the (hidden) Snap preview window. Transparent and click-through;
+/// it never takes focus, so the drag keeps its pointer capture.
+fn build_snap_preview(app: &AppHandle) -> tauri::Result<()> {
+    let window = WebviewWindowBuilder::new(app, SNAP_PREVIEW, WebviewUrl::App("snap.html".into()))
+        .title("Memo")
+        .decorations(false)
+        .transparent(true)
+        .background_color(Color(0, 0, 0, 0))
+        .shadow(false)
+        .resizable(false)
+        .skip_taskbar(true)
+        .focused(false)
+        .focusable(false)
+        .visible(false)
+        .build()?;
+    window.set_ignore_cursor_events(true)
+}
+
+/// Shows the preview over `rect`, or hides it (`None`).
+fn show_snap_preview(app: &AppHandle, rect: Option<Rect>) {
+    let Some(preview) = app.get_webview_window(SNAP_PREVIEW) else {
         return;
     };
-    // `x`,`y` are the window corner; snapping works on the visible area.
+    match rect {
+        Some(r) => {
+            let (dx, dy) = frame_offset(&preview).unwrap_or((0, 0));
+            let _ = preview.set_position(PhysicalPosition::new(r.x - dx, r.y - dy));
+            let _ = preview.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
+            if !preview.is_visible().unwrap_or(false) {
+                let _ = preview.show();
+            }
+        }
+        None => {
+            if preview.is_visible().unwrap_or(false) {
+                let _ = preview.hide();
+            }
+        }
+    }
+}
+
+/// Start of a titlebar drag (the pointer moved past the click threshold).
+/// While dragging, the window is kept above other windows — including the
+/// Snap preview, which is not always on top — and its pin is put back by
+/// `drag_end`.
+#[tauri::command]
+fn drag_start(window: WebviewWindow, drags: State<'_, Drags>) {
+    let (Ok(cursor), Ok(outer)) = (window.cursor_position(), window.outer_position()) else {
+        return;
+    };
+    let grab = (cursor.x - outer.x as f64, cursor.y - outer.y as f64);
+    let _ = window.set_always_on_top(true);
+    drags
+        .active
+        .lock()
+        .unwrap()
+        .insert(window.label().into(), Drag { grab, zone: None });
+}
+
+/// Moves the window under the cursor, with the magnet, and updates the Snap
+/// preview.
+#[tauri::command]
+fn drag_to(window: WebviewWindow, drags: State<'_, Drags>) {
+    drag_move(&window, &drags);
+}
+
+fn drag_move(window: &WebviewWindow, drags: &Drags) {
+    let Ok(cursor) = window.cursor_position() else {
+        return;
+    };
+    let mut active = drags.active.lock().unwrap();
+    let Some(drag) = active.get_mut(window.label()) else {
+        return;
+    };
+
+    // A window snapped by an earlier drag gets its previous size back, with
+    // the cursor at the same relative spot of the titlebar.
+    let restore = drags.restore.lock().unwrap().remove(window.label());
+    if let (Some((w, h)), Ok(before)) = (restore, window.outer_size()) {
+        let _ = window.set_size(LogicalSize::new(w, h));
+        if let Ok(after) = window.outer_size() {
+            drag.grab.0 *= after.width as f64 / before.width.max(1) as f64;
+        }
+    }
+    // Moving to a monitor with another scale resizes the window: keep the
+    // grab point inside it.
+    if let Ok(outer) = window.outer_size() {
+        drag.grab.0 = drag.grab.0.min(outer.width as f64 - 1.0);
+    }
+
+    let (Some((dx, dy)), Ok(size)) = (frame_offset(window), window.inner_size()) else {
+        return;
+    };
+    let x = (cursor.x - drag.grab.0).round() as i32;
+    let y = (cursor.y - drag.grab.1).round() as i32;
+    // `x`,`y` are the window corner; the magnet works on the visible area.
     let (vx, vy) = snapped(
-        &window,
+        window,
         x + dx,
         y + dy,
         size.width as i32,
         size.height as i32,
     );
     let _ = window.set_position(PhysicalPosition::new(vx - dx, vy - dy));
+
+    drag.zone = snap_zone(window, cursor);
+    show_snap_preview(window.app_handle(), drag.zone);
+}
+
+/// End of the drag: final move, then, if released in a Snap zone, the window
+/// takes the zone's rect (its size is kept to restore on the next drag).
+#[tauri::command]
+fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
+    drag_move(&window, &drags);
+    let drag = drags.active.lock().unwrap().remove(window.label());
+    show_snap_preview(window.app_handle(), None);
+    let _ = window.set_always_on_top(pinned(&window));
+    let Some(Drag {
+        zone: Some(zone), ..
+    }) = drag
+    else {
+        return;
+    };
+    let (Some((dx, dy)), Ok(size), Ok(scale)) = (
+        frame_offset(&window),
+        window.inner_size(),
+        window.scale_factor(),
+    ) else {
+        return;
+    };
+    let logical = size.to_logical::<f64>(scale);
+    drags
+        .restore
+        .lock()
+        .unwrap()
+        .insert(window.label().into(), (logical.width, logical.height));
+    let _ = window.set_position(PhysicalPosition::new(zone.x - dx, zone.y - dy));
+    let _ = window.set_size(PhysicalSize::new(zone.w as u32, zone.h as u32));
 }
 
 /// Resize driven by the page (handles on the edges and corners): the moving
@@ -464,7 +713,17 @@ fn drag_to(window: WebviewWindow, x: i32, y: i32) {
 /// dragging. Native resizing is off (`resizable(false)`): the OS wouldn't let
 /// us adjust the size mid-gesture.
 #[tauri::command]
-fn resize_to(window: WebviewWindow, x: i32, y: i32, w: i32, h: i32, edges: String) {
+fn resize_to(
+    window: WebviewWindow,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    edges: String,
+    drags: State<'_, Drags>,
+) {
+    // Resized by hand: no longer "snapped", so a later drag keeps this size.
+    drags.restore.lock().unwrap().remove(window.label());
     let Some((dx, dy)) = frame_offset(&window) else {
         return;
     };
@@ -702,7 +961,7 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
         .app_handle()
         .webview_windows()
         .values()
-        .filter(|w| w.is_visible().unwrap_or(false))
+        .filter(|w| is_app_window(w) && w.is_visible().unwrap_or(false))
         .filter_map(|w| w.outer_position().ok())
         .collect();
     let occupied = |y: i32| {
@@ -1018,7 +1277,7 @@ fn reload_windows(app: &AppHandle) {
         let _ = open_note_window(app, &note);
     }
     let theme = store.theme();
-    for window in app.webview_windows().values() {
+    for window in app.webview_windows().values().filter(|w| is_app_window(w)) {
         apply_background(window, &theme);
     }
     if let Some(manager) = app.get_webview_window(MANAGER) {
@@ -1276,7 +1535,9 @@ fn main() {
         }))
         .invoke_handler(tauri::generate_handler![
             get_theme,
+            drag_start,
             drag_to,
+            drag_end,
             resize_to,
             load_note,
             save_text,
@@ -1317,6 +1578,7 @@ fn main() {
             let dir = data_dir(&default_dir);
             let store: Shared = Arc::new(Store::load(dir.join("notes.json")));
             app.manage(store.clone());
+            app.manage(Drags::default());
 
             // Writes pending changes and, every hour, purges from the trash
             // whatever is older than 30 days.
@@ -1340,6 +1602,7 @@ fn main() {
 
             // The manager opens on every launch; on the first one, the welcome
             // note opens beside it.
+            build_snap_preview(&handle)?;
             open_manager(&handle)?;
             let notes = store.active();
             if store.is_first_run() {
