@@ -45,6 +45,16 @@
   --selection: rgba(208, 214, 224, 0.18);
   --highlight: rgba(242, 201, 76, 0.42);
 
+  /* Syntax highlighting in code blocks (muted, readable on Carbon). */
+  --code-comment: var(--color-ash);
+  --code-punct: var(--color-fog);
+  --code-keyword: #b3a6f2;
+  --code-string: #86c995;
+  --code-number: #e8a06a;
+  --code-function: #6cc3d2;
+  --code-tag: #e88a8a;
+  --code-attr: #e3c46f;
+
   --titlebar-h: 36px;
   --note-color: transparent;
 
@@ -71,6 +81,12 @@
     --overlay-strong: rgba(0, 0, 0, 0.1);
     --selection: rgba(35, 37, 42, 0.14);
     --highlight: rgba(242, 201, 76, 0.5);
+    --code-keyword: #6a4bd1;
+    --code-string: #23843b;
+    --code-number: #b85e1d;
+    --code-function: #0a7f93;
+    --code-tag: #c23b3b;
+    --code-attr: #8f6a00;
     color-scheme: light;
   }
 }
@@ -92,6 +108,12 @@
   --overlay-strong: rgba(0, 0, 0, 0.1);
   --selection: rgba(35, 37, 42, 0.14);
   --highlight: rgba(242, 201, 76, 0.5);
+  --code-keyword: #6a4bd1;
+  --code-string: #23843b;
+  --code-number: #b85e1d;
+  --code-function: #0a7f93;
+  --code-tag: #c23b3b;
+  --code-attr: #8f6a00;
   color-scheme: light;
 }
 
@@ -244,6 +266,20 @@ html, body {
 .is-focused .titlebar .icon-btn,
 .frame:hover .titlebar .icon-btn,
 .menu-open .titlebar .icon-btn { opacity: 1; }
+/* While hidden they take no room either, so the title runs to the right edge;
+   the group opens (and the title shortens) when they show. */
+.titlebar .actions {
+  max-width: 0;
+  margin-left: -8px; /* cancels the titlebar gap before the empty group */
+  overflow: hidden;
+  transition: max-width 160ms ease, margin-left 160ms ease;
+}
+.is-focused .titlebar .actions,
+.frame:hover .titlebar .actions,
+.menu-open .titlebar .actions {
+  max-width: 96px; /* 3 × 28px buttons + 2 × 2px gaps, with slack */
+  margin-left: 0;
+}
 .pin { opacity: 0.55; }
 .is-focused .pin, .frame:hover .pin { opacity: 1; }
 

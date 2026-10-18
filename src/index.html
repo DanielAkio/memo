@@ -84,6 +84,9 @@
       <div class="editor" id="editor" contenteditable="true" spellcheck="true" lang="pt-BR" role="textbox"
            aria-multiline="true" data-i18n-attr="aria-label=noteText"
            data-placeholder=""></div>
+      <!-- Highlighted copies of the code blocks, drawn over them, plus their
+           language pickers (app.js, "code highlighting"). -->
+      <div class="code-layer" id="codeLayer"></div>
     </main>
 
     <footer class="statusbar">
@@ -97,6 +100,7 @@
 
   <script src="i18n.js"></script>
   <script src="chrome.js"></script>
+  <script src="vendor/prism.js" data-manual></script>
   <script src="app.js"></script>
 </body>
 </html>

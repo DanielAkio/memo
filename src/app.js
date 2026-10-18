@@ -255,7 +255,7 @@
           const pre = document.createElement('pre');
           pre.className = 'code';
           pre.spellcheck = false;
-          const lang = (n.dataset.lang || '').replace(LANG_RE, '').slice(0, 20);
+          const lang = codeLang(n.dataset.lang);
           if (lang) pre.dataset.lang = lang;
           const body = preText(n);
           if (body) pre.textContent = body;
@@ -315,6 +315,7 @@
   function loadContent() {
     editor.replaceChildren(note.html ? sanitize(note.html) : sanitize(fromPlain(note.text)));
     syncCheckSizes();
+    renderCode();
   }
 
   // List item (checklist or bullet) whose text is all in one size
@@ -406,6 +407,7 @@
 
   function onContentChanged() {
     syncCheckSizes();
+    renderCode();
     note.text = toPlain();
     note.html = contentHtml();
     note.updatedAt = Date.now();
@@ -490,7 +492,7 @@
     const pre = document.createElement('pre');
     pre.className = 'code';
     pre.spellcheck = false;
-    const clean = lang.replace(LANG_RE, '').slice(0, 20);
+    const clean = codeLang(lang);
     if (clean) pre.dataset.lang = clean;
     pre.appendChild(document.createElement('br'));
     line.replaceWith(pre);
@@ -500,6 +502,120 @@
     }
     caretIn(pre);
     onContentChanged();
+  }
+
+  // ------------------------------------------------- code highlighting
+  //
+  // Code blocks stay plain text in the editor, so typing, undo and saving work
+  // as before. #codeLayer, a sibling on top of the editor, holds one item per
+  // block: a copy of its text highlighted by Prism (vendor/prism.js), laid
+  // exactly over it while the block's own text is transparent (CSS), and a
+  // language picker in its top-right corner. None of it is saved.
+
+  // Languages in the picker: [data-lang value, label]; '' = plain text.
+  const CODE_LANGS = [
+    ['', null], ['bash', 'Bash'], ['c', 'C'], ['cpp', 'C++'], ['csharp', 'C#'], ['css', 'CSS'],
+    ['go', 'Go'], ['html', 'HTML'], ['java', 'Java'], ['javascript', 'JavaScript'], ['json', 'JSON'],
+    ['markdown', 'Markdown'], ['php', 'PHP'], ['python', 'Python'], ['ruby', 'Ruby'], ['rust', 'Rust'],
+    ['sql', 'SQL'], ['typescript', 'TypeScript'], ['xml', 'XML'], ['yaml', 'YAML'],
+  ];
+  const LANG_ALIASES = {
+    js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash',
+    rs: 'rust', yml: 'yaml', md: 'markdown', cs: 'csharp', 'c#': 'csharp', 'c++': 'cpp',
+    golang: 'go', rb: 'ruby', htm: 'html',
+  };
+
+  // Typed language ("```JS") → picker value ("javascript") when known; an
+  // unknown one is kept as typed (shown, but not highlighted).
+  function codeLang(lang) {
+    const clean = (lang || '').replace(LANG_RE, '').slice(0, 20);
+    const id = LANG_ALIASES[clean.toLowerCase()] || clean.toLowerCase();
+    return CODE_LANGS.some(([value]) => value === id) ? id : clean;
+  }
+
+  // Computed styles the copy takes from its block, so both wrap identically.
+  const MIRROR = ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'tabSize',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'whiteSpace', 'overflowWrap', 'wordBreak'];
+  const codeLayer = $('codeLayer');
+  // Block under the mouse: only its picker is shown.
+  let hoveredPre = null;
+
+  function highlighted(text, lang) {
+    const grammar = window.Prism && window.Prism.languages[lang];
+    return grammar ? window.Prism.highlight(text, grammar, lang) : esc(text);
+  }
+
+  function codeItem() {
+    const item = document.createElement('div');
+    item.className = 'code-hl';
+    const copy = item.appendChild(document.createElement('div'));
+    copy.className = 'code-hl-text';
+    copy.setAttribute('aria-hidden', 'true');
+    const picker = item.appendChild(document.createElement('select'));
+    picker.className = 'code-lang';
+    picker.addEventListener('change', () => setCodeLang(item.pre, picker.value));
+    return item;
+  }
+
+  // Lays one item over each code block (position, size, highlighted text,
+  // picker). Cheap when nothing changed, so it runs on every edit and scroll.
+  function renderCode() {
+    const blocks = [...editor.querySelectorAll(':scope > pre.code')];
+    while (codeLayer.children.length > blocks.length) codeLayer.lastChild.remove();
+    while (codeLayer.children.length < blocks.length) codeLayer.append(codeItem());
+    blocks.forEach((pre, i) => {
+      const item = codeLayer.children[i];
+      const [copy, picker] = item.children;
+      item.pre = pre;
+      item.classList.toggle('is-hovered', pre === hoveredPre);
+      item.style.top = `${pre.offsetTop - editor.scrollTop}px`;
+      item.style.left = `${pre.offsetLeft - editor.scrollLeft}px`;
+      item.style.width = `${pre.offsetWidth}px`;
+      item.style.height = `${pre.offsetHeight}px`;
+      const style = getComputedStyle(pre);
+      for (const prop of MIRROR) copy.style[prop] = style[prop];
+
+      const lang = pre.dataset.lang || '';
+      const text = preText(pre);
+      const key = `${lang}\n${text}`;
+      if (copy.key !== key) {
+        copy.key = key;
+        copy.innerHTML = highlighted(text, lang);
+      }
+
+      const optionsKey = `${I18n.lang}|${lang}`;
+      if (picker.optionsKey !== optionsKey) {
+        picker.optionsKey = optionsKey;
+        const known = CODE_LANGS.some(([value]) => value === lang);
+        const langs = known ? CODE_LANGS : [...CODE_LANGS, [lang, lang]];
+        picker.replaceChildren(...langs.map(([value, label]) => new Option(label || t('plainText'), value)));
+        picker.value = lang;
+        picker.title = t('codeLanguage');
+        picker.setAttribute('aria-label', t('codeLanguage'));
+      }
+    });
+  }
+
+  function setHoveredPre(pre) {
+    if (pre === hoveredPre) return;
+    hoveredPre = pre;
+    for (const item of codeLayer.children) item.classList.toggle('is-hovered', item.pre === pre);
+  }
+
+  // Leaving a block for its picker (which sits on top of it, in the layer)
+  // or back keeps the picker shown; leaving for anywhere else hides it.
+  function leaveCode(e) {
+    const to = e.relatedTarget;
+    if (!(to && (codeLayer.contains(to) || (to.closest && to.closest('pre.code'))))) setHoveredPre(null);
+  }
+
+  function setCodeLang(pre, lang) {
+    if (!pre || !editor.contains(pre)) return;
+    if (lang) pre.dataset.lang = lang;
+    else delete pre.dataset.lang;
+    onContentChanged();
+    editor.focus();
+    caretIn(pre, true);
   }
 
   // Inside the block: Enter breaks the line, Tab indents; Enter on an empty
@@ -1004,7 +1120,10 @@
   editor.addEventListener('keydown', onEditorKeydown);
   editor.addEventListener('paste', onPaste);
   editor.addEventListener('blur', flushText);
-  editor.addEventListener('scroll', scheduleFormatBar);
+  editor.addEventListener('scroll', () => {
+    renderCode();
+    scheduleFormatBar();
+  });
 
   editor.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
@@ -1013,6 +1132,9 @@
     e.preventDefault();
     toggleCheck(block);
   });
+  editor.addEventListener('mousemove', (e) => setHoveredPre(e.target.closest('pre.code')));
+  editor.addEventListener('mouseleave', leaveCode);
+  codeLayer.addEventListener('mouseout', leaveCode);
   editor.addEventListener('mousemove', (e) => {
     editor.style.cursor = checkAt(e) ? 'default' : '';
   });
@@ -1027,7 +1149,10 @@
     scheduleFormatBar();
   });
   document.addEventListener('selectionchange', scheduleFormatBar);
-  new ResizeObserver(scheduleFormatBar).observe(editor);
+  new ResizeObserver(() => {
+    renderCode();
+    scheduleFormatBar();
+  }).observe(editor);
 
   // mousedown with preventDefault: clicking the bar keeps the text selection.
   formatBar.addEventListener('mousedown', (e) => e.preventDefault());
@@ -1161,6 +1286,7 @@
       btn.title = btn.getAttribute('aria-label') + (sizeKeys[btn.dataset.size] || '');
     }
     renderMonoName();
+    renderCode();
   }
 
   async function init() {

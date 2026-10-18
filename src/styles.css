@@ -91,6 +91,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 /* ------------------------------------------------------------------- body */
 
 .body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -148,18 +149,105 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.editor pre.code[data-lang]::before {
-  content: attr(data-lang);
+/* The block's own text is invisible (caret and selection still show): the
+   highlighted copy in .code-layer is drawn exactly over it (app.js). */
+.editor pre.code { color: transparent; }
+.editor pre.code::selection,
+.editor pre.code *::selection { color: transparent; }
+
+/* ------------------------------------------------- code highlighting */
+
+.code-layer {
   position: absolute;
-  top: 4px;
-  right: 8px;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+.code-hl { position: absolute; }
+.code-hl-text {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--color-bone);
+}
+
+/* Language picker in the block's top-right corner. */
+.code-lang {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  max-width: 60%;
+  height: 18px;
+  padding: 0 16px 0 6px;
+  border: 0;
+  outline: 0;
+  border-radius: var(--radius-badge);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-ash) 50%),
+                    linear-gradient(135deg, var(--color-ash) 50%, transparent 50%);
+  background-position: calc(100% - 10px) 8px, calc(100% - 7px) 8px;
+  background-size: 3px 3px, 3px 3px;
+  background-repeat: no-repeat;
+  color: var(--color-ash);
   font-family: var(--font-ui);
   font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--color-ash);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: default;
+  /* Only while the mouse is over the block or the picker, or its list is
+     open; opaque so it covers the code underneath cleanly. */
+  visibility: hidden;
+  background-color: var(--color-obsidian);
+  box-shadow: var(--shadow-popover);
 }
+.code-hl.is-hovered .code-lang,
+.code-lang:hover,
+.code-lang:focus { visibility: visible; }
+.code-lang:hover,
+.code-lang:focus-visible { color: var(--color-mist); }
+.code-lang option {
+  background: var(--color-obsidian);
+  color: var(--color-mist);
+  text-transform: none;
+}
+
+/* Prism tokens. Colours only: bold/italic could change glyph widths and
+   misalign the copy with the text underneath. */
+.code-hl-text .token.comment,
+.code-hl-text .token.prolog,
+.code-hl-text .token.doctype,
+.code-hl-text .token.cdata { color: var(--code-comment); }
+.code-hl-text .token.punctuation,
+.code-hl-text .token.operator { color: var(--code-punct); }
+.code-hl-text .token.keyword,
+.code-hl-text .token.atrule,
+.code-hl-text .token.important,
+.code-hl-text .token.rule { color: var(--code-keyword); }
+.code-hl-text .token.string,
+.code-hl-text .token.char,
+.code-hl-text .token.attr-value,
+.code-hl-text .token.regex,
+.code-hl-text .token.url,
+.code-hl-text .token.inserted { color: var(--code-string); }
+.code-hl-text .token.number,
+.code-hl-text .token.boolean,
+.code-hl-text .token.constant,
+.code-hl-text .token.symbol { color: var(--code-number); }
+.code-hl-text .token.function,
+.code-hl-text .token.class-name,
+.code-hl-text .token.builtin { color: var(--code-function); }
+.code-hl-text .token.tag,
+.code-hl-text .token.selector,
+.code-hl-text .token.property,
+.code-hl-text .token.deleted { color: var(--code-tag); }
+.code-hl-text .token.attr-name,
+.code-hl-text .token.variable,
+.code-hl-text .token.title,
+.code-hl-text .token.key { color: var(--code-attr); }
 
 /* Highlight: the HTML stores a sentinel colour; the theme colour applies here. */
 .editor span[style*="rgb(255, 230, 0)"] {

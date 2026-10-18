@@ -13,7 +13,7 @@ The interface is available in English and Portuguese.
 | Give the memory a title | Double-click the titlebar; `Enter` saves, `Esc` cancels |
 | Checklist | Type `[]` at the start of a line; click the box to check it (the text gets struck through) |
 | Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` indent and outdent the item (also in checklists) |
-| Code | `` `text` `` (or `Ctrl+E` / the `</>` button in the format bar) for inline code; ` ```sql ` + `Enter` opens a code block (`Enter` on an empty last line leaves the block) |
+| Code | `` `text` `` (or `Ctrl+E` / the `</>` button in the format bar) for inline code; ` ```sql ` + `Enter` opens a code block (`Enter` on an empty last line leaves the block); the picker in the block's corner chooses the language used for syntax highlighting |
 | Bold, italic, underline, highlight | `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` (`⌘` on Mac), or select text and use the bar that appears above the selection |
 | Text size (small, normal, large) | The "A" buttons in the format bar, or `Ctrl+Shift+>` / `Ctrl+Shift+<` (`⌘⇧` on Mac) |
 | New memory | The `+` button, `Ctrl+N` (`⌘N`) or the Memo tray icon |
