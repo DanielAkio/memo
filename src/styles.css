@@ -66,30 +66,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 .note-name.is-empty { color: var(--color-ash); font-weight: 400; }
 
-/* Pencil left of the name, only while hovering it (or focused by keyboard):
-   it opens the title field. Hidden it takes no room (the negative margin
-   cancels the .identity gap); shown it slides the name aside. */
-.frame .titlebar .identity .rename-btn {
-  flex: none;
-  width: 0;
-  height: 22px;
-  margin: 0 -8px 0 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: width 120ms ease, margin 120ms ease, opacity 120ms ease;
-}
-.frame .titlebar .identity:hover .rename-btn,
-.frame .titlebar .identity .rename-btn:focus-visible {
-  width: 22px;
-  margin: 0 -4px 0 -2px;
-  opacity: 1;
-}
-.rename-btn svg { width: 13px; height: 13px; }
-.rename-btn[hidden] { display: none; }
 
-/* Collapsed (double-click on the titlebar): only the titlebar is left. */
-.is-collapsed .body,
-.is-collapsed .statusbar { display: none; }
 
 /* Field shown on double click to name the note. */
 .title-input {

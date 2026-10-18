@@ -20,11 +20,11 @@ window.MemoI18n = (() => {
       groupIs: 'Grupo: {name} (clique para mudar)',
       moveToGroup: 'Grupo da memória',
       groupName: 'Nome do grupo',
-      groupRename: 'Renomear grupo',
       groupColor: 'Cor do grupo',
+      managerColor: 'Cor do gerenciador',
       newNoteInGroup: 'Nova memória no grupo',
-      groupShowHint: 'Clique duplo para soltar as memórias',
-      groupHideHint: 'Clique duplo para recolher as memórias',
+      groupShowHint: 'Soltar as memórias',
+      groupHideHint: 'Recolher as memórias',
       groupCountOne: '1 memória',
       groupCountMany: '{n} memórias',
       deleteGroup: 'Excluir grupo',
@@ -37,7 +37,6 @@ window.MemoI18n = (() => {
       noteColor: 'Cor da memória',
       colorIs: 'Cor: {name}',
       colorCustomIs: 'Cor: Personalizada ({hex})',
-      editTitle: 'Editar título',
       noteTitle: 'Título da memória',
       untitled: 'Sem título',
       emptyNote: 'Memória vazia',
@@ -72,6 +71,9 @@ window.MemoI18n = (() => {
       copied: 'Copiado',
       plainText: 'Texto puro',
       textSize: 'Tamanho do texto',
+      zoomIn: 'Aumentar',
+      zoomOut: 'Diminuir',
+      zoomReset: 'Restaurar',
       smallText: 'Texto pequeno',
       normalText: 'Texto normal',
       largeText: 'Texto grande',
@@ -129,6 +131,7 @@ window.MemoI18n = (() => {
       application: 'Aplicativo',
       exit: 'Saída',
       tabHelp: 'Ajuda',
+      sections: 'Seção',
       helpIntro: 'Como usar o Memo.',
       openWelcome: 'Abrir a memória de boas-vindas',
       quit: 'Sair do Memo',
@@ -145,11 +148,11 @@ window.MemoI18n = (() => {
       groupIs: 'Group: {name} (click to change)',
       moveToGroup: 'Memory group',
       groupName: 'Group name',
-      groupRename: 'Rename group',
       groupColor: 'Group color',
+      managerColor: 'Manager color',
       newNoteInGroup: 'New memory in this group',
-      groupShowHint: 'Double-click to take the memories out',
-      groupHideHint: 'Double-click to put the memories away',
+      groupShowHint: 'Take the memories out',
+      groupHideHint: 'Put the memories away',
       groupCountOne: '1 memory',
       groupCountMany: '{n} memories',
       deleteGroup: 'Delete group',
@@ -161,7 +164,6 @@ window.MemoI18n = (() => {
       noteColor: 'Memory color',
       colorIs: 'Color: {name}',
       colorCustomIs: 'Color: Custom ({hex})',
-      editTitle: 'Edit title',
       noteTitle: 'Memory title',
       untitled: 'Untitled',
       emptyNote: 'Empty memory',
@@ -194,6 +196,9 @@ window.MemoI18n = (() => {
       copied: 'Copied',
       plainText: 'Plain text',
       textSize: 'Text size',
+      zoomIn: 'Larger',
+      zoomOut: 'Smaller',
+      zoomReset: 'Reset',
       smallText: 'Small text',
       normalText: 'Normal text',
       largeText: 'Large text',
@@ -250,6 +255,7 @@ window.MemoI18n = (() => {
       application: 'App',
       exit: 'Exit',
       tabHelp: 'Help',
+      sections: 'Section',
       helpIntro: 'How to use Memo.',
       openWelcome: 'Open the welcome memory',
       quit: 'Quit Memo',
@@ -323,16 +329,13 @@ window.MemoI18n = (() => {
           ['Nova memória', 'Botão + na barra, {{Mod+N}} ou o ícone do Memo na bandeja.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-name">Lista de compras</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
-          ['Título', 'Passe o mouse sobre o título e clique no lápis que aparece à esquerda dele; {{Enter}} salva e {{Esc}} cancela.',
+          ['Título', 'Clique duplo na barra de título; {{Enter}} salva e {{Esc}} cancela.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
-            + '<i data-icon="pencil" class="demo-hot"></i><span class="demo-name">Lista de compras</span></span>'],
-          ['Recolher', 'Clique duplo na barra de título: a memória fica só com a barra; outro clique duplo a expande.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
-            + '<span class="demo-name">Lista de compras</span><i data-icon="plus"></i><i data-icon="close"></i></span>'],
+            + '<span class="demo-input">Lista de compras</span></span>'],
           ['Cor', 'Clique na bolinha colorida ao lado do título. "Personalizada" abre qualquer cor.',
             '<span class="demo-dots"><span class="demo-dot" data-color="yellow"></span><span class="demo-dot" data-color="green"></span>'
             + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
-            + '<span class="demo-dot" data-color="iris"></span><span class="demo-dot" data-color="lavender"></span>'
+            + '<span class="demo-dot" data-color="iris"></span>'
             + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot demo-rainbow"></span><span class="demo-dot" data-color=""></span></span>'],
           ['Mover e redimensionar', 'Arraste pela barra de título ou pelas bordas. Perto da borda da tela ou de outra memória, ela gruda.'],
           ['Encaixar na tela', 'Arraste até encostar o cursor na borda da tela: aparece uma prévia da metade (laterais), de um quarto (cantos) ou da tela inteira (topo). Solte para encaixar; ao arrastar de novo, ela volta ao tamanho anterior.'],
@@ -367,16 +370,16 @@ window.MemoI18n = (() => {
       {
         title: 'Grupos',
         items: [
-          ['O que é', 'Uma barrinha que guarda várias memórias. Clique duplo nela: as memórias saem para onde estavam; outro clique duplo as recolhe para dentro dela.',
+          ['O que é', 'Uma barrinha que guarda várias memórias. O botão de seta solta todas elas para onde estavam; clicando de novo, elas são recolhidas para dentro do grupo.',
             '<span class="demo-bar"><i data-icon="pin"></i><i data-icon="folder"></i><span class="demo-name">Trabalho</span>'
-            + '<span class="demo-meta">3</span><i data-icon="close"></i></span>'],
+            + '<span class="demo-meta">3</span><i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Criar', 'Botão de pasta com + na barra do Gerenciador, ou no rodapé de uma memória (onde aparece "Sem grupo") escolha "Novo grupo": ele começa sem nome, como uma memória nova. Também pela caixa de grupo na lista do Gerenciador.'],
           ['Nova memória no grupo', 'O botão + da barra (ou {{Mod+N}} com o grupo em foco) cria uma memória já dentro do grupo, ao lado dele.',
             '<span class="demo-bar" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint"></i>'
             + '<span class="demo-name">Trabalho</span><span class="demo-meta">3</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
           ['Adicionar memórias', 'Arraste uma memória e solte sobre o grupo, ou escolha o grupo no rodapé da memória ou no Gerenciador. O nome do grupo aparece no rodapé.',
             '<span class="demo-foot"><i data-icon="folder"></i>Trabalho</span><span class="demo-foot-meta">12 palavras</span>'],
-          ['Renomear', 'Passe o mouse sobre o nome do grupo e clique no lápis; {{Enter}} salva e {{Esc}} cancela.'],
+          ['Renomear', 'Clique duplo na barra do grupo; {{Enter}} salva e {{Esc}} cancela.'],
           ['Cor', 'Clique no ícone de pasta do grupo e escolha a cor: ela pinta a pasta, a faixa da barra e o ícone do grupo no rodapé das memórias.',
             '<span class="demo-bar" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
             + '<span class="demo-name">Trabalho</span><span class="demo-meta">3</span><i data-icon="close"></i></span>'],
@@ -391,12 +394,11 @@ window.MemoI18n = (() => {
         title: 'Gerenciador do Memo',
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
-          ['Recolher', 'Clique duplo na barra do Gerenciador: ele fica só com a barra; outro clique duplo o expande (como nas memórias).'],
           ['Novo grupo', 'O botão de pasta com + na barra do Gerenciador cria um grupo vazio ao lado dele.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Gerenciador do Memo</span>'
+            '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
             + '<i data-icon="raise"></i><i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Trazer para a frente', 'O botão ao lado do + na barra do Gerenciador traz todas as memórias abertas para a frente das outras janelas, inclusive as minimizadas.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Gerenciador do Memo</span>'
+            '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
             + '<i data-icon="raise" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Buscar', 'Campo de busca nas abas Memórias e Lixeira, ou {{Mod+F}}.',
             '<span class="demo-field"><i data-icon="search"></i>compras</span>'],
@@ -413,6 +415,7 @@ window.MemoI18n = (() => {
         items: [
           ['Aparência', 'Tema (sistema, claro ou escuro) e idioma.',
             '<span class="demo-seg"><span>Sistema</span><span class="on">Claro</span><span>Escuro</span></span>'],
+          ['Tamanho do texto', 'Aumenta ou diminui o texto de todas as janelas do Memo: em Aparência, ou {{Mod++}} / {{Mod+-}}, {{Mod+0}} para voltar a 100%, e {{Mod}} + rolagem do mouse.'],
           ['Padrão', 'Cor, título e texto com que as memórias novas começam; cor e título dos grupos novos.'],
           ['Armazenamento', 'Pasta onde as memórias ficam salvas (uma pasta do Dropbox ou OneDrive leva para outros computadores) e backup: exportar e importar.'],
           ['Sair', 'Fechar as memórias não encerra o app, que continua na bandeja. Use "Sair do Memo" na bandeja ou em Configurações.'],
@@ -429,16 +432,13 @@ window.MemoI18n = (() => {
           ['New memory', 'The + button in the titlebar, {{Mod+N}} or the Memo tray icon.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-name">Shopping list</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
-          ['Title', 'Hover over the title and click the pencil that appears to its left; {{Enter}} saves and {{Esc}} cancels.',
+          ['Title', 'Double-click the titlebar; {{Enter}} saves and {{Esc}} cancels.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
-            + '<i data-icon="pencil" class="demo-hot"></i><span class="demo-name">Shopping list</span></span>'],
-          ['Collapse', 'Double-click the titlebar: the memory shrinks to its bar; double-click again to expand it.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
-            + '<span class="demo-name">Shopping list</span><i data-icon="plus"></i><i data-icon="close"></i></span>'],
+            + '<span class="demo-input">Shopping list</span></span>'],
           ['Color', 'Click the colored dot next to the title. "Custom" opens any color.',
             '<span class="demo-dots"><span class="demo-dot" data-color="yellow"></span><span class="demo-dot" data-color="green"></span>'
             + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
-            + '<span class="demo-dot" data-color="iris"></span><span class="demo-dot" data-color="lavender"></span>'
+            + '<span class="demo-dot" data-color="iris"></span>'
             + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot demo-rainbow"></span><span class="demo-dot" data-color=""></span></span>'],
           ['Move and resize', 'Drag by the titlebar or the edges. Near a screen edge or another memory, it snaps.'],
           ['Snap to the screen', 'Drag until the cursor touches a screen edge: a preview shows half the screen (sides), a quarter (corners) or the whole screen (top). Release to snap; drag it again to get its previous size back.'],
@@ -473,16 +473,16 @@ window.MemoI18n = (() => {
       {
         title: 'Groups',
         items: [
-          ['What it is', 'A small bar that holds several memories. Double-click it: the memories come out where they were; double-click again to put them back in.',
+          ['What it is', 'A small bar that holds several memories. Its arrow button takes them all out where they were; click it again to put them back in.',
             '<span class="demo-bar"><i data-icon="pin"></i><i data-icon="folder"></i><span class="demo-name">Work</span>'
-            + '<span class="demo-meta">3</span><i data-icon="close"></i></span>'],
+            + '<span class="demo-meta">3</span><i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Create', 'The folder-with-+ button in the Manager’s titlebar, or "New group" in a memory’s footer (where it says "No group"): it starts unnamed, like a new memory. Also from the group box in the Manager’s list.'],
           ['New memory in the group', 'The bar’s + button (or {{Mod+N}} with the group focused) creates a memory already in the group, next to it.',
             '<span class="demo-bar" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint"></i>'
             + '<span class="demo-name">Work</span><span class="demo-meta">3</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
           ['Add memories', 'Drag a memory and drop it on the group, or pick the group in the memory’s footer or in the Manager. The group’s name shows in the footer.',
             '<span class="demo-foot"><i data-icon="folder"></i>Work</span><span class="demo-foot-meta">12 words</span>'],
-          ['Rename', 'Hover over the group’s name and click the pencil; {{Enter}} saves and {{Esc}} cancels.'],
+          ['Rename', 'Double-click the group’s bar; {{Enter}} saves and {{Esc}} cancels.'],
           ['Color', 'Click the group’s folder icon and pick a color: it tints the folder, the bar’s stripe and the group icon in its memories’ footer.',
             '<span class="demo-bar" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
             + '<span class="demo-name">Work</span><span class="demo-meta">3</span><i data-icon="close"></i></span>'],
@@ -497,12 +497,11 @@ window.MemoI18n = (() => {
         title: 'Memo Manager',
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
-          ['Collapse', 'Double-click the Manager’s titlebar: it shrinks to its bar; double-click again to expand it (as for memories).'],
           ['New group', 'The folder-with-+ button in the Manager’s titlebar creates an empty group next to it.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Memo Manager</span>'
+            '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
             + '<i data-icon="raise"></i><i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Bring to front', 'The button next to + in the Manager’s titlebar brings every open memory in front of other windows, minimized ones included.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Memo Manager</span>'
+            '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
             + '<i data-icon="raise" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Search', 'The search box in the Memories and Trash tabs, or {{Mod+F}}.',
             '<span class="demo-field"><i data-icon="search"></i>shopping</span>'],
@@ -519,6 +518,7 @@ window.MemoI18n = (() => {
         items: [
           ['Appearance', 'Theme (system, light or dark) and language.',
             '<span class="demo-seg"><span>System</span><span class="on">Light</span><span>Dark</span></span>'],
+          ['Text size', 'Makes the text of every Memo window larger or smaller: in Appearance, or {{Mod++}} / {{Mod+-}}, {{Mod+0}} back to 100%, and {{Mod}} + mouse wheel.'],
           ['Defaults', 'Color, title and text that new memories start with; color and title of new groups.'],
           ['Storage', 'Folder where memories are saved (a Dropbox or OneDrive folder takes them to other computers) and backup: export and import.'],
           ['Quit', 'Closing memories doesn’t quit the app, which stays in the tray. Use "Quit Memo" in the tray or in Settings.'],

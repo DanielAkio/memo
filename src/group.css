@@ -74,25 +74,9 @@
 .group-name.is-empty { color: var(--color-ash); font-weight: 400; }
 .group-name[hidden], .title-input[hidden] { display: none; }
 
-/* Pencil left of the name, only while hovering it: renames the group.
-   Hidden it takes no room; shown it slides the name aside. */
-.frame .titlebar .identity .rename-btn {
-  flex: none;
-  width: 0;
-  height: 22px;
-  margin: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: width 120ms ease, margin 120ms ease, opacity 120ms ease;
-}
-.frame .titlebar .identity:hover .rename-btn,
-.frame .titlebar .identity .rename-btn:focus-visible {
-  width: 22px;
-  margin: 0 2px 0 -2px;
-  opacity: 1;
-}
-.rename-btn svg { width: 13px; height: 13px; }
-.rename-btn[hidden] { display: none; }
+/* Out/in button: arrow up = put the memories away, down = take them out. */
+.toggle-btn svg { transition: transform 160ms ease; }
+.frame:not(.is-open) .toggle-btn svg { transform: rotate(180deg); }
 
 /* Colour picker under the bar, as in a note (styles.css .menu). */
 .menu {

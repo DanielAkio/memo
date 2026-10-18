@@ -1,7 +1,7 @@
 // Memo — group bar: a compact window that holds notes (label group-{id};
-// Rust has the logic, main.rs "Groups"). Double-click takes the notes out
-// (back where they were) or puts them back in; the pencil shown while
-// hovering the name renames; ✕ twice deletes the group and sends its notes
+// Rust has the logic, main.rs "Groups"). The arrow button takes all the
+// notes out (back where they were) or puts them all back in; double-click
+// on the titlebar renames; ✕ twice deletes the group and sends its notes
 // to the trash; the pin keeps the bar above other apps, like a note's; the
 // folder icon picks the group's colour (folder and stripe); +
 // (or Mod+N) adds a new note straight into the group.
@@ -22,7 +22,7 @@
   const countEl = $('groupCount');
   const closeBtn = $('closeBtn');
   const pinBtn = $('pinBtn');
-  const renameBtn = $('renameBtn');
+  const toggleBtn = $('toggleBtn');
   const colorBtn = $('colorBtn');
   const colorMenu = $('colorMenu');
   const customColor = $('customColor');
@@ -50,7 +50,9 @@
     const pinLabel = t(group.pinned ? 'unpin' : 'pin');
     pinBtn.setAttribute('aria-label', pinLabel);
     pinBtn.title = `${pinLabel} (${pinKeys})`;
-    titlebar.title = t(group.open ? 'groupHideHint' : 'groupShowHint');
+    const toggleLabel = t(group.open ? 'groupHideHint' : 'groupShowHint');
+    toggleBtn.title = toggleLabel;
+    toggleBtn.setAttribute('aria-label', toggleLabel);
     // Colour: a label, or a custom #rrggbb straight into --note-color.
     const custom = isCustomColor(group.color);
     frame.dataset.color = custom ? 'custom' : group.color || '';
@@ -80,6 +82,7 @@
   }
 
   const toggle = () => invoke('toggle_group').catch((err) => console.error('toggle_group', err));
+  toggleBtn.addEventListener('click', toggle);
   const newNote = () => invoke('new_note_in_group').catch((err) => console.error('new_note_in_group', err));
   $('newBtn').addEventListener('click', newNote);
 
@@ -118,7 +121,6 @@
     renaming = true;
     nameInput.value = group.name;
     nameEl.hidden = true;
-    renameBtn.hidden = true;
     nameInput.hidden = false;
     nameInput.focus();
     nameInput.select();
@@ -130,7 +132,6 @@
     const value = nameInput.value.trim();
     nameInput.hidden = true;
     nameEl.hidden = false;
-    renameBtn.hidden = false;
     if (save && value !== group.name) {
       group.name = value;
       render();
@@ -143,7 +144,6 @@
     render();
   }
 
-  renameBtn.addEventListener('click', startRename);
   nameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); finishRename(true); }
     else if (e.key === 'Escape') { e.preventDefault(); finishRename(false); }
@@ -239,7 +239,7 @@
     frame,
     titlebar,
     resizeEdges: ['e', 'w'],
-    onDoubleClick: toggle,
+    onDoubleClick: startRename,
     onClose: deleteGroup,
   });
 
@@ -282,5 +282,6 @@
     await load();
   }
 
+  window.MemoZoom.attach(invoke);
   init().catch((err) => console.error('init', err));
 })();

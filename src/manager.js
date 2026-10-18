@@ -34,8 +34,8 @@
   let view = 'notes';
   let defaultColor = 'yellow';
   let reloadTimer = null;
-  // State of this window itself (pinned, collapsed), saved by Rust.
-  let win = { pinned: false, collapsed: false };
+  // State of this window itself (pinned), saved by Rust.
+  let win = { pinned: false };
 
   // ------------------------------------------------------------ helpers
 
@@ -126,6 +126,16 @@
     for (const tab of document.querySelectorAll('.tab')) {
       tab.setAttribute('aria-selected', String(tab.dataset.view === view));
     }
+    // The narrow-window select mirrors the tabs (labels with the counts).
+    const labels = {
+      notes: `${t('tabNotes')} (${active.length})`,
+      trash: `${t('tabTrash')} (${trashed.length})`,
+      settings: t('tabSettings'),
+      help: t('tabHelp'),
+    };
+    for (const option of $('viewSelect').options) option.textContent = labels[option.value];
+    $('viewSelect').value = view;
+    fitTabs();
     trashBar.hidden = view !== 'trash';
     emptyTrashBtn.disabled = trashed.length === 0;
     document.body.classList.toggle('notes-view', view === 'notes');
@@ -137,6 +147,7 @@
     $('listWrap').hidden = panel;
     $('searchBox').hidden = panel;
     renderDefaultColor();
+    if (view === 'settings') fitSettings();
     if (panel) return;
 
     const q = fold(search.value.trim());
@@ -399,7 +410,7 @@
     const theme = document.documentElement.dataset.theme;
     const light = theme ? theme === 'light' : systemLight.matches;
     const name = t(light ? 'black' : 'white');
-    for (const sw of document.querySelectorAll('.settings .swatch[data-color="mono"]')) {
+    for (const sw of document.querySelectorAll('.settings .swatch[data-color="mono"], #mgrSwatches .swatch[data-color="mono"]')) {
       sw.setAttribute('aria-label', name);
       sw.title = name;
     }
@@ -408,6 +419,43 @@
 
   // -------------------------------------------------------------- events
 
+  // Settings: labels stay left of their controls unless one control can't
+  // fit beside its label (it wraps below); then every row stacks (.stacked).
+  const settingsView = $('settingsView');
+  function fitSettings() {
+    if (settingsView.hidden) return;
+    settingsView.classList.remove('stacked');
+    // Label column: the widest label's natural width (labels don't wrap).
+    const widest = Math.max(...[...settingsView.querySelectorAll('.setting-label')].map((label) => {
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      return range.getBoundingClientRect().width;
+    }));
+    settingsView.style.setProperty('--label-w', `${Math.ceil(widest) + 2}px`);
+    const tight = [...settingsView.querySelectorAll('.setting')].some((row) => {
+      const label = row.querySelector('.setting-label');
+      const control = label && label.nextElementSibling;
+      return Boolean(control) && control.offsetTop > label.offsetTop + 4;
+    });
+    settingsView.classList.toggle('stacked', tight);
+  }
+  new ResizeObserver(fitSettings).observe(settingsView);
+
+  // Tabs or select: show the tabs, and fall back to the select only if a tab
+  // can't fit its label. Re-measured on resize (window, zoom), language and
+  // count changes.
+  const mgrHead = document.querySelector('.mgr-head');
+  function fitTabs() {
+    mgrHead.classList.remove('compact');
+    const tight = [...document.querySelectorAll('.tab')].some((tab) => tab.scrollWidth > tab.clientWidth + 1);
+    mgrHead.classList.toggle('compact', tight);
+  }
+  new ResizeObserver(fitTabs).observe(mgrHead);
+
+  $('viewSelect').addEventListener('change', (e) => {
+    view = e.target.value;
+    render();
+  });
   for (const tab of document.querySelectorAll('.tab')) {
     tab.addEventListener('click', () => {
       view = tab.dataset.view;
@@ -484,7 +532,6 @@
     if (mod && key === 'f') {
       e.preventDefault();
       if (view === 'settings' || view === 'help') { view = 'notes'; render(); }
-      if (win.collapsed) toggleCollapse(); // the search is hidden while collapsed
       search.focus();
       search.select();
     } else if (e.key === 'Escape' && document.activeElement === search && search.value) {
@@ -501,12 +548,76 @@
   // ------------------------------------------- window (like a note)
 
   function renderWindow() {
-    frame.classList.toggle('is-collapsed', Boolean(win.collapsed));
+    // Colour: stripe and manager icon, as in a note or group.
+    const color = win.color || '';
+    const custom = isCustomColor(color);
+    frame.dataset.color = custom ? 'custom' : color;
+    if (custom) frame.style.setProperty('--note-color', color);
+    else frame.style.removeProperty('--note-color');
+    if (custom) mgrCustomSwatch.style.setProperty('--sw', color);
+    else mgrCustomSwatch.style.removeProperty('--sw');
+    for (const sw of mgrColorMenu.querySelectorAll('.swatch')) {
+      const checked = sw === mgrCustomSwatch ? custom : sw.dataset.color === color;
+      sw.setAttribute('aria-checked', String(checked));
+    }
     pinBtn.setAttribute('aria-pressed', String(win.pinned));
     const pinLabel = t(win.pinned ? 'unpin' : 'pin');
     pinBtn.setAttribute('aria-label', pinLabel);
     pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
   }
+
+  // ------------------------------------------------- window colour picker
+
+  const mgrColorBtn = $('mgrColorBtn');
+  const mgrColorMenu = $('mgrColorMenu');
+  const mgrCustomColor = $('mgrCustomColor');
+  const mgrCustomSwatch = mgrColorMenu.querySelector('.swatch[data-color="custom"]');
+
+  function openMgrColors() {
+    mgrColorMenu.hidden = false;
+    frame.classList.add('menu-open');
+    mgrColorBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeMgrColors() {
+    if (mgrColorMenu.hidden) return;
+    mgrColorMenu.hidden = true;
+    frame.classList.remove('menu-open');
+    mgrColorBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function setMgrColor(color) {
+    win.color = color;
+    renderWindow();
+    invoke('set_manager_color', { color }).catch((err) => console.error('set_manager_color', err));
+  }
+
+  mgrColorBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    mgrColorMenu.hidden ? openMgrColors() : closeMgrColors();
+  });
+  $('mgrSwatches').addEventListener('click', (e) => {
+    const sw = e.target.closest('.swatch');
+    if (!sw) return;
+    if (sw === mgrCustomSwatch) {
+      mgrCustomColor.value = isCustomColor(win.color) ? win.color : '#f2c94c';
+      mgrCustomColor.click();
+      return;
+    }
+    setMgrColor(sw.dataset.color);
+    closeMgrColors();
+  });
+  mgrCustomColor.addEventListener('change', () => {
+    setMgrColor(mgrCustomColor.value.toLowerCase());
+    closeMgrColors();
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (!mgrColorMenu.hidden && !mgrColorMenu.contains(e.target) && !mgrColorBtn.contains(e.target)) closeMgrColors();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMgrColors();
+  });
+  window.addEventListener('blur', closeMgrColors);
 
   async function togglePin() {
     const next = !win.pinned;
@@ -521,19 +632,6 @@
     renderWindow();
   }
 
-  // Double-click on the titlebar: collapse to the titlebar, or expand back
-  // (as for notes).
-  async function toggleCollapse() {
-    win.collapsed = !win.collapsed;
-    renderWindow();
-    try {
-      await invoke('set_collapsed', { collapsed: win.collapsed });
-    } catch (err) {
-      console.error('set_collapsed', err);
-    }
-    if (!win.collapsed) search.focus();
-  }
-
   const newNote = () => invoke('new_note').catch((err) => console.error('new_note', err));
   const closeWindow = () => invoke('close_manager').catch((err) => console.error('close_manager', err));
 
@@ -541,7 +639,6 @@
     frame,
     titlebar: $('titlebar'),
     grip: $('grip'),
-    onDoubleClick: toggleCollapse,
     onClose: closeWindow,
   });
   pinBtn.addEventListener('click', togglePin);
@@ -636,10 +733,12 @@
     pin: PIN_SVG,
     'pin-on': PIN_SVG,
     plus: '<path d="M8 3.25v9.5M3.25 8h9.5"/>',
-    pencil: '<path d="M10.6 3.2l2.2 2.2-7 7-2.9.7.7-2.9z"/><path d="M9.3 4.5l2.2 2.2"/>',
+    manager: '<rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2"/><path d="M5.25 6h5.5M5.25 8.25h5.5M5.25 10.5h3.25"/>',
+    toggle: '<path d="M4.5 9.75 8 6.25l3.5 3.5"/>',
     'folder-plus': '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/>',
     folder: '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>',
-    raise: '<rect x="5.25" y="2.75" width="8" height="7" rx="1.5"/><path d="M2.75 6.25v5.5a1.5 1.5 0 0 0 1.5 1.5h5.5"/>',
+    // Layers: the top one is "in front" (not the copy icon's two sheets).
+    raise: '<path d="M8 2.5 13.75 5.5 8 8.5 2.25 5.5z"/><path d="M2.25 8.25 8 11.25l5.75-3"/><path d="M2.25 11 8 14l5.75-3"/>',
     close: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',
     search: '<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>',
     sort: '<path d="M5 3v10M2.75 10.75 5 13l2.25-2.25M11 13V3M8.75 5.25 11 3l2.25 2.25"/>',
@@ -711,8 +810,29 @@
 
   // --------------------------------------------------------------- init
 
+  // -------------------------------------------------------------- zoom
+  // Global zoom of every window, also changed by Mod +/−, Mod 0 and Mod +
+  // wheel anywhere (MemoZoom in chrome.js); Rust emits "zoom-changed".
+
+  function renderZoom(zoom) {
+    const pct = Math.round(zoom * 100);
+    $('zoomValue').textContent = `${pct}%`;
+    $('zoomReset').hidden = pct === 100;
+    $('zoomOut').title = `${t('zoomOut')} (${keys('Mod', '-')})`;
+    $('zoomIn').title = `${t('zoomIn')} (${keys('Mod', '+')})`;
+    $('zoomReset').title = `${t('zoomReset')} (${keys('Mod', '0')})`;
+  }
+
+  const stepZoom = (n) => invoke('change_zoom', { step: n }).catch((err) => console.error('change_zoom', err));
+  $('zoomOut').addEventListener('click', () => stepZoom(-1));
+  $('zoomIn').addEventListener('click', () => stepZoom(1));
+  $('zoomReset').addEventListener('click', () => stepZoom(0));
+  window.MemoZoom.attach(invoke);
+
   async function init() {
     win = await invoke('load_manager');
+    renderZoom(await invoke('get_zoom'));
+    listen('zoom-changed', (e) => renderZoom(e.payload));
     let lang;
     [languageSetting, lang] = await invoke('get_language');
     applyLanguage(languageSetting, lang);
@@ -727,7 +847,7 @@
     // defaults may differ, so start over.
     listen('store-replaced', () => location.reload());
     await Promise.all([load(), loadDefaults(), loadGroupDefaults(), loadDataDir()]);
-    if (!win.collapsed) search.focus();
+    search.focus();
   }
 
   init().catch((err) => console.error('init', err));

@@ -22,10 +22,15 @@
           </g>
         </svg>
       </button>
+      <!-- Manager icon in the window's colour: its colour picker (the
+           manager's counterpart of a note's dot or a group's folder). -->
+      <button class="mgr-icon" id="mgrColorBtn" type="button" data-i18n-attr="aria-label=managerColor,title=managerColor" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2"/><path d="M5.25 6h5.5M5.25 8.25h5.5M5.25 10.5h3.25"/></svg>
+      </button>
       <span class="mgr-title" data-i18n="manager"></span>
       <div class="actions">
         <button class="icon-btn" id="raiseBtn" type="button" data-i18n-attr="aria-label=bringAllToFront,title=bringAllToFront">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.25" y="2.75" width="8" height="7" rx="1.5"/><path d="M2.75 6.25v5.5a1.5 1.5 0 0 0 1.5 1.5h5.5"/></svg>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5 13.75 5.5 8 8.5 2.25 5.5z"/><path d="M2.25 8.25 8 11.25l5.75-3"/><path d="M2.25 11 8 14l5.75-3"/></svg>
         </button>
         <button class="icon-btn" id="newGroupBtn" type="button" data-i18n-attr="aria-label=newGroup,title=newGroup">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/></svg>
@@ -38,6 +43,22 @@
         </button>
       </div>
     </header>
+
+    <!-- Colour picker under the titlebar, as in a note or group. -->
+    <div class="menu color-menu" id="mgrColorMenu" hidden>
+      <div class="menu-label" data-i18n="managerColor"></div>
+      <div class="swatches" id="mgrSwatches">
+        <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
+        <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
+        <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
+        <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
+        <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
+        <button type="button" class="swatch" data-color="mono"></button>
+        <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+        <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+      </div>
+      <input type="color" class="custom-color" id="mgrCustomColor" tabindex="-1" aria-hidden="true">
+    </div>
 
     <div class="mgr-body">
       <header class="mgr-head">
@@ -55,6 +76,14 @@
             <span data-i18n="tabHelp"></span>
           </button>
         </div>
+        <!-- The same sections as one select, shown instead of the tabs when
+             the window is too narrow for them (manager.css). -->
+        <select class="field select view-select" id="viewSelect" data-i18n-attr="aria-label=sections">
+          <option value="notes"></option>
+          <option value="trash"></option>
+          <option value="settings"></option>
+          <option value="help"></option>
+        </select>
       </header>
 
       <!-- Search: only in the Memories and Trash tabs. -->
@@ -102,6 +131,16 @@
             <option value="en" lang="en">English</option>
           </select>
         </div>
+        <div class="setting">
+          <span class="setting-label" data-i18n="textSize"></span>
+          <!-- Global zoom of every window (also Mod +/−, Mod 0, Mod + wheel). -->
+          <div class="zoom-control">
+            <button type="button" class="btn zoom-step" id="zoomOut" data-i18n-attr="aria-label=zoomOut">−</button>
+            <span class="zoom-value" id="zoomValue">100%</span>
+            <button type="button" class="btn zoom-step" id="zoomIn" data-i18n-attr="aria-label=zoomIn">+</button>
+            <button type="button" class="btn" id="zoomReset" data-i18n="zoomReset" hidden></button>
+          </div>
+        </div>
         <h2 class="settings-title">
           <span data-i18n="newNotes"></span>
           <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=newNotesTip,data-tip=newNotesTip">i</span>
@@ -114,7 +153,6 @@
             <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
             <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
             <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
-            <button type="button" class="swatch" data-color="lavender" data-i18n-attr="aria-label=lavender,title=lavender"></button>
             <button type="button" class="swatch" data-color="mono"></button>
             <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
             <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
@@ -145,7 +183,6 @@
             <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
             <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
             <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
-            <button type="button" class="swatch" data-color="lavender" data-i18n-attr="aria-label=lavender,title=lavender"></button>
             <button type="button" class="swatch" data-color="mono"></button>
             <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
             <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>

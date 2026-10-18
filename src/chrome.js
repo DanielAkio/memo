@@ -3,6 +3,37 @@
 // monitor edges and other windows (and, when dragging, Snap to half, quarter
 // or full screen); double click and middle click (close) on the titlebar.
 
+// Global zoom shortcuts, in every window (and the manager's embedded
+// editor): Mod + / Mod − step the zoom of all windows by 10%, Mod 0 resets
+// it, Mod + wheel steps it too. Rust applies it everywhere (change_zoom).
+window.MemoZoom = {
+  attach(invoke) {
+    const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    const step = (n) => invoke('change_zoom', { step: n }).catch((err) => console.error('change_zoom', err));
+    document.addEventListener('keydown', (e) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod || e.altKey) return;
+      let n = null;
+      if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') n = 1;
+      else if (e.key === '-' || e.code === 'NumpadSubtract') n = -1;
+      else if (e.key === '0' || e.code === 'Numpad0') n = 0;
+      if (n === null) return;
+      e.preventDefault();
+      step(n);
+    });
+    // One step per wheel gesture tick (trackpads send many small events).
+    let last = 0;
+    document.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey && !(isMac && e.metaKey)) return;
+      e.preventDefault();
+      const now = Date.now();
+      if (!e.deltaY || now - last < 120) return;
+      last = now;
+      step(e.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
+  },
+};
+
 window.MemoChrome = {
   // `resizeEdges`: which edges/corners get a resize handle (a group bar only
   // changes width). `onDoubleClick` receives the mousedown event.

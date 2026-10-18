@@ -10,15 +10,14 @@ The interface is available in English and Portuguese.
 | Action | How |
 |--------|-----|
 | Pin / unpin on top of everything | Click the pin on the left of the titlebar, or `Ctrl+Shift+P` (`⌘⇧P` on Mac) |
-| Give the memory a title | Hover over the title and click the pencil; `Enter` saves, `Esc` cancels |
-| Collapse / expand to the titlebar | Double-click the titlebar |
+| Give the memory a title | Double-click the titlebar; `Enter` saves, `Esc` cancels |
 | Checklist | Type `[]` at the start of a line; click the box to check it (the text gets struck through) |
 | Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` indent and outdent the item (also in checklists) |
 | Code | `` `text` `` (or `Ctrl+E` / the `</>` button in the format bar) for inline code; ` ```sql ` + `Enter` opens a code block (`Enter` on an empty last line leaves the block); hovering the block shows its language picker (left) and a copy button (right) |
 | Bold, italic, underline, highlight | `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` (`⌘` on Mac), or select text and use the bar that appears above the selection |
 | Text size (small, normal, large) | The "A" buttons in the format bar, or `Ctrl+Shift+>` / `Ctrl+Shift+<` (`⌘⇧` on Mac) |
 | New memory | The `+` button, `Ctrl+N` (`⌘N`) or the Memo tray icon |
-| Groups | Click the folder-with-`+` button in the Memo Manager's titlebar, or choose "New group" in a memory's footer (bottom left): a small bar appears. Drop memories on it, or pick the group in their footer or in the Memo Manager; the footer then shows the group's name. Its `+` creates a memory straight in the group. Double-click the bar to take its memories out (back where they were) or put them away; hover over its name and click the pencil to rename it; its pin keeps it on top like a memory's; click its folder icon to give it a color; its `✕` twice deletes it and sends its memories to the trash |
+| Groups | Click the folder-with-`+` button in the Memo Manager's titlebar, or choose "New group" in a memory's footer (bottom left): a small bar appears. Drop memories on it, or pick the group in their footer or in the Memo Manager; the footer then shows the group's name. Its `+` creates a memory straight in the group. Its arrow button takes its memories out (back where they were) or puts them away; double-click the bar to rename it; its pin keeps it on top like a memory's; click its folder icon to give it a color; its `✕` twice deletes it and sends its memories to the trash |
 | Close | The `✕` button or a middle click (wheel) on the titlebar: the memory goes to the trash |
 | See all memories, search, sort, restore from the trash | Memo Manager: opens with the app, or from the tray icon → Memo Manager. The sort box next to the search orders the list by most recent or by title (A–Z). Memories in the trash for over 30 days are deleted |
 | Colour, title and text for new memories; colour and title for new groups | Memo Manager → Settings → Memory defaults / Group defaults (the text uses the same editor as a memory: checklist, bullets, code and formatting) |
@@ -28,9 +27,11 @@ The interface is available in English and Portuguese.
 | Language (Portuguese / English) | Memo Manager → Settings → Language: System (default), Português or English |
 | Folder where memories are saved | Memo Manager → Settings → Storage → Change… |
 | Back up / restore memories | Memo Manager → Settings → Storage → Export… (a `.json` with every memory not in the trash) / Import… (adds the file's memories; an existing one is only replaced if the file's copy is newer) |
+| Text size of every window | Memo Manager → Settings → Text size, or `Ctrl` `+` / `Ctrl` `-` (`Ctrl` `0` resets), or `Ctrl` + mouse wheel (`⌘` on Mac) |
 | Light / dark theme | Memo Manager → Settings → Theme: System (default), Light or Dark |
 | Help, shortcuts and the welcome memory | Memo Manager → Help: a guide to every feature, and a button that reopens the welcome memory |
-| Show all memories | Tray icon (menu bar on macOS), or the "bring all memories to the front" button next to `+` in the Memo Manager's titlebar |
+| Open the Memo Manager | Click the tray icon (Windows, macOS), or tray menu → Memo Manager |
+| Show all memories | Tray menu → Show all memories, or the "bring all memories to the front" button next to `+` in the Memo Manager's titlebar |
 | Quit | Tray icon → Quit Memo, or Memo Manager → Settings → Quit Memo |
 
 On launch, Memo shows the Memo Manager together with the memories that were open (the first time, with the welcome

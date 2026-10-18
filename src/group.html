@@ -8,9 +8,9 @@
   <link rel="stylesheet" href="group.css">
 </head>
 <body>
-  <!-- Group bar: a compact window holding notes. Double-click takes them out
-       or puts them back in; the folder icon (in the group's colour) picks
-       its colour; the pencil renames it (group.js). -->
+  <!-- Group bar: a compact window holding notes. The arrow button takes them
+       out or puts them back in; the folder icon (in the group's colour) picks
+       its colour; double-click on the bar renames it (group.js). -->
   <div class="frame group" id="frame" data-color="">
     <header class="titlebar" id="titlebar">
       <button class="icon-btn pin" id="pinBtn" type="button" aria-pressed="false">
@@ -31,16 +31,16 @@
         <svg class="folder-open" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 11.75v-7.5a1 1 0 0 1 1-1h2.9l1.5 1.5h3.6a1 1 0 0 1 1 1v1.25"/><path d="M2.5 11.75 4.2 7.6a1 1 0 0 1 .93-.6h8.37l-1.9 4.75a1 1 0 0 1-.93.6H2.5z"/></svg>
       </button>
       <div class="identity">
-        <!-- Shown while hovering the name: click to rename the group (left of the name). -->
-        <button class="icon-btn rename-btn" id="renameBtn" type="button" data-i18n-attr="aria-label=groupRename,title=groupRename">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.6 3.2l2.2 2.2-7 7-2.9.7.7-2.9z"/><path d="M9.3 4.5l2.2 2.2"/></svg>
-        </button>
         <span class="group-name" id="groupName"></span>
         <input class="title-input" id="nameInput" type="text" maxlength="60" spellcheck="false"
                data-i18n-attr="placeholder=groupName,aria-label=groupName" hidden>
       </div>
       <span class="group-count" id="groupCount"></span>
       <div class="actions">
+        <!-- Takes all the group's memories out, or puts them all back in. -->
+        <button class="icon-btn toggle-btn" id="toggleBtn" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 9.75 8 6.25l3.5 3.5"/></svg>
+        </button>
         <button class="icon-btn" id="newBtn" type="button" data-i18n-attr="aria-label=newNoteInGroup">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
         </button>
@@ -59,7 +59,6 @@
         <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
         <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
         <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
-        <button type="button" class="swatch" data-color="lavender" data-i18n-attr="aria-label=lavender,title=lavender"></button>
         <button type="button" class="swatch" data-color="mono"></button>
         <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
         <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>

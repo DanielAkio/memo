@@ -51,6 +51,11 @@ pub const TITLE_MAX: usize = 80;
 /// is always `TITLEBAR_H`).
 pub const GROUP_W: f64 = DEFAULT_W;
 
+/// Global zoom range and step (Settings, Mod +/-, Mod + wheel).
+pub const ZOOM_MIN: f64 = 0.7;
+pub const ZOOM_MAX: f64 = 1.6;
+pub const ZOOM_STEP: f64 = 0.1;
+
 /// Maximum length of a group's name, in characters.
 pub const GROUP_NAME_MAX: usize = 60;
 
@@ -70,13 +75,11 @@ pub struct Note {
     /// Physical position (screen pixels) of the top-left corner.
     pub x: Option<i32>,
     pub y: Option<i32>,
-    /// Logical size; `height` is always the expanded height.
+    /// Logical size.
     pub width: f64,
     pub height: f64,
     pub pinned: bool,
     pub color: String,
-    /// Collapsed to its titlebar (double-click on the titlebar toggles it).
-    pub collapsed: bool,
     pub created_at: u64,
     pub updated_at: u64,
     /// When it was trashed; `None` = active note.
@@ -108,7 +111,6 @@ impl Default for Note {
             height: DEFAULT_H,
             pinned: false,
             color: DEFAULT_COLOR.to_string(),
-            collapsed: false,
             created_at: 0,
             updated_at: 0,
             trashed_at: None,
@@ -125,6 +127,8 @@ struct FileData {
     next_seq: u32,
     /// Theme chosen in the manager (see `THEMES`); empty = "system".
     theme: String,
+    /// Global zoom of every window's content (1.0 = 100%); 0 = unset.
+    zoom: f64,
     /// Language chosen in Settings (see `LANGUAGES`); empty = "system".
     language: String,
     /// Position, size and state of the manager window.
@@ -193,12 +197,12 @@ pub struct ManagerState {
     /// Physical position of the top-left corner; `None` = centred.
     pub x: Option<i32>,
     pub y: Option<i32>,
-    /// Logical size; `height` is always the expanded height.
+    /// Logical size.
     pub width: f64,
     pub height: f64,
     pub pinned: bool,
-    /// Collapsed to its titlebar (double-click on the titlebar, as for notes).
-    pub collapsed: bool,
+    /// Colour label, as for notes and groups (stripe and icon).
+    pub color: String,
 }
 
 impl Default for ManagerState {
@@ -209,7 +213,7 @@ impl Default for ManagerState {
             width: 560.0,
             height: 640.0,
             pinned: false,
-            collapsed: false,
+            color: DEFAULT_COLOR.to_string(),
         }
     }
 }
@@ -538,6 +542,22 @@ impl Store {
 
     pub fn set_theme(&self, theme: &str) {
         self.data.lock().unwrap().theme = theme.to_string();
+        self.mark_dirty();
+    }
+
+    /// Global zoom (text and controls of every window), within
+    /// `ZOOM_MIN`..`ZOOM_MAX`; 1.0 when unset.
+    pub fn zoom(&self) -> f64 {
+        let zoom = self.data.lock().unwrap().zoom;
+        if zoom > 0.0 {
+            zoom.clamp(ZOOM_MIN, ZOOM_MAX)
+        } else {
+            1.0
+        }
+    }
+
+    pub fn set_zoom(&self, zoom: f64) {
+        self.data.lock().unwrap().zoom = zoom.clamp(ZOOM_MIN, ZOOM_MAX);
         self.mark_dirty();
     }
 

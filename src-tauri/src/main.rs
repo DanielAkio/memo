@@ -14,7 +14,7 @@ use std::{
 
 use store::{
     is_valid_color, now_ms, Config, Group, ManagerState, Note, Store, DEFAULT_H, DEFAULT_TEXT_MAX,
-    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, THEMES, TITLEBAR_H, TITLE_MAX,
+    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
 };
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -130,14 +130,7 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
     let label = label_for(&note.id);
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("Memo")
-        .inner_size(
-            note.width,
-            if note.collapsed {
-                TITLEBAR_H
-            } else {
-                note.height
-            },
-        )
+        .inner_size(note.width, note.height)
         .decorations(false)
         // Resized through the page's handles (resize_to), with snapping.
         .resizable(false)
@@ -157,6 +150,7 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
 
     apply_background(&window, &app.state::<Shared>().theme());
     track_geometry(app, &window);
+    let _ = window.set_zoom(app.state::<Shared>().zoom());
     Ok(window)
 }
 
@@ -174,14 +168,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     let state = store.manager();
     let window = WebviewWindowBuilder::new(app, MANAGER, WebviewUrl::App("manager.html".into()))
         .title(manager_title(store.effective_language()))
-        .inner_size(
-            state.width,
-            if state.collapsed {
-                TITLEBAR_H
-            } else {
-                state.height
-            },
-        )
+        .inner_size(state.width, state.height)
         .decorations(false)
         // Resized through the page's handles (resize_to), with snapping.
         .resizable(false)
@@ -199,6 +186,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     }
     apply_background(&window, &store.theme());
     track_geometry(app, &window);
+    let _ = window.set_zoom(store.zoom());
     window.show()?;
     window.set_focus()?;
     Ok(())
@@ -349,24 +337,16 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 let logical = size.to_logical::<f64>(scale);
                 match &kind {
                     Kind::Note(id) => {
-                        // While collapsed, the saved height stays the expanded one.
                         store.update(id, |n| {
-                            n.width = logical.width;
-                            if !n.collapsed && logical.height > TITLEBAR_H + 8.0 {
-                                n.height = logical.height;
-                            }
+                            (n.width, n.height) = (logical.width, logical.height)
                         });
                     }
                     Kind::Group(id) => {
                         store.update_group(id, |g| g.width = logical.width);
                     }
                     Kind::Manager => {
-                        // While collapsed, the saved height stays the expanded one.
                         store.update_manager(|m| {
-                            m.width = logical.width;
-                            if !m.collapsed && logical.height > TITLEBAR_H + 8.0 {
-                                m.height = logical.height;
-                            }
+                            (m.width, m.height) = (logical.width, logical.height)
                         });
                     }
                 }
@@ -971,14 +951,8 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
             drag.drop = target;
         }
     }
-    // Group bars and collapsed windows don't Snap (a half-screen titlebar).
-    let store = window.state::<Shared>();
-    let collapsed = if is_note(window) {
-        store.get(&id_of(window)).is_some_and(|n| n.collapsed)
-    } else {
-        !is_group(window) && store.manager().collapsed
-    };
-    drag.zone = if is_group(window) || collapsed || drag.drop.is_some() {
+    // Group bars don't Snap (a half-screen titlebar).
+    drag.zone = if is_group(window) || drag.drop.is_some() {
         None
     } else {
         snap_zone(window, cursor)
@@ -1095,7 +1069,8 @@ fn resize_to(
         MANAGER_MIN_W
     };
     let min_w = (min_w * targets.scale).round() as i32;
-    let min_h = (TITLEBAR_H * targets.scale).round() as i32;
+    let zoom = window.state::<Shared>().zoom();
+    let min_h = (TITLEBAR_H * zoom * targets.scale).round() as i32;
     if r - l < min_w {
         if edges.contains('w') {
             l = r - min_w;
@@ -1254,29 +1229,6 @@ fn set_color(
     store.update(&id_of(&window), |n| n.color = color);
     notify(&app);
     Ok(())
-}
-
-/// Double-click on a note's (or the manager's) titlebar: collapses it to the
-/// titlebar or expands it back to its saved height.
-#[tauri::command]
-fn set_collapsed(
-    window: WebviewWindow,
-    collapsed: bool,
-    store: State<'_, Shared>,
-) -> Result<(), String> {
-    let (width, expanded) = if is_note(&window) {
-        let note = store
-            .update(&id_of(&window), |n| n.collapsed = collapsed)
-            .ok_or("note not found")?;
-        (note.width, note.height)
-    } else {
-        let state = store.update_manager(|m| m.collapsed = collapsed);
-        (state.width, state.height)
-    };
-    let height = if collapsed { TITLEBAR_H } else { expanded };
-    window
-        .set_size(LogicalSize::new(width, height))
-        .map_err(|e| e.to_string())
 }
 
 // Creating and destroying windows from sync commands can deadlock on
@@ -1468,6 +1420,38 @@ fn change_language(app: AppHandle, language: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Global zoom, for the Settings control.
+#[tauri::command]
+fn get_zoom(store: State<'_, Shared>) -> f64 {
+    store.zoom()
+}
+
+/// Steps the global zoom (`step` × 10%, `0` = back to 100%) and applies it
+/// to every window: Settings' − / + / reset, Mod + / Mod − / Mod 0 and
+/// Mod + wheel in any window. Group bars, a titlebar tall, grow with it.
+/// Returns the new zoom; emits "zoom-changed".
+#[tauri::command]
+fn change_zoom(app: AppHandle, step: i32) -> f64 {
+    let store = app.state::<Shared>();
+    let zoom = if step == 0 {
+        1.0
+    } else {
+        ((store.zoom() + step as f64 * ZOOM_STEP) * 10.0).round() / 10.0
+    };
+    store.set_zoom(zoom);
+    let zoom = store.zoom();
+    for window in app.webview_windows().values().filter(|w| is_app_window(w)) {
+        let _ = window.set_zoom(zoom);
+        if is_group(window) {
+            if let Some(group) = store.group(&group_id_of(window)) {
+                let _ = window.set_size(LogicalSize::new(group.width, TITLEBAR_H * zoom));
+            }
+        }
+    }
+    let _ = app.emit("zoom-changed", zoom);
+    zoom
+}
+
 #[tauri::command]
 fn change_theme(app: AppHandle, theme: String) -> Result<(), String> {
     if !THEMES.contains(&theme.as_str()) {
@@ -1606,7 +1590,7 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
     }
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("group.html".into()))
         .title(group_title(&group.name))
-        .inner_size(group.width, TITLEBAR_H)
+        .inner_size(group.width, TITLEBAR_H * app.state::<Shared>().zoom())
         .decorations(false)
         .resizable(false)
         .always_on_top(group.pinned)
@@ -1623,6 +1607,7 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
     }
     apply_background(&window, &app.state::<Shared>().theme());
     track_geometry(app, &window);
+    let _ = window.set_zoom(app.state::<Shared>().zoom());
     window.show()?;
     Ok(window)
 }
@@ -1815,6 +1800,16 @@ fn rename_group(app: AppHandle, window: WebviewWindow, name: String) -> String {
     saved
 }
 
+/// Colour of the manager window (same labels as notes and groups).
+#[tauri::command]
+fn set_manager_color(color: String, store: State<'_, Shared>) -> Result<(), String> {
+    if !is_valid_color(&color) {
+        return Err(format!("unknown color: {color}"));
+    }
+    store.update_manager(|m| m.color = color);
+    Ok(())
+}
+
 /// Colour of the calling group (same labels as notes).
 #[tauri::command]
 fn set_group_color(app: AppHandle, window: WebviewWindow, color: String) -> Result<(), String> {
@@ -1828,15 +1823,19 @@ fn set_group_color(app: AppHandle, window: WebviewWindow, color: String) -> Resu
 }
 
 /// The bar is only a titlebar tall: while its colour picker is open the
-/// window grows to `height` (logical), then shrinks back. Not saved — a
-/// group's height is always `TITLEBAR_H`.
+/// window grows to `height` (CSS pixels, scaled by the zoom), then shrinks
+/// back. Not saved — a group's height is always a titlebar.
 #[tauri::command]
 fn set_group_height(window: WebviewWindow, height: f64) -> Result<(), String> {
+    let zoom = window.state::<Shared>().zoom();
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
     let size = window.inner_size().map_err(|e| e.to_string())?;
     let width = size.to_logical::<f64>(scale).width;
     window
-        .set_size(LogicalSize::new(width, height.max(TITLEBAR_H)))
+        .set_size(LogicalSize::new(
+            width,
+            (height * zoom).max(TITLEBAR_H * zoom),
+        ))
         .map_err(|e| e.to_string())
 }
 
@@ -2230,6 +2229,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             }
             _ => {}
         })
+        // A click on the tray icon opens the manager (Linux trays send no
+        // clicks: the menu has the manager item).
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
@@ -2237,7 +2238,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 ..
             } = event
             {
-                show_all(tray.app_handle());
+                let _ = open_manager(tray.app_handle());
             }
         })
         .build(app)?;
@@ -2305,7 +2306,6 @@ fn main() {
             save_text,
             set_pinned,
             set_color,
-            set_collapsed,
             set_title,
             new_note,
             trash_note,
@@ -2319,6 +2319,8 @@ fn main() {
             delete_forever,
             empty_trash,
             change_theme,
+            get_zoom,
+            change_zoom,
             get_language,
             change_language,
             show_welcome,
@@ -2343,6 +2345,7 @@ fn main() {
             load_group,
             rename_group,
             set_group_color,
+            set_manager_color,
             set_group_height,
             toggle_group,
             new_note_in_group,

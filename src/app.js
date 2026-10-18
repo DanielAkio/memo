@@ -11,6 +11,7 @@
   if (EMBED) document.documentElement.classList.add('embedded');
 
   const { invoke } = TAURI.core;
+  window.MemoZoom.attach(invoke);
   const appWindow = TAURI.window.getCurrentWindow();
 
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -31,7 +32,6 @@
   const nameEl = $('noteName');
   const titleInput = $('titleInput');
   const footBtn = $('footBtn');
-  const renameBtn = $('renameBtn');
   const groupMenu = $('groupMenu');
 
   let note = null;
@@ -74,7 +74,6 @@
     else frame.style.removeProperty('--note-color');
     customSwatch.style.setProperty('--sw', custom ? note.color : '');
     if (!custom) customSwatch.style.removeProperty('--sw');
-    frame.classList.toggle('is-collapsed', Boolean(note.collapsed));
 
     pinBtn.setAttribute('aria-pressed', String(note.pinned));
     const pinLabel = t(note.pinned ? 'unpin' : 'pin');
@@ -1161,7 +1160,7 @@
   }
 
   function updateFormatBar() {
-    const range = !selecting && note && !note.collapsed && document.activeElement === editor && selectionRange();
+    const range = !selecting && note && document.activeElement === editor && selectionRange();
     const rects = range ? [...range.getClientRects()].filter((r) => r.width || r.height) : [];
     if (!rects.length) { hideFormatBar(); return; }
 
@@ -1217,22 +1216,6 @@
     render();
   }
 
-  // Double-click on the titlebar: collapse to the titlebar, or expand back.
-  async function toggleCollapse() {
-    closeColors();
-    closeGroupMenu();
-    hideFormatBar();
-    if (renaming) await finishRename(true);
-    note.collapsed = !note.collapsed;
-    render();
-    try {
-      await invoke('set_collapsed', { collapsed: note.collapsed });
-    } catch (err) {
-      console.error('set_collapsed', err);
-    }
-    if (!note.collapsed) editor.focus();
-  }
-
   async function newNote() {
     closeColors();
     await flushText();
@@ -1255,14 +1238,13 @@
 
   // ------------------------------------------------------------- title
 
-  // The pencil next to the name (shown on hover) opens the title field.
+  // Double-click on the titlebar opens the title field.
   function startRename() {
     if (renaming) return;
     renaming = true;
     closeColors();
     titleInput.value = note.title;
     nameEl.hidden = true;
-    renameBtn.hidden = true;
     titleInput.hidden = false;
     titleInput.focus();
     titleInput.select();
@@ -1274,7 +1256,6 @@
     const value = titleInput.value.trim();
     titleInput.hidden = true;
     nameEl.hidden = false;
-    renameBtn.hidden = false;
     if (save && value !== note.title) {
       note.title = value;
       renderName();
@@ -1285,15 +1266,12 @@
       }
     }
     renderName();
-    if (!note.collapsed) editor.focus();
+    editor.focus();
   }
-  renameBtn.addEventListener('click', startRename);
 
   // ------------------------------------------------------- colour picker
 
-  // A collapsed note is only a titlebar: it expands to show the picker.
-  async function openColors() {
-    if (note.collapsed) await toggleCollapse();
+  function openColors() {
     hideFormatBar();
     colorMenu.hidden = false;
     frame.classList.add('menu-open');
@@ -1478,7 +1456,7 @@
       frame,
       titlebar,
       grip: $('grip'),
-      onDoubleClick: toggleCollapse,
+      onDoubleClick: startRename,
       onClose: closeNote,
     });
   }
@@ -1581,7 +1559,7 @@
       await loadGroups();
     }
     if (document.hasFocus()) frame.classList.add('is-focused');
-    if (!EMBED && !note.collapsed) {
+    if (!EMBED) {
       editor.focus();
       const r = document.createRange();
       r.selectNodeContents(editor);
