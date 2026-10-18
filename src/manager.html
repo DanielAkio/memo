@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gerenciador — Taxinha</title>
+  <title>Gerenciador — Memo</title>
   <link rel="stylesheet" href="base.css">
   <link rel="stylesheet" href="manager.css">
 </head>
@@ -49,11 +49,15 @@
             <span data-i18n="tabSettings"></span>
           </button>
         </div>
-        <label class="search" id="searchBox">
+      </header>
+
+      <!-- Busca: só nas abas Notas e Lixeira. -->
+      <div class="list-tools" id="searchBox">
+        <label class="search">
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/></svg>
           <input type="search" id="search" data-i18n-attr="placeholder=search,aria-label=searchNotes" spellcheck="false" autocomplete="off">
         </label>
-      </header>
+      </div>
 
       <div class="trash-bar" id="trashBar" hidden>
         <span data-i18n="trashInfo"></span>
@@ -108,10 +112,11 @@
                  autocomplete="off" data-i18n-attr="placeholder=untitled">
         </div>
         <div class="setting setting-top">
-          <label class="setting-label" for="defaultText" data-i18n="text"></label>
+          <label class="setting-label" for="defaultTextFrame" data-i18n="text"></label>
           <div class="field-wrap">
-            <textarea class="field" id="defaultText" rows="5" maxlength="5000" spellcheck="true"
-                      data-i18n-attr="placeholder=defaultTextPlaceholder"></textarea>
+            <!-- O mesmo editor da nota, em modo embutido: renderiza igual à nota. -->
+            <iframe class="field note-frame" id="defaultTextFrame" src="index.html?defaults"
+                    data-i18n-attr="title=text"></iframe>
           </div>
         </div>
         <h2 class="settings-title" data-i18n="application"></h2>

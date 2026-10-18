@@ -1,8 +1,8 @@
 {
-  "name": "taxinha",
+  "name": "memo",
   "version": "0.1.0",
   "private": true,
-  "description": "Notas adesivas que você fixa por cima de tudo — Windows, macOS e Linux",
+  "description": "Memórias adesivas que você fixa por cima de tudo — Windows, macOS e Linux",
   "license": "MIT",
   "scripts": {
     "dev": "tauri dev",

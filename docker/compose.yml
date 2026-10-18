@@ -2,14 +2,14 @@
 #   docker compose -f docker/compose.yml run --rm windows
 # node_modules, target e os caches ficam em volumes, para não misturar com os
 # arquivos do Windows e para os builds seguintes não recompilarem tudo.
-name: taxinha
+name: memo
 
 services:
   windows:
     build:
       context: .
       dockerfile: windows.Dockerfile
-    image: taxinha-build-windows
+    image: memo-build-windows
     working_dir: /app
     volumes:
       - ..:/app

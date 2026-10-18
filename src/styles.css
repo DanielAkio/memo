@@ -1,4 +1,4 @@
-/* Taxinha — janela da nota (título, editor, barra de status, menus). Fontes,
+/* Memo — janela da nota (título, editor, barra de status, menus). Fontes,
    tokens, temas, cores das etiquetas, seletor de cor e a moldura comum às
    janelas (barra de título, botões, tachinha, alça) ficam no base.css.
    Estilo segundo o docs/style.md ("midnight precision instrument").
@@ -6,6 +6,16 @@
    única cor na tela é a etiqueta da nota. O tema claro inverte a escala de
    cinza (mesmos nomes de token) e é escolhido no ícone da bandeja:
    <html data-theme="light|dark">, ou sem atributo para seguir o sistema. */
+
+/* Modo embutido (index.html?defaults, dentro do Gerenciador): só o editor,
+   sem barra, rodapé nem fio de cor, com o fundo do campo do Gerenciador. */
+html.embedded, html.embedded body, .embedded .frame { background: transparent; }
+.embedded .frame { box-shadow: none; }
+.embedded .frame::before,
+.embedded .titlebar,
+.embedded .statusbar { display: none; }
+.embedded .body { border-top: 0; }
+.embedded .editor { padding: 8px 12px; }
 
 /* ------------------------------------------- identidade (título, cor) */
 
@@ -49,7 +59,7 @@
   text-overflow: ellipsis;
   font-size: 13px;
   line-height: 1.2;
-  font-weight: 510;
+  font-weight: 500;
   letter-spacing: -0.010em;
   color: var(--color-mist);
 }
@@ -71,7 +81,7 @@
   caret-color: var(--color-paper);
   font-family: var(--font-ui);
   font-size: 13px;
-  font-weight: 510;
+  font-weight: 500;
   letter-spacing: -0.010em;
 }
 .title-input::placeholder { color: var(--color-ash); font-weight: 400; }
@@ -101,7 +111,6 @@
   color: var(--color-mist);
   caret-color: var(--color-paper);
   font-family: var(--font-ui);
-  font-feature-settings: "cv01" on, "ss03" on, "zero" on;
   font-size: 15px;
   font-weight: 400;
   line-height: 1.6;
@@ -111,10 +120,53 @@
   tab-size: 4;
 }
 .editor ::selection { background: var(--selection); color: var(--color-paper); }
-/* 600, não 590: o Chromium só reconhece negrito (queryCommandState e o
-   desligar do Ctrl+B) a partir de 600. A fonte é a mesma (Inter SemiBold). */
+/* Negrito em 600: o Chromium só reconhece negrito (queryCommandState e o
+   desligar do Ctrl+B) a partir de 600. */
 .editor b, .editor strong { font-weight: 600; color: var(--color-bone); }
 .editor u { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+/* Código na linha (`texto`) e bloco de código (```linguagem). */
+.editor code {
+  padding: 1px 5px;
+  border-radius: var(--radius-badge);
+  background: var(--overlay-active);
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+.editor pre.code {
+  position: relative;
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-button);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+  color: var(--color-bone);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.editor pre.code[data-lang]::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ash);
+  pointer-events: none;
+}
+
+/* Marca-texto: o HTML guarda uma cor-sentinela; aqui vale a cor do tema. */
+.editor span[style*="rgb(255, 230, 0)"] {
+  background-color: var(--highlight) !important;
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
 /* Tamanhos do <font size> gerado pelo editor (ver SIZES no app.js). */
 .editor font[size="2"] { font-size: 13px; }
 .editor font[size="3"] { font-size: inherit; }
@@ -134,11 +186,38 @@
   position: relative;
   padding-left: 24px;
 }
+/* Item todo num tamanho (data-size, do app.js): a linha assume o tamanho,
+   então a caixa (0.8em) e o risco ficam no meio do texto. Mesmos px do
+   .editor font[size]. */
+.check[data-size="2"], .bullet[data-size="2"] { font-size: 13px; }
+.check[data-size="5"], .bullet[data-size="5"] { font-size: 20px; }
+
+/* Item com marcador ("- "): bolinha preenchida no lugar da caixa. */
+.bullet {
+  position: relative;
+  padding-left: 24px;
+}
+.bullet::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: calc(var(--check-mid, 0.8em) - 3px);
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-fog);
+}
+
+/* Recuo (Tab): 20px por nível, para checklist e marcador. */
+.check[data-level="1"], .bullet[data-level="1"] { margin-left: 20px; }
+.check[data-level="2"], .bullet[data-level="2"] { margin-left: 40px; }
+.check[data-level="3"], .bullet[data-level="3"] { margin-left: 60px; }
+.check[data-level="4"], .bullet[data-level="4"] { margin-left: 80px; }
 .check::before {
   content: "";
   position: absolute;
   left: 1px;
-  top: calc(0.8em - 7px);
+  top: calc(var(--check-mid, 0.8em) - 7px);
   width: 13px;
   height: 13px;
   border-radius: var(--radius-badge);
@@ -149,7 +228,7 @@
   content: "";
   position: absolute;
   left: 6px;
-  top: calc(0.8em - 5px);
+  top: calc(var(--check-mid, 0.8em) - 5px);
   width: 3px;
   height: 7px;
   transform: rotate(45deg);
@@ -254,14 +333,16 @@
   line-height: 1;
   cursor: default;
 }
-.fmt-btn b { font-weight: 590; }
+.fmt-btn b { font-weight: 600; }
 .fmt-btn u { text-underline-offset: 2px; }
 .fmt-btn:hover { background: var(--overlay-hover); color: var(--color-mist); }
 .fmt-btn[aria-pressed="true"] { background: var(--overlay-active); color: var(--color-paper); }
 
+.fmt-mark svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.fmt-mark[aria-pressed="true"] { color: var(--color-paper); }
 .fmt-sep { width: 1px; margin: 4px 2px; background: var(--color-graphite); }
 .fmt-sizes { display: flex; gap: 2px; }
-.fmt-size { width: 24px; font-weight: 510; }
+.fmt-size { width: 24px; font-weight: 500; }
 .fmt-size.sz-s { font-size: 11px; }
 .fmt-size.sz-m { font-size: 14px; }
 .fmt-size.sz-l { font-size: 18px; }

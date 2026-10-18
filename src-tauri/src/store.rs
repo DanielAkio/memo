@@ -118,6 +118,8 @@ struct FileData {
     /// definidos no gerenciador. Vazios = nota em branco.
     default_title: String,
     default_text: String,
+    /// O mesmo texto padrão com a formatação (HTML do editor da nota).
+    default_html: String,
     notes: Vec<Note>,
 }
 
@@ -183,7 +185,7 @@ impl Store {
                     // Nunca sobrescreve um arquivo ilegível: guarda uma cópia antes.
                     let backup = path.with_extension(format!("corrompido-{}.json", now_ms()));
                     let _ = fs::copy(&path, &backup);
-                    eprintln!("taxinha: notes.json ilegível ({err}); cópia em {backup:?}");
+                    eprintln!("memo: notes.json ilegível ({err}); cópia em {backup:?}");
                     FileData::default()
                 }
             },
@@ -288,16 +290,25 @@ impl Store {
         self.mark_dirty();
     }
 
-    /// Título e texto com que as notas novas nascem.
-    pub fn new_note_defaults(&self) -> (String, String) {
+    /// Título, texto e HTML com que as notas novas nascem.
+    pub fn new_note_defaults(&self) -> (String, String, String) {
         let data = self.data.lock().unwrap();
-        (data.default_title.clone(), data.default_text.clone())
+        (
+            data.default_title.clone(),
+            data.default_text.clone(),
+            data.default_html.clone(),
+        )
     }
 
-    pub fn set_new_note_defaults(&self, title: String, text: String) {
+    pub fn set_default_title(&self, title: String) {
+        self.data.lock().unwrap().default_title = title;
+        self.mark_dirty();
+    }
+
+    pub fn set_default_content(&self, text: String, html: String) {
         let mut data = self.data.lock().unwrap();
-        data.default_title = title;
         data.default_text = text;
+        data.default_html = html;
         drop(data);
         self.mark_dirty();
     }
@@ -307,7 +318,7 @@ impl Store {
         if note.is_blank() {
             return true;
         }
-        let (title, text) = self.new_note_defaults();
+        let (title, text, _) = self.new_note_defaults();
         note.title == title && note.text == text
     }
 
@@ -358,7 +369,7 @@ impl Store {
 
     pub fn create(&self, pos: Option<(i32, i32)>) -> Note {
         let color = self.default_color();
-        let (title, text) = self.new_note_defaults();
+        let (title, text, html) = self.new_note_defaults();
         let note = {
             let mut data = self.data.lock().unwrap();
             let seq = data.next_seq.max(1);
@@ -372,6 +383,7 @@ impl Store {
                 color,
                 title,
                 text,
+                html,
                 created_at: now,
                 updated_at: now,
                 ..Default::default()
@@ -420,7 +432,7 @@ impl Store {
             fs::rename(&tmp, &self.path)
         });
         if let Err(err) = result {
-            eprintln!("taxinha: falha ao salvar notas: {err}");
+            eprintln!("memo: falha ao salvar notas: {err}");
             self.mark_dirty();
         }
     }

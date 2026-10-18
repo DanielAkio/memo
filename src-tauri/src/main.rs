@@ -27,8 +27,8 @@ const PAPER: Color = Color(251, 251, 250, 255);
 /// De quanto em quanto tempo a lixeira é verificada com o app aberto (1 h).
 const PURGE_EVERY: Duration = Duration::from_secs(3600);
 const SAVE_EVERY: Duration = Duration::from_millis(800);
-/// Distância (lógica) de uma borda do monitor em que a nota gruda nela
-/// durante o arraste.
+/// Distância (lógica) de uma borda do monitor ou de outra janela em que a
+/// nota gruda nela durante o arraste.
 const SNAP_DISTANCE: f64 = 16.0;
 /// Espaço (lógico) entre duas notas grudadas, igual nos quatro lados; também
 /// é o espaço entre uma nota nova e a nota que a criou.
@@ -84,7 +84,7 @@ fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow
         note.height
     };
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
-        .title("Taxinha")
+        .title("Memo")
         .inner_size(note.width, height)
         .decorations(false)
         // Redimensiona pelas alças da página (resize_to), com ímã.
@@ -154,22 +154,22 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
 /// Título da janela "Gerenciador" (barra de tarefas) no idioma da interface.
 fn manager_title(lang: &str) -> &'static str {
     if lang == "en" {
-        "Manager — Taxinha"
+        "Memory Manager — Memo"
     } else {
-        "Gerenciador — Taxinha"
+        "Gerenciador de Memórias — Memo"
     }
 }
 
 /// Textos do menu da bandeja no idioma da interface.
 fn tray_labels(lang: &str) -> [&'static str; 4] {
     if lang == "en" {
-        ["New note", "Show all notes", "Manager", "Quit Taxinha"]
+        ["New memory", "Show all memories", "Memory Manager", "Quit Memo"]
     } else {
         [
-            "Nova nota",
-            "Mostrar todas as notas",
-            "Gerenciador",
-            "Sair da Taxinha",
+            "Nova memória",
+            "Mostrar todas as memórias",
+            "Gerenciador de Memórias",
+            "Sair do Memo",
         ]
     }
 }
@@ -192,7 +192,7 @@ fn set_language(app: &AppHandle, language: &str) {
 fn refresh_tray(app: &AppHandle) {
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
-        if let (Some(tray), Ok(menu)) = (handle.tray_by_id("taxinha"), build_tray_menu(&handle)) {
+        if let (Some(tray), Ok(menu)) = (handle.tray_by_id("memo"), build_tray_menu(&handle)) {
             let _ = tray.set_menu(Some(menu));
         }
     });
@@ -285,7 +285,7 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
     });
 }
 
-/// Abre a nota de boas-vindas (primeira execução ou "Como usar a Taxinha" na
+/// Abre a nota de boas-vindas (primeira execução ou "Como usar o Memo" na
 /// janela "Gerenciador"). Se uma cópia intacta já estiver aberta, só traz ela para frente.
 ///
 /// `pos` posiciona a nota quando ela é criada (ao lado do Gerenciador).
@@ -364,12 +364,13 @@ impl SnapTargets {
             reach,
             scale,
         };
+        // Bordas do monitor: mesmo espaço (`SNAP_GAP`) que fica entre as notas.
         if let Some(m) = &monitor {
             let a = m.work_area();
-            t_.left.push(a.position.x);
-            t_.right.push(a.position.x + a.size.width as i32);
-            t_.top.push(a.position.y);
-            t_.bottom.push(a.position.y + a.size.height as i32);
+            t_.left.push(a.position.x + gap);
+            t_.right.push(a.position.x + a.size.width as i32 - gap);
+            t_.top.push(a.position.y + gap);
+            t_.bottom.push(a.position.y + a.size.height as i32 - gap);
         }
         for other in window.app_handle().webview_windows().into_values() {
             if other.label() == window.label() || !other.is_visible().unwrap_or(false) {
@@ -674,13 +675,14 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     let monitor = parent.current_monitor().ok()??;
     let scale = monitor.scale_factor();
     let area = monitor.work_area();
-    let (left_edge, top_edge) = (area.position.x, area.position.y);
-    let right_edge = left_edge + area.size.width as i32;
-    let bottom_edge = top_edge + area.size.height as i32;
+    let gap = (SNAP_GAP * scale).round() as i32;
+    // Área útil recuada do mesmo espaço do ímã: a nota nova não encosta na borda.
+    let (left_edge, top_edge) = (area.position.x + gap, area.position.y + gap);
+    let right_edge = area.position.x + area.size.width as i32 - gap;
+    let bottom_edge = area.position.y + area.size.height as i32 - gap;
 
     let w = (DEFAULT_W * scale).round() as i32;
     let h = (DEFAULT_H * scale).round() as i32;
-    let gap = (SNAP_GAP * scale).round() as i32;
     let parent_right = pos.x + size.width as i32;
 
     // Canto visível da nota nova.
@@ -831,7 +833,7 @@ fn change_theme(app: AppHandle, theme: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Reabre a nota de boas-vindas ("Como usar a Taxinha").
+/// Reabre a nota de boas-vindas ("Como usar o Memo").
 #[tauri::command]
 async fn show_welcome(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     open_welcome(&app, beside(&window)).map_err(|e| e.to_string())
@@ -849,17 +851,24 @@ fn get_default_color(store: State<'_, Shared>) -> String {
     store.default_color()
 }
 
-/// Título e texto padrão das notas novas, para o gerenciador.
+/// Título, texto e HTML padrão das notas novas, para o gerenciador.
 #[tauri::command]
-fn get_new_note_defaults(store: State<'_, Shared>) -> (String, String) {
+fn get_new_note_defaults(store: State<'_, Shared>) -> (String, String, String) {
     store.new_note_defaults()
 }
 
 #[tauri::command]
-fn set_new_note_defaults(title: String, text: String, store: State<'_, Shared>) {
-    let title: String = title.trim().chars().take(TITLE_MAX).collect();
-    let text: String = text.chars().take(DEFAULT_TEXT_MAX).collect();
-    store.set_new_note_defaults(title, text);
+fn set_default_title(title: String, store: State<'_, Shared>) {
+    store.set_default_title(title.trim().chars().take(TITLE_MAX).collect());
+}
+
+/// Conteúdo padrão das notas novas, editado no Gerenciador com o mesmo editor
+/// da nota (index.html?defaults): texto puro e HTML, como uma nota guarda.
+#[tauri::command]
+fn set_default_content(text: String, html: String, store: State<'_, Shared>) {
+    let text = text.chars().take(DEFAULT_TEXT_MAX).collect();
+    let html = html.chars().take(DEFAULT_TEXT_MAX * 10).collect();
+    store.set_default_content(text, html);
 }
 
 #[tauri::command]
@@ -912,10 +921,10 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     #[cfg(not(target_os = "macos"))]
     let icon = tauri::include_image!("icons/tray.png");
 
-    TrayIconBuilder::with_id("taxinha")
+    TrayIconBuilder::with_id("memo")
         .icon(icon)
         .icon_as_template(cfg!(target_os = "macos"))
-        .tooltip("Taxinha")
+        .tooltip("Memo")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -947,6 +956,27 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 }
 
 // ---------------------------------------------------------------------------
+
+/// O app se chamava Taxinha, com o identificador `br.taxinha.notas`, que dá
+/// nome à pasta de dados. Na primeira execução como Memo, sem `notes.json`
+/// na pasta nova, copia o da pasta antiga (que fica intacta, como backup).
+fn migrate_from_taxinha(dir: &std::path::Path) {
+    let new = dir.join("notes.json");
+    if new.exists() {
+        return;
+    }
+    let Some(old) = dir
+        .parent()
+        .map(|p| p.join("br.taxinha.notas").join("notes.json"))
+    else {
+        return;
+    };
+    if old.exists() {
+        if let Err(err) = std::fs::copy(&old, &new) {
+            eprintln!("memo: não foi possível copiar as notas da Taxinha: {err}");
+        }
+    }
+}
 
 fn main() {
     // No Wayland o compositor ignora "sempre no topo". Rodando via XWayland o
@@ -994,11 +1024,13 @@ fn main() {
             get_default_color,
             set_default_color,
             get_new_note_defaults,
-            set_new_note_defaults
+            set_default_title,
+            set_default_content
         ])
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
+            migrate_from_taxinha(&dir);
             let store: Shared = Arc::new(Store::load(dir.join("notes.json")));
             app.manage(store.clone());
 
@@ -1039,7 +1071,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("não foi possível iniciar a Taxinha");
+        .expect("não foi possível iniciar o Memo");
 
     app.run(|app, event| match event {
         // Fechar a última nota não encerra o app: ele continua na bandeja.

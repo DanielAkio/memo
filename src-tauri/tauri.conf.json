@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Taxinha",
+  "productName": "Memo",
   "version": "0.1.0",
-  "identifier": "br.taxinha.notas",
+  "identifier": "br.memo.notas",
   "build": {
     "frontendDist": "../src"
   },
@@ -17,8 +17,8 @@
     "active": true,
     "targets": "all",
     "category": "Productivity",
-    "shortDescription": "Notas adesivas que ficam por cima de tudo",
-    "longDescription": "Taxinha é um bloco de notas adesivas para Windows, macOS e Linux. Cada nota é uma janela própria, e um clique na tachinha a mantém por cima de todos os outros aplicativos.",
+    "shortDescription": "Memórias adesivas que ficam por cima de tudo",
+    "longDescription": "Memo guarda suas memórias em notas adesivas para Windows, macOS e Linux. Cada memória é uma janela própria, e um clique na tachinha a mantém por cima de todos os outros aplicativos.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

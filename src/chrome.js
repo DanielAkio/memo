@@ -1,9 +1,9 @@
-// Taxinha — comportamento comum às janelas sem moldura (nota e "Gerenciador"):
+// Memo — comportamento comum às janelas sem moldura (nota e "Gerenciador"):
 // arrastar pela barra de título e redimensionar pelas bordas, os dois com ímã
 // nas bordas do monitor e das outras janelas; clique duplo e clique do meio
 // (fechar) na barra.
 
-window.TaxinhaChrome = {
+window.MemoChrome = {
   attach({ frame, titlebar, grip, onDoubleClick, onClose }) {
     const { invoke } = window.__TAURI__.core;
     const appWindow = window.__TAURI__.window.getCurrentWindow();

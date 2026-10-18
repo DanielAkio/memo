@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Taxinha</title>
+  <title>Memo</title>
   <link rel="stylesheet" href="base.css">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -66,6 +66,12 @@
       <button type="button" class="fmt-btn" data-cmd="bold" data-key="B" data-i18n-attr="aria-label=bold" aria-pressed="false"><b data-i18n="boldLetter"></b></button>
       <button type="button" class="fmt-btn" data-cmd="italic" data-key="I" data-i18n-attr="aria-label=italic" aria-pressed="false"><i data-i18n="italicLetter"></i></button>
       <button type="button" class="fmt-btn" data-cmd="underline" data-key="U" data-i18n-attr="aria-label=underline" aria-pressed="false"><u data-i18n="underlineLetter"></u></button>
+      <button type="button" class="fmt-btn fmt-mark" data-cmd="highlight" data-key="H" data-shift="1" data-i18n-attr="aria-label=highlight" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.2 2.8l3 3-6.4 6.4H3.8v-3z"/><path d="M2.5 14.5h11"/></svg>
+      </button>
+      <button type="button" class="fmt-btn fmt-mark" data-cmd="code" data-key="E" data-i18n-attr="aria-label=code" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/></svg>
+      </button>
       <span class="fmt-sep" aria-hidden="true"></span>
       <span class="fmt-sizes" role="group" data-i18n-attr="aria-label=textSize">
         <button type="button" class="fmt-btn fmt-size sz-s" data-size="2" data-i18n-attr="aria-label=smallText" aria-pressed="false">A</button>

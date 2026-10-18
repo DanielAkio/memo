@@ -1,7 +1,7 @@
 [package]
-name = "taxinha"
+name = "memo"
 version = "0.1.0"
-description = "Taxinha — notas adesivas que você fixa por cima de tudo"
+description = "Memo — memórias adesivas que você fixa por cima de tudo"
 authors = ["Daniel Akio Teixeira"]
 license = "MIT"
 edition = "2021"

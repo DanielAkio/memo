@@ -1,4 +1,4 @@
-/* Taxinha — janela "Gerenciador" (gerenciamento das notas e da lixeira).
+/* Memo — janela "Gerenciador" (gerenciamento das notas e da lixeira).
    Tokens, temas, cores das etiquetas, o seletor de cor e a moldura comum
    (barra de título, botões, tachinha, alça) vêm do base.css. */
 
@@ -14,7 +14,7 @@ body {
   min-width: 0;
   padding-left: 4px;
   font-size: 13px;
-  font-weight: 510;
+  font-weight: 500;
   letter-spacing: -0.010em;
   color: var(--color-mist);
 }
@@ -54,7 +54,7 @@ body {
   background: transparent;
   color: var(--color-fog);
   font-size: 13px;
-  font-weight: 510;
+  font-weight: 500;
   letter-spacing: -0.010em;
   cursor: default;
 }
@@ -66,15 +66,19 @@ body {
   color: var(--color-ash);
 }
 
+/* Linha da busca, no alto das abas Notas e Lixeira. */
+.list-tools {
+  flex: none;
+  padding: 12px 16px 4px;
+}
+.list-tools[hidden] { display: none; }
+
 .search {
-  flex: 1;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  max-width: 260px;
-  height: 28px;
-  margin-left: auto;
+  height: 30px;
   padding: 0 8px;
   border-radius: var(--radius-button);
   background: var(--overlay-subtle);
@@ -109,8 +113,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--color-graphite);
+  padding: 6px 16px 8px;
   color: var(--color-ash);
   font-size: 12px;
 }
@@ -171,7 +174,7 @@ body {
 }
 .row-title {
   font-size: 13px;
-  font-weight: 510;
+  font-weight: 500;
   letter-spacing: -0.010em;
   color: var(--color-mist);
 }
@@ -210,7 +213,7 @@ body {
   box-shadow: var(--hairline);
   color: var(--color-mist);
   font-size: 12px;
-  font-weight: 510;
+  font-weight: 500;
   white-space: nowrap;
   cursor: default;
 }
@@ -243,7 +246,7 @@ body {
 .settings-title {
   margin: 20px 0 6px;
   font-size: 11px;
-  font-weight: 510;
+  font-weight: 500;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--color-ash);
@@ -287,6 +290,16 @@ body {
 }
 textarea.field { resize: vertical; min-height: 84px; }
 
+/* Editor do texto padrão: a página da nota embutida (index.html?defaults). */
+.note-frame {
+  display: block;
+  height: 180px;
+  min-height: 96px;
+  padding: 0;
+  resize: vertical;
+  overflow: hidden;
+}
+
 /* Lista de escolha (idioma): mesmo visual dos campos, com seta própria. */
 .select {
   flex: none;
@@ -319,7 +332,7 @@ textarea.field { resize: vertical; min-height: 84px; }
   box-shadow: inset 0 0 0 1px var(--color-smoke);
   color: var(--color-ash);
   font-size: 10px;
-  font-weight: 590;
+  font-weight: 600;
   font-style: normal;
   text-transform: none;
   letter-spacing: 0;
@@ -368,7 +381,7 @@ textarea.field { resize: vertical; min-height: 84px; }
   background: transparent;
   color: var(--color-fog);
   font-size: 12px;
-  font-weight: 510;
+  font-weight: 500;
   cursor: default;
 }
 .seg:hover { color: var(--color-mist); }

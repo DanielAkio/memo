@@ -53,14 +53,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: "Taxinha ${{ github.ref_name }}"
+          releaseName: "Memo ${{ github.ref_name }}"
           releaseDraft: true
           args: ${{ matrix.args }}
 
       - name: Guardar instaladores
         uses: actions/upload-artifact@v4
         with:
-          name: taxinha-${{ matrix.platform }}${{ matrix.args != '' && '-' || '' }}${{ contains(matrix.args, 'aarch64') && 'arm64' || contains(matrix.args, 'x86_64') && 'x64' || '' }}
+          name: memo-${{ matrix.platform }}${{ matrix.args != '' && '-' || '' }}${{ contains(matrix.args, 'aarch64') && 'arm64' || contains(matrix.args, 'x86_64') && 'x64' || '' }}
           path: |
             src-tauri/target/**/release/bundle/**/*.msi
             src-tauri/target/**/release/bundle/**/*-setup.exe

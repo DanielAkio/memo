@@ -1,4 +1,4 @@
-// Taxinha — janela "Gerenciador": lista as notas e a lixeira, com busca, e define a
+// Memo — janela "Gerenciador": lista as notas e a lixeira, com busca, e define a
 // cor das notas novas e o tema. A janela se comporta como uma nota (barra com
 // tachinha, nova nota, recolher e fechar; arraste com ímã; alça), sem título
 // editável nem texto. Os dados vêm do Rust (list_notes) e a lista é
@@ -14,7 +14,7 @@
     : parts.map((p) => ({ Mod: 'Ctrl' }[p] || p)).join('+'));
 
   const $ = (id) => document.getElementById(id);
-  const I18n = window.TaxinhaI18n;
+  const I18n = window.MemoI18n;
   const { t } = I18n;
   const frame = $('frame');
   const pinBtn = $('pinBtn');
@@ -41,7 +41,7 @@
 
   const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
   // Texto puro sem os marcadores de checklist ("[ ] " / "[x] ").
-  const plain = (t) => (t || '').replace(/^(\s*)\[[ xX]\](?= |$) ?/gm, '$1');
+  const plain = (text) => (text || '').replace(/^(\s*)(?:\[[ xX]?\]|-)(?= |$) ?/gm, '$1');
   // Para a busca: minúsculas e sem acentos.
   const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -199,14 +199,15 @@
   }
 
   // ------------------------------------------- título e texto padrão
+  // O texto padrão é editado no próprio editor da nota, embutido num <iframe>
+  // (index.html?defaults), que lê e salva o conteúdo sozinho. Aqui só o título.
 
   const defaultTitle = $('defaultTitle');
-  const defaultText = $('defaultText');
   let defaultsTimer = null;
 
   async function loadDefaults() {
     try {
-      [defaultTitle.value, defaultText.value] = await invoke('get_new_note_defaults');
+      [defaultTitle.value] = await invoke('get_new_note_defaults');
     } catch (err) {
       console.error('get_new_note_defaults', err);
     }
@@ -214,19 +215,16 @@
 
   function flushDefaults() {
     clearTimeout(defaultsTimer);
-    invoke('set_new_note_defaults', { title: defaultTitle.value, text: defaultText.value })
-      .catch((err) => console.error('set_new_note_defaults', err));
+    invoke('set_default_title', { title: defaultTitle.value })
+      .catch((err) => console.error('set_default_title', err));
   }
 
   // Salva sozinho, um pouco depois de parar de digitar, e ao sair do campo.
-  function saveDefaults() {
+  defaultTitle.addEventListener('input', () => {
     clearTimeout(defaultsTimer);
     defaultsTimer = setTimeout(flushDefaults, 400);
-  }
-  for (const field of [defaultTitle, defaultText]) {
-    field.addEventListener('input', saveDefaults);
-    field.addEventListener('change', flushDefaults);
-  }
+  });
+  defaultTitle.addEventListener('change', flushDefaults);
 
   // Várias mudanças seguidas (digitação numa nota) viram um só recarregamento.
   function scheduleLoad() {
@@ -403,7 +401,7 @@
   const newNote = () => invoke('new_note').catch((err) => console.error('new_note', err));
   const closeWindow = () => invoke('close_manager').catch((err) => console.error('close_manager', err));
 
-  window.TaxinhaChrome.attach({ frame, titlebar: $('titlebar'), grip: $('grip'), onClose: closeWindow });
+  window.MemoChrome.attach({ frame, titlebar: $('titlebar'), grip: $('grip'), onClose: closeWindow });
   pinBtn.addEventListener('click', togglePin);
   collapseBtn.addEventListener('click', toggleCollapse);
   $('newBtn').addEventListener('click', newNote);
@@ -416,8 +414,7 @@
 
   function applyLanguage(setting, lang) {
     I18n.set(lang);
-    document.title = `${t('manager')} — Taxinha`;
-    $('defaultText').lang = I18n.locale();
+    document.title = `${t('manager')} — Memo`;
     $('newBtn').title = `${t('newNote')} (${keys('Mod', 'N')})`;
     $('languageSelect').value = setting;
     renderWindow();
