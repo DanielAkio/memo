@@ -78,7 +78,7 @@ window.MemoI18n = (() => {
       smaller: '{keys} diminui',
       larger: '{keys} aumenta',
       // Manager
-      manager: 'Gerenciador de Memórias',
+      manager: 'Gerenciador do Memo',
       tabNotes: 'Memórias',
       tabTrash: 'Lixeira',
       tabSettings: 'Configurações',
@@ -199,7 +199,7 @@ window.MemoI18n = (() => {
       largeText: 'Large text',
       smaller: '{keys} smaller',
       larger: '{keys} larger',
-      manager: 'Memory Manager',
+      manager: 'Memo Manager',
       tabNotes: 'Memories',
       tabTrash: 'Trash',
       tabSettings: 'Settings',
@@ -388,15 +388,15 @@ window.MemoI18n = (() => {
         ],
       },
       {
-        title: 'Gerenciador de Memórias',
+        title: 'Gerenciador do Memo',
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
           ['Recolher', 'Clique duplo na barra do Gerenciador: ele fica só com a barra; outro clique duplo o expande (como nas memórias).'],
           ['Novo grupo', 'O botão de pasta com + na barra do Gerenciador cria um grupo vazio ao lado dele.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Gerenciador de Memórias</span>'
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Gerenciador do Memo</span>'
             + '<i data-icon="raise"></i><i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Trazer para a frente', 'O botão ao lado do + na barra do Gerenciador traz todas as memórias abertas para a frente das outras janelas, inclusive as minimizadas.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Gerenciador de Memórias</span>'
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Gerenciador do Memo</span>'
             + '<i data-icon="raise" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Buscar', 'Campo de busca nas abas Memórias e Lixeira, ou {{Mod+F}}.',
             '<span class="demo-field"><i data-icon="search"></i>compras</span>'],
@@ -494,15 +494,15 @@ window.MemoI18n = (() => {
         ],
       },
       {
-        title: 'Memory Manager',
+        title: 'Memo Manager',
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
           ['Collapse', 'Double-click the Manager’s titlebar: it shrinks to its bar; double-click again to expand it (as for memories).'],
           ['New group', 'The folder-with-+ button in the Manager’s titlebar creates an empty group next to it.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Memory Manager</span>'
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Memo Manager</span>'
             + '<i data-icon="raise"></i><i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Bring to front', 'The button next to + in the Manager’s titlebar brings every open memory in front of other windows, minimized ones included.',
-            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Memory Manager</span>'
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-name">Memo Manager</span>'
             + '<i data-icon="raise" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
           ['Search', 'The search box in the Memories and Trash tabs, or {{Mod+F}}.',
             '<span class="demo-field"><i data-icon="search"></i>shopping</span>'],

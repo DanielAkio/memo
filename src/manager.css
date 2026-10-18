@@ -248,24 +248,20 @@ body {
   display: flex;
   gap: 4px;
 }
-/* The memory's group, before the date. */
-.row-group-chip {
+/* The group's folder before the group select: in the group's colour, grey
+   without a group or colour (like the folder in a note's footer). */
+.row-folder {
   flex: none;
-  max-width: 110px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  padding: 1px 6px;
-  border-radius: var(--radius-badge);
-  background: var(--overlay-active);
-  color: var(--color-fog);
-  font-size: 11px;
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+  fill: none;
+  stroke: var(--color-ash);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
 }
-.row-group-chip { display: inline-flex; align-items: center; gap: 5px; }
-.chip-dot { flex: none; width: 6px; height: 6px; border-radius: 9999px; background: var(--note-color); }
-.chip-dot[data-color=""] { display: none; }
-.chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* Group picker in the row's actions (shown on hover, like the trash button). */
+.row-folder[data-color]:not([data-color=""]) { stroke: var(--note-color); }
+/* Group picker in the row's actions (always shown, like the trash button). */
 .row-group {
   max-width: 120px;
   height: 26px;
@@ -290,10 +286,6 @@ body {
 .row-group:hover, .row-group:focus-visible { box-shadow: inset 0 0 0 1px var(--color-smoke); }
 .row-group option { background: var(--color-obsidian); color: var(--color-mist); }
 
-/* In the notes list, the trash button only shows on hover. */
-.notes-view .row-actions { opacity: 0; }
-.notes-view .row:hover .row-actions,
-.notes-view .row:focus-within .row-actions { opacity: 1; }
 .row-actions { align-items: center; }
 
 

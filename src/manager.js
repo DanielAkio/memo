@@ -87,6 +87,8 @@
     return svg;
   }
 
+  // Same folder as a group bar and a note's footer.
+  const FOLDER_ICON = '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>';
   const TRASH_ICON = '<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/>';
 
   // ------------------------------------------------------------- render
@@ -198,17 +200,16 @@
     trashBtn.setAttribute('aria-label', t('moveToTrash'));
     trashBtn.append(icon(TRASH_ICON));
     const actions = el('div', 'row-actions');
-    actions.append(groupSelect(note), trashBtn);
+    // Always visible: the group select (which shows the group's name),
+    // preceded by the group's folder icon in its colour (grey without a
+    // group, as in the note's footer), and the trash button.
     const group = groups.find((g) => g.id === note.groupId);
-    if (group) {
-      // The group's name, with a dot in its colour (if it has one).
-      const chip = el('span', 'row-group-chip');
-      const dot = el('span', 'chip-dot');
-      dot.dataset.color = isCustomColor(group.color) ? 'custom' : group.color || '';
-      if (isCustomColor(group.color)) dot.style.setProperty('--note-color', group.color);
-      chip.append(dot, el('span', 'chip-name', group.name || t('untitled')));
-      row.append(chip);
-    }
+    const folder = icon(FOLDER_ICON);
+    folder.classList.add('row-folder');
+    const color = group ? group.color || '' : '';
+    folder.dataset.color = isCustomColor(color) ? 'custom' : color;
+    if (isCustomColor(color)) folder.style.setProperty('--note-color', color);
+    actions.append(folder, groupSelect(note), trashBtn);
     row.append(el('span', 'row-meta', editedLabel(note.updatedAt)), actions);
     return row;
   }
@@ -692,7 +693,7 @@
 
   function applyLanguage(setting, lang) {
     I18n.set(lang);
-    document.title = `${t('manager')} — Memo`;
+    document.title = t('manager');
     $('newBtn').title = `${t('newNote')} (${keys('Mod', 'N')})`;
     $('languageSelect').value = setting;
     renderWindow();

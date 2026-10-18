@@ -207,9 +207,9 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
 /// Manager window title (taskbar) in the UI language.
 fn manager_title(lang: &str) -> &'static str {
     if lang == "en" {
-        "Memory Manager — Memo"
+        "Memo Manager"
     } else {
-        "Gerenciador de Memórias — Memo"
+        "Gerenciador do Memo"
     }
 }
 
@@ -219,14 +219,14 @@ fn tray_labels(lang: &str) -> [&'static str; 4] {
         [
             "New memory",
             "Show all memories",
-            "Memory Manager",
+            "Memo Manager",
             "Quit Memo",
         ]
     } else {
         [
             "Nova memória",
             "Mostrar todas as memórias",
-            "Gerenciador de Memórias",
+            "Gerenciador do Memo",
             "Sair do Memo",
         ]
     }
@@ -939,13 +939,16 @@ fn show_all(app: &AppHandle) {
 }
 
 /// Brings every open note window and group bar to the front (restoring
-/// minimised ones). Returns `false` if there is none.
+/// minimised ones). Notes are raised first and group bars last, so the
+/// groups end up on top. Returns `false` if there is none.
 fn raise_notes(app: &AppHandle) -> bool {
-    let windows: Vec<WebviewWindow> = app
+    let mut windows: Vec<WebviewWindow> = app
         .webview_windows()
         .into_values()
         .filter(|w| is_note(w) || is_group(w))
         .collect();
+    // Each focused window goes on top of the previous ones.
+    windows.sort_by_key(is_group);
     for window in &windows {
         let _ = window.unminimize();
         let _ = window.show();

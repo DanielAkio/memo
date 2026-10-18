@@ -37,7 +37,7 @@ pub const PT: Welcome = Welcome {
         r#"<div class="bullet">Crases em volta de um trecho viram <code>código</code>; três crases e Enter abrem um bloco:</div>"#,
         r#"<pre class="code" data-lang="sql">select * from memorias where fixada = true</pre>"#,
         r#"<div><br></div>"#,
-        r#"<div><b>Gerenciador de Memórias</b></div>"#,
+        r#"<div><b>Gerenciador do Memo</b></div>"#,
         r#"<div>Abre com o app ou pelo ícone do Memo na bandeja. Lá você:</div>"#,
         r#"<div class="bullet">busca e ordena as memórias (mais recentes ou A–Z)</div>"#,
         r#"<div class="bullet">recupera da lixeira o que fechou no ✕ (fica lá por 30 dias)</div>"#,
@@ -66,7 +66,7 @@ Escrever
 select * from memorias where fixada = true
 ```
 
-Gerenciador de Memórias
+Gerenciador do Memo
 Abre com o app ou pelo ícone do Memo na bandeja. Lá você:
 - busca e ordena as memórias (mais recentes ou A–Z)
 - recupera da lixeira o que fechou no ✕ (fica lá por 30 dias)
@@ -97,7 +97,7 @@ pub const EN: Welcome = Welcome {
         r#"<div class="bullet">Backticks around some text make it <code>code</code>; three backticks and Enter open a block:</div>"#,
         r#"<pre class="code" data-lang="sql">select * from memories where pinned = true</pre>"#,
         r#"<div><br></div>"#,
-        r#"<div><b>Memory Manager</b></div>"#,
+        r#"<div><b>Memo Manager</b></div>"#,
         r#"<div>Opens with the app or from the Memo icon in the system tray. There you can:</div>"#,
         r#"<div class="bullet">search and sort all memories (most recent or A–Z)</div>"#,
         r#"<div class="bullet">restore from the trash what you closed with ✕ (kept for 30 days)</div>"#,
@@ -126,7 +126,7 @@ Writing
 select * from memories where pinned = true
 ```
 
-Memory Manager
+Memo Manager
 Opens with the app or from the Memo icon in the system tray. There you can:
 - search and sort all memories (most recent or A–Z)
 - restore from the trash what you closed with ✕ (kept for 30 days)
