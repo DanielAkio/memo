@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "bashOutputMaxChars": 15000,
+  "permissions": {
+    "deny": [
+      "Read(/src/vendor/**)",
+      "Read(/src-tauri/icons/**)",
+      "Read(/assets/**)",
+      "Read(/src-tauri/Cargo.lock)",
+      "Read(/package-lock.json)",
+      "Read(/src-tauri/target/**)",
+      "Read(/src-tauri/gen/**)",
+      "Read(/node_modules/**)",
+      "Read(/dist/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/large-read-guard.js\""
+          }
+        ]
+      }
+    ]
+  }
+}
