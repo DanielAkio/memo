@@ -51,8 +51,9 @@ The IDs are compiled in from two environment variables (`option_env!` in
   rebuilds when they change.
 - **Docker** (Windows installer): `docker/compose.yml` passes both through from the
   host shell.
-- **GitHub Actions**: add both as repository secrets (Settings → Secrets and
-  variables → Actions); `build.yml` passes them to the build.
+- **GitHub Actions**: add them as repository secrets named `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET` (Settings → Secrets and variables → Actions); `build.yml`
+  passes them to the build as the two variables above.
 
 ## 5. Publishing
 
