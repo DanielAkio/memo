@@ -119,6 +119,15 @@ Privacy: this program will not transfer any information to other networked syste
 by the user or the person installing or operating it. Cloud sync only talks to Google after you connect a Google
 account in the manager.
 
+## Uninstalling
+
+- Windows: Settings → Apps → Installed apps → Memo → Uninstall.
+- macOS: quit Memo from the tray and drag `Memo.app` from Applications to the Trash.
+- Linux: `sudo apt remove memo` (`.deb`) or `sudo dnf remove memo` (`.rpm`); for the AppImage, delete the file.
+
+Uninstalling keeps your memories. To remove them too, delete the data folder listed above (or the one you chose in
+Settings → Storage).
+
 ## Linux and Wayland
 
 Wayland compositors don't let an app put itself "always on top". So Memo automatically runs through
