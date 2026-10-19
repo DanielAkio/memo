@@ -1,0 +1,27 @@
+name: Sugerir uma melhoria / Suggest an improvement
+description: Uma ideia para deixar o Memo melhor. / An idea to make Memo better.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Que bom que você tem uma ideia! Veja antes se ela já não foi sugerida nas issues abertas; se sim, um 👍 nela já ajuda.
+        Glad you have an idea! Check the open issues first; if it is already there, a 👍 on it helps.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Que problema ela resolve? / What problem does it solve?
+      description: O que hoje é difícil ou impossível de fazer? / What is hard or impossible to do today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Como você imagina? / How do you picture it?
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Mais detalhes / More details
+      description: Alternativas, exemplos de outros apps, imagens. / Alternatives, examples from other apps, images.
