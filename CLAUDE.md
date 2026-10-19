@@ -47,6 +47,7 @@ src-tauri/
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
   capabilities/default.json  permissions for note-*, group-* and manager windows
 docs/google-cloud.md     Google Cloud project / OAuth client setup for cloud sync
+docs/code-signing.md     Windows installer signing through SignPath Foundation (CI setup)
 docs/style.md            visual reference ("Linear"-style dark system); base.css tokens are what the app uses
 ```
 
