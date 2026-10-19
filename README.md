@@ -100,8 +100,24 @@ macOS Apple Silicon and Intel (`.dmg`) and Linux (`.deb`, `.rpm`, `.AppImage`). 
 Actions → Build → Run workflow, and uploads the installers as artifacts. Run from a `v0.1.0` tag, it also
 creates a draft release.
 
-Builds are unsigned. On macOS, open the app the first time with right-click → Open; on Windows,
-SmartScreen may ask you to "Run anyway".
+macOS builds are unsigned: open the app the first time with right-click → Open. Windows builds are unsigned
+until signing through SignPath is set up ([`docs/code-signing.md`](docs/code-signing.md)); until then SmartScreen
+may ask you to "Run anyway".
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).
+
+- Committers and reviewers: [Daniel Akio Teixeira](https://github.com/DanielAkio)
+- Approvers: [Daniel Akio Teixeira](https://github.com/DanielAkio)
+
+Only the Windows installers built from this repository by its GitHub Actions workflow are signed, and each signing
+request is approved by hand.
+
+Privacy: this program will not transfer any information to other networked systems unless specifically requested
+by the user or the person installing or operating it. Cloud sync only talks to Google after you connect a Google
+account in the manager.
 
 ## Linux and Wayland
 
