@@ -1,0 +1,52 @@
+name: Reportar um bug / Report a bug
+description: Algo não funciona como deveria. / Something doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por ajudar a melhorar o Memo! Pode escrever em português ou em inglês.
+        Thanks for helping improve Memo! Feel free to write in Portuguese or English.
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu? / What happened?
+      description: Descreva o problema e o que você esperava. / Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir / Steps to reproduce
+      placeholder: |
+        1. Criei uma memória / Created a memory
+        2. Cliquei no alfinete / Clicked the pin
+        3. ...
+    validations:
+      required: false
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistema / System
+      options:
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: Versão do sistema / System version
+      placeholder: "Windows 11, macOS 15, Ubuntu 24.04 (GNOME, Wayland)…"
+  - type: input
+    id: memo-version
+    attributes:
+      label: Versão do Memo / Memo version
+      placeholder: "0.1.0"
+  - type: textarea
+    id: extra
+    attributes:
+      label: Prints ou mais detalhes / Screenshots or more details
+      description: Arraste imagens para cá. Não cole o conteúdo de memórias com dados pessoais. / Drag images here. Don't paste memories with personal data.
