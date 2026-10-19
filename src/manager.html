@@ -199,6 +199,22 @@
                  autocomplete="off" data-i18n-attr="placeholder=untitled">
         </div>
         <input type="color" class="custom-color" id="groupCustomColor" tabindex="-1" aria-hidden="true">
+        <!-- Cloud sync: only in builds with a Google OAuth client (cloud.rs). -->
+        <h2 class="settings-title" data-cloud hidden>
+          <span data-i18n="sync"></span>
+          <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=syncTip,data-tip=syncTip">i</span>
+        </h2>
+        <div class="setting setting-top" data-cloud hidden>
+          <span class="setting-label" data-i18n="googleDrive"></span>
+          <div class="field-wrap">
+            <div class="app-actions">
+              <button type="button" class="btn" id="cloudConnectBtn" data-i18n="cloudConnect"></button>
+              <button type="button" class="btn" id="cloudCancelBtn" data-i18n="cancel" hidden></button>
+              <button type="button" class="btn" id="cloudDisconnectBtn" data-i18n="cloudDisconnect" hidden></button>
+            </div>
+            <p class="storage-status" id="cloudStatus" role="status"></p>
+          </div>
+        </div>
         <h2 class="settings-title">
           <span data-i18n="storage"></span>
           <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=storageTip,data-tip=storageTip">i</span>

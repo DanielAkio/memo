@@ -1,6 +1,7 @@
 // No console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cloud;
 mod store;
 mod welcome;
 
@@ -2273,6 +2274,48 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
     manager.is_enabled().map_err(|e| e.to_string())
 }
 
+/// Configurações → Sincronização: whether this build can connect a Google
+/// account, and the one connected on this computer.
+#[tauri::command]
+fn get_cloud_account(app: AppHandle) -> (bool, Option<String>) {
+    let account = default_data_dir(&app)
+        .ok()
+        .and_then(|dir| Config::load(&dir.join(CONFIG)).google_account);
+    (cloud::available(), account.filter(|_| cloud::available()))
+}
+
+/// Signs in with Google in the browser and remembers the account. Errors are
+/// `cloud::ERR_*` codes the page translates.
+#[tauri::command]
+async fn connect_cloud(app: AppHandle) -> Result<String, String> {
+    let lang = app.state::<Shared>().effective_language();
+    let email = cloud::sign_in(&app, lang).await?;
+    let path = default_data_dir(&app).map_err(|e| e.to_string())?.join(CONFIG);
+    let mut config = Config::load(&path);
+    config.google_account = Some(email.clone());
+    config.save(&path).map_err(|e| e.to_string())?;
+    let _ = app.emit("cloud-changed", ());
+    Ok(email)
+}
+
+/// Stops a sign-in still waiting for the browser.
+#[tauri::command]
+fn cancel_cloud_connect() {
+    cloud::cancel_sign_in();
+}
+
+/// Forgets the Google account on this computer; the memories stay here.
+#[tauri::command]
+fn disconnect_cloud(app: AppHandle) -> Result<(), String> {
+    cloud::sign_out();
+    let path = default_data_dir(&app).map_err(|e| e.to_string())?.join(CONFIG);
+    let mut config = Config::load(&path);
+    config.google_account = None;
+    config.save(&path).map_err(|e| e.to_string())?;
+    let _ = app.emit("cloud-changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 fn get_data_dir(app: AppHandle, store: State<'_, Shared>) -> (String, bool) {
     let path = store.path();
@@ -2513,8 +2556,13 @@ fn main() {
         }
     }
 
+    // TLS for the Google sign-in (reqwest is built without a default
+    // crypto provider, so the installer needs no C toolchain for it).
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         // Start with the system: same name and argument as the Windows
         // installer's Run value (windows/hooks.nsh).
         .plugin(
@@ -2583,6 +2631,10 @@ fn main() {
             delete_group_forever,
             get_autostart,
             set_autostart,
+            get_cloud_account,
+            connect_cloud,
+            cancel_cloud_connect,
+            disconnect_cloud,
             empty_group_trash,
             set_group_color,
             set_manager_color,
