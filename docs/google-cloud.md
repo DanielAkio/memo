@@ -51,8 +51,9 @@ The IDs are compiled in from two environment variables (`option_env!` in
   rebuilds when they change.
 - **Docker** (Windows installer): `docker/compose.yml` passes both through from the
   host shell.
-- **GitHub Actions**: add both as repository secrets (Settings → Secrets and
-  variables → Actions); `build.yml` passes them to the build.
+- **GitHub Actions**: add them as repository secrets named `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET` (Settings → Secrets and variables → Actions); `build.yml`
+  passes them to the build as the two variables above.
 
 ## 5. Publishing
 
@@ -62,3 +63,18 @@ Publish app). Google asks for a home page and a privacy policy on a domain you o
 say what Memo accesses (its own hidden Drive folder and the account's e-mail), that
 the memories go only to the user's own Drive, and that nobody else, the developer
 included, receives them.
+
+Both pages live in `site/` (English, with Portuguese under `site/pt/`) and are
+published by `.github/workflows/pages.yml` once Settings → Pages → Source is
+**GitHub Actions**:
+
+| Field | URL |
+| --- | --- |
+| Application home page | `https://danielakio.github.io/memo/` |
+| Privacy policy | `https://danielakio.github.io/memo/privacy.html` |
+| Authorized domain | `danielakio.github.io` |
+
+Search Console verifies `https://danielakio.github.io/` (URL-prefix property), which
+needs the verification file at the root of that host, i.e. in a
+`DanielAkio/danielakio.github.io` repository with Pages on. Keep the pages in step
+with what the app accesses: a new scope means a new section in both policies.

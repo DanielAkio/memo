@@ -59,8 +59,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Google OAuth client for cloud sync (docs/google-cloud.md); without
           # these secrets the build simply has no cloud sync.
-          MEMO_GOOGLE_CLIENT_ID: ${{ secrets.MEMO_GOOGLE_CLIENT_ID }}
-          MEMO_GOOGLE_CLIENT_SECRET: ${{ secrets.MEMO_GOOGLE_CLIENT_SECRET }}
+          MEMO_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          MEMO_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         with:
           # Signed Windows builds reach the release after signing (below).
           tagName: ${{ env.SIGN_WINDOWS != 'true' && env.RELEASE_TAG || '' }}
