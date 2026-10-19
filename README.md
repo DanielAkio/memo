@@ -85,6 +85,15 @@ Everything is saved automatically, on your computer:
 In **Settings → Storage** you can change the folder (a synced Dropbox or OneDrive folder takes your memories to other
 computers), export a `.json` backup and import it back.
 
+## Uninstalling
+
+- **Windows**: Settings → Apps → Installed apps → Memo → Uninstall.
+- **macOS**: quit Memo from the menu bar and drag `Memo.app` from Applications to the Trash.
+- **Linux**: `sudo apt remove memo` (`.deb`) or `sudo dnf remove memo` (`.rpm`); for the AppImage, delete the file.
+
+Uninstalling keeps your memories. To remove them too, delete the folder listed above (or the one you chose in
+Settings → Storage).
+
 ## Linux and Wayland
 
 Wayland doesn't let an app put itself "always on top", so Memo runs through XWayland automatically and the pin works
@@ -119,12 +128,27 @@ npm run build    # installer for the current OS in src-tauri/target/release/bund
   `docker compose -f docker/compose.yml run --build --rm windows` puts the NSIS `*-setup.exe` in `dist/`.
 - **All platforms**: the manual workflow in `.github/workflows/build.yml` (Actions → Build → Run workflow) builds
   Windows, macOS (Apple Silicon and Intel) and Linux installers; run from a version tag, it also creates a draft
-  release.
+  release. With SignPath set up it also signs the Windows installers ([`docs/code-signing.md`](docs/code-signing.md)).
 - The visual reference is [`docs/style.md`](docs/style.md); [`CLAUDE.md`](CLAUDE.md) describes the architecture and
   conventions.
 
 Older versions saved to a folder named `br.memo.notas` (or `br.taxinha.notas`); on first launch Memo copies that data
 into `memo` and keeps the old folder as a backup.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).
+
+- Committers and reviewers: [Daniel Akio Teixeira](https://github.com/DanielAkio)
+- Approvers: [Daniel Akio Teixeira](https://github.com/DanielAkio)
+
+Only the Windows installers built from this repository by its GitHub Actions workflow are signed, and each signing
+request is approved by hand.
+
+Privacy: this program will not transfer any information to other networked systems unless specifically requested
+by the user or the person installing or operating it. Cloud sync only talks to Google after you connect a Google
+account in the Manager.
 
 ## License
 
