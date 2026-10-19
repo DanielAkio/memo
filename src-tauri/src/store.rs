@@ -59,6 +59,11 @@ pub const ZOOM_STEP: f64 = 0.1;
 /// Maximum length of a group's name, in characters.
 pub const GROUP_NAME_MAX: usize = 60;
 
+/// How long the record of a permanently deleted note or group is kept (90
+/// days), so that another device syncing later deletes it too instead of
+/// bringing it back.
+pub const TOMBSTONE_TTL_MS: u64 = 90 * 86_400_000;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Note {
@@ -98,6 +103,38 @@ impl Note {
     pub fn is_blank(&self) -> bool {
         self.title.trim().is_empty() && self.text.trim().is_empty()
     }
+
+    /// The fields that are the note itself, the same on every device. The
+    /// rest (position, size, pin, closed with ✕, welcome copy) is this
+    /// computer's layout. Changing any of these bumps `updated_at`.
+    fn content(&self) -> NoteContent {
+        NoteContent {
+            title: self.title.clone(),
+            text: self.text.clone(),
+            html: self.html.clone(),
+            color: self.color.clone(),
+            group_id: self.group_id.clone(),
+            trashed_at: self.trashed_at,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+struct NoteContent {
+    title: String,
+    text: String,
+    html: String,
+    color: String,
+    group_id: String,
+    trashed_at: Option<u64>,
+}
+
+/// Record of a note or group deleted for good (see `TOMBSTONE_TTL_MS`).
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Tombstone {
+    pub id: String,
+    pub deleted_at: u64,
 }
 
 impl Default for Note {
@@ -154,6 +191,10 @@ struct FileData {
     /// Groups of notes (compact bars that show or hide their notes).
     groups: Vec<Group>,
     next_group_seq: u32,
+    /// When a new-note or new-group default last changed.
+    defaults_updated_at: u64,
+    /// Notes and groups deleted for good, kept for `TOMBSTONE_TTL_MS`.
+    deleted: Vec<Tombstone>,
 }
 
 /// A group of notes: a compact bar on screen. Double-clicking it takes its
@@ -176,6 +217,8 @@ pub struct Group {
     /// Colour label, as for notes (see `COLORS`); empty = none.
     pub color: String,
     pub created_at: u64,
+    /// Last change to its content (see `Group::content`).
+    pub updated_at: u64,
     /// When it was trashed (with its notes); `None` = active group.
     pub trashed_at: Option<u64>,
     /// Closed with ✕: its bar (and its notes) are not opened until the
@@ -195,9 +238,19 @@ impl Default for Group {
             pinned: false,
             color: DEFAULT_COLOR.to_string(),
             created_at: 0,
+            updated_at: 0,
             trashed_at: None,
             hidden: false,
         }
+    }
+}
+
+impl Group {
+    /// The fields that are the group itself, the same on every device. The
+    /// rest (position, width, out/put away, pin, closed with ✕) is this
+    /// computer's layout. Changing any of these bumps `updated_at`.
+    fn content(&self) -> (String, String, Option<u64>) {
+        (self.name.clone(), self.color.clone(), self.trashed_at)
     }
 }
 
@@ -288,7 +341,13 @@ fn normalize(data: &mut FileData) {
     data.notes.retain(|n| !n.id.is_empty());
     let max_seq = data.notes.iter().map(|n| n.seq).max().unwrap_or(0);
     data.next_seq = data.next_seq.max(max_seq + 1).max(1);
+    for note in &mut data.notes {
+        note.updated_at = note.updated_at.max(note.created_at);
+    }
     data.groups.retain(|g| !g.id.is_empty());
+    for group in &mut data.groups {
+        group.updated_at = group.updated_at.max(group.created_at);
+    }
     data.next_group_seq = data.next_group_seq.max(data.groups.len() as u32 + 1);
     let groups: HashSet<String> = data.groups.iter().map(|g| g.id.clone()).collect();
     for note in &mut data.notes {
@@ -310,6 +369,14 @@ fn now_nanos() -> u128 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0)
+}
+
+/// Records the ids as deleted for good.
+fn bury(data: &mut FileData, ids: impl IntoIterator<Item = String>, now: u64) {
+    for id in ids {
+        data.deleted.retain(|t| t.id != id);
+        data.deleted.push(Tombstone { id, deleted_at: now });
+    }
 }
 
 impl Store {
@@ -387,6 +454,7 @@ impl Store {
             copy.version = 1;
             copy.notes.retain(|n| n.trashed_at.is_none());
             copy.groups.retain(|g| g.trashed_at.is_none());
+            copy.deleted.clear();
             normalize(&mut copy);
             serde_json::to_string_pretty(&copy)
         };
@@ -420,6 +488,14 @@ impl Store {
                     }
                 }
             }
+            let known: HashSet<String> = data
+                .notes
+                .iter()
+                .map(|n| n.id.clone())
+                .chain(data.groups.iter().map(|g| g.id.clone()))
+                .collect();
+            // What the import brought back is no longer deleted.
+            data.deleted.retain(|t| !known.contains(&t.id));
             normalize(&mut data);
         }
         if !changed.is_empty() {
@@ -456,13 +532,15 @@ impl Store {
                 Some(c) if is_valid_color(c) => c.clone(),
                 _ => DEFAULT_COLOR.to_string(),
             };
+            let now = now_ms();
             let group = Group {
                 id: format!("{:x}-g{}", now_nanos(), seq),
                 name: data.default_group_title.clone(),
                 color,
                 x: pos.map(|p| p.0),
                 y: pos.map(|p| p.1),
-                created_at: now_ms(),
+                created_at: now,
+                updated_at: now,
                 ..Default::default()
             };
             data.groups.push(group.clone());
@@ -472,12 +550,17 @@ impl Store {
         group
     }
 
-    /// Applies `f` to the group and returns an updated copy.
+    /// Applies `f` to the group and returns an updated copy. `updated_at`
+    /// follows changes to its content (not to its layout).
     pub fn update_group<F: FnOnce(&mut Group)>(&self, id: &str, f: F) -> Option<Group> {
         let updated = {
             let mut data = self.data.lock().unwrap();
             let group = data.groups.iter_mut().find(|g| g.id == id)?;
+            let before = group.content();
             f(group);
+            if group.content() != before {
+                group.updated_at = now_ms();
+            }
             group.clone()
         };
         self.mark_dirty();
@@ -510,10 +593,13 @@ impl Store {
     pub fn remove_group(&self, id: &str) {
         {
             let mut data = self.data.lock().unwrap();
+            let now = now_ms();
             data.groups.retain(|g| g.id != id);
             for note in data.notes.iter_mut().filter(|n| n.group_id == id) {
                 note.group_id.clear();
+                note.updated_at = now;
             }
+            bury(&mut data, [id.to_string()], now);
         }
         self.mark_dirty();
     }
@@ -558,11 +644,26 @@ impl Store {
         let removed = {
             let mut data = self.data.lock().unwrap();
             let kept = |t: Option<u64>| t.map_or(true, |t| now.saturating_sub(t) < TRASH_TTL_MS);
-            let before = (data.notes.len(), data.groups.len());
+            let purged: Vec<String> = data
+                .notes
+                .iter()
+                .filter(|n| !kept(n.trashed_at))
+                .map(|n| n.id.clone())
+                .chain(
+                    data.groups
+                        .iter()
+                        .filter(|g| !kept(g.trashed_at))
+                        .map(|g| g.id.clone()),
+                )
+                .collect();
             data.notes.retain(|n| kept(n.trashed_at));
             data.groups.retain(|g| kept(g.trashed_at));
-            let changed = before != (data.notes.len(), data.groups.len());
-            if changed {
+            let tombstones = data.deleted.len();
+            data.deleted
+                .retain(|t| now.saturating_sub(t.deleted_at) < TOMBSTONE_TTL_MS);
+            let changed = !purged.is_empty() || tombstones != data.deleted.len();
+            if !purged.is_empty() {
+                bury(&mut data, purged, now);
                 // Notes of purged groups become ungrouped.
                 normalize(&mut data);
             }
@@ -642,7 +743,10 @@ impl Store {
     }
 
     pub fn set_default_color(&self, color: &str) {
-        self.data.lock().unwrap().default_color = Some(color.to_string());
+        let mut data = self.data.lock().unwrap();
+        data.default_color = Some(color.to_string());
+        data.defaults_updated_at = now_ms();
+        drop(data);
         self.mark_dirty();
     }
 
@@ -657,7 +761,10 @@ impl Store {
     }
 
     pub fn set_default_title(&self, title: String) {
-        self.data.lock().unwrap().default_title = title;
+        let mut data = self.data.lock().unwrap();
+        data.default_title = title;
+        data.defaults_updated_at = now_ms();
+        drop(data);
         self.mark_dirty();
     }
 
@@ -673,12 +780,18 @@ impl Store {
     }
 
     pub fn set_default_group_color(&self, color: &str) {
-        self.data.lock().unwrap().default_group_color = Some(color.to_string());
+        let mut data = self.data.lock().unwrap();
+        data.default_group_color = Some(color.to_string());
+        data.defaults_updated_at = now_ms();
+        drop(data);
         self.mark_dirty();
     }
 
     pub fn set_default_group_title(&self, title: String) {
-        self.data.lock().unwrap().default_group_title = title;
+        let mut data = self.data.lock().unwrap();
+        data.default_group_title = title;
+        data.defaults_updated_at = now_ms();
+        drop(data);
         self.mark_dirty();
     }
 
@@ -686,6 +799,7 @@ impl Store {
         let mut data = self.data.lock().unwrap();
         data.default_text = text;
         data.default_html = html;
+        data.defaults_updated_at = now_ms();
         drop(data);
         self.mark_dirty();
     }
@@ -720,11 +834,16 @@ impl Store {
     }
 
     pub fn empty_trash(&self) {
-        self.data
-            .lock()
-            .unwrap()
+        let mut data = self.data.lock().unwrap();
+        let trashed: Vec<String> = data
             .notes
-            .retain(|n| n.trashed_at.is_none());
+            .iter()
+            .filter(|n| n.trashed_at.is_some())
+            .map(|n| n.id.clone())
+            .collect();
+        data.notes.retain(|n| n.trashed_at.is_none());
+        bury(&mut data, trashed, now_ms());
+        drop(data);
         self.mark_dirty();
     }
 
@@ -772,12 +891,17 @@ impl Store {
         note
     }
 
-    /// Applies `f` to the note and returns an updated copy.
+    /// Applies `f` to the note and returns an updated copy. `updated_at`
+    /// follows changes to its content (not to its layout).
     pub fn update<F: FnOnce(&mut Note)>(&self, id: &str, f: F) -> Option<Note> {
         let updated = {
             let mut data = self.data.lock().unwrap();
             let note = data.notes.iter_mut().find(|n| n.id == id)?;
+            let before = note.content();
             f(note);
+            if note.content() != before {
+                note.updated_at = now_ms();
+            }
             note.clone()
         };
         self.mark_dirty();
@@ -785,7 +909,10 @@ impl Store {
     }
 
     pub fn remove(&self, id: &str) {
-        self.data.lock().unwrap().notes.retain(|n| n.id != id);
+        let mut data = self.data.lock().unwrap();
+        data.notes.retain(|n| n.id != id);
+        bury(&mut data, [id.to_string()], now_ms());
+        drop(data);
         self.mark_dirty();
     }
 

@@ -62,6 +62,7 @@ Tokens spent on things that don't help understand or change the project are wast
 - **Rust is the source of truth.** `Store` (`store.rs`) holds everything in a `Mutex`, marks it dirty, and a saver thread flushes atomically every 800 ms. Never overwrite user data: unreadable files are backed up, old files are never deleted. Default data folder is `<OS data folder>/memo` — **never** use Tauri's `app_data_dir()` for notes or config.
 - **Tauri commands** live in `main.rs` and must be registered in `generate_handler!`; a new JS window API needs its permission in `capabilities/default.json`. Commands that create/destroy windows are `async` on purpose (sync ones can deadlock on Windows). Rust errors returned to JS are English `String`s (logged, not shown).
 - **Events** keep windows in step: `notes-changed`, `groups-changed`, `store-replaced`, `theme-changed`, `language-changed`, `zoom-changed`, `drop-hover`.
+- **Content vs layout (sync groundwork):** `Note::content` / `Group::content` hold what is the same on every device; position, size, pin, `hidden`, `open` are local layout. Keep new content fields inside `content()` and route mutations through `Store::update` / `update_group` (they bump `updatedAt` only on content changes); permanent removals leave tombstones. Details in `memo-storage`.
 - **Close ≠ trash.** ✕ / middle click only close (`Note.hidden`); only the manager's trash buttons trash. Details in `memo-windows`.
 
 ## Conventions

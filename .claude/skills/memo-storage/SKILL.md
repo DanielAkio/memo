@@ -19,6 +19,10 @@ Selectors: `Store::active` (not trashed), `Store::visible()` (active, not `hidde
 
 Notes and groups trashed longer than `TRASH_TTL_MS` (30 days) are purged on load and hourly by the saver thread (`PURGE_EVERY`). Permanent deletion happens only from the trash or this purge.
 
+## Content vs layout (groundwork for cloud sync)
+
+`Note::content` (title, text, html, colour, group, `trashedAt`) and `Group::content` (name, colour, `trashedAt`) are what a note or group *is* and would be the same on every device; everything else (position, size, pin, `hidden`, a group's `open`) is this computer's layout. `Store::update` / `update_group` bump `updatedAt` only when the content changes (layout-only changes never do), so `updatedAt` is the "last real edit" that merges compare (`import_from`, and later sync); old files get `updatedAt = createdAt` in `normalize`. Changing a new-note/new-group default sets `FileData.defaults_updated_at`. Every permanent removal (`remove`, `empty_trash`, `remove_group`, the trash purge) leaves a `Tombstone { id, deletedAt }` in `FileData.deleted` (`bury`), pruned after `TOMBSTONE_TTL_MS` (90 days), so a future sync can tell "deleted here" from "new there"; an import that brings an id back drops its tombstone, and exports leave tombstones out. Keep new content fields inside `content()` and route mutations through `update`/`update_group`.
+
 ## Data folder
 
 - Default folder: `<OS data folder>/memo` (`default_data_dir`, `DATA_FOLDER`) — **not** `app_data_dir()` (named after the identifier `br.memo.notas`); never use `app_data_dir()` for notes or config.
