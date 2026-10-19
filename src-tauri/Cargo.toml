@@ -23,13 +23,14 @@ tauri-plugin-dialog = "2"
 # (`shows_on_screen` in main.rs): the magnet ignores notes not on screen.
 raw-window-handle = "0.6"
 tauri-plugin-autostart = "2"
-reqwest = { version = "0.13", default-features = false, features = ["json", "form", "rustls-no-provider"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "form", "query", "rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "async-secret-service", "tokio", "crypto-rust"] }
 tauri-plugin-opener = "2"
 sha2 = "0.10"
 base64 = "0.22"
 getrandom = "0.3"
+tokio = { version = "1", features = ["sync", "time"] }
 
 # Windows: which window is shown at a point (WindowFromPoint).
 [target.'cfg(windows)'.dependencies]

@@ -85,6 +85,15 @@ Everything is saved automatically, on your computer:
 In **Settings → Storage** you can change the folder (a synced Dropbox or OneDrive folder takes your memories to other
 computers), export a `.json` backup and import it back.
 
+### Google Drive sync
+
+Memo can connect a Google account in Memo Manager → Settings → Sync, to keep the memories in a hidden Memo folder of
+your own Google Drive and use them on several computers. Only the content syncs (text, title, colour, group, trash);
+window positions, size and pin stay on each computer, and without connecting everything stays local. A memory created
+on another computer shows up closed in the Manager; if the same memory is edited in two places before syncing, the newer
+version wins and the other is kept in the trash with "(conflict)" in its title. The section only shows in builds made
+with a Google OAuth client — see [`docs/google-cloud.md`](docs/google-cloud.md).
+
 ## Uninstalling
 
 - **Windows**: Settings → Apps → Installed apps → Memo → Uninstall.

@@ -855,7 +855,7 @@
   // Google account for cloud sync (cloud.rs). The section only shows in
   // builds with an OAuth client. Errors come back as short codes.
 
-  const cloud = { available: false, email: null, waiting: false, error: null };
+  const cloud = { available: false, email: null, waiting: false, error: null, status: {} };
   const CLOUD_ERRORS = {
     denied: 'cloudErrDenied',
     timeout: 'cloudErrTimeout',
@@ -863,20 +863,35 @@
     keyring: 'cloudErrKeyring',
   };
 
+  // One line: who is connected, then how syncing goes.
+  function cloudStatusText() {
+    if (cloud.waiting) return t('cloudWaiting');
+    if (cloud.error) return t(CLOUD_ERRORS[cloud.error] || 'cloudErrOther');
+    if (!cloud.email) return t('cloudOff');
+    const st = cloud.status || {};
+    if (st.error === 'reauth') return t('cloudErrReauth');
+    const parts = [t('cloudOn', { email: cloud.email })];
+    if (st.syncing) parts.push(t('cloudSyncing'));
+    else if (st.error) parts.push(t('cloudOffline'));
+    else if (st.lastSync) parts.push(t('cloudSynced', { time: editedLabel(st.lastSync) }));
+    if (st.pending && !st.syncing) parts.push(st.pending === 1 ? t('cloudPendingOne') : t('cloudPending', { n: st.pending }));
+    return parts.join(' ');
+  }
+
   function renderCloud() {
     document.querySelectorAll('[data-cloud]').forEach((el) => { el.hidden = !cloud.available; });
-    $('cloudConnectBtn').hidden = !!cloud.email || cloud.waiting;
+    const reauth = (cloud.status || {}).error === 'reauth';
+    $('cloudConnectBtn').hidden = (!!cloud.email && !reauth) || cloud.waiting;
     $('cloudCancelBtn').hidden = !cloud.waiting;
-    $('cloudDisconnectBtn').hidden = !cloud.email;
-    let status = cloud.email ? t('cloudOn', { email: cloud.email }) : t('cloudOff');
-    if (cloud.waiting) status = t('cloudWaiting');
-    else if (cloud.error) status = t(CLOUD_ERRORS[cloud.error] || 'cloudErrOther');
-    $('cloudStatus').textContent = status;
+    $('cloudSyncBtn').hidden = !cloud.email || reauth || cloud.waiting;
+    $('cloudSyncBtn').disabled = !!(cloud.status || {}).syncing;
+    $('cloudDisconnectBtn').hidden = !cloud.email || cloud.waiting;
+    $('cloudStatus').textContent = cloudStatusText();
   }
 
   async function loadCloud() {
     try {
-      [cloud.available, cloud.email] = await invoke('get_cloud_account');
+      [cloud.available, cloud.email, cloud.status] = await invoke('get_cloud_account');
     } catch (err) {
       console.error('get_cloud_account', err);
     }
@@ -893,7 +908,11 @@
       console.error('connect_cloud', err);
     }
     cloud.waiting = false;
-    renderCloud();
+    await loadCloud();
+  });
+
+  $('cloudSyncBtn').addEventListener('click', () => {
+    invoke('sync_cloud').catch((err) => console.error('sync_cloud', err));
   });
 
   $('cloudCancelBtn').addEventListener('click', () => {

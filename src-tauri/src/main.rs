@@ -3,6 +3,7 @@
 
 mod cloud;
 mod store;
+mod sync;
 mod welcome;
 
 use std::{
@@ -355,6 +356,8 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 }
             }
             WindowEvent::ThemeChanged(_) => apply_background(&win, &store.theme()),
+            // Coming back to Memo: fetch what changed on other computers.
+            WindowEvent::Focused(true) => sync::on_focus(),
             WindowEvent::Destroyed => {
                 app.state::<Sliding>().0.lock().unwrap().remove(win.label());
             }
@@ -2275,13 +2278,19 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
 }
 
 /// Configurações → Sincronização: whether this build can connect a Google
-/// account, and the one connected on this computer.
+/// account, the one connected on this computer and how syncing goes.
 #[tauri::command]
-fn get_cloud_account(app: AppHandle) -> (bool, Option<String>) {
+fn get_cloud_account(app: AppHandle) -> (bool, Option<String>, sync::Status) {
     let account = default_data_dir(&app)
         .ok()
         .and_then(|dir| Config::load(&dir.join(CONFIG)).google_account);
-    (cloud::available(), account.filter(|_| cloud::available()))
+    (cloud::available(), account.filter(|_| cloud::available()), sync::status())
+}
+
+/// "Sync now".
+#[tauri::command]
+fn sync_cloud(app: AppHandle) {
+    sync::sync_now(&app);
 }
 
 /// Signs in with Google in the browser and remembers the account. Errors are
@@ -2294,6 +2303,7 @@ async fn connect_cloud(app: AppHandle) -> Result<String, String> {
     let mut config = Config::load(&path);
     config.google_account = Some(email.clone());
     config.save(&path).map_err(|e| e.to_string())?;
+    sync::on_connected(&app);
     let _ = app.emit("cloud-changed", ());
     Ok(email)
 }
@@ -2312,6 +2322,7 @@ fn disconnect_cloud(app: AppHandle) -> Result<(), String> {
     let mut config = Config::load(&path);
     config.google_account = None;
     config.save(&path).map_err(|e| e.to_string())?;
+    sync::reset(&app);
     let _ = app.emit("cloud-changed", ());
     Ok(())
 }
@@ -2635,6 +2646,7 @@ fn main() {
             connect_cloud,
             cancel_cloud_connect,
             disconnect_cloud,
+            sync_cloud,
             empty_group_trash,
             set_group_color,
             set_manager_color,
@@ -2697,6 +2709,7 @@ fn main() {
                     open_note_window(&handle, note)?;
                 }
             }
+            sync::start(&handle);
             Ok(())
         })
         .build(tauri::generate_context!())
