@@ -49,13 +49,14 @@ memories between computers). The current memories are copied there and the old f
 already has Memo memories, Memo asks whether to open those or replace them with the current ones. "Use default folder"
 moves them back.
 
-### Google Drive sync (in progress)
+### Google Drive sync
 
 Memo can connect a Google account in Memo Manager → Settings → Sync, to keep the memories in a hidden Memo folder of
-your own Google Drive and use them on several computers. Only the content syncs; window positions stay on each
-computer, and without connecting everything stays local. For now only the account is connected: uploading and merging
-the memories comes next. The section only shows in builds made with a Google OAuth client — see
-[`docs/google-cloud.md`](docs/google-cloud.md).
+your own Google Drive and use them on several computers. Only the content syncs (text, title, colour, group, trash);
+window positions, size and pin stay on each computer, and without connecting everything stays local. A memory created
+on another computer shows up closed in the Manager; if the same memory is edited in two places before syncing, the newer
+version wins and the other is kept in the trash with "(conflict)" in its title. The section only shows in builds made
+with a Google OAuth client — see [`docs/google-cloud.md`](docs/google-cloud.md).
 
 Older versions saved to a folder named `br.memo.notas` (or `br.taxinha.notas`, when the app was called Taxinha):
 the first time this version opens, it copies the memories and settings from there into `memo`, leaving the old folder
@@ -118,6 +119,7 @@ src-tauri/src/
   main.rs            windows, commands, tray
   store.rs           persistence to notes.json
   cloud.rs           Google sign-in for cloud sync
+  sync.rs            syncing with the Drive (pull, push, conflicts)
 src-tauri/icons/     icons generated from assets/icon.svg
 ```
 

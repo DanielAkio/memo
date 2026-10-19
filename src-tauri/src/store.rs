@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs, io,
     path::{Path, PathBuf},
     sync::{
@@ -195,6 +195,127 @@ struct FileData {
     defaults_updated_at: u64,
     /// Notes and groups deleted for good, kept for `TOMBSTONE_TTL_MS`.
     deleted: Vec<Tombstone>,
+    /// Cloud sync bookkeeping (see `SyncState`); per machine, like the rest
+    /// of this file.
+    sync: SyncState,
+}
+
+// ------------------------------------------------------------ cloud format
+// What goes to the user's Drive (sync.rs): one JSON file per note
+// (`note-<id>.json`) and per group (`group-<id>.json`), plus `settings.json`.
+// Only content travels; layout stays on each computer. A deleted note or
+// group keeps its file as a tombstone (`deleted: true`).
+
+/// A note as stored in the cloud.
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct NoteDoc {
+    pub version: u32,
+    pub id: String,
+    pub title: String,
+    pub text: String,
+    pub html: String,
+    pub color: String,
+    pub group_id: String,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub trashed_at: Option<u64>,
+    pub deleted: bool,
+    pub deleted_at: u64,
+}
+
+impl NoteDoc {
+    /// The time this version was made (edit or deletion).
+    pub fn stamp(&self) -> u64 {
+        if self.deleted {
+            self.deleted_at
+        } else {
+            self.updated_at
+        }
+    }
+}
+
+/// A group as stored in the cloud.
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct GroupDoc {
+    pub version: u32,
+    pub id: String,
+    pub name: String,
+    pub color: String,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub trashed_at: Option<u64>,
+    pub deleted: bool,
+    pub deleted_at: u64,
+}
+
+impl GroupDoc {
+    pub fn stamp(&self) -> u64 {
+        if self.deleted {
+            self.deleted_at
+        } else {
+            self.updated_at
+        }
+    }
+}
+
+/// The new-note and new-group defaults, as stored in the cloud.
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SettingsDoc {
+    pub version: u32,
+    pub default_color: Option<String>,
+    pub default_title: String,
+    pub default_text: String,
+    pub default_html: String,
+    pub default_group_color: Option<String>,
+    pub default_group_title: String,
+    pub updated_at: u64,
+}
+
+/// A cloud file this computer knows: its Drive id and the stamp
+/// (`updatedAt` / `deletedAt`) last sent or received for it.
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SyncedFile {
+    pub file_id: String,
+    pub synced: u64,
+}
+
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SyncState {
+    /// Account these file ids belong to; another account starts over.
+    pub account: String,
+    /// Drive changes token: where the next pull starts. `None` = list all.
+    pub page_token: Option<String>,
+    /// By file name (`note-<id>.json`, `group-<id>.json`, `settings.json`).
+    pub files: HashMap<String, SyncedFile>,
+    /// Cloud versions of notes being edited here when they arrived; applied
+    /// once their window is no longer focused.
+    pub deferred: Vec<NoteDoc>,
+    /// Last successful sync (ms).
+    pub last_sync: u64,
+}
+
+/// Everything sync needs to read in one lock.
+pub struct SyncSnapshot {
+    pub notes: Vec<Note>,
+    pub groups: Vec<Group>,
+    pub deleted: Vec<Tombstone>,
+    pub settings: SettingsDoc,
+    pub state: SyncState,
+}
+
+/// What applying a cloud note did, so the caller can update its window.
+#[derive(Debug, PartialEq)]
+pub enum Applied {
+    Unchanged,
+    Created,
+    Updated,
+    Trashed,
+    Removed,
 }
 
 /// A group of notes: a compact bar on screen. Double-clicking it takes its
@@ -374,6 +495,15 @@ fn now_nanos() -> u128 {
         .unwrap_or(0)
 }
 
+fn set_content(note: &mut Note, content: NoteContent) {
+    note.title = content.title;
+    note.text = content.text;
+    note.html = content.html;
+    note.color = content.color;
+    note.group_id = content.group_id;
+    note.trashed_at = content.trashed_at;
+}
+
 /// Records the ids as deleted for good.
 fn bury(data: &mut FileData, ids: impl IntoIterator<Item = String>, now: u64) {
     for id in ids {
@@ -458,6 +588,7 @@ impl Store {
             copy.notes.retain(|n| n.trashed_at.is_none());
             copy.groups.retain(|g| g.trashed_at.is_none());
             copy.deleted.clear();
+            copy.sync = SyncState::default();
             normalize(&mut copy);
             serde_json::to_string_pretty(&copy)
         };
@@ -917,6 +1048,211 @@ impl Store {
         bury(&mut data, [id.to_string()], now_ms());
         drop(data);
         self.mark_dirty();
+    }
+
+    // --------------------------------------------------------- cloud sync
+
+    pub fn sync_snapshot(&self) -> SyncSnapshot {
+        let data = self.data.lock().unwrap();
+        SyncSnapshot {
+            notes: data.notes.clone(),
+            groups: data.groups.clone(),
+            deleted: data.deleted.clone(),
+            settings: SettingsDoc {
+                version: 1,
+                default_color: data.default_color.clone(),
+                default_title: data.default_title.clone(),
+                default_text: data.default_text.clone(),
+                default_html: data.default_html.clone(),
+                default_group_color: data.default_group_color.clone(),
+                default_group_title: data.default_group_title.clone(),
+                updated_at: data.defaults_updated_at,
+            },
+            state: data.sync.clone(),
+        }
+    }
+
+    pub fn update_sync<F: FnOnce(&mut SyncState)>(&self, f: F) {
+        f(&mut self.data.lock().unwrap().sync);
+        self.mark_dirty();
+    }
+
+    /// Applies a note from the cloud as is (its stamps included, so it isn't
+    /// sent back). A note new to this computer arrives closed, and so does
+    /// one restored from the trash elsewhere: the manager lists them.
+    pub fn apply_note_doc(&self, doc: &NoteDoc) -> Applied {
+        let mut data = self.data.lock().unwrap();
+        let index = data.notes.iter().position(|n| n.id == doc.id);
+        let applied = if doc.deleted {
+            match index {
+                Some(i) => {
+                    data.notes.remove(i);
+                    Applied::Removed
+                }
+                None => Applied::Unchanged,
+            }
+        } else {
+            let color = if is_valid_color(&doc.color) {
+                doc.color.clone()
+            } else {
+                DEFAULT_COLOR.to_string()
+            };
+            let content = NoteContent {
+                title: doc.title.chars().take(TITLE_MAX).collect(),
+                text: doc.text.clone(),
+                html: doc.html.clone(),
+                color,
+                group_id: doc.group_id.clone(),
+                trashed_at: doc.trashed_at,
+            };
+            match index {
+                Some(i) => {
+                    let note = &mut data.notes[i];
+                    let was_trashed = note.trashed_at.is_some();
+                    let changed = note.content() != content;
+                    set_content(note, content);
+                    note.updated_at = doc.updated_at;
+                    note.created_at = doc.created_at;
+                    match (was_trashed, note.trashed_at.is_some()) {
+                        (false, true) => Applied::Trashed,
+                        (true, false) => {
+                            note.hidden = true;
+                            Applied::Updated
+                        }
+                        _ if changed => Applied::Updated,
+                        _ => Applied::Unchanged,
+                    }
+                }
+                None => {
+                    // Deleted here and edited elsewhere: the edit wins.
+                    data.deleted.retain(|t| t.id != doc.id);
+                    let seq = data.next_seq.max(1);
+                    data.next_seq = seq + 1;
+                    let mut note = Note {
+                        id: doc.id.clone(),
+                        seq,
+                        created_at: doc.created_at,
+                        updated_at: doc.updated_at,
+                        hidden: true,
+                        ..Default::default()
+                    };
+                    set_content(&mut note, content);
+                    data.notes.push(note);
+                    Applied::Created
+                }
+            }
+        };
+        if doc.deleted {
+            data.deleted.retain(|t| t.id != doc.id);
+            data.deleted.push(Tombstone {
+                id: doc.id.clone(),
+                deleted_at: doc.deleted_at,
+            });
+        }
+        drop(data);
+        if applied != Applied::Unchanged || doc.deleted {
+            self.mark_dirty();
+        }
+        applied
+    }
+
+    /// Applies a group from the cloud as is. A group new to this computer
+    /// arrives closed (no bar until the manager opens it). Returns `true` if
+    /// anything changed.
+    pub fn apply_group_doc(&self, doc: &GroupDoc) -> bool {
+        let mut data = self.data.lock().unwrap();
+        let index = data.groups.iter().position(|g| g.id == doc.id);
+        let changed = if doc.deleted {
+            data.deleted.retain(|t| t.id != doc.id);
+            data.deleted.push(Tombstone {
+                id: doc.id.clone(),
+                deleted_at: doc.deleted_at,
+            });
+            if let Some(i) = index {
+                data.groups.remove(i);
+                for note in data.notes.iter_mut().filter(|n| n.group_id == doc.id) {
+                    note.group_id.clear();
+                }
+            }
+            true
+        } else {
+            let color = if is_valid_color(&doc.color) {
+                doc.color.clone()
+            } else {
+                DEFAULT_COLOR.to_string()
+            };
+            let name: String = doc.name.chars().take(GROUP_NAME_MAX).collect();
+            let group = match index {
+                Some(i) => &mut data.groups[i],
+                None => {
+                    data.groups.push(Group {
+                        id: doc.id.clone(),
+                        hidden: true,
+                        open: false,
+                        ..Default::default()
+                    });
+                    data.groups.last_mut().unwrap()
+                }
+            };
+            let changed = index.is_none()
+                || group.content() != (name.clone(), color.clone(), doc.trashed_at);
+            group.name = name;
+            group.color = color;
+            group.trashed_at = doc.trashed_at;
+            group.created_at = doc.created_at;
+            group.updated_at = doc.updated_at;
+            changed
+        };
+        drop(data);
+        if changed {
+            self.mark_dirty();
+        }
+        changed
+    }
+
+    pub fn apply_settings_doc(&self, doc: &SettingsDoc) {
+        let mut data = self.data.lock().unwrap();
+        data.default_color = doc.default_color.clone().filter(|c| is_valid_color(c));
+        data.default_title = doc.default_title.chars().take(TITLE_MAX).collect();
+        data.default_text = doc.default_text.chars().take(DEFAULT_TEXT_MAX).collect();
+        data.default_html = doc.default_html.clone();
+        data.default_group_color = doc.default_group_color.clone().filter(|c| is_valid_color(c));
+        data.default_group_title = doc.default_group_title.chars().take(GROUP_NAME_MAX).collect();
+        data.defaults_updated_at = doc.updated_at;
+        drop(data);
+        self.mark_dirty();
+    }
+
+    /// Keeps the version of a note that lost a conflict: a new note in the
+    /// trash, titled "<title> (<suffix>)", so no text is lost.
+    pub fn add_conflict_copy(&self, doc: &NoteDoc, suffix: &str) -> Note {
+        let mut data = self.data.lock().unwrap();
+        let seq = data.next_seq.max(1);
+        data.next_seq = seq + 1;
+        let now = now_ms();
+        let base = if doc.title.trim().is_empty() {
+            doc.text.lines().next().unwrap_or("").trim().to_string()
+        } else {
+            doc.title.clone()
+        };
+        let title: String = format!("{base} ({suffix})").trim_start().to_string();
+        let note = Note {
+            id: format!("{:x}-{}", now_nanos(), seq),
+            seq,
+            title: title.chars().take(TITLE_MAX).collect(),
+            text: doc.text.clone(),
+            html: doc.html.clone(),
+            color: if is_valid_color(&doc.color) { doc.color.clone() } else { DEFAULT_COLOR.to_string() },
+            created_at: now,
+            updated_at: now,
+            trashed_at: Some(now),
+            hidden: true,
+            ..Default::default()
+        };
+        data.notes.push(note.clone());
+        drop(data);
+        self.mark_dirty();
+        note
     }
 
     fn mark_dirty(&self) {

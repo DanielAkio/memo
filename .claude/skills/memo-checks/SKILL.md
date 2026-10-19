@@ -5,7 +5,7 @@ description: Build, check and verify Memo across Windows, macOS and Linux. Use b
 
 # Building and checking Memo
 
-There are no tests, linters or JS build step. The JS is served as-is, so a JS change is checked by running the app (`npm run dev`).
+There are no linters or JS build step; the only test is the cloud-sync one in `sync.rs` (`cd src-tauri && cargo test`: two stores against a fake Drive, no network). The JS is served as-is, so a JS change is checked by running the app (`npm run dev`).
 
 ## Local
 

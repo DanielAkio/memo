@@ -19,7 +19,10 @@ use sha2::{Digest, Sha256};
 use std::{
     io::{ErrorKind, Read, Write},
     net::{TcpListener, TcpStream},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
     time::{Duration, Instant},
 };
 use tauri::AppHandle;
@@ -46,6 +49,9 @@ pub const ERR_TIMEOUT: &str = "timeout";
 pub const ERR_DENIED: &str = "denied";
 pub const ERR_NETWORK: &str = "network";
 pub const ERR_KEYRING: &str = "keyring";
+/// The sign-in is no longer valid (revoked, or expired: in Google's
+/// "Testing" mode a sign-in lasts 7 days). The user connects again.
+pub const ERR_REAUTH: &str = "reauth";
 
 /// A sign-in is waiting for the browser.
 static SIGNING_IN: AtomicBool = AtomicBool::new(false);
@@ -64,13 +70,13 @@ pub fn available() -> bool {
     client().is_some()
 }
 
-fn random_b64(len: usize) -> String {
+pub fn random_b64(len: usize) -> String {
     let mut bytes = vec![0u8; len];
     getrandom::fill(&mut bytes).expect("no OS random source");
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
-fn http() -> Result<reqwest::Client, String> {
+pub fn http() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
@@ -81,6 +87,61 @@ fn http() -> Result<reqwest::Client, String> {
 struct TokenResponse {
     access_token: String,
     refresh_token: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RefreshResponse {
+    access_token: String,
+    expires_in: u64,
+}
+
+/// Current access token and when it expires.
+static ACCESS: Mutex<Option<(String, Instant)>> = Mutex::new(None);
+
+/// An access token for the Drive API, refreshed from the stored sign-in
+/// when the cached one is about to expire.
+pub async fn access_token() -> Result<String, String> {
+    if let Some((token, expires)) = ACCESS.lock().unwrap().clone() {
+        if expires > Instant::now() + Duration::from_secs(60) {
+            return Ok(token);
+        }
+    }
+    let (client_id, client_secret) = client().ok_or(ERR_UNAVAILABLE)?;
+    let refresh = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+        .and_then(|entry| entry.get_password())
+        .map_err(|_| ERR_REAUTH)?;
+    let mut form = vec![
+        ("grant_type", "refresh_token"),
+        ("refresh_token", refresh.as_str()),
+        ("client_id", client_id),
+    ];
+    if let Some(secret) = client_secret {
+        form.push(("client_secret", secret));
+    }
+    let response = http()?
+        .post(TOKEN_URL)
+        .form(&form)
+        .send()
+        .await
+        .map_err(|_| ERR_NETWORK)?;
+    // 400 invalid_grant / 401: the sign-in was revoked or expired.
+    if matches!(response.status().as_u16(), 400 | 401) {
+        return Err(ERR_REAUTH.into());
+    }
+    let tokens: RefreshResponse = response
+        .error_for_status()
+        .map_err(|_| ERR_NETWORK)?
+        .json()
+        .await
+        .map_err(|_| ERR_NETWORK)?;
+    let expires = Instant::now() + Duration::from_secs(tokens.expires_in);
+    *ACCESS.lock().unwrap() = Some((tokens.access_token.clone(), expires));
+    Ok(tokens.access_token)
+}
+
+/// Drops the cached access token (after a 401, or on sign-out).
+pub fn forget_access_token() {
+    *ACCESS.lock().unwrap() = None;
 }
 
 #[derive(Deserialize)]
@@ -178,6 +239,7 @@ async fn sign_in_inner(
             eprintln!("memo: can't store the Google sign-in: {err}");
             ERR_KEYRING
         })?;
+    forget_access_token();
     Ok(user.email)
 }
 
@@ -269,6 +331,7 @@ fn done_page(lang: &str, ok: bool) -> String {
 /// credential store. The token is not revoked at Google: that would revoke
 /// the grant itself and disconnect the user's other computers too.
 pub fn sign_out() {
+    forget_access_token();
     if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         let _ = entry.delete_credential();
     }
