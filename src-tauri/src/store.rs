@@ -305,6 +305,9 @@ pub struct Config {
     pub data_dir: Option<PathBuf>,
     /// Start-with-the-system has been set up once (see `init_autostart`).
     pub autostart_init: bool,
+    /// E-mail of the Google account connected for cloud sync on this
+    /// computer (its token is in the OS credential store, see cloud.rs).
+    pub google_account: Option<String>,
 }
 
 impl Config {

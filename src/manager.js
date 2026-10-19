@@ -851,6 +851,65 @@
     }
   });
 
+  // ------------------------------------------------------------- cloud
+  // Google account for cloud sync (cloud.rs). The section only shows in
+  // builds with an OAuth client. Errors come back as short codes.
+
+  const cloud = { available: false, email: null, waiting: false, error: null };
+  const CLOUD_ERRORS = {
+    denied: 'cloudErrDenied',
+    timeout: 'cloudErrTimeout',
+    network: 'cloudErrNetwork',
+    keyring: 'cloudErrKeyring',
+  };
+
+  function renderCloud() {
+    document.querySelectorAll('[data-cloud]').forEach((el) => { el.hidden = !cloud.available; });
+    $('cloudConnectBtn').hidden = !!cloud.email || cloud.waiting;
+    $('cloudCancelBtn').hidden = !cloud.waiting;
+    $('cloudDisconnectBtn').hidden = !cloud.email;
+    let status = cloud.email ? t('cloudOn', { email: cloud.email }) : t('cloudOff');
+    if (cloud.waiting) status = t('cloudWaiting');
+    else if (cloud.error) status = t(CLOUD_ERRORS[cloud.error] || 'cloudErrOther');
+    $('cloudStatus').textContent = status;
+  }
+
+  async function loadCloud() {
+    try {
+      [cloud.available, cloud.email] = await invoke('get_cloud_account');
+    } catch (err) {
+      console.error('get_cloud_account', err);
+    }
+    renderCloud();
+  }
+
+  $('cloudConnectBtn').addEventListener('click', async () => {
+    Object.assign(cloud, { waiting: true, error: null });
+    renderCloud();
+    try {
+      cloud.email = await invoke('connect_cloud');
+    } catch (err) {
+      if (err !== 'cancelled' && err !== 'busy') cloud.error = err;
+      console.error('connect_cloud', err);
+    }
+    cloud.waiting = false;
+    renderCloud();
+  });
+
+  $('cloudCancelBtn').addEventListener('click', () => {
+    invoke('cancel_cloud_connect').catch((err) => console.error('cancel_cloud_connect', err));
+  });
+
+  $('cloudDisconnectBtn').addEventListener('click', async () => {
+    cloud.error = null;
+    try {
+      await invoke('disconnect_cloud');
+    } catch (err) {
+      console.error('disconnect_cloud', err);
+    }
+    await loadCloud();
+  });
+
   // ---------------------------------------------------------------- help
   // Each group is a title and [topic, how, demo?] items. In "how", {{…}}
   // marks a key or something to type, shown as <kbd>; "Mod"/"Shift" inside it
@@ -932,6 +991,7 @@
     renderWindow();
     renderMonoName();
     renderHelp();
+    renderCloud();
     render();
   }
 
@@ -993,6 +1053,8 @@
     if (document.hasFocus()) frame.classList.add('is-focused');
     applyTheme(await invoke('get_theme'));
     listen('theme-changed', (e) => applyTheme(e.payload));
+    loadCloud();
+    listen('cloud-changed', loadCloud);
     listen('notes-changed', scheduleLoad);
     listen('groups-changed', scheduleLoad);
     // Switched to another folder's notes file: its theme, language and

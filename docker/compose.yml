@@ -11,6 +11,11 @@ services:
       dockerfile: windows.Dockerfile
     image: memo-build-windows
     working_dir: /app
+    # Google OAuth client for cloud sync, from the host shell (empty = none;
+    # see docs/google-cloud.md).
+    environment:
+      MEMO_GOOGLE_CLIENT_ID: ${MEMO_GOOGLE_CLIENT_ID:-}
+      MEMO_GOOGLE_CLIENT_SECRET: ${MEMO_GOOGLE_CLIENT_SECRET:-}
     volumes:
       - ..:/app
       - node_modules:/app/node_modules

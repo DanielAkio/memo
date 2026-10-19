@@ -30,4 +30,4 @@ Native code is gated with `#[cfg(windows)]` / `#[cfg(target_os = "macos")]` / `#
 
 ## CI
 
-`.github/workflows/build.yml` builds installers for Windows, macOS arm64 + x64 and Linux (ubuntu-22.04). It runs only via `workflow_dispatch`; run from a `v*` tag it creates a draft GitHub release via `tauri-action`. Builds are unsigned.
+`.github/workflows/build.yml` builds installers for Windows, macOS arm64 + x64 and Linux (ubuntu-22.04). It runs only via `workflow_dispatch`; run from a `v*` tag it creates a draft GitHub release via `tauri-action`. Builds are unsigned. Cloud sync needs the repository secrets `MEMO_GOOGLE_CLIENT_ID` / `MEMO_GOOGLE_CLIENT_SECRET` (passed to `tauri-action`; Docker passes them from the host shell); without them the build has no sync section. To compile both code paths locally: `MEMO_GOOGLE_CLIENT_ID=x cargo clippy`.

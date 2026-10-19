@@ -36,3 +36,7 @@ Notes and groups trashed longer than `TRASH_TTL_MS` (30 days) are purged on load
 
 - `export_notes(fileName)` → `Store::export_to`: same format as `notes.json`, trashed notes left out; the page suggests `memo-YYYY-MM-DD.json`.
 - `import_notes` → `Store::import_from`: unknown ids are added, known ones replaced only if the imported `updatedAt` is newer, settings ignored; then the changed notes' windows are opened/reloaded and the count is shown in `#storageStatus`.
+
+## Cloud account (sync, in progress)
+
+`cloud.rs` signs in with Google (desktop OAuth: system browser via `tauri-plugin-opener`, one-shot loopback server on `127.0.0.1:<random>`, PKCE, `access_type=offline` + `prompt=consent`); scope `drive.appdata` + `openid email`. The refresh token lives in the OS credential store (`keyring`, service `Memo`, user `google-drive`), never in a file; the account e-mail is `Config.google_account` in `config.json` (per machine). Disconnecting only deletes the local token (revoking would drop the grant on the user's other computers). The OAuth client is compiled in from `MEMO_GOOGLE_CLIENT_ID` / `MEMO_GOOGLE_CLIENT_SECRET` (`option_env!`); without it `cloud::available()` is false and the manager hides the section. TLS is rustls with the `ring` provider (installed in `main()`), so cross-builds need no extra C toolchain. Design and phases: content vs layout above; the Drive format (one file per note/group, tombstones) comes in the next phase. Setup: `docs/google-cloud.md`.

@@ -41,9 +41,11 @@ src/                     frontend: plain HTML/CSS/JS, no bundler (frontendDist =
 src-tauri/
   src/main.rs            windows, commands, tray, lifecycle (~94 KB: grep by section, see memo-code-map)
   src/store.rs           Note/Group model + persistence
+  src/cloud.rs           Google sign-in for cloud sync (OAuth loopback + PKCE, token in the OS credential store)
   src/welcome.rs         first-run welcome note (HTML + matching plain text)
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
   capabilities/default.json  permissions for note-*, group-* and manager windows
+docs/google-cloud.md     Google Cloud project / OAuth client setup for cloud sync
 docs/style.md            visual reference ("Linear"-style dark system); base.css tokens are what the app uses
 ```
 
@@ -61,7 +63,7 @@ Tokens spent on things that don't help understand or change the project are wast
 - **One window per note.** Labels: `note-{id}`, `group-{id}`, `manager`, plus the hidden `snap-preview`. Rust derives the note id from the calling window's label (`id_of`), so note commands take no id (`invoke('save_text', { text, html })`); manager commands take explicit ids. All note windows load `index.html`, which calls `load_note`. Code that iterates windows tells them apart with `is_note` / `is_group` / `is_app_window` (the last excludes the Snap preview).
 - **Rust is the source of truth.** `Store` (`store.rs`) holds everything in a `Mutex`, marks it dirty, and a saver thread flushes atomically every 800 ms. Never overwrite user data: unreadable files are backed up, old files are never deleted. Default data folder is `<OS data folder>/memo` — **never** use Tauri's `app_data_dir()` for notes or config.
 - **Tauri commands** live in `main.rs` and must be registered in `generate_handler!`; a new JS window API needs its permission in `capabilities/default.json`. Commands that create/destroy windows are `async` on purpose (sync ones can deadlock on Windows). Rust errors returned to JS are English `String`s (logged, not shown).
-- **Events** keep windows in step: `notes-changed`, `groups-changed`, `store-replaced`, `theme-changed`, `language-changed`, `zoom-changed`, `drop-hover`.
+- **Events** keep windows in step: `notes-changed`, `groups-changed`, `store-replaced`, `theme-changed`, `language-changed`, `zoom-changed`, `drop-hover`, `cloud-changed`.
 - **Content vs layout (sync groundwork):** `Note::content` / `Group::content` hold what is the same on every device; position, size, pin, `hidden`, `open` are local layout. Keep new content fields inside `content()` and route mutations through `Store::update` / `update_group` (they bump `updatedAt` only on content changes); permanent removals leave tombstones. Details in `memo-storage`.
 - **Close ≠ trash.** ✕ / middle click only close (`Note.hidden`); only the manager's trash buttons trash. Details in `memo-windows`.
 
