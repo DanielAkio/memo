@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Política de privacidade do Memo</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+  <nav>
+    <a class="brand" href="./">Memo</a>
+    <span class="links"><a href="./">Início</a><a href="../privacy.html">English</a></span>
+  </nav>
+
+  <h1>Política de privacidade</h1>
+  <p class="muted">Última atualização: 19 de outubro de 2026</p>
+
+  <p>O Memo é um app de notas adesivas para computador feito por Daniel Akio Teixeira. Esta política explica quais
+    dados o Memo usa e para onde eles vão. Em resumo: suas memórias ficam no seu computador e, se você ativar a
+    sincronização, no seu próprio Google Drive. Ninguém mais as recebe, nem o desenvolvedor.</p>
+
+  <h2>Dados guardados no seu computador</h2>
+  <p>Suas memórias, grupos e configurações são salvos numa pasta do seu computador (por padrão a pasta do app no
+    diretório de dados do sistema, ou uma pasta que você escolher). O Memo não tem servidor, nem conta própria, nem
+    análise de uso, nem anúncios, nem rastreamento.</p>
+
+  <h2>Sincronização com o Google Drive (opcional)</h2>
+  <p>A sincronização fica desligada até você entrar com o Google nas configurações do Memo. Ao entrar, o Memo pede
+    ao Google estas permissões:</p>
+  <ul>
+    <li><strong>Ver, criar e excluir os próprios dados de configuração no seu Google Drive</strong>
+      (<code>drive.appdata</code>): o Memo guarda uma cópia das suas memórias e grupos numa pasta oculta do seu Drive
+      que só o Memo acessa. O Memo não consegue ver, ler nem alterar nenhum outro arquivo do seu Drive.</li>
+    <li><strong>Seu endereço de e-mail</strong> (<code>openid</code>, <code>email</code>): mostrado nas configurações
+      do Memo para você saber qual conta está conectada.</li>
+  </ul>
+  <p>O Memo fala diretamente com o Google a partir do seu computador. Os dados vão apenas entre o seu computador e a
+    sua própria conta Google; nunca são enviados ao desenvolvedor nem a terceiros. O token de acesso fica no cofre de
+    credenciais do sistema (Gerenciador de Credenciais do Windows, Keychain do macOS ou Secret Service no Linux), e o
+    seu e-mail fica no arquivo de configurações do Memo no seu computador.</p>
+  <p>O uso e a transferência pelo Memo de informações recebidas das APIs do Google seguem a
+    <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de Dados do Usuário dos
+    Serviços de API do Google</a>, incluindo os requisitos de Uso Limitado. O Memo não usa esses dados para
+    publicidade, não os vende e não os usa para treinar modelos de IA.</p>
+
+  <h2>Como remover seus dados</h2>
+  <ul>
+    <li><strong>Saia da conta</strong> nas configurações do Memo para parar de sincronizar e apagar o token do seu
+      computador.</li>
+    <li><strong>Revogue o acesso</strong> a qualquer momento em
+      <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+    <li><strong>Apague a cópia sincronizada</strong> no Google Drive: Configurações → Gerenciar apps → Memo → Excluir
+      dados ocultos do app.</li>
+    <li><strong>Apague os dados locais</strong> removendo a pasta de dados do Memo ou desinstalando o app.</li>
+  </ul>
+
+  <h2>Mudanças</h2>
+  <p>Se esta política mudar, a nova versão será publicada nesta página com uma nova data.</p>
+
+  <h2>Contato</h2>
+  <p>Dúvidas sobre privacidade: abra uma issue em
+    <a href="https://github.com/DanielAkio/memo/issues">github.com/DanielAkio/memo/issues</a>.</p>
+
+  <footer><a href="./">Memo</a> · © 2026 Daniel Akio Teixeira</footer>
+</main>
+</body>
+</html>

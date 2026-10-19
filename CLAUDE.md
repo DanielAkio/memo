@@ -46,6 +46,7 @@ src-tauri/
   src/welcome.rs         first-run welcome note (HTML + matching plain text)
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
   capabilities/default.json  permissions for note-*, group-* and manager windows
+site/                    GitHub Pages home page + privacy policy (en, pt/) for Google's consent screen
 docs/google-cloud.md     Google Cloud project / OAuth client setup for cloud sync
 docs/code-signing.md     Windows installer signing through SignPath Foundation (CI setup)
 docs/style.md            visual reference ("Linear"-style dark system); base.css tokens are what the app uses

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memo privacy policy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <nav>
+    <a class="brand" href="./">Memo</a>
+    <span class="links"><a href="./">Home</a><a href="pt/privacidade.html">Português</a></span>
+  </nav>
+
+  <h1>Privacy policy</h1>
+  <p class="muted">Last updated: October 19, 2026</p>
+
+  <p>Memo is a desktop sticky-notes app made by Daniel Akio Teixeira. This policy explains what data Memo handles
+    and where it goes. In short: your memories stay on your computer and, if you turn on sync, in your own Google
+    Drive. Nobody else receives them, the developer included.</p>
+
+  <h2>Data stored on your computer</h2>
+  <p>Your memories, groups and settings are saved in a folder on your computer (by default the app's folder in your
+    system's data directory, or a folder you choose). Memo has no server, no account of its own, no analytics, no
+    ads and no tracking.</p>
+
+  <h2>Google Drive sync (optional)</h2>
+  <p>Sync is off until you sign in with Google in Memo's settings. When you sign in, Memo asks Google for these
+    permissions:</p>
+  <ul>
+    <li><strong>See, create and delete its own configuration data in your Google Drive</strong>
+      (<code>drive.appdata</code>): Memo stores a copy of your memories and groups in a hidden folder of your Drive
+      that only Memo can access. Memo cannot see, read or change any other file in your Drive.</li>
+    <li><strong>Your e-mail address</strong> (<code>openid</code>, <code>email</code>): shown in Memo's settings so
+      you know which account is connected.</li>
+  </ul>
+  <p>Memo talks to Google directly from your computer. The data goes only between your computer and your own Google
+    account; it is never sent to the developer or to any third party. The sign-in token is kept in your operating
+    system's credential store (Windows Credential Manager, macOS Keychain or the Linux Secret Service), and your
+    e-mail address is kept in Memo's settings file on your computer.</p>
+  <p>Memo's use and transfer of information received from Google APIs adheres to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data
+    Policy</a>, including the Limited Use requirements. Memo does not use this data for advertising, does not sell
+    it and does not use it to train AI models.</p>
+
+  <h2>Removing your data</h2>
+  <ul>
+    <li><strong>Sign out</strong> in Memo's settings to stop syncing and remove the token from your computer.</li>
+    <li><strong>Revoke access</strong> at any time at
+      <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+    <li><strong>Delete the synced copy</strong> in Google Drive: Settings → Manage apps → Memo → Delete hidden app
+      data.</li>
+    <li><strong>Delete the local data</strong> by removing Memo's data folder or uninstalling the app.</li>
+  </ul>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the new version will be published on this page with a new date.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about privacy: open an issue at
+    <a href="https://github.com/DanielAkio/memo/issues">github.com/DanielAkio/memo/issues</a>.</p>
+
+  <footer><a href="./">Memo</a> · © 2026 Daniel Akio Teixeira</footer>
+</main>
+</body>
+</html>
