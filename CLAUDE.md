@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Memo is a cross-platform (Windows/macOS/Linux) sticky-notes desktop app built on **Tauri 2**. Each note is its own frameless window; the headline feature is the pin button ("always on top"). Code, comments, docs, config labels and commit messages are in **English**; only the UI and the user-facing README (Portuguese section, then English, developer notes last) are bilingual — Portuguese (default) and English, and every new user-facing string needs both (`i18n.js`; Rust strings in `tray_labels` / `welcome.rs`). In the UI a note is a **memória** (en: *memory*); internal names stay `note` (`notes.json`, `note-*` labels, commands).
+Memo is a cross-platform (Windows/macOS/Linux) sticky-notes desktop app built on **Tauri 2**. Each note is its own frameless window; the headline feature is the pin button ("always on top"). Code, comments, docs, config labels and commit messages are in **English**; only the UI is bilingual — Portuguese (default) and English, and every new user-facing string needs both (`i18n.js`; Rust strings in `tray_labels` / `welcome.rs`). In the UI a note is a **memória** (en: *memory*); internal names stay `note` (`notes.json`, `note-*` labels, commands).
 
 This file holds only what every task needs. Subsystem detail lives in skills under `.claude/skills/` and is loaded on demand — **load the matching skill before changing that area**:
 

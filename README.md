@@ -1,126 +1,13 @@
 # Memo
 
-**Memórias adesivas que você fixa por cima de tudo.**
-*Sticky memories you pin on top of everything.*
-
-[Português](#português) · [English](#english) · [Para desenvolvedores / For developers](#for-developers)
-
----
-
-## Português
-
-O Memo é um app de notas adesivas para **Windows, macOS e Linux**. Cada memória é uma janelinha própria na sua tela
-e, com **um clique no alfinete**, ela fica por cima de qualquer outro programa: a lista de tarefas ao lado da
-planilha, o comando que você sempre esquece em cima do terminal, o recado que não pode sumir atrás do navegador.
-É gratuito, de código aberto e funciona totalmente offline.
-
-### O que ele faz
-
-- **Fixar por cima de tudo**: o alfinete no canto da memória (ou `Ctrl+Shift+P`) a mantém sempre visível.
-- **Escrita rápida e formatada**: listas de tarefas com `[]`, marcadores com `- `, negrito, itálico, sublinhado,
-  marca-texto, três tamanhos de texto e blocos de código com destaque de sintaxe.
-- **Cores e títulos**: dê um nome e uma cor a cada memória para achá-la de relance.
-- **Grupos**: junte memórias numa barrinha, guarde todas de uma vez e tire-as de volta onde estavam.
-- **Organização na tela**: arraste e ela gruda nas bordas e nas outras memórias; empurre contra a borda da tela para
-  encaixar em meia tela, num quarto ou em tela cheia.
-- **Gerenciador**: veja, busque e ordene todas as memórias e grupos; restaure da lixeira por até 30 dias.
-- **Seus dados ficam com você**: tudo é salvo automaticamente no seu computador. Dá para escolher outra pasta
-  (por exemplo do Dropbox ou OneDrive) e exportar ou importar um backup.
-- **Do seu jeito**: tema claro ou escuro, tamanho do texto, cor e texto padrão das novas memórias, e iniciar com o
-  sistema.
-- Interface em **português e inglês**.
-
-### Baixar
-
-Os instaladores ficam na página de **[Releases](https://github.com/DanielAkio/memo/releases)**. Escolha o arquivo
-do seu sistema:
-
-| Sistema | Arquivo |
-| --- | --- |
-| Windows 10/11 | `…-setup.exe` (recomendado) ou `.msi` |
-| macOS com Apple Silicon (M1, M2…) | `.dmg` com `aarch64` no nome |
-| macOS com Intel | `.dmg` com `x64` no nome |
-| Linux (Ubuntu, Debian, Mint…) | `.deb` |
-| Linux (Fedora, openSUSE…) | `.rpm` |
-| Linux (qualquer distribuição) | `.AppImage` |
-
-> Ainda não há uma versão publicada? Ela está a caminho: acompanhe a página de Releases (no GitHub, **Watch →
-> Custom → Releases** avisa quando sair).
-
-### Primeira abertura
-
-Os instaladores ainda **não são assinados digitalmente**, então o sistema pode desconfiar na primeira vez. É
-esperado e só acontece uma vez:
-
-- **Windows**: se o SmartScreen mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar
-  assim mesmo**. O instalador pergunta se o Memo deve iniciar com o sistema.
-- **macOS**: arraste o Memo para Aplicativos. Na primeira vez, clique com o botão direito no app → **Abrir**; se o
-  macOS bloquear mesmo assim, vá em **Ajustes do Sistema → Privacidade e Segurança** e clique em **Abrir Mesmo
-  Assim**. Se aparecer "o app está danificado", rode `xattr -cr /Applications/Memo.app` no Terminal e abra de novo.
-- **Linux**: instale o `.deb` ou o `.rpm` pelo gerenciador de pacotes, ou torne o `.AppImage` executável
-  (`chmod +x Memo*.AppImage`) e abra-o.
-
-Ao abrir, o Memo mostra o **Gerenciador do Memo** e uma memória de boas-vindas que explica o básico. Fechar a última
-memória não encerra o app: ele continua no ícone da bandeja (barra de menus, no Mac).
-
-### Primeiros passos
-
-| Para… | Faça |
-| --- | --- |
-| Criar uma memória | Botão `+`, `Ctrl+N` (`⌘N` no Mac) ou o ícone do Memo na bandeja |
-| Fixar por cima de tudo | Clique no alfinete à esquerda da barra de título, ou `Ctrl+Shift+P` (`⌘⇧P`) |
-| Dar um título | Clique duas vezes na barra de título; `Enter` salva, `Esc` cancela |
-| Mudar a cor | Clique na bolinha colorida ao lado do título |
-| Lista de tarefas | Digite `[]` no começo da linha; clique na caixinha para marcar |
-| Lista com marcadores | Digite `- ` no começo da linha; `Tab` / `Shift+Tab` mudam o recuo |
-| Formatar | Selecione o texto e use a barra que aparece, ou `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` |
-| Código | `` `texto` `` para código na linha; ` ```sql ` + `Enter` abre um bloco de código |
-| Fechar | `✕` ou clique com o botão do meio na barra de título; ela continua no Gerenciador, de onde você reabre |
-| Apagar | Só pelo botão de lixeira do Gerenciador (dá para restaurar por 30 dias) |
-| Agrupar | No Gerenciador, botão de pasta com `+`, ou "Novo grupo" no rodapé de uma memória; depois solte memórias na barra |
-| Ver tudo, buscar, ajustar | Gerenciador do Memo: abas Memórias, Grupos, Configurações e Ajuda |
-| Sair | Ícone da bandeja → Sair do Memo |
-
-A aba **Ajuda** do Gerenciador tem um guia completo de cada recurso, com demonstrações e atalhos.
-
-### Onde ficam suas memórias
-
-Tudo é salvo sozinho, no seu computador:
-
-- Windows: `%APPDATA%\memo\`
-- macOS: `~/Library/Application Support/memo/`
-- Linux: `~/.local/share/memo/`
-
-Em **Configurações → Armazenamento** você pode trocar a pasta (uma pasta sincronizada do Dropbox ou OneDrive leva
-as memórias para outros computadores), exportar um backup `.json` e importá-lo de volta.
-
-### Linux e Wayland
-
-O Wayland não deixa um app se colocar "sempre por cima". Por isso o Memo roda via XWayland automaticamente, e o
-alfinete funciona no GNOME, KDE e afins.
-
-### Encontrou um problema ou tem uma ideia?
-
-Toda sugestão e relato de bug ajuda o Memo a melhorar:
-
-- **[Reportar um bug](https://github.com/DanielAkio/memo/issues/new?template=bug_report.yml)**: conte o que você fez,
-  o que esperava e o que aconteceu, e qual sistema e versão do Memo você usa.
-- **[Sugerir uma melhoria](https://github.com/DanielAkio/memo/issues/new?template=feature_request.yml)**: descreva a
-  ideia e o problema que ela resolve.
-
-Antes de abrir, dê uma olhada nas [issues já abertas](https://github.com/DanielAkio/memo/issues): se alguém já pediu
-o mesmo, um 👍 nela já ajuda. É preciso uma conta gratuita do GitHub. Pode escrever em português ou em inglês.
-
----
-
-## English
+**Sticky memories you pin on top of everything.**
 
 Memo is a sticky-notes app for **Windows, macOS and Linux**. Each memory is its own little window on your screen,
 and **one click on the pin** keeps it on top of every other app: the to-do list next to the spreadsheet, the command
 you always forget above the terminal, the reminder that must not hide behind the browser. It is free, open source and
 works fully offline.
 
-### What it does
+## What it does
 
 - **Pin on top of everything**: the pin in the memory's corner (or `Ctrl+Shift+P`) keeps it always visible.
 - **Quick, formatted writing**: checklists with `[]`, bullets with `- `, bold, italic, underline, highlight, three
@@ -135,7 +22,7 @@ works fully offline.
 - **Your way**: light or dark theme, text size, default colour and text for new memories, and start with the system.
 - Interface in **English and Portuguese**.
 
-### Download
+## Download
 
 Installers are on the **[Releases](https://github.com/DanielAkio/memo/releases)** page. Pick the file for your
 system:
@@ -151,7 +38,7 @@ system:
 
 > No release yet? One is on its way: on GitHub, **Watch → Custom → Releases** tells you when it is out.
 
-### First launch
+## First launch
 
 The installers are **not code-signed** yet, so your system may be wary the first time. That is expected and only
 happens once:
@@ -167,7 +54,7 @@ happens once:
 On launch, Memo shows the **Memo Manager** and a welcome memory that explains the basics. Closing the last memory
 doesn't quit the app: it stays in the tray (the menu bar, on Mac).
 
-### Getting started
+## Getting started
 
 | To… | Do |
 | --- | --- |
@@ -187,7 +74,7 @@ doesn't quit the app: it stays in the tray (the menu bar, on Mac).
 
 The Manager's **Help** tab has a full guide to every feature, with demos and shortcuts.
 
-### Where your memories live
+## Where your memories live
 
 Everything is saved automatically, on your computer:
 
@@ -198,12 +85,12 @@ Everything is saved automatically, on your computer:
 In **Settings → Storage** you can change the folder (a synced Dropbox or OneDrive folder takes your memories to other
 computers), export a `.json` backup and import it back.
 
-### Linux and Wayland
+## Linux and Wayland
 
 Wayland doesn't let an app put itself "always on top", so Memo runs through XWayland automatically and the pin works
 on GNOME, KDE and the like.
 
-### Found a problem or have an idea?
+## Found a problem or have an idea?
 
 Every suggestion and bug report helps Memo get better:
 
@@ -214,8 +101,6 @@ Every suggestion and bug report helps Memo get better:
 
 Before opening one, check the [open issues](https://github.com/DanielAkio/memo/issues): if someone already asked for
 the same thing, a 👍 on it helps. You need a free GitHub account. Write in English or Portuguese.
-
----
 
 ## For developers
 
