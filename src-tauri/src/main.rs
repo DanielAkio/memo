@@ -1189,7 +1189,6 @@ fn save_text(
         if n.text != text || n.html != html {
             n.text = text;
             n.html = html;
-            n.updated_at = now_ms();
             changed = true;
         }
     });
