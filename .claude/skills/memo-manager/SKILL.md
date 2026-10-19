@@ -1,0 +1,38 @@
+---
+name: memo-manager
+description: The Memo manager window ("Gerenciador do Memo") and app-wide settings. Use when changing manager.html/.js/.css, its tabs (Memórias, Grupos, Configurações, Ajuda), trash views, theme, language/i18n, zoom, new-note or new-group defaults, start with the system, or the Help guide.
+---
+
+# Manager window and settings
+
+Code: "Manager commands" in `main.rs`, `src/manager.html` / `manager.js` / `manager.css`, `src/i18n.js`. Find sections with `memo-code-map`.
+
+## Window
+
+Label `manager` (`MANAGER`), page `manager.html`. Behaves like a note — frameless, same titlebar (pin, +, ✕) plus "bring all memories to the front" (`#raiseBtn` → `bring_notes_to_front`) and "new group" (`#newGroupBtn` → `new_group`) before the +; drag with snapping, resize, middle-click close via `chrome.js`; position/size/pinned/colour persisted in `FileData.manager` (`ManagerState`). Fixed title ("Gerenciador"/`manager_title`), no double-click action, no editor. Colour control: a manager icon drawn in its colour (`#mgrColorBtn`, same swatch popover; `ManagerState.color`, default yellow, `set_manager_color`). `set_pinned` / `track_geometry` branch on `is_note`; ✕ / middle click → `close_manager`. Opened by `open_manager` at startup / relaunch, from the tray item and a tray left click; notes have no button for it. Notes snap to it and `+` from it opens a note beside it.
+
+Every change to the note list emits `notes-changed` (`notify`); the manager reloads `list_notes` (all notes, `html` stripped) on it, debounced. Also `groups-changed`, `store-replaced` (reloads the page).
+
+## Tabs
+
+Four equal-width `.tab` buttons (no counts): **Memórias**, **Grupos**, **Configurações**, **Ajuda**. When a tab can't fit its label (small window, zoom, language), `fitTabs` sets `.mgr-head.compact` and one `#viewSelect` replaces them.
+
+- **Memórias** and **Grupos** have search and sort, plus a segmented `#scopeSwitch` Atuais | Lixeira (`scopes[view]`, `inTrash()`). The trash scope shows `#trashBar` (info + empty button: `empty_trash` / `empty_group_trash`, asks for a second click) and trashed rows (`trashRow` / `groupTrashRow`: restore, delete for good, days left). There is no separate Lixeira tab.
+- Note rows: click → `open_note`; a closed note is a dimmed `.is-closed` row; each row shows the group's folder icon in its colour, the group `<select>` (`move_note_to_group`) and the trash button (`move_to_trash`). Trash: `restore_note`, `delete_forever`.
+- Group rows: folder colour, count, out/put-away state; click → `focus_group`; buttons → `toggle_group_id` / `trash_group_id`; trash: `restore_group`, `delete_group_forever`.
+- **Configurações** (no list, no search): appearance (theme, zoom, language), new-note defaults, new-group defaults, storage/backup (`memo-storage`), app (start with the system, quit → `quit_app`, second click). `fitSettings` sizes the label column to the widest label (`--label-w`; labels never wrap) and stacks every label above its control (`.settings.stacked`) only once some control no longer fits.
+- **Ajuda**: the how-to guide (below).
+
+## Settings
+
+- **Theme:** `FileData.theme` = `system` | `light` | `dark` (empty = system), segmented switch → `change_theme` → `set_theme`: saves, updates every window's native background (`apply_background`: `PAPER` or `CARBON`; "system" uses `window.theme()`, re-applied on `WindowEvent::ThemeChanged`) and emits `theme-changed`. Pages read `get_theme` and set `<html data-theme>` (no attribute = follow `prefers-color-scheme`).
+- **Language:** `FileData.language` = `system` | `pt-BR` | `en`; `Store::effective_language()` → `"pt"` or `"en"` (system: `sys-locale`, Portuguese for any `pt*` locale). Pages call `get_language` → `(setting, effective)` and `MemoI18n.set(effective)`. `#languageSelect` → `change_language` → `set_language`: emits `language-changed`, rebuilds the tray (`refresh_tray`, main thread), retitles the manager. Rust strings: `tray_labels`, `manager_title`, `storage_text`, `welcome::for_lang`. Note content and defaults are never translated.
+- **i18n in pages:** static text uses `data-i18n="key"` and `data-i18n-attr="attr=key,…"`; JS uses `t('key', vars)` (parameters are never named `t`). Every new string goes in both `pt` and `en`; reuse existing keys (tooltips with their shortcut, placeholders, confirmations) instead of near-duplicates.
+- **Zoom:** `FileData.zoom` (`ZOOM_MIN`..`ZOOM_MAX` by `ZOOM_STEP`, 1.0 = 100%), from Aparência (− / % / + / reset) or Mod + / Mod − / Mod 0 / Mod + wheel in any window (`MemoZoom` in chrome.js, also in the embedded editor) → `change_zoom(step)` (0 = reset) → `set_zoom` on every app window + `zoom-changed`; new windows get it when built. Group bars are `TITLEBAR_H × zoom` tall; `resize_to`'s minimum height scales too.
+- **New-note defaults:** colour (`get_default_color` / `set_default_color`, `FileData.default_color`, `None` = yellow), title (`set_default_title`), text via the embedded editor (`memo-editor`, `set_default_content`). Plain-text `[ ] ` lines become checklist items via `fromPlain`. `trash()` deletes outright a note still equal to the defaults (`is_pristine`).
+- **New-group defaults** ("Padrão dos grupos"): `FileData.default_group_color` (`None` = yellow) / `default_group_title` (empty = unnamed) via `get_group_defaults`, `set_default_group_color`, `set_default_group_title`; applied by `Store::create_group`.
+- **Start with the system:** `tauri-plugin-autostart` (name "Memo", argument `--autostart` = `AUTOSTART_ARG`; Windows Run registry value, macOS LaunchAgent, Linux `~/.config/autostart`). The Windows NSIS installer asks with a checkbox on its welcome page, checked by default (`src-tauri/windows/hooks.nsh` via `bundle.windows.nsis.installerHooks`; writes/removes `HKCU\…\Run\Memo`, removed on uninstall; its functions attach to the welcome page because Tauri includes the hooks before the pages). macOS and Linux have no installer step, so `init_autostart` turns it on at the first run of a release build (`Config.autostart_init` in `config.json`). Switch: `get_autostart` / `set_autostart`.
+
+## Help guide (Ajuda)
+
+Groups are data in `i18n.js` (`HELP`, `MemoI18n.help()`, pt/en), rendered by `renderHelp`. In each "how" text `{{…}}` marks a key or something to type, shown as `<kbd>` through `keys()` (Mod → Ctrl/⌘). Items are `[topic, how, demo?]`: `demo` is optional static HTML (`demoBox`) drawn like the real thing — editor markup (`b`/`i`/`u`, `.hl`, `.sz-2`/`.sz-5`, `.check`, `.bullet`, `code`, `pre.code[data-lang]` highlighted with Prism, which manager.html also loads), `<i data-icon="…">` for chrome icons (pin, pin-on, plus, close, folder, folder-plus, manager, raise, toggle, search, sort; paths in the help section of manager.js) and `.demo-*` mock-ups in manager.css. Add a demo whenever a feature can be shown. Prism token colours live in base.css. Keep the guide in sync when features or shortcuts change. The "open the welcome memory" button → `show_welcome`.
