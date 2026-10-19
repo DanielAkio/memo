@@ -1,108 +1,139 @@
 # Memo
 
-Sticky memories for Windows, macOS and Linux, inspired by [Stickies](https://www.zhornsoftware.co.uk/stickies/).
-Each memory is its own window, and **one click on the pin** keeps it on top of every other app.
+**Sticky memories you pin on top of everything.**
 
-The interface is available in English and Portuguese.
+Memo is a sticky-notes app for **Windows, macOS and Linux**. Each memory is its own little window on your screen,
+and **one click on the pin** keeps it on top of every other app: the to-do list next to the spreadsheet, the command
+you always forget above the terminal, the reminder that must not hide behind the browser. It is free, open source and
+works fully offline.
 
-## How to use
+## What it does
 
-| Action | How |
-|--------|-----|
-| Pin / unpin on top of everything | Click the pin on the left of the titlebar, or `Ctrl+Shift+P` (`⌘⇧P` on Mac) |
-| Give the memory a title | Double-click the titlebar; `Enter` saves, `Esc` cancels |
-| Checklist | Type `[]` at the start of a line; click the box to check it (the text gets struck through) |
-| Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` indent and outdent the item (also in checklists) |
-| Code | `` `text` `` (or `Ctrl+E` / the `</>` button in the format bar) for inline code; ` ```sql ` + `Enter` opens a code block (`Enter` on an empty last line leaves the block); hovering the block shows its language picker (left) and a copy button (right) |
-| Bold, italic, underline, highlight | `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` (`⌘` on Mac), or select text and use the bar that appears above the selection |
-| Text size (small, normal, large) | The "A" buttons in the format bar, or `Ctrl+Shift+>` / `Ctrl+Shift+<` (`⌘⇧` on Mac) |
-| New memory | The `+` button, `Ctrl+N` (`⌘N`) or the Memo tray icon |
-| Groups | Click the folder-with-`+` button in the Memo Manager's titlebar, or choose "New group" in a memory's footer (bottom left): a small bar appears. Drop memories on it, or pick the group in their footer or in the Memo Manager; the footer then shows the group's name. Its `+` creates a memory straight in the group. Its arrow button takes its memories out (back where they were) or puts them away; double-click the bar to rename it; its pin keeps it on top like a memory's; click its folder icon to give it a color; its `✕` closes it with its memories (reopen it from the Memo Manager); the Manager's trash button sends it and its memories to the trash |
-| Close | The `✕` button or a middle click (wheel) on the titlebar: the memory closes but stays in the Memo Manager (dimmed) — click it there to reopen it. Only the Manager's trash button sends it to the trash |
-| See all memories and groups, search, sort, restore from the trash | Memo Manager: opens with the app, or from the tray icon → Memo Manager. Memories and Groups each have a Current / Trash switch; the sort button on the right of the search orders the list by most recent or by title (A–Z). Memories and groups in the trash for over 30 days are deleted |
-| Colour, title and text for new memories; colour and title for new groups | Memo Manager → Settings → Memory defaults / Group defaults (the text uses the same editor as a memory: checklist, bullets, code and formatting) |
-| Move | Drag by the titlebar; near a screen edge or another memory, it snaps. Push the cursor against a screen edge to Snap it: a preview shows the left/right half, a quarter (near a corner) or the whole screen (top edge), and releasing there fits it; dragging it again restores its size |
-| Resize | By the edges or the bottom-right corner; near a screen edge or another memory, the edge snaps |
-| Change the colour (default: yellow) | Click the coloured dot left of the title and pick a colour, or "Custom" for any colour |
-| Language (Portuguese / English) | Memo Manager → Settings → Language: System (default), Português or English |
-| Folder where memories are saved | Memo Manager → Settings → Storage → Change… |
-| Start with the system | On by default: the Windows installer asks (checkbox on its first page); on macOS and Linux it is turned on at the first run. Change it in Memo Manager → Settings → App → Start with the system |
-| Back up / restore memories | Memo Manager → Settings → Storage → Export… (a `.json` with every memory not in the trash) / Import… (adds the file's memories; an existing one is only replaced if the file's copy is newer) |
-| Text size of every window | Memo Manager → Settings → Text size, or `Ctrl` `+` / `Ctrl` `-` (`Ctrl` `0` resets), or `Ctrl` + mouse wheel (`⌘` on Mac) |
-| Light / dark theme | Memo Manager → Settings → Theme: System (default), Light or Dark |
-| Help, shortcuts and the welcome memory | Memo Manager → Help: a guide to every feature, and a button that reopens the welcome memory |
-| Open the Memo Manager | Click the tray icon (Windows, macOS), or tray menu → Memo Manager |
-| Show all memories | Tray menu → Show all memories, or the "bring all memories to the front" button next to `+` in the Memo Manager's titlebar |
-| Quit | Tray icon → Quit Memo, or Memo Manager → Settings → Quit Memo |
+- **Pin on top of everything**: the pin in the memory's corner (or `Ctrl+Shift+P`) keeps it always visible.
+- **Quick, formatted writing**: checklists with `[]`, bullets with `- `, bold, italic, underline, highlight, three
+  text sizes and code blocks with syntax highlighting.
+- **Colours and titles**: name and colour each memory to find it at a glance.
+- **Groups**: gather memories in a small bar, put them all away at once and take them back out where they were.
+- **Tidy screen**: drag a memory and it snaps to screen edges and other memories; push it against a screen edge to
+  fit it to half, a quarter or the whole screen.
+- **Manager**: see, search and sort every memory and group; restore from the trash for up to 30 days.
+- **Your data stays with you**: everything is saved automatically on your computer. You can choose another folder
+  (a Dropbox or OneDrive one, for example) and export or import a backup.
+- **Your way**: light or dark theme, text size, default colour and text for new memories, and start with the system.
+- Interface in **English and Portuguese**.
 
-On launch, Memo shows the Memo Manager together with the memories that were open (the first time, with the welcome
-memory). Open memories appear in the taskbar (in the Dock, on macOS). Closing the last memory doesn't quit the app: it
-stays in the tray. Text, title, position, size, colour and pin state are saved automatically to `notes.json`, in the
-app data folder:
+## Download
+
+Installers are on the **[Releases](https://github.com/DanielAkio/memo/releases)** page. Pick the file for your
+system:
+
+| System | File |
+| --- | --- |
+| Windows 10/11 | `…-setup.exe` (recommended) or `.msi` |
+| macOS on Apple Silicon (M1, M2…) | `.dmg` with `aarch64` in its name |
+| macOS on Intel | `.dmg` with `x64` in its name |
+| Linux (Ubuntu, Debian, Mint…) | `.deb` |
+| Linux (Fedora, openSUSE…) | `.rpm` |
+| Linux (any distribution) | `.AppImage` |
+
+> No release yet? One is on its way: on GitHub, **Watch → Custom → Releases** tells you when it is out.
+
+## First launch
+
+The installers are **not code-signed** yet, so your system may be wary the first time. That is expected and only
+happens once:
+
+- **Windows**: if SmartScreen says "Windows protected your PC", click **More info → Run anyway**. The installer asks
+  whether Memo should start with the system.
+- **macOS**: drag Memo to Applications. The first time, right-click the app → **Open**; if macOS still blocks it, go
+  to **System Settings → Privacy & Security** and click **Open Anyway**. If it says the app "is damaged", run
+  `xattr -cr /Applications/Memo.app` in Terminal and open it again.
+- **Linux**: install the `.deb` or `.rpm` with your package manager, or make the `.AppImage` executable
+  (`chmod +x Memo*.AppImage`) and run it.
+
+On launch, Memo shows the **Memo Manager** and a welcome memory that explains the basics. Closing the last memory
+doesn't quit the app: it stays in the tray (the menu bar, on Mac).
+
+## Getting started
+
+| To… | Do |
+| --- | --- |
+| Create a memory | The `+` button, `Ctrl+N` (`⌘N` on Mac) or the Memo tray icon |
+| Pin it on top of everything | Click the pin on the left of the titlebar, or `Ctrl+Shift+P` (`⌘⇧P`) |
+| Give it a title | Double-click the titlebar; `Enter` saves, `Esc` cancels |
+| Change its colour | Click the coloured dot next to the title |
+| Checklist | Type `[]` at the start of a line; click the box to check it |
+| Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` change the indent |
+| Format | Select text and use the bar that appears, or `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` |
+| Code | `` `text` `` for inline code; ` ```sql ` + `Enter` opens a code block |
+| Close | `✕` or a middle click on the titlebar; it stays in the Manager, where you reopen it |
+| Delete | Only with the Manager's trash button (restorable for 30 days) |
+| Group | In the Manager, the folder-with-`+` button, or "New group" in a memory's footer; then drop memories on the bar |
+| See everything, search, settings | Memo Manager: Memories, Groups, Settings and Help tabs |
+| Quit | Tray icon → Quit Memo |
+
+The Manager's **Help** tab has a full guide to every feature, with demos and shortcuts.
+
+## Where your memories live
+
+Everything is saved automatically, on your computer:
 
 - Windows: `%APPDATA%\memo\`
 - macOS: `~/Library/Application Support/memo/`
 - Linux: `~/.local/share/memo/`
 
-You can pick another folder in Memo Manager → Settings → Storage (for example a Dropbox or OneDrive folder, to share
-memories between computers). The current memories are copied there and the old file is kept as a backup; if the folder
-already has Memo memories, Memo asks whether to open those or replace them with the current ones. "Use default folder"
-moves them back.
+In **Settings → Storage** you can change the folder (a synced Dropbox or OneDrive folder takes your memories to other
+computers), export a `.json` backup and import it back.
 
-### Google Drive sync (in progress)
+## Uninstalling
 
-Memo can connect a Google account in Memo Manager → Settings → Sync, to keep the memories in a hidden Memo folder of
-your own Google Drive and use them on several computers. Only the content syncs; window positions stay on each
-computer, and without connecting everything stays local. For now only the account is connected: uploading and merging
-the memories comes next. The section only shows in builds made with a Google OAuth client — see
-[`docs/google-cloud.md`](docs/google-cloud.md).
+- **Windows**: Settings → Apps → Installed apps → Memo → Uninstall.
+- **macOS**: quit Memo from the menu bar and drag `Memo.app` from Applications to the Trash.
+- **Linux**: `sudo apt remove memo` (`.deb`) or `sudo dnf remove memo` (`.rpm`); for the AppImage, delete the file.
 
-Older versions saved to a folder named `br.memo.notas` (or `br.taxinha.notas`, when the app was called Taxinha):
-the first time this version opens, it copies the memories and settings from there into `memo`, leaving the old folder
-intact as a backup.
+Uninstalling keeps your memories. To remove them too, delete the folder listed above (or the one you chose in
+Settings → Storage).
 
-## Running from source
+## Linux and Wayland
 
-Prerequisites: [Rust](https://rustup.rs), Node.js 18+ and Tauri's system dependencies
-([official guide](https://v2.tauri.app/start/prerequisites/)). On Linux (Debian/Ubuntu):
+Wayland doesn't let an app put itself "always on top", so Memo runs through XWayland automatically and the pin works
+on GNOME, KDE and the like.
 
-```bash
-sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev build-essential
-```
+## Found a problem or have an idea?
 
-Then:
+Every suggestion and bug report helps Memo get better:
+
+- **[Report a bug](https://github.com/DanielAkio/memo/issues/new?template=bug_report.yml)**: tell what you did, what
+  you expected and what happened, and which system and Memo version you use.
+- **[Suggest an improvement](https://github.com/DanielAkio/memo/issues/new?template=feature_request.yml)**: describe
+  the idea and the problem it solves.
+
+Before opening one, check the [open issues](https://github.com/DanielAkio/memo/issues): if someone already asked for
+the same thing, a 👍 on it helps. You need a free GitHub account. Write in English or Portuguese.
+
+## For developers
+
+Memo is built with [Tauri 2](https://v2.tauri.app): a Rust backend (`src-tauri/`) and a plain HTML/CSS/JS frontend
+(`src/`, no bundler). Prerequisites: [Rust](https://rustup.rs), Node.js 18+ and
+[Tauri's system dependencies](https://v2.tauri.app/start/prerequisites/) (on Debian/Ubuntu:
+`sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev build-essential`).
 
 ```bash
 npm install
-npm run dev      # opens the app in development mode
-npm run build    # builds the installer for the current OS in src-tauri/target/release/bundle/
+npm run dev      # run in development mode (also "Run in dev mode" in VS Code)
+npm run build    # installer for the current OS in src-tauri/target/release/bundle/
 ```
 
-In VS Code, the same `npm run dev` is under **Run and Debug** → **Run in dev mode**.
+- **Windows installer without a toolchain**: with Docker running,
+  `docker compose -f docker/compose.yml run --build --rm windows` puts the NSIS `*-setup.exe` in `dist/`.
+- **All platforms**: the manual workflow in `.github/workflows/build.yml` (Actions → Build → Run workflow) builds
+  Windows, macOS (Apple Silicon and Intel) and Linux installers; run from a version tag, it also creates a draft
+  release. With SignPath set up it also signs the Windows installers ([`docs/code-signing.md`](docs/code-signing.md)).
+- The visual reference is [`docs/style.md`](docs/style.md); [`CLAUDE.md`](CLAUDE.md) describes the architecture and
+  conventions.
 
-## Windows installer via Docker
-
-To build the Windows installer without installing Rust, Node or Visual Studio, you only need
-[Docker Desktop](https://www.docker.com/products/docker-desktop/) running. In VS Code, go to **Run and Debug**,
-choose **Build Windows installer (Docker)** and click ▶. From the terminal:
-
-```bash
-docker compose -f docker/compose.yml run --build --rm windows
-```
-
-The `*-setup.exe` (NSIS) shows up in `dist/`. The first build takes longer, because it builds the image and downloads
-the Windows SDK; later builds reuse the caches. The `.msi` only comes out of CI, because WiX requires Windows.
-
-## Installers for all three platforms
-
-The workflow in `.github/workflows/build.yml` builds on GitHub Actions for Windows (`.msi` and `.exe`),
-macOS Apple Silicon and Intel (`.dmg`) and Linux (`.deb`, `.rpm`, `.AppImage`). It only runs manually, from
-Actions → Build → Run workflow, and uploads the installers as artifacts. Run from a `v0.1.0` tag, it also
-creates a draft release.
-
-macOS builds are unsigned: open the app the first time with right-click → Open. Windows builds are unsigned
-until signing through SignPath is set up ([`docs/code-signing.md`](docs/code-signing.md)); until then SmartScreen
-may ask you to "Run anyway".
+Older versions saved to a folder named `br.memo.notas` (or `br.taxinha.notas`); on first launch Memo copies that data
+into `memo` and keeps the old folder as a backup.
 
 ## Code signing policy
 
@@ -117,37 +148,7 @@ request is approved by hand.
 
 Privacy: this program will not transfer any information to other networked systems unless specifically requested
 by the user or the person installing or operating it. Cloud sync only talks to Google after you connect a Google
-account in the manager.
-
-## Uninstalling
-
-- Windows: Settings → Apps → Installed apps → Memo → Uninstall.
-- macOS: quit Memo from the tray and drag `Memo.app` from Applications to the Trash.
-- Linux: `sudo apt remove memo` (`.deb`) or `sudo dnf remove memo` (`.rpm`); for the AppImage, delete the file.
-
-Uninstalling keeps your memories. To remove them too, delete the data folder listed above (or the one you chose in
-Settings → Storage).
-
-## Linux and Wayland
-
-Wayland compositors don't let an app put itself "always on top". So Memo automatically runs through
-XWayland when it detects Wayland, and the pin button works on GNOME, KDE and the like.
-To force a different backend, set `GDK_BACKEND` before launching the app.
-
-## Layout
-
-```
-src/                 interface (plain HTML, CSS and JS, no build step)
-  styles.css         tokens and components from docs/style.md
-src-tauri/src/
-  main.rs            windows, commands, tray
-  store.rs           persistence to notes.json
-  cloud.rs           Google sign-in for cloud sync
-src-tauri/icons/     icons generated from assets/icon.svg
-```
-
-The look follows the project's [`docs/style.md`](docs/style.md): near-black surfaces, the system font (Segoe UI,
-SF Pro…), hairline borders and, as the only colour, the memory's label (yellow by default).
+account in the Manager.
 
 ## License
 
