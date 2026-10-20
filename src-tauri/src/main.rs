@@ -44,6 +44,9 @@ const SNAP_DISTANCE: f64 = 16.0;
 /// Gap (logical) between two snapped notes, the same on all four sides; also
 /// the gap between a new note and the note that created it.
 const SNAP_GAP: f64 = 6.0;
+/// Height of text (logical) left under a note's titlebar at which a resize
+/// snaps the note down to the titlebar alone (the titlebar "magnet").
+const TITLEBAR_SNAP: f64 = 40.0;
 /// Minimum widths (logical) of a note, the manager and a group bar.
 const MIN_W: f64 = 180.0;
 const MANAGER_MIN_W: f64 = 380.0;
@@ -1088,6 +1091,16 @@ fn resize_to(
             l = r - min_w;
         } else {
             r = l + min_w;
+        }
+    }
+    // Titlebar magnet: a note with almost no text left closes onto its
+    // titlebar, like the other magnets; pulling the edge past it opens it.
+    let shut = (TITLEBAR_SNAP * zoom * targets.scale).round() as i32;
+    if is_note(&window) && (edges.contains('n') || edges.contains('s')) && b - t < min_h + shut {
+        if edges.contains('n') {
+            t = b - min_h;
+        } else {
+            b = t + min_h;
         }
     }
     if b - t < min_h {

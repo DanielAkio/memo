@@ -9,7 +9,7 @@ Code: `main.rs` sections "Windows" and "Dragging and Snap" (see `memo-code-map`)
 
 ## Geometry
 
-Tracked from `WindowEvent::Moved/Resized` in `track_geometry` (branches on `is_note` to update `ManagerState` for the manager). Position is stored in **physical** pixels, size in **logical** pixels. `TITLEBAR_H` (36 px, = `--titlebar-h` in CSS) is the minimum window height. Saved positions are restored only if the titlebar would be on a connected monitor (`is_on_screen`); Windows' `-32000` minimise coordinates are ignored. No collapse feature (removed twice): a titlebar double-click renames.
+Tracked from `WindowEvent::Moved/Resized` in `track_geometry` (branches on `is_note` to update `ManagerState` for the manager). Position is stored in **physical** pixels, size in **logical** pixels. `TITLEBAR_H` (36 px, = `--titlebar-h` in CSS) is the minimum window height. Saved positions are restored only if the titlebar would be on a connected monitor (`is_on_screen`); Windows' `-32000` minimise coordinates are ignored. No collapse feature (removed twice): a titlebar double-click renames; folding to the titlebar happens only by resizing (titlebar magnet, below).
 
 All snapping uses the **visible** rect (`inner_position`/`inner_size`), not the outer one: on Windows an undecorated window has an invisible 8 px resize border on left, right and bottom (not top). `drag_to` converts between the two with the inner−outer offset.
 
@@ -27,7 +27,7 @@ Note, manager and group windows are built with `accept_first_mouse(true)`: on ma
 
 ## Resizing
 
-Windows are built with `resizable(false)`. `chrome.js` adds invisible handles on the 4 edges and 4 corners (plus the visible bottom-right grip; group bars get only e/w via `resizeEdges`) and sends the requested visible rect to `resize_to`, which snaps only the moving edges with the same `SnapTargets` and enforces `MIN_W` / `MANAGER_MIN_W` × `TITLEBAR_H` (scaled by zoom).
+Windows are built with `resizable(false)`. `chrome.js` adds invisible handles on the 4 edges and 4 corners (plus the visible bottom-right grip; group bars get only e/w via `resizeEdges`) and sends the requested visible rect to `resize_to`, which snaps only the moving edges with the same `SnapTargets` and enforces `MIN_W` / `MANAGER_MIN_W` × `TITLEBAR_H` (scaled by zoom). **Titlebar magnet:** when a resize of a note's top or bottom edge leaves less than `TITLEBAR_SNAP` (40 logical px) of text, the note snaps down to `TITLEBAR_H`, folding the text into the titlebar; pulling the edge past that distance opens it again. It must not depend on the current size (an earlier "only while shrinking" check made it bounce open on the next pointer move). This is only a resize snap, not a collapse state (nothing is stored but the height).
 
 ## New notes: `beside`
 

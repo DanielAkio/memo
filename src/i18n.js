@@ -398,6 +398,7 @@ window.MemoI18n = (() => {
             + '<span class="demo-dot" data-color="iris"></span>'
             + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot demo-rainbow"></span><span class="demo-dot" data-color=""></span></span>'],
           ['Mover e redimensionar', 'Arraste pela barra de título ou pelas bordas. Perto da borda da tela ou de outra memória, ela gruda.'],
+          ['Recolher na barra', 'Diminua a altura pela borda de baixo (ou de cima): perto do fim, a memória gruda na barra de título e esconde o texto. Puxe a borda de novo para abrir.'],
           ['Encaixar na tela', 'Arraste até encostar o cursor na borda da tela: aparece uma prévia da metade (laterais), de um quarto (cantos) ou da tela inteira (topo). Solte para encaixar; ao arrastar de novo, ela volta ao tamanho anterior.'],
           ['Fechar', 'Botão ✕ ou clique do meio na barra de título: a memória fecha, mas continua em Atuais no Gerenciador (esmaecida); clique nela para reabrir. Para a lixeira, use o botão de lixeira no Gerenciador. Uma memória fechada sem nenhuma alteração (texto, cor ou grupo) é excluída.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
@@ -508,6 +509,7 @@ window.MemoI18n = (() => {
             + '<span class="demo-dot" data-color="iris"></span>'
             + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot demo-rainbow"></span><span class="demo-dot" data-color=""></span></span>'],
           ['Move and resize', 'Drag by the titlebar or the edges. Near a screen edge or another memory, it snaps.'],
+          ['Fold into the titlebar', 'Shrink the height from the bottom (or top) edge: near the end, the memory snaps onto its titlebar and hides the text. Pull the edge again to open it.'],
           ['Snap to the screen', 'Drag until the cursor touches a screen edge: a preview shows half the screen (sides), a quarter (corners) or the whole screen (top). Release to snap; drag it again to get its previous size back.'],
           ['Close', 'The ✕ button or a middle click on the titlebar: the memory closes but stays under Current in the Manager (dimmed); click it to reopen it. To send it to the trash, use the Manager’s trash button. A memory closed without any change (text, colour or group) is deleted.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
