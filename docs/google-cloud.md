@@ -46,9 +46,10 @@ The IDs are compiled in from two environment variables (`option_env!` in
 | `MEMO_GOOGLE_CLIENT_ID` | `….apps.googleusercontent.com` |
 | `MEMO_GOOGLE_CLIENT_SECRET` | the client secret |
 
-- **Local** (`npm run dev` / `npm run build`): set them in the shell first. PowerShell:
-  `$env:MEMO_GOOGLE_CLIENT_ID="…"; $env:MEMO_GOOGLE_CLIENT_SECRET="…"`. Cargo
-  rebuilds when they change.
+- **Local** (`npm run dev` / `npm run build`): copy `.env.example` to `.env` at the
+  repository root and fill both in; `src-tauri/build.rs` reads it (`.env` is
+  git-ignored). A variable set in the shell wins over the file, e.g. PowerShell
+  `$env:MEMO_GOOGLE_CLIENT_ID="…"`. Cargo rebuilds when either changes.
 - **Docker** (Windows installer): `docker/compose.yml` passes both through from the
   host shell.
 - **GitHub Actions**: add them as repository secrets named `GOOGLE_CLIENT_ID` and
