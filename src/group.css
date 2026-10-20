@@ -112,15 +112,6 @@
   color: var(--color-ash);
 }
 
-/* Number of notes in the group. */
-.group-count {
-  flex: none;
-  padding: 0 4px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-ash);
-}
-
 /* A note being dragged over the bar: dropping it adds it to the group. */
 .frame.drop-hover {
   background: var(--color-obsidian);

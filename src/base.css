@@ -268,25 +268,7 @@ html, body {
 .icon-btn:active { background: var(--overlay-active); }
 .icon-btn:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
 
-/* Secondary titlebar buttons only show when the window is focused or hovered. */
-.titlebar .icon-btn:not(.pin) { opacity: 0; }
-.is-focused .titlebar .icon-btn,
-.frame:hover .titlebar .icon-btn,
-.menu-open .titlebar .icon-btn { opacity: 1; }
-/* While hidden they take no room either, so the title runs to the right edge;
-   the group opens (and the title shortens) when they show. */
-.titlebar .actions {
-  max-width: 0;
-  margin-left: -8px; /* cancels the titlebar gap before the empty group */
-  overflow: hidden;
-  transition: max-width 160ms ease, margin-left 160ms ease;
-}
-.is-focused .titlebar .actions,
-.frame:hover .titlebar .actions,
-.menu-open .titlebar .actions {
-  max-width: 128px; /* up to 4 × 28px buttons (manager) + 3 × 2px gaps, with slack */
-  margin-left: 0;
-}
+/* Titlebar buttons are always visible (and take their room), focused or not. */
 .pin { opacity: 0.55; }
 .is-focused .pin, .frame:hover .pin { opacity: 1; }
 

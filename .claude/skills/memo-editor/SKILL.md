@@ -9,7 +9,7 @@ description: The Memo note editor in app.js/index.html/styles.css. Use when chan
 
 ## Note window chrome
 
-Titlebar: pin far left, colour dot (`#colorBtn` → swatch popover `#colorMenu`), name, then new / close on the right (hidden and taking no room unless focused or hovered). Drag, resize, middle-click close (`auxclick` → `closeNote`, same as ✕) and double-click rename (inline `#titleInput` → `set_title`, max 80 chars) come through `MemoChrome.attach` (`chrome.js`); resize handles and the bottom-right grip are `chrome.js` too. The name (or first line) is mirrored to the native window title (`setTitle`). Footer: `#footBtn` shows the group (see `memo-groups`). The native context menu is suppressed everywhere except the editor and the title input. Shortcuts: Mod+Shift+P pin, Mod+N new note (Mod = ⌘ on Mac, Ctrl elsewhere).
+Titlebar: pin far left, colour dot (`#colorBtn` → swatch popover `#colorMenu`), name, then new / close on the right (always visible). Drag, resize, middle-click close (`auxclick` → `closeNote`, same as ✕) and double-click rename (inline `#titleInput` → `set_title`, max 80 chars) come through `MemoChrome.attach` (`chrome.js`); resize handles and the bottom-right grip are `chrome.js` too. The name (or first line) is mirrored to the native window title (`setTitle`). Footer: `#footBtn` shows the group (see `memo-groups`). The native context menu is suppressed everywhere except the editor and the title input. Shortcuts: Mod+Shift+P pin, Mod+N new note (Mod = ⌘ on Mac, Ctrl elsewhere).
 
 ## Stored format
 
