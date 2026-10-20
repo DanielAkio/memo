@@ -92,7 +92,7 @@ your own Google Drive and use them on several computers. Only the content syncs 
 window positions, size and pin stay on each computer, and without connecting everything stays local. A memory created
 on another computer shows up closed in the Manager; if the same memory is edited in two places before syncing, the newer
 version wins and the other is kept in the trash with "(conflict)" in its title. The section only shows in builds made
-with a Google OAuth client — see [`docs/google-cloud.md`](docs/google-cloud.md).
+with a Google OAuth client (for local builds, put it in `.env`, see `.env.example`) — see [`docs/google-cloud.md`](docs/google-cloud.md).
 
 ## Uninstalling
 
