@@ -529,3 +529,9 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   );
 }
 .frame > .titlebar { position: relative; z-index: 1; }
+
+/* Folded onto the titlebar (titlebar magnet in resize_to): only the titlebar
+   shows; the text and the status bar would push it out of the window. */
+@media (max-height: 40px) {
+  .body, .statusbar, .format-bar { display: none; }
+}

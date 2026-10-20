@@ -938,13 +938,37 @@ impl Store {
         self.mark_dirty();
     }
 
-    /// The note is as it was created: nothing beyond the default title and text.
+    /// The note is as it was created: nothing beyond the default title and
+    /// text, the default colour, and in no group (joining one is a change).
     pub fn is_pristine(&self, note: &Note) -> bool {
+        if !note.group_id.is_empty() || note.color != self.default_color() {
+            return false;
+        }
         if note.is_blank() {
             return true;
         }
         let (title, text, _) = self.new_note_defaults();
         note.title == title && note.text == text
+    }
+
+    /// The group is as it was created: no name beyond the default one, the
+    /// default colour, and no notes (trashed ones aside).
+    pub fn is_pristine_group(&self, id: &str) -> bool {
+        let Some(group) = self.group(id) else {
+            return false;
+        };
+        let (title, color) = {
+            let data = self.data.lock().unwrap();
+            let color = match &data.default_group_color {
+                Some(c) if is_valid_color(c) => c.clone(),
+                _ => DEFAULT_COLOR.to_string(),
+            };
+            (data.default_group_title.clone(), color)
+        };
+        let name = group.name.trim();
+        (name.is_empty() || name == title.trim())
+            && group.color == color
+            && self.members(id).is_empty()
     }
 
     pub fn manager(&self) -> ManagerState {

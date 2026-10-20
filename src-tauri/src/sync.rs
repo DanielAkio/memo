@@ -209,8 +209,12 @@ fn uploads(store: &Shared, state: &SyncState) -> Vec<Upload> {
     let mut out = Vec::new();
     for group in &snap.groups {
         let name = group_file(&group.id);
-        if synced(&name).is_some_and(|s| group.updated_at <= s) {
-            continue;
+        match synced(&name) {
+            Some(s) if group.updated_at <= s => continue,
+            // Untouched and never sent: closing it deletes it, so it waits
+            // until it is changed or a note joins it.
+            None if store.is_pristine_group(&group.id) => continue,
+            _ => {}
         }
         let doc = GroupDoc {
             version: 1,

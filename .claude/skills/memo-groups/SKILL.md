@@ -19,7 +19,7 @@ Code: `main.rs` section "Groups", `src/group.html` / `group.js` / `group.css`, t
 
 **Joining.** Drop a note on a bar (`drag_move` → `group_under`, broadcasting `drop-hover` `[groupId, on]`; `drag_end` → `join_group`, sliding back to the drag's start if the group is open, into the bar if put away), the footer picker (`#footBtn` → `#groupMenu` → `set_note_group`) or the manager's row `<select>` (`move_note_to_group`). Both pickers go through `assign_group` (`""` = leave, `"new"` = `create_group`, placed with `beside`). The footer button always shows the note's group with a folder icon ("Sem grupo"/"No group" without one).
 
-**Close.** ✕ / middle click → `close_group`: sets `Group.hidden` and destroys the bar and its notes' windows (an empty unnamed group is removed outright). `focus_group` / `show_group` reopen it. The manager's new-group button → `new_group` (an empty group beside the manager).
+**Close.** ✕ / middle click → `close_group`: sets `Group.hidden` and destroys the bar and its notes' windows (a group nobody touched — `Store::is_pristine_group`: default or empty name, default colour, no notes — is removed outright, here and in `trash_group_by_id`; never-sent pristine groups are not uploaded). `focus_group` / `show_group` reopen it. The manager's new-group button → `new_group` (an empty group beside the manager).
 
 **Trash.** Manager row trash → `trash_group_id`: sets `Group.trashed_at`, then members go through `trash()` (so their `trashedAt` is later); an empty unnamed group is removed outright. `restore_group` brings the group back with the notes trashed at/after it. `delete_group_forever` / `empty_group_trash` remove trashed groups (their notes stay in the trash, ungrouped). `restore_note` ungroups a note whose group is trashed.
 

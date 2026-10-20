@@ -486,16 +486,26 @@
     reloadTimer = setTimeout(load, 150);
   }
 
-  // "Empty trash" and "Quit" require a second click within 3 s.
+  // "Empty trash" and "Quit" require a second click within 3 s. The second
+  // click restores the button at once instead of waiting for the timer.
+  const confirmStates = new Map();
   function confirmFirst(btn, label) {
-    if (btn.classList.contains('confirming')) return true;
-    const original = btn.textContent;
+    const state = confirmStates.get(btn);
+    const restore = (s) => {
+      clearTimeout(s.timer);
+      confirmStates.delete(btn);
+      btn.classList.remove('confirming');
+      btn.textContent = s.original;
+    };
+    if (state) {
+      restore(state);
+      return true;
+    }
+    const next = { original: btn.textContent };
+    next.timer = setTimeout(() => restore(next), 3000);
+    confirmStates.set(btn, next);
     btn.classList.add('confirming');
     btn.textContent = label;
-    setTimeout(() => {
-      btn.classList.remove('confirming');
-      btn.textContent = original;
-    }, 3000);
     return false;
   }
 
