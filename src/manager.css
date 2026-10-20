@@ -769,7 +769,7 @@ textarea.field { resize: vertical; min-height: 84px; }
 .help-demo .icon-btn.demo-tint { color: var(--note-color); }
 /* A group bar (or a member note's titlebar) washed in its group colour. */
 .demo-bar.demo-grouped {
-  box-shadow: inset 2px 0 0 var(--note-color), inset 0 2px 0 var(--note-color), var(--hairline);
+  box-shadow: inset 0 2px 0 var(--note-color), var(--hairline);
   background-image: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--note-color) 20%, transparent),

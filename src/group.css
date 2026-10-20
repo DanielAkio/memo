@@ -49,8 +49,9 @@
   background-size: 100% var(--titlebar-h);
   background-repeat: no-repeat;
 }
-/* Top stripe in the group colour, the top counterpart of the left one;
-   its member notes carry the same stripe (styles.css .group-tint). */
+/* A group bar's colour stripe runs along the top instead of the left edge;
+   its member notes carry the same top stripe (styles.css .group-tint). */
+.group.frame::before { display: none; }
 .group.frame:not([data-color=""])::after {
   content: "";
   position: absolute;
