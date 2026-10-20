@@ -37,6 +37,18 @@
 .is-open .folder-open { display: block; }
 .is-open .group-icon { color: var(--color-mist); }
 .frame:not([data-color=""]) .group-icon { color: var(--note-color); }
+/* The bar takes the same soft wash of its colour as its member notes'
+   titlebars (styles.css .group-tint); only titlebar-high, so it stays put
+   while the colour picker grows the window. */
+.group.frame:not([data-color=""]) {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--note-color) 20%, transparent),
+    color-mix(in srgb, var(--note-color) 6%, transparent)
+  );
+  background-size: 100% var(--titlebar-h);
+  background-repeat: no-repeat;
+}
 
 .identity {
   display: flex;

@@ -440,8 +440,8 @@ window.MemoI18n = (() => {
           ['Adicionar memórias', 'Arraste uma memória e solte sobre o grupo, ou escolha o grupo no rodapé da memória ou no Gerenciador. O nome do grupo aparece no rodapé.',
             '<span class="demo-foot"><i data-icon="folder"></i>Trabalho</span><span class="demo-foot-meta">12 palavras</span>'],
           ['Renomear', 'Clique duplo na barra do grupo; {{Enter}} salva e {{Esc}} cancela.'],
-          ['Cor', 'Clique no ícone de pasta do grupo e escolha a cor: ela pinta a pasta, a faixa da barra, o ícone do grupo no rodapé das memórias e, de leve, o topo de cada memória do grupo.',
-            '<span class="demo-bar" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
+          ['Cor', 'Clique no ícone de pasta do grupo e escolha a cor: ela pinta a pasta, a faixa da barra e o ícone do grupo no rodapé das memórias, e dá um tom suave ao topo da barra e de cada memória do grupo.',
+            '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
             + '<span class="demo-name">Trabalho</span><span class="demo-meta">3</span><i data-icon="close"></i></span>'],
           ['Fixar', 'A tachinha do grupo o mantém por cima de tudo, como numa memória ({{Mod+Shift+P}}).',
             '<span class="demo-bar"><i data-icon="pin-on"></i><i data-icon="folder"></i><span class="demo-name">Trabalho</span>'
@@ -550,8 +550,8 @@ window.MemoI18n = (() => {
           ['Add memories', 'Drag a memory and drop it on the group, or pick the group in the memory’s footer or in the Manager. The group’s name shows in the footer.',
             '<span class="demo-foot"><i data-icon="folder"></i>Work</span><span class="demo-foot-meta">12 words</span>'],
           ['Rename', 'Double-click the group’s bar; {{Enter}} saves and {{Esc}} cancels.'],
-          ['Color', 'Click the group’s folder icon and pick a color: it tints the folder, the bar’s stripe, the group icon in its memories’ footer and, softly, the top of each memory in the group.',
-            '<span class="demo-bar" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
+          ['Color', 'Click the group’s folder icon and pick a color: it tints the folder, the bar’s stripe and the group icon in its memories’ footer, and gives a soft wash to the top of the bar and of each memory in the group.',
+            '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
             + '<span class="demo-name">Work</span><span class="demo-meta">3</span><i data-icon="close"></i></span>'],
           ['Pin', 'The group’s pin keeps it on top of everything, like a memory’s ({{Mod+Shift+P}}).',
             '<span class="demo-bar"><i data-icon="pin-on"></i><i data-icon="folder"></i><span class="demo-name">Work</span>'
