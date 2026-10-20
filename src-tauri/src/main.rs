@@ -1940,18 +1940,17 @@ fn show_group(app: &AppHandle, id: &str) {
 }
 
 /// ✕ or middle click on a group bar: closes the bar and its notes' windows.
-/// The group stays among the current ones and the manager reopens it; an
-/// empty group without a name is just removed.
+/// The group stays among the current ones and the manager reopens it; a
+/// group nobody touched is just removed (`Store::is_pristine_group`).
 #[tauri::command]
 async fn close_group(app: AppHandle, window: WebviewWindow) {
     let id = group_id_of(&window);
     let store = app.state::<Shared>();
-    let members = store.members(&id);
-    if members.is_empty() && store.group(&id).is_some_and(|g| g.name.trim().is_empty()) {
+    if store.is_pristine_group(&id) {
         store.remove_group(&id);
     } else {
         store.update_group(&id, |g| g.hidden = true);
-        for note in members {
+        for note in store.members(&id) {
             if let Some(note_window) = app.get_webview_window(&label_for(&note.id)) {
                 let _ = note_window.destroy();
             }
@@ -2015,15 +2014,16 @@ async fn trash_group_id(app: AppHandle, id: String) {
     trash_group_by_id(&app, &id);
 }
 
-/// An empty group without a name is removed outright. Otherwise the group
+/// A group nobody touched is removed outright (`Store::is_pristine_group`).
+/// Otherwise the group
 /// is marked trashed first, so its notes (trashed right after)
 /// have a later `trashed_at`: that is how `restore_group` finds the notes
 /// that went to the trash with it.
 fn trash_group_by_id(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
     let members = store.members(id);
-    // Like a blank note: an empty group without a name is just removed.
-    if members.is_empty() && store.group(id).is_some_and(|g| g.name.trim().is_empty()) {
+    // Like a blank note: a group nobody touched is just removed.
+    if store.is_pristine_group(id) {
         store.remove_group(id);
     } else {
         store.update_group(id, |g| g.trashed_at = Some(now_ms()));
