@@ -140,6 +140,9 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
         .resizable(false)
         .always_on_top(note.pinned)
         .background_color(CARBON)
+        // macOS: the first click on an inactive window reaches the page, so
+        // the titlebar drags (and buttons work) without a focusing click first.
+        .accept_first_mouse(true)
         .visible(false)
         .build()?;
 
@@ -178,6 +181,9 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
         .resizable(false)
         .always_on_top(state.pinned)
         .background_color(CARBON)
+        // macOS: the first click on an inactive window reaches the page, so
+        // the titlebar drags (and buttons work) without a focusing click first.
+        .accept_first_mouse(true)
         .visible(false)
         .build()?;
     match (state.x, state.y) {
@@ -1634,6 +1640,9 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
         .resizable(false)
         .always_on_top(group.pinned)
         .background_color(CARBON)
+        // macOS: the first click on an inactive window reaches the page, so
+        // the titlebar drags (and buttons work) without a focusing click first.
+        .accept_first_mouse(true)
         .visible(false)
         .build()?;
     match (group.x, group.y) {

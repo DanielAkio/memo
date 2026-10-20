@@ -17,6 +17,8 @@ All snapping uses the **visible** rect (`inner_position`/`inner_size`), not the 
 
 Started by the page, not `startDragging` (the OS would own the window until release, so no magnet/Snap). The titlebar captures the pointer and, past a 3 px threshold, calls `drag_start` (records the grab offset from `cursor_position()`, keeps the window always-on-top during the drag), then `drag_to` on moves (calls are chained; queued moves share one call) and `drag_end` on release. `drag_move` places the window at `cursor − grab` and applies `snapped` before `set_position`.
 
+Note, manager and group windows are built with `accept_first_mouse(true)`: on macOS a click on an inactive window otherwise only focuses it, so dragging (or any button) needed a second click. It only affects WKWebView; Windows and Linux already deliver the first click.
+
 **Magnet (`snapped`)** collects candidate positions per axis — work-area edges of the monitor under the window's centre, plus edges of every other note really on screen (shown, not minimised, same monitor, not covered: `shows_on_screen`) in the same row (x) or column (y), either side by side with a uniform `SNAP_GAP` (6 logical px) or aligned — and picks the nearest within `SNAP_DISTANCE` (16 logical px). Work-area edges are inset by `SNAP_GAP` so nothing sits flush against the screen edge (also in `beside`).
 
 `shows_on_screen` per OS: Windows asks `WindowFromPoint` for a 3×3 grid of points (`windows-sys`); macOS reads `NSWindow.occlusionState` (`objc2-app-kit`); Linux/X11 walks the root window's stacking order for the same grid (`x11-dl`, own Xlib connection, errors ignored); native handles via `raw-window-handle`; when a system can't tell, the window counts as shown.

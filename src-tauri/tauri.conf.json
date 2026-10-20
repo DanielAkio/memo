@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Memo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "br.memo.notas",
   "build": {
     "frontendDist": "../src"
@@ -20,6 +20,9 @@
     "category": "Productivity",
     "shortDescription": "Sticky memories that stay on top of everything",
     "longDescription": "Memo keeps your memories in sticky notes for Windows, macOS and Linux. Each memory is its own window, and one click on the pin keeps it on top of every other app.",
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "windows": {
       "nsis": {
         "languages": ["English", "PortugueseBR"],
