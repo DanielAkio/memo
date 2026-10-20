@@ -19,7 +19,6 @@
   const titlebar = $('titlebar');
   const nameEl = $('groupName');
   const nameInput = $('nameInput');
-  const countEl = $('groupCount');
   const closeBtn = $('closeBtn');
   const pinBtn = $('pinBtn');
   const toggleBtn = $('toggleBtn');
@@ -34,7 +33,6 @@
   const newKeys = isMac ? '⌘N' : 'Ctrl+N';
 
   let group = null;
-  let count = 0;
   let renaming = false;
 
   function render() {
@@ -42,8 +40,6 @@
     // Unnamed (the default, as for notes): "Untitled", greyed out.
     nameEl.textContent = group.name || t('untitled');
     nameEl.classList.toggle('is-empty', !group.name);
-    countEl.textContent = String(count);
-    countEl.title = t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count });
     frame.classList.toggle('is-open', group.open);
     pinBtn.setAttribute('aria-pressed', String(group.pinned));
     const pinLabel = t(group.pinned ? 'unpin' : 'pin');
@@ -73,7 +69,7 @@
     try {
       const data = await invoke('load_group');
       if (!data) return;
-      [group, count] = data;
+      [group] = data;
       render();
     } catch (err) {
       console.error('load_group', err);
@@ -261,7 +257,7 @@
     applyTheme(await invoke('get_theme'));
     listen('language-changed', (e) => applyLanguage(e.payload));
     listen('theme-changed', (e) => applyTheme(e.payload));
-    // Name, open state and member count all come from load_group.
+    // Name and open state come from load_group.
     listen('groups-changed', load);
     listen('notes-changed', load);
     // [groupId, on]: a note dragged over (or away from) one of the bars.

@@ -37,6 +37,30 @@
 .is-open .folder-open { display: block; }
 .is-open .group-icon { color: var(--color-mist); }
 .frame:not([data-color=""]) .group-icon { color: var(--note-color); }
+/* The bar takes the same soft wash of its colour as its member notes'
+   titlebars (styles.css .group-tint); only titlebar-high, so it stays put
+   while the colour picker grows the window. */
+.group.frame:not([data-color=""]) {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--note-color) 20%, transparent),
+    color-mix(in srgb, var(--note-color) 6%, transparent)
+  );
+  background-size: 100% var(--titlebar-h);
+  background-repeat: no-repeat;
+}
+/* A group bar's colour stripe runs along the top instead of the left edge;
+   its member notes carry the same top stripe (styles.css .group-tint). */
+.group.frame::before { display: none; }
+.group.frame:not([data-color=""])::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--note-color);
+  z-index: 3;
+  pointer-events: none;
+}
 
 .identity {
   display: flex;
@@ -97,15 +121,6 @@
   padding: 4px 8px 6px;
   font-size: 11px;
   line-height: 1.4;
-  color: var(--color-ash);
-}
-
-/* Number of notes in the group. */
-.group-count {
-  flex: none;
-  padding: 0 4px;
-  font-family: var(--font-mono);
-  font-size: 11px;
   color: var(--color-ash);
 }
 

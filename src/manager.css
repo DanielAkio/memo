@@ -767,6 +767,15 @@ textarea.field { resize: vertical; min-height: 84px; }
 /* A coloured group bar: stripe on the left and the folder in its colour. */
 .demo-bar[data-color] { box-shadow: inset 2px 0 0 var(--note-color), var(--hairline); }
 .help-demo .icon-btn.demo-tint { color: var(--note-color); }
+/* A group bar (or a member note's titlebar) washed in its group colour. */
+.demo-bar.demo-grouped {
+  box-shadow: inset 0 2px 0 var(--note-color), var(--hairline);
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--note-color) 20%, transparent),
+    color-mix(in srgb, var(--note-color) 6%, transparent)
+  );
+}
 .demo-list-row { padding: 0 6px; }
 .demo-name {
   min-width: 0;

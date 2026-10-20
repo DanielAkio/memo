@@ -102,6 +102,11 @@
     folder.dataset.color = isCustomColor(groupColor) ? 'custom' : groupColor;
     if (isCustomColor(groupColor)) folder.style.setProperty('--note-color', groupColor);
     else folder.style.removeProperty('--note-color');
+    // The top of the window takes a soft wash of the same colour.
+    const tint = $('groupTint');
+    tint.dataset.color = isCustomColor(groupColor) ? 'custom' : groupColor;
+    if (isCustomColor(groupColor)) tint.style.setProperty('--note-color', groupColor);
+    else tint.style.removeProperty('--note-color');
     footBtn.title = group ? t('groupIs', { name: groupLabel(group) }) : t('addToGroup');
     $('edited').textContent = group ? groupLabel(group) : t('noGroup');
     editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check'));

@@ -13,6 +13,7 @@
 html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .embedded .frame { box-shadow: none; }
 .embedded .frame::before,
+.embedded .group-tint,
 .embedded .titlebar,
 .embedded .statusbar { display: none; }
 .embedded .body { border-top: 0; }
@@ -507,3 +508,24 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .fmt-size.sz-s { font-size: 11px; }
 .fmt-size.sz-m { font-size: 14px; }
 .fmt-size.sz-l { font-size: 18px; }
+
+/* Group tint: a member note's titlebar has a top stripe and fades from a wash of its group's
+   colour (its own --note-color scope via data-color) into the note. No group
+   or a colourless group: nothing. Sits under the titlebar, above the frame. */
+.group-tint {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--titlebar-h);
+  pointer-events: none;
+  z-index: 0;
+}
+.group-tint[data-color]:not([data-color=""]) {
+  /* 2px top stripe in the group colour, as on the group's own bar. */
+  box-shadow: inset 0 2px 0 var(--note-color);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--note-color) 20%, transparent),
+    color-mix(in srgb, var(--note-color) 6%, transparent)
+  );
+}
+.frame > .titlebar { position: relative; z-index: 1; }
