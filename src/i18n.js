@@ -11,6 +11,7 @@ window.MemoI18n = (() => {
       // Titlebar
       pin: 'Fixar acima de tudo',
       unpin: 'Desafixar',
+      rename: 'Renomear',
       newNote: 'Nova memória',
       // Groups
       groupMenuTitle: 'Grupo',
@@ -174,6 +175,7 @@ window.MemoI18n = (() => {
     en: {
       pin: 'Keep on top',
       unpin: 'Unpin',
+      rename: 'Rename',
       newNote: 'New memory',
       groupMenuTitle: 'Group',
       noGroup: 'No group',
@@ -405,6 +407,7 @@ window.MemoI18n = (() => {
           ['Título', 'Clique duplo na barra de título; {{Enter}} ou clicar fora salva, {{Esc}} cancela.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-input">Lista de compras</span></span>'],
+          ['Clique direito na barra', 'Abre um menu com os comandos da barra: renomear, fixar, cor, nova memória e fechar. Nos grupos e no Gerenciador também, com os comandos de cada um.'],
           ['Cor', 'Clique na bolinha colorida ao lado do título. "Personalizada" abre qualquer cor.',
             '<span class="demo-dots"><span class="demo-dot" data-color="yellow"></span><span class="demo-dot" data-color="green"></span>'
             + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
@@ -518,6 +521,7 @@ window.MemoI18n = (() => {
           ['Title', 'Double-click the titlebar; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-input">Shopping list</span></span>'],
+          ['Right click on the bar', 'Opens a menu with the bar’s commands: rename, pin, color, new memory and close. Groups and the Manager have one too, with their own commands.'],
           ['Color', 'Click the colored dot next to the title. "Custom" opens any color.',
             '<span class="demo-dots"><span class="demo-dot" data-color="yellow"></span><span class="demo-dot" data-color="green"></span>'
             + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'

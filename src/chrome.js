@@ -1,7 +1,8 @@
 // Memo — behaviour shared by the frameless windows (note and manager):
 // dragging by the titlebar and resizing by the edges, both snapping to the
 // monitor edges and other windows (and, when dragging, Snap to half, quarter
-// or full screen); double click and middle click (close) on the titlebar.
+// or full screen); double click, middle click (close) and the right-click
+// menu on the titlebar.
 
 // Global zoom shortcuts, in every window (and the manager's embedded
 // editor): Mod + / Mod − step the zoom of all windows by 10%, Mod 0 resets
@@ -168,5 +169,65 @@ window.MemoChrome = {
     if (grip) startResize(grip, 'se');
 
     return { cancelDrag };
+  },
+
+  // Right click on the titlebar: a menu with the window's commands, the same
+  // ones its buttons and gestures give. `items()` is called on each opening,
+  // so labels follow the current state: [{ label, run }], null = separator.
+  // `onOpen(menu)` / `onClose()` let a group bar grow around it.
+  titleMenu({ frame, titlebar, items, onOpen, onClose }) {
+    const menu = document.createElement('div');
+    menu.className = 'menu title-menu';
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    frame.append(menu);
+    let entries = [];
+
+    function close() {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      if (onClose) onClose();
+    }
+
+    titlebar.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('input')) return;
+      e.preventDefault();
+      entries = items();
+      if (!entries.length) return;
+      menu.replaceChildren(...entries.map((item, i) => {
+        if (!item) {
+          const sep = document.createElement('div');
+          sep.className = 'menu-sep';
+          return sep;
+        }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'menu-item';
+        btn.setAttribute('role', 'menuitem');
+        btn.dataset.index = i;
+        const text = document.createElement('span');
+        text.textContent = item.label;
+        btn.append(text);
+        return btn;
+      }));
+      menu.hidden = false;
+      // Opens under the titlebar, at the pointer, kept inside the window.
+      const max = frame.clientWidth - menu.offsetWidth - 6;
+      menu.style.left = `${Math.max(6, Math.min(e.clientX, max))}px`;
+      if (onOpen) onOpen(menu);
+    });
+    menu.addEventListener('mousedown', (e) => e.preventDefault()); // keeps the focus
+    menu.addEventListener('click', (e) => {
+      const btn = e.target.closest('.menu-item');
+      if (!btn) return;
+      const item = entries[btn.dataset.index];
+      close();
+      item.run();
+    });
+    document.addEventListener('mousedown', (e) => { if (!menu.contains(e.target)) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    window.addEventListener('blur', close);
+
+    return { close };
   },
 };

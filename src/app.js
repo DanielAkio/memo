@@ -1859,6 +1859,21 @@
       onDoubleClick: startRename,
       onClose: closeNote,
     });
+    // Right click on the titlebar: its commands in a menu.
+    window.MemoChrome.titleMenu({
+      frame,
+      titlebar,
+      items: () => (note ? [
+        { label: t('rename'), run: startRename },
+        { label: t(note.pinned ? 'unpin' : 'pin'), run: togglePin },
+        { label: t('noteColor'), run: openColors },
+        null,
+        { label: t('newNote'), run: newNote },
+        null,
+        { label: t('closeNote'), run: closeNote },
+      ] : []),
+      onOpen: () => { closeColors(); closeGroupMenu(); hideFormatBar(); },
+    });
   }
 
   document.addEventListener('keydown', (e) => {

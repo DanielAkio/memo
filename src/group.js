@@ -229,6 +229,27 @@
     onDoubleClick: startRename,
     onClose: closeGroup,
   });
+  // Right click on the bar: its commands in a menu (the window grows around
+  // it, as for the colour picker).
+  window.MemoChrome.titleMenu({
+    frame,
+    titlebar,
+    items: () => (group ? [
+      { label: t('rename'), run: startRename },
+      { label: t(group.pinned ? 'unpin' : 'pin'), run: togglePin },
+      { label: t('groupColor'), run: openColors },
+      null,
+      { label: t(group.open ? 'groupHideHint' : 'groupShowHint'), run: toggle },
+      { label: t('newNoteInGroup'), run: newNote },
+      null,
+      { label: t('close'), run: closeGroup },
+    ] : []),
+    onOpen: (menu) => {
+      closeColors();
+      setHeight(menu.offsetTop + menu.offsetHeight + 6);
+    },
+    onClose: () => setHeight(titlebar.offsetHeight),
+  });
 
   document.addEventListener('contextmenu', (e) => {
     if (!e.target.closest('input')) e.preventDefault();

@@ -62,6 +62,7 @@ doesn't quit the app: it stays in the tray (the menu bar, on Mac).
 | Pin it on top of everything | Click the pin on the left of the titlebar, or `Ctrl+Shift+P` (`⌘⇧P`) |
 | Give it a title | Double-click the titlebar; `Enter` saves, `Esc` cancels |
 | Change its colour | Click the coloured dot next to the title |
+| Titlebar commands | Right-click the titlebar: rename, pin, colour, new memory, close (groups and the manager too) |
 | Checklist | Type `[]` at the start of a line; click the box to check it |
 | Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` change the indent |
 | Format | Select text and use the bar that appears, or `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` |
