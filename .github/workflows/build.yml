@@ -68,6 +68,22 @@ jobs:
           releaseDraft: true
           args: ${{ matrix.args }}
 
+      # tauri-action also uploads the macOS .app as .app.tar.gz, which only an
+      # updater would use; Memo has none, so the release keeps the .dmg only.
+      # Each macOS job removes its own architecture's tarball.
+      - name: Drop the macOS .app.tar.gz from the release
+        if: runner.os == 'macOS' && env.RELEASE_TAG != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARCH: ${{ contains(matrix.args, 'aarch64') && 'aarch64' || 'x64' }}
+        run: |
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' |
+            { grep -E "_${ARCH}\.app\.tar\.gz$" || true; } |
+            while read -r asset; do
+              gh release delete-asset "$RELEASE_TAG" "$asset" -y
+            done
+
       - name: Collect Windows installers for signing
         if: env.SIGN_WINDOWS == 'true'
         shell: bash
