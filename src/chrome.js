@@ -72,6 +72,10 @@ window.MemoChrome = {
     titlebar.addEventListener('mousedown', (e) => {
       if (e.button === 1) { e.preventDefault(); return; } // no autoscroll
       if (e.button !== 0 || e.target.closest('button, input')) return;
+      // preventDefault keeps the focus where it is, so a name being edited
+      // would stay open: blur it, which confirms it like Enter.
+      const active = document.activeElement;
+      if (active && active.matches('input') && titlebar.contains(active)) active.blur();
       e.preventDefault();
       if (e.detail === 2 && onDoubleClick) { cancelDrag(); onDoubleClick(e); }
     });

@@ -236,6 +236,7 @@
   window.addEventListener('focus', () => frame.classList.add('is-focused'));
   window.addEventListener('blur', () => {
     frame.classList.remove('is-focused');
+    finishRename(true);
     closeColors();
   });
 

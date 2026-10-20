@@ -402,7 +402,7 @@ window.MemoI18n = (() => {
           ['Nova memória', 'Botão + na barra, {{Mod+N}} ou o ícone do Memo na bandeja.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-name">Lista de compras</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
-          ['Título', 'Clique duplo na barra de título; {{Enter}} salva e {{Esc}} cancela.',
+          ['Título', 'Clique duplo na barra de título; {{Enter}} ou clicar fora salva, {{Esc}} cancela.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-input">Lista de compras</span></span>'],
           ['Cor', 'Clique na bolinha colorida ao lado do título. "Personalizada" abre qualquer cor.',
@@ -455,7 +455,7 @@ window.MemoI18n = (() => {
             + '<span class="demo-name">Trabalho</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
           ['Adicionar memórias', 'Arraste uma memória e solte sobre o grupo, ou escolha o grupo no rodapé da memória ou no Gerenciador. O nome do grupo aparece no rodapé.',
             '<span class="demo-foot"><i data-icon="folder"></i>Trabalho</span><span class="demo-foot-meta">12 palavras</span>'],
-          ['Renomear', 'Clique duplo na barra do grupo; {{Enter}} salva e {{Esc}} cancela.'],
+          ['Renomear', 'Clique duplo na barra do grupo; {{Enter}} ou clicar fora salva, {{Esc}} cancela.'],
           ['Cor', 'Clique no ícone de pasta do grupo e escolha a cor: ela pinta a pasta e o ícone do grupo no rodapé das memórias, e marca o topo da barra e de cada memória do grupo com uma faixa e um tom suave.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
             + '<span class="demo-name">Trabalho</span><i data-icon="close"></i></span>'],
@@ -515,7 +515,7 @@ window.MemoI18n = (() => {
           ['New memory', 'The + button in the titlebar, {{Mod+N}} or the Memo tray icon.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-name">Shopping list</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
-          ['Title', 'Double-click the titlebar; {{Enter}} saves and {{Esc}} cancels.',
+          ['Title', 'Double-click the titlebar; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-input">Shopping list</span></span>'],
           ['Color', 'Click the colored dot next to the title. "Custom" opens any color.',
@@ -568,7 +568,7 @@ window.MemoI18n = (() => {
             + '<span class="demo-name">Work</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
           ['Add memories', 'Drag a memory and drop it on the group, or pick the group in the memory’s footer or in the Manager. The group’s name shows in the footer.',
             '<span class="demo-foot"><i data-icon="folder"></i>Work</span><span class="demo-foot-meta">12 words</span>'],
-          ['Rename', 'Double-click the group’s bar; {{Enter}} saves and {{Esc}} cancels.'],
+          ['Rename', 'Double-click the group’s bar; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.'],
           ['Color', 'Click the group’s folder icon and pick a color: it tints the folder and the group icon in its memories’ footer, and marks the top of the bar and of each memory in the group with a stripe and a soft wash.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
             + '<span class="demo-name">Work</span><i data-icon="close"></i></span>'],
