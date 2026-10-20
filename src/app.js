@@ -437,6 +437,7 @@
   function onContentChanged(typing = false) {
     applyContent();
     recordHistory(typing);
+    renderMarkerCaret();
   }
 
   function applyContent() {
@@ -609,11 +610,64 @@
     onContentChanged();
   }
 
-  // Clicking the box (left of the item) toggles it without moving the caret.
+  // "Before the marker": the caret at the start of a list item, drawn left of
+  // its box or dot (#markerCaret; the real caret is hidden meanwhile). There
+  // Enter pushes the item down. Set by clicking left of the box or ArrowLeft
+  // at the item's start; any other key or caret move clears it.
+  const markerCaret = $('markerCaret');
+  let beforeMarker = null;
+
+  function setBeforeMarker(block) {
+    beforeMarker = block;
+    editor.classList.toggle('caret-before-marker', !!block);
+    renderMarkerCaret();
+  }
+
+  function renderMarkerCaret() {
+    const block = beforeMarker && beforeMarker.isConnected ? beforeMarker : null;
+    markerCaret.hidden = !block;
+    if (!block) return;
+    const box = markerCaret.parentElement.getBoundingClientRect();
+    const r = block.getBoundingClientRect();
+    // Same height and top as the real caret at the start of the item.
+    const at = document.createRange();
+    at.selectNodeContents(block);
+    at.collapse(true);
+    let caret = at.getClientRects()[0];
+    if (!caret || !caret.height) {
+      const probe = document.createRange();
+      probe.selectNode(block.firstChild || block);
+      caret = probe.getBoundingClientRect();
+    }
+    const layer = markerCaret.parentElement; // positioned inside its border
+    markerCaret.style.left = `${r.left - box.left - layer.clientLeft - 4}px`;
+    markerCaret.style.top = `${caret.top - box.top - layer.clientTop}px`;
+    markerCaret.style.height = `${caret.height}px`;
+    // Restart the blink, as the real caret does when it moves.
+    markerCaret.style.animation = 'none';
+    void markerCaret.offsetWidth;
+    markerCaret.style.animation = '';
+  }
+
+  // List item whose marker area (the margin left of the box or dot, the marker
+  // and the gap up to the text) is under the pointer, on the item's first line.
+  function listMarkerAt(e) {
+    for (const block of editor.children) {
+      if (!isListItem(block)) continue;
+      const r = block.getBoundingClientRect();
+      const lineHeight = parseFloat(getComputedStyle(block).lineHeight) || 20;
+      if (e.clientY < r.top || e.clientY >= Math.min(r.bottom, r.top + lineHeight)) continue;
+      return e.clientX < r.left + 24 ? block : null;
+    }
+    return null;
+  }
+
+  // Clicking the box toggles it without moving the caret.
   function checkAt(e) {
-    const block = e.target.closest && e.target.closest('.check');
-    if (!block || !editor.contains(block)) return null;
-    return e.clientX < block.getBoundingClientRect().left + 22 ? block : null;
+    const block = listMarkerAt(e);
+    if (!block || !block.classList.contains('check')) return null;
+    const x = e.clientX - block.getBoundingClientRect().left;
+    return x >= -2 && x < 17 ? block : null;
   }
 
   // --------------------------------------------------------------- code
@@ -946,6 +1000,9 @@
     if (e.isComposing) return;
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const key = e.key.toLowerCase();
+    // Any key but a modifier leaves "before the marker" (see "lists").
+    const wasBeforeMarker = beforeMarker;
+    if (beforeMarker && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) setBeforeMarker(null);
 
     // Esc on a selected image puts the caret after it.
     if (e.key === 'Escape' && selectedImage()) {
@@ -1018,6 +1075,40 @@
     const block = currentBlock();
     if (!block || !isListItem(block)) return;
     const atStart = getSelection().isCollapsed && textBeforeCaret(block).toString() === '';
+
+    const plainKey = !e.shiftKey && !mod && !e.altKey;
+    const before = wasBeforeMarker === block && atStart;
+
+    // ArrowLeft at the start of an item puts the caret before its marker.
+    if (e.key === 'ArrowLeft' && plainKey && atStart && !before) {
+      e.preventDefault();
+      setBeforeMarker(block);
+      return;
+    }
+    // Before the marker, Enter pushes the item down, leaving a plain line above
+    // (the way to get text above a list that starts the note).
+    if (e.key === 'Enter' && plainKey && before) {
+      e.preventDefault();
+      const line = document.createElement('div');
+      line.appendChild(document.createElement('br'));
+      block.before(line);
+      caretIn(block);
+      onContentChanged();
+      setBeforeMarker(block);
+      return;
+    }
+    // Enter on an empty first item adds the next item (a list just started).
+    const prev = block.previousElementSibling;
+    if (e.key === 'Enter' && plainKey && block.textContent.trim() === '' && !(prev && isListItem(prev))) {
+      e.preventDefault();
+      const item = block.cloneNode(false);
+      item.classList.remove('done');
+      item.appendChild(document.createElement('br'));
+      block.after(item);
+      caretIn(item);
+      onContentChanged();
+      return;
+    }
 
     // Enter on an empty item, or Backspace at its start: outdent if indented;
     // otherwise leave the list.
@@ -1591,10 +1682,18 @@
 
   editor.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    const block = checkAt(e);
+    const block = listMarkerAt(e);
     if (!block) return;
     e.preventDefault();
-    toggleCheck(block);
+    if (checkAt(e)) {
+      toggleCheck(block);
+    } else {
+      // Beside the box or dot: caret before the marker, so Enter can push the
+      // list down.
+      editor.focus();
+      caretIn(block);
+      setBeforeMarker(block);
+    }
   });
   editor.addEventListener('mousemove', (e) => setHoveredPre(e.target.closest('pre.code')));
   editor.addEventListener('mouseleave', leaveCode);
@@ -1615,10 +1714,20 @@
   document.addEventListener('selectionchange', () => {
     scheduleFormatBar();
     renderImageFrame();
+    // The caret left the start of the item: no longer before its marker.
+    if (beforeMarker) {
+      const block = currentBlock();
+      if (!getSelection().isCollapsed || block !== beforeMarker || textBeforeCaret(block).toString() !== '') {
+        setBeforeMarker(null);
+      }
+    }
   });
+  editor.addEventListener('blur', () => setBeforeMarker(null));
+  editor.addEventListener('scroll', renderMarkerCaret);
   new ResizeObserver(() => {
     renderCode();
     renderImageFrame();
+    renderMarkerCaret();
     scheduleFormatBar();
   }).observe(editor);
 

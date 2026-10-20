@@ -431,7 +431,7 @@ window.MemoI18n = (() => {
             '<div class="check done">Comprar café</div><div class="check">Ligar para o dentista</div>'],
           ['Marcadores', 'Digite {{-}} e espaço no começo da linha.',
             '<div class="bullet">Frutas</div><div class="bullet">Verduras</div>'],
-          ['Recuo de itens', '{{Tab}} recua e {{Shift+Tab}} volta. {{Enter}} num item vazio sai da lista.',
+          ['Recuo de itens', '{{Tab}} recua e {{Shift+Tab}} volta. Clique à esquerda do quadrado ou do ponto (ou {{←}} no início do item) e {{Enter}} empurra o item para baixo, deixando uma linha de texto acima. {{Enter}} num item vazio sai da lista, exceto no primeiro, que cria o próximo; {{Backspace}} no início também sai.',
             '<div class="bullet">Viagem</div><div class="check done" data-level="1">reservar hotel</div>'
             + '<div class="check" data-level="1">renovar passaporte</div>'],
           ['Código na linha', 'Texto entre crases, como {{`código`}}, ou {{Mod+E}}.',
@@ -544,7 +544,7 @@ window.MemoI18n = (() => {
             '<div class="check done">Buy coffee</div><div class="check">Call the dentist</div>'],
           ['Bullets', 'Type {{-}} and a space at the start of a line.',
             '<div class="bullet">Fruit</div><div class="bullet">Vegetables</div>'],
-          ['Indenting items', '{{Tab}} indents and {{Shift+Tab}} outdents. {{Enter}} on an empty item leaves the list.',
+          ['Indenting items', '{{Tab}} indents and {{Shift+Tab}} outdents. Click left of the box or dot (or {{←}} at the item’s start) and {{Enter}} pushes the item down, leaving a text line above. {{Enter}} on an empty item leaves the list, except on the first one, where it adds the next; {{Backspace}} at its start also leaves.',
             '<div class="bullet">Trip</div><div class="check done" data-level="1">book the hotel</div>'
             + '<div class="check" data-level="1">renew passport</div>'],
           ['Inline code', 'Text between backticks, like {{`code`}}, or {{Mod+E}}.',

@@ -183,6 +183,21 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   border-radius: var(--radius-badge);
 }
 .image-frame[hidden] { display: none; }
+
+/* Caret before a list item's box or dot (app.js, "lists"): blinks in the
+   margin left of the marker while the real caret is hidden. */
+.marker-caret {
+  position: absolute;
+  z-index: 6;
+  width: 1px;
+  background: var(--color-paper);
+  pointer-events: none;
+  /* Same rhythm as the system caret: 530 ms on, 530 ms off. */
+  animation: marker-caret-blink 1.06s steps(1) 0.53s infinite;
+}
+.marker-caret[hidden] { display: none; }
+.editor.caret-before-marker { caret-color: transparent; }
+@keyframes marker-caret-blink { 0% { opacity: 0; } 50% { opacity: 1; } }
 .image-handle {
   position: absolute;
   right: -1px;
