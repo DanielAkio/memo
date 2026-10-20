@@ -84,6 +84,12 @@
       <!-- Highlighted copies of the code blocks, drawn over them, plus their
            language pickers (app.js, "code highlighting"). -->
       <div class="code-layer" id="codeLayer"></div>
+      <!-- Frame of the selected image, with its resize handle (app.js, "images"). -->
+      <div class="image-layer" id="imageLayer">
+        <div class="image-frame" id="imageFrame" hidden>
+          <span class="image-handle" id="imageHandle" data-i18n-attr="title=resizeImage"></span>
+        </div>
+      </div>
     </main>
 
     <!-- Group picker, opened from the footer: the note's group, "no group" or

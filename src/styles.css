@@ -157,6 +157,48 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .editor pre.code::selection,
 .editor pre.code *::selection { color: transparent; }
 
+/* Pasted images: inline in the line, never wider than the note; `width`
+   (set by resizing) keeps the proportion through height: auto. */
+.editor img {
+  max-width: 100%;
+  height: auto;
+  vertical-align: bottom;
+  border-radius: var(--radius-badge);
+  cursor: default;
+}
+/* Selected, it shows the frame below instead of the selection tint. */
+.editor img::selection { background: transparent; }
+/* The frame drawn around the selected image (app.js, "images"). */
+.image-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  pointer-events: none;
+}
+.image-frame {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-badge);
+}
+.image-frame[hidden] { display: none; }
+.image-handle {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-carbon);
+  border-radius: 2px;
+  background: var(--color-paper);
+  cursor: nwse-resize;
+  pointer-events: auto;
+  touch-action: none;
+}
+.image-frame.is-resizing { border-style: dashed; }
+
 /* ------------------------------------------------- code highlighting */
 
 .code-layer {
@@ -364,6 +406,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   white-space: nowrap;
   overflow: hidden;
 }
+#count.is-alert { color: var(--color-mist); }
 .foot-btn {
   flex: 1;
   display: flex;

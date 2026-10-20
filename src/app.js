@@ -53,11 +53,15 @@
   // it can be typed in the new-note default text.
   // Parameters are never named "t", which is the translation function.
   const LIST_RE = /^( *)(?:\[([ xX]?)\]|(-))(?= |$) ?/;
+  // In the plain text (toPlain) an image is "[imagem]" / "[image]", in the
+  // language it was written in, so an image-only note is not blank and the
+  // manager, tray and group lists show something for it.
+  const IMAGE_MARK_RE = /\[(?:imagem|image)\]/g;
   const plain = (text) => text.replace(/^(\s*)(?:\[[ xX]?\]|-)(?= |$) ?/gm, '$1');
   const MAX_LEVEL = 4;
 
   const firstLine = (text) => plain(text).split('\n').map((s) => s.trim()).find(Boolean) || t('emptyNote');
-  const wordCount = (text) => (plain(text).trim().match(/\S+/g) || []).length;
+  const wordCount = (text) => (plain(text).replace(IMAGE_MARK_RE, ' ').trim().match(/\S+/g) || []).length;
   const displayName = () => note.title || firstLine(note.text);
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -109,7 +113,7 @@
     else tint.style.removeProperty('--note-color');
     footBtn.title = group ? t('groupIs', { name: groupLabel(group) }) : t('addToGroup');
     $('edited').textContent = group ? groupLabel(group) : t('noGroup');
-    editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check'));
+    editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check, img'));
     renderName();
   }
 
@@ -159,6 +163,14 @@
   }
   const DROP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
 
+  // Images (pasted, see "images") are kept inline in the HTML as data URLs,
+  // so they travel with the note (backup, sync); `width` is set once resized.
+  const IMAGE_SRC_RE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+  const IMAGE_MIN = 24;
+  const IMAGE_MAX = 4000;
+  // In the plain text an image is "[imagem]" / "[image]" (see toPlain).
+  const imageMark = () => `[${t('imageMark')}]`;
+
   const levelOf = (block) => Number(block.dataset.level) || 0;
 
   // Start of the line in plain text: indent + list item marker.
@@ -189,6 +201,8 @@
           lines.push('```');
         } else if (n.nodeName === 'CODE') {
           cur = `${cur ?? ''}\`${n.textContent.replace(ZWSP, '')}\``;
+        } else if (n.nodeName === 'IMG') {
+          cur = (cur ?? '') + imageMark();
         } else if (n.nodeName === 'BR') {
           // A block's trailing <br> only holds the height of an empty line.
           if (n.nextSibling || !isBlock(n.parentNode)) { lines.push(cur ?? ''); cur = ''; } else cur = cur ?? '';
@@ -242,7 +256,8 @@
   }
 
   // Rebuilds saved HTML with only what the editor uses: lines, <br>, <b>,
-  // <i>, <u>, <code>, <pre>, sizes, highlight and the list classes.
+  // <i>, <u>, <code>, <pre>, <img> (data URLs), sizes, highlight and the list
+  // classes.
   // Anything else becomes text.
   function sanitize(html) {
     const src = new DOMParser().parseFromString(html, 'text/html').body;
@@ -255,6 +270,13 @@
           continue;
         } else if (n.nodeName === 'BR') {
           to.appendChild(document.createElement('br'));
+        } else if (n.nodeName === 'IMG') {
+          const src = n.getAttribute('src') || '';
+          if (!IMAGE_SRC_RE.test(src)) continue;
+          const img = to.appendChild(document.createElement('img'));
+          img.src = src;
+          const width = Math.round(Number(n.getAttribute('width')));
+          if (width) img.width = Math.min(IMAGE_MAX, Math.max(IMAGE_MIN, width));
         } else if (n.nodeName === 'PRE') {
           const pre = document.createElement('pre');
           pre.className = 'code';
@@ -420,6 +442,7 @@
   function applyContent() {
     syncCheckSizes();
     renderCode();
+    renderImageFrame();
     note.text = toPlain();
     note.html = contentHtml();
     note.updatedAt = Date.now();
@@ -460,6 +483,25 @@
     return n || null;
   }
 
+  // Snapshots keep each image's data URL once (`imageRefs`) and refer to it
+  // by a short key, so 200 undo steps don't hold 200 copies of every image.
+  const imageRefs = new Map(); // data URL → key
+  const imageData = new Map(); // key → data URL
+  const IMAGE_ATTR_RE = /src="(data:image\/[^"]+)"/g;
+  const IMAGE_KEY_RE = /src="memo-image:(\d+)"/g;
+  function internImages(html) {
+    return html.replace(IMAGE_ATTR_RE, (_, url) => {
+      let key = imageRefs.get(url);
+      if (!key) {
+        key = String(imageRefs.size + 1);
+        imageRefs.set(url, key);
+        imageData.set(key, url);
+      }
+      return `src="memo-image:${key}"`;
+    });
+  }
+  const expandImages = (html) => html.replace(IMAGE_KEY_RE, (_, key) => `src="${imageData.get(key) || ''}"`);
+
   function snapshot() {
     const sel = getSelection();
     let range = null;
@@ -467,7 +509,7 @@
       const r = sel.getRangeAt(0);
       range = [nodePath(r.startContainer), r.startOffset, nodePath(r.endContainer), r.endOffset];
     }
-    return { html: editor.innerHTML, range, typing: false };
+    return { html: internImages(editor.innerHTML), range, typing: false };
   }
 
   function resetHistory() {
@@ -511,7 +553,7 @@
     historyAt = target;
     lastTyping = 0;
     const { html, range } = history[target];
-    editor.innerHTML = html;
+    editor.innerHTML = expandImages(html);
     const start = range && nodeAt(range[0]);
     const end = range && nodeAt(range[2]);
     let placed = false;
@@ -905,6 +947,13 @@
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const key = e.key.toLowerCase();
 
+    // Esc on a selected image puts the caret after it.
+    if (e.key === 'Escape' && selectedImage()) {
+      e.preventDefault();
+      getSelection().collapseToEnd();
+      return;
+    }
+
     // Undo / redo through the editor's own history (see "undo").
     if (mod && !e.altKey && key === 'z') {
       e.preventDefault();
@@ -1069,11 +1118,32 @@
     if (wordEnd) lastTyping = 0;
   }
 
-  // Always paste as plain text: avoids bringing in styles from other apps.
-  // A paste is its own undo step, never merged with typing.
+  // Text is always pasted as plain text: avoids bringing in styles from other
+  // apps. Images (a screenshot, "Copy image") go in as images. A paste is its
+  // own undo step, never merged with typing.
   function onPaste(e) {
     e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
+    const data = e.clipboardData;
+    const text = data.getData('text/plain');
+    if (!currentPre()) {
+      const files = [...data.items]
+        .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter(Boolean);
+      if (files.length) {
+        pasteImages(files);
+        return;
+      }
+      // An image copied from a note comes back as HTML with its data URL.
+      if (!text.trim()) {
+        const doc = new DOMParser().parseFromString(data.getData('text/html') || '', 'text/html');
+        const imgs = [...doc.images].filter((img) => IMAGE_SRC_RE.test(img.getAttribute('src') || ''));
+        if (imgs.length) {
+          insertImages(imgs.map((img) => ({ src: img.getAttribute('src'), width: Number(img.getAttribute('width')) || 0 })));
+          return;
+        }
+      }
+    }
     if (!text) return;
     pasting = true;
     try {
@@ -1082,6 +1152,204 @@
       pasting = false;
     }
   }
+
+  // ------------------------------------------------------------- images
+  //
+  // A pasted image is re-encoded on a canvas (at most IMAGE_SIDE px on its
+  // longest side) and stored inline as a data URL: lossless PNG when that is
+  // small (screenshots of text stay sharp), else WebP (JPEG where WebP can't
+  // be encoded; PNG if it has transparency), shrunk until it fits
+  // IMAGE_CHARS. A note keeps under NOTE_CHARS in all, so it still syncs as
+  // one file to Google Drive. Clicking an image selects it and shows a frame
+  // with a handle in the bottom-right corner: dragging it sets the image's
+  // `width` (the height follows, keeping the proportion).
+
+  const IMAGE_SIDE = 1600;
+  const IMAGE_PNG_CHARS = 350000;
+  const IMAGE_CHARS = 700000;
+  const NOTE_CHARS = 4000000;
+  const imageLayer = $('imageLayer');
+  const imageFrame = $('imageFrame');
+  const imageHandle = $('imageHandle');
+  let resizing = null;
+  let alertTimer = null;
+
+  function readImage(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('unreadable image'));
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function isOpaque(ctx, w, h) {
+    const px = ctx.getImageData(0, 0, w, h).data;
+    for (let i = 3; i < px.length; i += 4) if (px[i] < 255) return false;
+    return true;
+  }
+
+  // { src, width } for an image file, or null if it can't be read or made small enough.
+  async function encodeImage(blob) {
+    const img = await readImage(blob);
+    const w0 = img.naturalWidth;
+    const h0 = img.naturalHeight;
+    if (!w0 || !h0) return null;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    let scale = Math.min(1, IMAGE_SIDE / Math.max(w0, h0));
+    let opaque = null;
+    for (let i = 0; i < 8; i++) {
+      canvas.width = Math.max(1, Math.round(w0 * scale));
+      canvas.height = Math.max(1, Math.round(h0 * scale));
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (opaque === null) opaque = blob.type === 'image/jpeg' || isOpaque(ctx, canvas.width, canvas.height);
+      let src = canvas.toDataURL('image/png');
+      if (src.length > IMAGE_PNG_CHARS) {
+        // toDataURL falls back to PNG where WebP can't be encoded (WebKit).
+        const webp = canvas.toDataURL('image/webp', 0.86);
+        if (webp.startsWith('data:image/webp')) src = webp;
+        else if (opaque) src = canvas.toDataURL('image/jpeg', 0.86);
+      }
+      // Shown at the size it had on screen (a screenshot on a 150% display
+      // is 1.5× larger in pixels); CSS keeps it within the note's width.
+      if (src.length <= IMAGE_CHARS) return { src, width: Math.round(w0 / (window.devicePixelRatio || 1)) };
+      scale *= 0.75;
+    }
+    return null;
+  }
+
+  async function pasteImages(files) {
+    const range = getSelection().rangeCount ? getSelection().getRangeAt(0).cloneRange() : null;
+    const images = [];
+    for (const file of files) {
+      try {
+        const image = await encodeImage(file);
+        if (image) images.push(image);
+      } catch (err) {
+        console.error('paste image', err);
+      }
+    }
+    if (!images.length) { showAlert(t('imageUnreadable')); return; }
+    insertImages(images, range);
+  }
+
+  // Inserts images at `range` (default: the selection), replacing what it selects.
+  function insertImages(images, range = null) {
+    const sel = getSelection();
+    if (!range || !editor.contains(range.commonAncestorContainer)) {
+      if (!sel.rangeCount || !editor.contains(sel.getRangeAt(0).commonAncestorContainer)) caretIn(editor, true);
+      range = sel.getRangeAt(0);
+    }
+    let size = editor.innerHTML.length;
+    const fit = images.filter((image) => (size += image.src.length) <= NOTE_CHARS);
+    if (fit.length < images.length) showAlert(t('imageTooBig'));
+    if (!fit.length) return;
+    editor.focus();
+    range.deleteContents();
+    for (const image of fit) {
+      const img = document.createElement('img');
+      img.src = image.src;
+      if (image.width) img.width = Math.min(IMAGE_MAX, Math.max(IMAGE_MIN, Math.round(image.width)));
+      range.insertNode(img);
+      // Never straight in the editor: everything lives inside a line.
+      if (img.parentNode === editor) {
+        const line = document.createElement('div');
+        img.replaceWith(line);
+        line.appendChild(img);
+      }
+      range.setStartAfter(img);
+      range.collapse(true);
+    }
+    sel.removeAllRanges();
+    sel.addRange(range);
+    onContentChanged();
+  }
+
+  // A message in the footer for a few seconds, in place of the word count.
+  function showAlert(text) {
+    const count = $('count');
+    count.textContent = text;
+    count.classList.add('is-alert');
+    clearTimeout(alertTimer);
+    alertTimer = setTimeout(() => {
+      count.classList.remove('is-alert');
+      renderMeta();
+    }, 4000);
+  }
+
+  // The image the selection holds exactly (clicked, or selected with Shift+arrow).
+  function selectedImage() {
+    if (resizing) return resizing.img;
+    if (document.activeElement !== editor) return null;
+    const sel = getSelection();
+    if (!sel.rangeCount) return null;
+    const r = sel.getRangeAt(0);
+    if (r.startContainer !== r.endContainer || r.endOffset - r.startOffset !== 1) return null;
+    const n = r.startContainer.childNodes[r.startOffset];
+    return n && n.nodeName === 'IMG' && editor.contains(n) ? n : null;
+  }
+
+  function selectImage(img) {
+    editor.focus();
+    const r = document.createRange();
+    r.selectNode(img);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    renderImageFrame();
+  }
+
+  function renderImageFrame() {
+    const img = selectedImage();
+    imageFrame.hidden = !img;
+    if (!img) return;
+    const box = imageLayer.getBoundingClientRect();
+    const r = img.getBoundingClientRect();
+    imageFrame.style.left = `${r.left - box.left}px`;
+    imageFrame.style.top = `${r.top - box.top}px`;
+    imageFrame.style.width = `${r.width}px`;
+    imageFrame.style.height = `${r.height}px`;
+  }
+
+  // Widest an image can be: the editor's text width.
+  function imageMaxWidth() {
+    const style = getComputedStyle(editor);
+    return editor.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  }
+
+  imageHandle.addEventListener('mousedown', (e) => e.preventDefault());
+  imageHandle.addEventListener('pointerdown', (e) => {
+    const img = selectedImage();
+    if (e.button !== 0 || !img) return;
+    e.preventDefault();
+    e.stopPropagation();
+    imageHandle.setPointerCapture(e.pointerId);
+    resizing = { img, x: e.clientX, width: img.getBoundingClientRect().width };
+    imageFrame.classList.add('is-resizing');
+  });
+  imageHandle.addEventListener('pointermove', (e) => {
+    if (!resizing) return;
+    const max = Math.max(IMAGE_MIN, imageMaxWidth());
+    const width = Math.min(max, Math.max(IMAGE_MIN, resizing.width + e.clientX - resizing.x));
+    resizing.img.width = Math.round(width);
+    renderImageFrame();
+  });
+  const endResize = () => {
+    if (!resizing) return;
+    const { img } = resizing;
+    resizing = null;
+    imageFrame.classList.remove('is-resizing');
+    selectImage(img);
+    onContentChanged();
+  };
+  imageHandle.addEventListener('pointerup', endResize);
+  imageHandle.addEventListener('pointercancel', endResize);
 
   // ---------------------------------------------------------- formatting
 
@@ -1165,7 +1433,8 @@
   }
 
   function updateFormatBar() {
-    const range = !selecting && note && document.activeElement === editor && selectionRange();
+    // A selected image has its resize frame instead.
+    const range = !selecting && note && document.activeElement === editor && !selectedImage() && selectionRange();
     const rects = range ? [...range.getClientRects()].filter((r) => r.width || r.height) : [];
     if (!rects.length) { hideFormatBar(); return; }
 
@@ -1303,10 +1572,21 @@
   });
   editor.addEventListener('keydown', onEditorKeydown);
   editor.addEventListener('paste', onPaste);
-  editor.addEventListener('blur', flushText);
+  editor.addEventListener('blur', () => {
+    flushText();
+    renderImageFrame();
+  });
   editor.addEventListener('scroll', () => {
     renderCode();
+    renderImageFrame();
     scheduleFormatBar();
+  });
+
+  // Clicking an image selects it, showing its resize frame.
+  editor.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || e.target.nodeName !== 'IMG') return;
+    e.preventDefault();
+    selectImage(e.target);
   });
 
   editor.addEventListener('mousedown', (e) => {
@@ -1332,9 +1612,13 @@
     selecting = false;
     scheduleFormatBar();
   });
-  document.addEventListener('selectionchange', scheduleFormatBar);
+  document.addEventListener('selectionchange', () => {
+    scheduleFormatBar();
+    renderImageFrame();
+  });
   new ResizeObserver(() => {
     renderCode();
+    renderImageFrame();
     scheduleFormatBar();
   }).observe(editor);
 

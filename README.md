@@ -11,7 +11,7 @@ works fully offline.
 
 - **Pin on top of everything**: the pin in the memory's corner (or `Ctrl+Shift+P`) keeps it always visible.
 - **Quick, formatted writing**: checklists with `[]`, bullets with `- `, bold, italic, underline, highlight, three
-  text sizes and code blocks with syntax highlighting.
+  text sizes, code blocks with syntax highlighting and pasted images you resize by their corner.
 - **Colours and titles**: name and colour each memory to find it at a glance.
 - **Groups**: gather memories in a small bar, put them all away at once and take them back out where they were.
 - **Tidy screen**: drag a memory and it snaps to screen edges and other memories; push it against a screen edge to
@@ -66,6 +66,7 @@ doesn't quit the app: it stays in the tray (the menu bar, on Mac).
 | Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` change the indent |
 | Format | Select text and use the bar that appears, or `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` |
 | Code | `` `text` `` for inline code; ` ```sql ` + `Enter` opens a code block |
+| Image | Paste it with `Ctrl+V` (`⌘V`); click it and drag its bottom-right corner to resize it |
 | Close | `✕` or a middle click on the titlebar; it stays in the Manager, where you reopen it |
 | Delete | Only with the Manager's trash button (restorable for 30 days) |
 | Group | In the Manager, the folder-with-`+` button, or "New group" in a memory's footer; then drop memories on the bar |

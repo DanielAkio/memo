@@ -67,6 +67,10 @@ window.MemoI18n = (() => {
       code: 'Código',
       codeLanguage: 'Linguagem do código',
       copyCode: 'Copiar código',
+      imageMark: 'imagem',
+      imageTooBig: 'Imagem grande demais para esta memória',
+      imageUnreadable: 'Não deu para colar essa imagem',
+      resizeImage: 'Arraste para mudar o tamanho',
       copied: 'Copiado',
       plainText: 'Texto puro',
       textSize: 'Tamanho do texto',
@@ -222,6 +226,10 @@ window.MemoI18n = (() => {
       code: 'Code',
       codeLanguage: 'Code language',
       copyCode: 'Copy code',
+      imageMark: 'image',
+      imageTooBig: 'Image too large for this memory',
+      imageUnreadable: "Couldn't paste that image",
+      resizeImage: 'Drag to resize',
       copied: 'Copied',
       plainText: 'Plain text',
       textSize: 'Text size',
@@ -378,6 +386,11 @@ window.MemoI18n = (() => {
   // .check, .bullet, code, pre.code[data-lang] — highlighted with Prism),
   // <i data-icon="…"> for titlebar icons and the .demo-* classes in
   // manager.css for small mock-ups of the window chrome.
+  // A pasted image with its resize frame (the same in every language).
+  const DEMO_IMAGE = '<span class="demo-image"><svg viewBox="0 0 64 40" aria-hidden="true">'
+    + '<circle cx="46" cy="12" r="5"/><path d="M4 36 22 16l12 13 7-7 19 14z"/></svg>'
+    + '<span class="demo-handle"></span></span>';
+
   const HELP = {
     pt: [
       {
@@ -426,6 +439,8 @@ window.MemoI18n = (() => {
           ['Bloco de código', 'Digite {{```}} (ou {{```sql}}) e {{Enter}}. Passe o mouse sobre o bloco: à esquerda escolhe a linguagem, à direita copia o código. {{Enter}} numa linha vazia no fim sai do bloco.',
             '<pre class="code" data-lang="sql">select titulo\nfrom memorias\nwhere fixada = true; -- só as fixadas</pre>'],
           ['Colar', 'O texto colado entra sempre sem formatação.'],
+          ['Imagens', 'Copie uma imagem ou um print e cole com {{Mod+V}}. Clique na imagem e arraste o canto de baixo para mudar o tamanho; a proporção se mantém.',
+            DEMO_IMAGE],
         ],
       },
       {
@@ -537,6 +552,8 @@ window.MemoI18n = (() => {
           ['Code block', 'Type {{```}} (or {{```sql}}) and {{Enter}}. Hover over the block: pick its language on the left, copy the code on the right. {{Enter}} on an empty last line leaves the block.',
             '<pre class="code" data-lang="sql">select title\nfrom memories\nwhere pinned = true; -- pinned only</pre>'],
           ['Paste', 'Pasted text always comes in without formatting.'],
+          ['Images', 'Copy an image or a screenshot and paste it with {{Mod+V}}. Click the image and drag its bottom corner to resize it; it keeps its proportions.',
+            DEMO_IMAGE],
         ],
       },
       {

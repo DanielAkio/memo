@@ -828,6 +828,34 @@ textarea.field { resize: vertical; min-height: 84px; }
 }
 .demo-field .icon-btn { width: auto; height: auto; }
 /* A note's footer showing its group (bottom left) and word count. */
+/* A pasted image (grey mock picture) with its resize frame and handle,
+   as drawn in a note (styles.css, .image-frame). */
+.demo-image {
+  position: relative;
+  display: inline-block;
+  width: 96px;
+  height: 60px;
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-badge);
+  background: var(--overlay-active);
+}
+.demo-image svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: var(--color-smoke);
+}
+.demo-handle {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-carbon);
+  border-radius: 2px;
+  background: var(--color-paper);
+}
 .demo-foot {
   display: inline-flex;
   align-items: center;
