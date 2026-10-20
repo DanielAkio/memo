@@ -36,7 +36,7 @@
   // Memories and Groups each list either the current ones or the trash.
   const scopes = { notes: 'current', groups: 'current' };
   const inTrash = () => scopes[view] === 'trash';
-  let defaultColor = 'yellow';
+  let defaultColor = 'iris';
   let reloadTimer = null;
   // State of this window itself (pinned), saved by Rust.
   let win = { pinned: false };
@@ -398,14 +398,14 @@
   // own. Only the title is handled here.
 
   // ----------------------------------------------------- group defaults
-  // Colour and name new groups start with (by default yellow and unnamed,
+  // Colour and name new groups start with (by default iris and unnamed,
   // like a new note).
 
   const groupSwatches = $('groupSwatches');
   const groupCustomSwatch = groupSwatches.querySelector('.swatch[data-color="custom"]');
   const groupCustomColor = $('groupCustomColor');
   const groupDefaultTitle = $('groupDefaultTitle');
-  let groupDefaultColor = 'yellow';
+  let groupDefaultColor = 'iris';
   let groupTitleTimer = null;
 
   function renderGroupDefaultColor() {

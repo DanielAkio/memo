@@ -36,7 +36,7 @@ pub fn is_valid_color(color: &str) -> bool {
 }
 
 /// Colour every new note starts with.
-pub const DEFAULT_COLOR: &str = "yellow";
+pub const DEFAULT_COLOR: &str = "iris";
 
 /// How long a note stays in the trash before being permanently deleted (30 days).
 pub const TRASH_TTL_MS: u64 = 30 * 86_400_000;
@@ -183,7 +183,7 @@ struct FileData {
     /// The same default text with formatting (HTML from the note editor).
     default_html: String,
     /// Colour new groups start with, set in the manager; `None` =
-    /// `DEFAULT_COLOR` (yellow, as for notes).
+    /// `DEFAULT_COLOR` (iris, as for notes).
     default_group_color: Option<String>,
     /// Name new groups start with; empty = unnamed.
     default_group_title: String,
@@ -902,7 +902,7 @@ impl Store {
         self.mark_dirty();
     }
 
-    /// Colour (yellow unless chosen, as for notes) and name new groups start
+    /// Colour (iris unless chosen, as for notes) and name new groups start
     /// with.
     pub fn group_defaults(&self) -> (String, String) {
         let data = self.data.lock().unwrap();
