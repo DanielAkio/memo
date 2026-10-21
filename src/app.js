@@ -1037,6 +1037,89 @@
     return true;
   }
 
+  function arrowRight(wasBeforeMarker) {
+    const sel = getSelection();
+    if (!sel.isCollapsed || !sel.rangeCount) return false;
+    // Before a marker: the next press goes to the item's (or block's) text.
+    if (wasBeforeMarker && wasBeforeMarker.isConnected) return true;
+    const block = currentPre() || currentBlock();
+    if (!block) return false;
+    const rest = document.createRange();
+    rest.setStart(sel.anchorNode, sel.anchorOffset);
+    rest.setEnd(block, block.childNodes.length);
+    const after = rest.toString().replace(ZWSP, '');
+
+    // End of a line followed by a list item or code block: before its marker.
+    const next = block.nextElementSibling;
+    if (!after && next && (next.nodeName === 'PRE' || isListItem(next))) {
+      caretIn(next);
+      setBeforeMarker(next);
+      return true;
+    }
+
+    // Inside a box with nothing after the caret: just after the box.
+    const box = currentBox();
+    if (box) {
+      const r = document.createRange();
+      r.setStart(sel.anchorNode, sel.anchorOffset);
+      r.setEnd(box, box.childNodes.length);
+      if (r.toString().replace(ZWSP, '')) return false;
+      // After an invisible separator: right at the box's end, the browser
+      // would type into the box.
+      let gap = box.nextSibling;
+      while (gap && gap.nodeType === 3 && !gap.length) gap = gap.nextSibling;
+      if (!(gap && gap.nodeType === 3)) {
+        gap = document.createTextNode('');
+        box.after(gap);
+      }
+      if (!gap.data.startsWith('\u200b')) gap.insertData(0, '\u200b');
+      const at = document.createRange();
+      at.setStart(gap, 1);
+      sel.removeAllRanges();
+      sel.addRange(at);
+      return true;
+    }
+
+    // Right before a box: before its first letter, inside it.
+    const entering = boxAfterCaret(sel.anchorNode, sel.anchorOffset, block);
+    if (!entering) return false;
+    const first = document.createTreeWalker(entering, NodeFilter.SHOW_TEXT).nextNode();
+    if (!first) return false;
+    if (!first.data.startsWith('\u200b')) first.insertData(0, '\u200b');
+    const at = document.createRange();
+    at.setStart(first, 1);
+    sel.removeAllRanges();
+    sel.addRange(at);
+    return true;
+  }
+
+  // The inline code or highlight that starts right after a caret position
+  // (only invisible separators in between), if any.
+  function boxAfterCaret(node, offset, block) {
+    let n;
+    if (node.nodeType === 3) {
+      if (node.data.slice(offset).replace(ZWSP, '')) return null;
+      n = node;
+    } else {
+      n = node.childNodes[offset];
+      if (!n) n = node;
+      else if (isBox(n)) return n;
+    }
+    // Climb until there is a next sibling, skipping separators.
+    while (n && n !== block) {
+      let sib = n.nextSibling;
+      while (sib && sib.nodeType === 3 && !sib.data.replace(ZWSP, '')) sib = sib.nextSibling;
+      if (sib) {
+        while (sib && sib.nodeType === 1 && !isBox(sib)) sib = sib.firstChild;
+        return sib && isBox(sib) ? sib : null;
+      }
+      n = n.parentNode;
+    }
+    return null;
+  }
+
+  const isBox = (n) => n.nodeType === 1 && (n.nodeName === 'CODE' || isHighlight(n));
+
   // Replaces `range` with <code>text</code>, followed by an invisible
   // separator (keeps the caret outside the code). Straight in the DOM:
   // Chromium's insertHTML would copy styles into it.
@@ -1110,6 +1193,14 @@
     // then one more press leaves it, the way it goes before a list marker:
     // the caret stops just before the box, where typing writes plain text.
     if (e.key === 'ArrowLeft' && !e.shiftKey && !mod && !e.altKey && boxArrowLeft()) {
+      e.preventDefault();
+      return;
+    }
+    // ArrowRight mirrors it: entering a list item or code block from the end
+    // of the line above stops before its marker first, entering an inline
+    // code or highlight stops before its first letter, and leaving one stops
+    // just after it.
+    if (e.key === 'ArrowRight' && !e.shiftKey && !mod && !e.altKey && arrowRight(wasBeforeMarker)) {
       e.preventDefault();
       return;
     }
