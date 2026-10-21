@@ -75,9 +75,9 @@ sort the list. Sent something to the trash by mistake? Restore it: the trash kee
 
 ## Let your AI assistant take notes
 
-Turn on **AI control** in Settings and connect your AI assistant with one copy and paste: Claude, ChatGPT's Codex,
-GitHub Copilot in VS Code, Cursor, Windsurf, Gemini CLI or any other app that speaks
-[MCP](https://modelcontextprotocol.io). Then just ask: *"put my shopping list in a yellow memory and pin it"*, *"what's in my Work group?"*,
+Turn on **AI control** in Settings and click **Connect** next to your AI assistant: Claude, ChatGPT's Codex,
+GitHub Copilot in VS Code, Cursor, Windsurf, Gemini CLI and Cline are found and set up for you, and any other app that
+speaks [MCP](https://modelcontextprotocol.io) takes one copy and paste. Then just ask: *"put my shopping list in a yellow memory and pin it"*, *"what's in my Work group?"*,
 *"tick off coffee"*. Your assistant finds, reads, writes, pins, colors and groups memories, and you watch them
 change on screen. It's off until you turn it on, only apps on your computer can connect, and deleting for good stays
 in your hands.

@@ -40,6 +40,13 @@ refused). MCP clients don't talk to that port: they launch `memo --mcp`, a stdio
 answers `initialize` / `tools/list` itself and forwards each tool call to the app, opening Memo (`--autostart`) when it
 isn't running. Tools change memories through the same functions as the windows, so the screen follows.
 
+Settings → AI control → **Connect** (`src-tauri/src/clients.rs`) adds a `memo` entry pointing at the running
+executable to the config file of each MCP client found (Claude Desktop, including the Microsoft Store build's folder,
+Claude Code `~/.claude.json`, VS Code `mcp.json`, Cursor, Windsurf, Gemini CLI, Cline CLI and VS Code extension, Codex
+`config.toml`). Only that entry changes; the first change keeps the original as `<file>.before-memo`, and a file that
+isn't plain JSON (comments) is left alone, so the user copies the setup instead. "Connected to another copy" means the
+entry launches a different executable (say, the installed app while you run `npm run dev`); Update repoints it.
+
 Try it without a client:
 
 ```bash
