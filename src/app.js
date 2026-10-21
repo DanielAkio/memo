@@ -955,33 +955,46 @@
     return true;
   }
 
-  // ArrowLeft inside an inline code. One letter from its start, stops right
-  // before that letter, still inside (the browser would jump out past it);
-  // at its start, moves just before the code, into the text there (an
-  // invisible separator when there is none).
-  function codeArrowLeft() {
+  // Inline element drawn as a box around its text: an inline code or a
+  // highlight (the outermost, when highlights are nested).
+  function currentBox() {
+    const code = currentCode();
+    if (code) return code;
+    const block = currentBlock();
+    let box = null;
+    for (let n = getSelection().anchorNode; n && n !== block; n = n.parentNode) {
+      if (n.nodeType === 1 && isHighlight(n)) box = n;
+    }
+    return box;
+  }
+
+  // ArrowLeft inside a box (inline code, highlight). One letter from its
+  // start, stops right before that letter, still inside (the browser would
+  // jump out past it); at its start, moves just before the box, into the
+  // text there (an invisible separator when there is none).
+  function boxArrowLeft() {
     const sel = getSelection();
-    const code = sel.isCollapsed && currentCode();
-    if (!code) return false;
+    const box = sel.isCollapsed && currentBox();
+    if (!box) return false;
     const r = document.createRange();
-    r.setStart(code, 0);
+    r.setStart(box, 0);
     r.setEnd(sel.anchorNode, sel.anchorOffset);
     const before = [...r.toString().replace(ZWSP, '')];
     if (before.length > 1) return false;
+    const first = document.createTreeWalker(box, NodeFilter.SHOW_TEXT).nextNode();
+    if (!first) return false;
     const at = document.createRange();
-    const first = code.firstChild;
-    if (!(first && first.nodeType === 3)) return false;
     if (before.length === 1) {
-      // After an invisible separator: right at the code's start, the browser
+      // After an invisible separator: right at the box's start, the browser
       // would type into the text before it.
       if (!first.data.startsWith('\u200b')) first.insertData(0, '\u200b');
       at.setStart(first, 1);
     } else {
       if (first.data.startsWith('\u200b') && first.length > 1) first.deleteData(0, 1);
-      let prev = code.previousSibling;
+      let prev = box.previousSibling;
       if (!(prev && prev.nodeType === 3)) {
         prev = document.createTextNode('');
-        code.before(prev);
+        box.before(prev);
       }
       if (!prev.length) prev.data = '\u200b';
       at.setStart(prev, prev.length);
@@ -1060,10 +1073,10 @@
       return;
     }
 
-    // ArrowLeft walks to the first letter of an inline code, then one more
-    // press leaves it, the way it goes before a list marker: the caret stops
-    // just before the code, where typing writes plain text.
-    if (e.key === 'ArrowLeft' && !e.shiftKey && !mod && !e.altKey && codeArrowLeft()) {
+    // ArrowLeft walks to the first letter of an inline code or highlight,
+    // then one more press leaves it, the way it goes before a list marker:
+    // the caret stops just before the box, where typing writes plain text.
+    if (e.key === 'ArrowLeft' && !e.shiftKey && !mod && !e.altKey && boxArrowLeft()) {
       e.preventDefault();
       return;
     }

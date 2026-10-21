@@ -428,7 +428,7 @@ window.MemoI18n = (() => {
         items: [
           ['Formatação', 'Selecione um trecho e use a barrinha que aparece, ou {{Mod+B}}, {{Mod+I}} e {{Mod+U}}.',
             '<b>negrito</b>, <i>itálico</i> e <u>sublinhado</u>'],
-          ['Marca-texto', '{{Mod+Shift+H}} ou o marcador na barrinha.',
+          ['Marca-texto', '{{Mod+Shift+H}} ou o marcador na barrinha. {{←}} no início do trecho marcado põe o cursor fora dele.',
             'Um <span class="hl">trecho importante</span> no meio do texto.'],
           ['Tamanho do texto', 'Botões "A" na barrinha, ou {{Mod+Shift+>}} e {{Mod+Shift+<}}.',
             '<span class="sz-2">pequeno</span> · normal · <span class="sz-5">grande</span>'],
@@ -543,7 +543,7 @@ window.MemoI18n = (() => {
         items: [
           ['Formatting', 'Select some text and use the bar that appears, or {{Mod+B}}, {{Mod+I}} and {{Mod+U}}.',
             '<b>bold</b>, <i>italic</i> and <u>underline</u>'],
-          ['Highlight', '{{Mod+Shift+H}} or the marker in the bar.',
+          ['Highlight', '{{Mod+Shift+H}} or the marker in the bar. {{←}} at the start of the highlighted text puts the caret outside it.',
             'An <span class="hl">important bit</span> in the middle of the text.'],
           ['Text size', 'The "A" buttons in the bar, or {{Mod+Shift+>}} and {{Mod+Shift+<}}.',
             '<span class="sz-2">small</span> · normal · <span class="sz-5">large</span>'],
