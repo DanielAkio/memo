@@ -8,11 +8,10 @@
    <html data-theme="light|dark">, or no attribute to follow the OS. */
 
 /* Embedded mode (index.html?defaults, inside the manager): just the editor,
-   with no titlebar, status bar or colour stripe, on the manager field's
+   with no titlebar, status bar or group stripe, on the manager field's
    background. */
 html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .embedded .frame { box-shadow: none; }
-.embedded .frame::before,
 .embedded .group-tint,
 .embedded .titlebar,
 .embedded .statusbar { display: none; }

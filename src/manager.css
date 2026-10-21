@@ -766,8 +766,6 @@ textarea.field { resize: vertical; min-height: 84px; }
 }
 .demo-bar { border-radius: var(--radius-button); background: var(--color-obsidian); box-shadow: var(--hairline); }
 .demo-bar .demo-name { flex: 1; }
-/* A coloured group bar: stripe on the left and the folder in its colour. */
-.demo-bar[data-color] { box-shadow: inset 2px 0 0 var(--note-color), var(--hairline); }
 .help-demo .icon-btn.demo-tint { color: var(--note-color); }
 /* A group bar (or a member note's titlebar) washed in its group colour. */
 .demo-bar.demo-grouped {

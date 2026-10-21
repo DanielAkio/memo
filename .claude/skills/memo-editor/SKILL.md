@@ -43,6 +43,6 @@ The editor keeps its own history ("undo" section): many edits change the DOM dir
 
 ## Embedded editor
 
-`index.html?defaults` runs the same page in embedded mode (`EMBED` in app.js, `html.embedded` in styles.css: no titlebar, statusbar, colour stripe or window shortcuts; Tauri API taken from `window.parent` inside an iframe). The manager's settings use it in `<iframe id="defaultTextFrame">` to edit the new-note default text: it loads `get_new_note_defaults` → `(title, text, html)` and saves with `set_default_content(text, html)`; the title is saved separately (`set_default_title`). `Store::create` copies `default_title`/`default_text`/`default_html` into new notes.
+`index.html?defaults` runs the same page in embedded mode (`EMBED` in app.js, `html.embedded` in styles.css: no titlebar, statusbar, group stripe or window shortcuts; Tauri API taken from `window.parent` inside an iframe). The manager's settings use it in `<iframe id="defaultTextFrame">` to edit the new-note default text: it loads `get_new_note_defaults` → `(title, text, html)` and saves with `set_default_content(text, html)`; the title is saved separately (`set_default_title`). `Store::create` copies `default_title`/`default_text`/`default_html` into new notes.
 
 Changing the editor's HTML whitelist? Also check `welcome.rs` (its HTML must survive `sanitize` and its `TEXT` must equal `toPlain` of that HTML) and the Help demos (`memo-manager`).
