@@ -4,6 +4,7 @@
 //! pending, so dragging or resizing a note doesn't hit the disk on every
 //! pixel. Writes are atomic (temporary file + rename).
 
+use crate::images;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -504,6 +505,20 @@ fn set_content(note: &mut Note, content: NoteContent) {
     note.trashed_at = content.trashed_at;
 }
 
+/// Moves inline images (data URLs) into files in `dir`; true if any moved.
+fn store_all_images(data: &mut FileData, dir: &Path) -> bool {
+    let mut moved = false;
+    let htmls = data.notes.iter_mut().map(|n| &mut n.html);
+    for html in htmls.chain(std::iter::once(&mut data.default_html)) {
+        let stored = images::store_images(html, dir);
+        if stored != *html {
+            *html = stored;
+            moved = true;
+        }
+    }
+    moved
+}
+
 /// Records the ids as deleted for good.
 fn bury(data: &mut FileData, ids: impl IntoIterator<Item = String>, now: u64) {
     for id in ids {
@@ -526,11 +541,16 @@ impl Store {
             Err(_) => FileData::default(),
         };
         normalize(&mut data);
+        // Older versions kept images inside notes.json: keep that file.
+        let migrated = store_all_images(&mut data, &images::dir_for(&path));
+        if migrated {
+            let _ = fs::copy(&path, path.with_extension(format!("backup-{}.json", now_ms())));
+        }
 
         let store = Self {
             path: Mutex::new(path),
             data: Mutex::new(data),
-            dirty: AtomicBool::new(false),
+            dirty: AtomicBool::new(migrated),
         };
         store.purge_trash(now_ms());
         store
@@ -539,6 +559,29 @@ impl Store {
     /// Path of the current `notes.json`.
     pub fn path(&self) -> PathBuf {
         self.path.lock().unwrap().clone()
+    }
+
+    /// Folder of the pasted images, beside `notes.json` (see images.rs).
+    pub fn images_dir(&self) -> PathBuf {
+        images::dir_for(&self.path())
+    }
+
+    /// Saves the inline images of an HTML as files; returns the HTML with
+    /// references to them (what the store keeps).
+    pub fn store_images(&self, html: &str) -> String {
+        images::store_images(html, &self.images_dir())
+    }
+
+    /// The HTML with its images inline again (what a window shows).
+    pub fn inline_images(&self, html: &str) -> String {
+        images::inline_images(html, &self.images_dir())
+    }
+
+    /// Every stored HTML (notes, trashed ones included, and the new-note
+    /// default), to find the images in use.
+    pub fn all_html(&self) -> Vec<String> {
+        let data = self.data.lock().unwrap();
+        data.notes.iter().map(|n| n.html.clone()).chain([data.default_html.clone()]).collect()
     }
 
     /// Moves the store to `path` (a `notes.json` in another folder). If a
@@ -560,9 +603,16 @@ impl Store {
         if path.exists() && load_existing {
             let mut data = read(&path)?;
             normalize(&mut data);
+            let migrated = store_all_images(&mut data, &images::dir_for(&path));
+            if migrated {
+                let _ = fs::copy(&path, path.with_extension(format!("backup-{}.json", now_ms())));
+            }
             *self.data.lock().unwrap() = data;
             *current = path;
             drop(current);
+            if migrated {
+                self.mark_dirty();
+            }
             self.purge_trash(now_ms());
             Ok(true)
         } else {
@@ -571,6 +621,11 @@ impl Store {
                     &path,
                     path.with_extension(format!("backup-{}.json", now_ms())),
                 )?;
+            }
+            // The images go along (the old folder keeps its copies).
+            let (from, to) = (images::dir_for(&current), images::dir_for(&path));
+            for html in self.all_html() {
+                images::copy_refs(&html, &from, &to)?;
             }
             self.write(&path)?;
             *current = path;
@@ -582,8 +637,14 @@ impl Store {
     /// same format as `notes.json` (so an export can also serve as a data
     /// folder's file).
     pub fn export_to(&self, path: &Path) -> io::Result<()> {
+        let dir = self.images_dir();
         let json = {
             let mut copy = self.data.lock().unwrap().clone();
+            // One self-contained file: the images go inside it.
+            for note in &mut copy.notes {
+                note.html = images::inline_images(&note.html, &dir);
+            }
+            copy.default_html = images::inline_images(&copy.default_html, &dir);
             copy.version = 1;
             copy.notes.retain(|n| n.trashed_at.is_none());
             copy.groups.retain(|g| g.trashed_at.is_none());
@@ -600,7 +661,12 @@ impl Store {
     /// is newer; its groups are added when unknown. Settings in the file are
     /// ignored. Returns the ids added or replaced.
     pub fn import_from(&self, path: &Path) -> io::Result<Vec<String>> {
-        let imported = read(path)?;
+        let mut imported = read(path)?;
+        // Images inside the file (an export) or beside it (a notes.json).
+        let (from, to) = (images::dir_for(path), self.images_dir());
+        for note in &mut imported.notes {
+            note.html = images::store_images(&images::inline_images(&note.html, &from), &to);
+        }
         let mut changed = Vec::new();
         {
             let mut data = self.data.lock().unwrap();

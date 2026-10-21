@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cloud;
+mod images;
 mod store;
 mod sync;
 mod welcome;
@@ -1260,7 +1261,9 @@ fn get_theme(store: State<'_, Shared>) -> String {
 
 #[tauri::command]
 fn load_note(window: WebviewWindow, store: State<'_, Shared>) -> Option<Note> {
-    store.get(&id_of(&window))
+    let mut note = store.get(&id_of(&window))?;
+    note.html = store.inline_images(&note.html);
+    Some(note)
 }
 
 /// Names the note; returns the name as saved.
@@ -1285,6 +1288,8 @@ fn save_text(
     html: String,
     store: State<'_, Shared>,
 ) {
+    // Images are kept as files; the note refers to them (images.rs).
+    let html = store.store_images(&html);
     let mut changed = false;
     store.update(&id_of(&window), |n| {
         if n.text != text || n.html != html {
@@ -1618,7 +1623,8 @@ fn get_default_color(store: State<'_, Shared>) -> String {
 /// Default title, text and HTML for new notes, for the manager.
 #[tauri::command]
 fn get_new_note_defaults(store: State<'_, Shared>) -> (String, String, String) {
-    store.new_note_defaults()
+    let (title, text, html) = store.new_note_defaults();
+    (title, text, store.inline_images(&html))
 }
 
 #[tauri::command]
@@ -1651,7 +1657,7 @@ fn set_default_group_title(title: String, store: State<'_, Shared>) {
 #[tauri::command]
 fn set_default_content(text: String, html: String, store: State<'_, Shared>) {
     let text = text.chars().take(DEFAULT_TEXT_MAX).collect();
-    let html = html.chars().take(DEFAULT_TEXT_MAX * 10).collect();
+    let html = store.store_images(&html).chars().take(DEFAULT_TEXT_MAX * 10).collect();
     store.set_default_content(text, html);
 }
 

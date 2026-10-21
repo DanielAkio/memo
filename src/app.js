@@ -163,9 +163,13 @@
   }
   const DROP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
 
-  // Images (pasted, see "images") are kept inline in the HTML as data URLs,
-  // so they travel with the note (backup, sync); `width` is set once resized.
+  // Images (pasted, see "images") are inline in the editor as data URLs;
+  // `width` is set once resized. Rust keeps each one as a file beside
+  // notes.json (images.rs) and hands them back inline, except one whose file
+  // is missing (still coming from the cloud): its "images/<name>" reference
+  // is kept as it is, so saving the note doesn't lose it.
   const IMAGE_SRC_RE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+  const IMAGE_REF_RE = /^images\/[0-9a-f]{16,64}\.(?:png|jpg|webp|gif)$/;
   const IMAGE_MIN = 24;
   const IMAGE_MAX = 4000;
   // In the plain text an image is "[imagem]" / "[image]" (see toPlain).
@@ -272,7 +276,7 @@
           to.appendChild(document.createElement('br'));
         } else if (n.nodeName === 'IMG') {
           const src = n.getAttribute('src') || '';
-          if (!IMAGE_SRC_RE.test(src)) continue;
+          if (!IMAGE_SRC_RE.test(src) && !IMAGE_REF_RE.test(src)) continue;
           const img = to.appendChild(document.createElement('img'));
           img.src = src;
           const width = Math.round(Number(n.getAttribute('width')));
@@ -1261,7 +1265,7 @@
   // ------------------------------------------------------------- images
   //
   // A pasted image is re-encoded on a canvas (at most IMAGE_SIDE px on its
-  // longest side) and stored inline as a data URL: lossless PNG when that is
+  // longest side) into a data URL (saved as a file by Rust): lossless PNG when that is
   // small (screenshots of text stay sharp), else WebP (JPEG where WebP can't
   // be encoded; PNG if it has transparency), shrunk until it fits
   // IMAGE_CHARS. A note keeps under NOTE_CHARS in all, so it still syncs as
