@@ -163,9 +163,13 @@
   }
   const DROP = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
 
-  // Images (pasted, see "images") are kept inline in the HTML as data URLs,
-  // so they travel with the note (backup, sync); `width` is set once resized.
+  // Images (pasted, see "images") are inline in the editor as data URLs;
+  // `width` is set once resized. Rust keeps each one as a file beside
+  // notes.json (images.rs) and hands them back inline, except one whose file
+  // is missing (still coming from the cloud): its "images/<name>" reference
+  // is kept as it is, so saving the note doesn't lose it.
   const IMAGE_SRC_RE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+  const IMAGE_REF_RE = /^images\/[0-9a-f]{16,64}\.(?:png|jpg|webp|gif)$/;
   const IMAGE_MIN = 24;
   const IMAGE_MAX = 4000;
   // In the plain text an image is "[imagem]" / "[image]" (see toPlain).
@@ -272,7 +276,7 @@
           to.appendChild(document.createElement('br'));
         } else if (n.nodeName === 'IMG') {
           const src = n.getAttribute('src') || '';
-          if (!IMAGE_SRC_RE.test(src)) continue;
+          if (!IMAGE_SRC_RE.test(src) && !IMAGE_REF_RE.test(src)) continue;
           const img = to.appendChild(document.createElement('img'));
           img.src = src;
           const width = Math.round(Number(n.getAttribute('width')));
@@ -612,10 +616,11 @@
     onContentChanged();
   }
 
-  // "Before the marker": the caret at the start of a list item, drawn left of
-  // its box or dot (#markerCaret; the real caret is hidden meanwhile). There
-  // Enter pushes the item down. Set by clicking left of the box or ArrowLeft
-  // at the item's start; any other key or caret move clears it.
+  // "Before the marker": the caret at the start of a list item (or a code
+  // block), drawn left of its box or dot (#markerCaret; the real caret is
+  // hidden meanwhile). There Enter pushes the item down. Set by clicking left
+  // of the box or ArrowLeft at the item's start; any other key or caret move
+  // clears it.
   const markerCaret = $('markerCaret');
   let beforeMarker = null;
 
@@ -880,7 +885,39 @@
   // Inside the block: Enter breaks the line, Tab indents; Enter on an empty
   // last line leaves the block; Backspace in an empty block turns it back
   // into a regular line.
-  function onCodeBlockKeydown(e, pre, mod) {
+  function onCodeBlockKeydown(e, pre, mod, before) {
+    // Like a list item: ArrowLeft at the block's start puts the caret before
+    // the block (the browser would jump to the line above, or nowhere when the
+    // block starts the note), and Enter there pushes the block down.
+    const plainKey = !e.shiftKey && !mod && !e.altKey;
+    const sel = getSelection();
+    const atStart = sel.isCollapsed && textBeforeCaret(pre).toString().replace(ZWSP, '') === '';
+    if (e.key === 'ArrowLeft' && plainKey && atStart && !before) {
+      e.preventDefault();
+      setBeforeMarker(pre);
+      return;
+    }
+    if (e.key === 'Enter' && plainKey && before) {
+      e.preventDefault();
+      const line = document.createElement('div');
+      line.appendChild(document.createElement('br'));
+      pre.before(line);
+      caretIn(pre);
+      onContentChanged();
+      setBeforeMarker(pre);
+      return;
+    }
+    // Typing there writes on a new line above the block: the caret moves
+    // into it and the browser types the character (or composes a dead key)
+    // there.
+    const typed = e.key.length === 1 || e.key === 'Dead' || e.key === 'Process';
+    if (before && typed && !e.metaKey && !(e.ctrlKey && !e.altKey)) {
+      const line = document.createElement('div');
+      line.appendChild(document.createElement('br'));
+      pre.before(line);
+      caretIn(line);
+      return;
+    }
     if (e.key === 'Tab' && !mod && !e.altKey) {
       e.preventDefault();
       if (!e.shiftKey) document.execCommand('insertText', false, '  ');
@@ -924,42 +961,181 @@
     }
   }
 
-  // `text` typed in a line becomes inline code.
-  function expandInlineCode() {
+  // `text` typed in a line becomes inline code. `typed` is what the last
+  // input inserted: usually just the closing backtick, but where the
+  // backtick is a dead key (ABNT2, US-International) it can come with the
+  // next character ("`," or "` ") or only when the composition ends.
+  function expandInlineCode(typed = '`') {
+    const tail = typed.length - 1 - typed.lastIndexOf('`');
     const sel = getSelection();
-    if (!sel.isCollapsed) return false;
+    if (!sel.isCollapsed || !sel.anchorNode) return false;
+    // A composition can leave the line split in several text nodes.
+    if (sel.anchorNode.nodeType === 3) sel.anchorNode.parentNode.normalize();
     const node = sel.anchorNode;
     if (!node || node.nodeType !== 3 || node.parentElement.closest('code, pre')) return false;
     const pos = sel.anchorOffset;
     const text = node.data.slice(0, pos);
-    if (!text.endsWith('`')) return false;
-    const open = text.lastIndexOf('`', pos - 2);
+    const close = pos - 1 - tail;
+    if (close < 1 || text[close] !== '`') return false;
+    const open = text.lastIndexOf('`', close - 1);
     if (open < 0) return false;
-    const inner = text.slice(open + 1, pos - 1);
+    const inner = text.slice(open + 1, close);
     if (!inner.trim() || text[open - 1] === '`') return false;
     const r = document.createRange();
     r.setStart(node, open);
     r.setEnd(node, pos);
-    insertCode(r, inner);
+    insertCode(r, inner, text.slice(close + 1));
     return true;
   }
+
+  // Inline element drawn as a box around its text: an inline code or a
+  // highlight (the outermost, when highlights are nested).
+  function currentBox() {
+    const code = currentCode();
+    if (code) return code;
+    const block = currentBlock();
+    let box = null;
+    for (let n = getSelection().anchorNode; n && n !== block; n = n.parentNode) {
+      if (n.nodeType === 1 && isHighlight(n)) box = n;
+    }
+    return box;
+  }
+
+  // ArrowLeft inside a box (inline code, highlight). One letter from its
+  // start, stops right before that letter, still inside (the browser would
+  // jump out past it); at its start, moves just before the box, into the
+  // text there (an invisible separator when there is none).
+  function boxArrowLeft() {
+    const sel = getSelection();
+    const box = sel.isCollapsed && currentBox();
+    if (!box) return false;
+    const r = document.createRange();
+    r.setStart(box, 0);
+    r.setEnd(sel.anchorNode, sel.anchorOffset);
+    const before = [...r.toString().replace(ZWSP, '')];
+    if (before.length > 1) return false;
+    const first = document.createTreeWalker(box, NodeFilter.SHOW_TEXT).nextNode();
+    if (!first) return false;
+    const at = document.createRange();
+    if (before.length === 1) {
+      // After an invisible separator: right at the box's start, the browser
+      // would type into the text before it.
+      if (!first.data.startsWith('\u200b')) first.insertData(0, '\u200b');
+      at.setStart(first, 1);
+    } else {
+      if (first.data.startsWith('\u200b') && first.length > 1) first.deleteData(0, 1);
+      let prev = box.previousSibling;
+      if (!(prev && prev.nodeType === 3)) {
+        prev = document.createTextNode('');
+        box.before(prev);
+      }
+      if (!prev.length) prev.data = '\u200b';
+      at.setStart(prev, prev.length);
+    }
+    sel.removeAllRanges();
+    sel.addRange(at);
+    return true;
+  }
+
+  function arrowRight(wasBeforeMarker) {
+    const sel = getSelection();
+    if (!sel.isCollapsed || !sel.rangeCount) return false;
+    // Before a marker: the next press goes to the item's (or block's) text.
+    if (wasBeforeMarker && wasBeforeMarker.isConnected) return true;
+    const block = currentPre() || currentBlock();
+    if (!block) return false;
+    const rest = document.createRange();
+    rest.setStart(sel.anchorNode, sel.anchorOffset);
+    rest.setEnd(block, block.childNodes.length);
+    const after = rest.toString().replace(ZWSP, '');
+
+    // End of a line followed by a list item or code block: before its marker.
+    const next = block.nextElementSibling;
+    if (!after && next && (next.nodeName === 'PRE' || isListItem(next))) {
+      caretIn(next);
+      setBeforeMarker(next);
+      return true;
+    }
+
+    // Inside a box with nothing after the caret: just after the box.
+    const box = currentBox();
+    if (box) {
+      const r = document.createRange();
+      r.setStart(sel.anchorNode, sel.anchorOffset);
+      r.setEnd(box, box.childNodes.length);
+      if (r.toString().replace(ZWSP, '')) return false;
+      // After an invisible separator: right at the box's end, the browser
+      // would type into the box.
+      let gap = box.nextSibling;
+      while (gap && gap.nodeType === 3 && !gap.length) gap = gap.nextSibling;
+      if (!(gap && gap.nodeType === 3)) {
+        gap = document.createTextNode('');
+        box.after(gap);
+      }
+      if (!gap.data.startsWith('\u200b')) gap.insertData(0, '\u200b');
+      const at = document.createRange();
+      at.setStart(gap, 1);
+      sel.removeAllRanges();
+      sel.addRange(at);
+      return true;
+    }
+
+    // Right before a box: before its first letter, inside it.
+    const entering = boxAfterCaret(sel.anchorNode, sel.anchorOffset, block);
+    if (!entering) return false;
+    const first = document.createTreeWalker(entering, NodeFilter.SHOW_TEXT).nextNode();
+    if (!first) return false;
+    if (!first.data.startsWith('\u200b')) first.insertData(0, '\u200b');
+    const at = document.createRange();
+    at.setStart(first, 1);
+    sel.removeAllRanges();
+    sel.addRange(at);
+    return true;
+  }
+
+  // The inline code or highlight that starts right after a caret position
+  // (only invisible separators in between), if any.
+  function boxAfterCaret(node, offset, block) {
+    let n;
+    if (node.nodeType === 3) {
+      if (node.data.slice(offset).replace(ZWSP, '')) return null;
+      n = node;
+    } else {
+      n = node.childNodes[offset];
+      if (!n) n = node;
+      else if (isBox(n)) return n;
+    }
+    // Climb until there is a next sibling, skipping separators.
+    while (n && n !== block) {
+      let sib = n.nextSibling;
+      while (sib && sib.nodeType === 3 && !sib.data.replace(ZWSP, '')) sib = sib.nextSibling;
+      if (sib) {
+        while (sib && sib.nodeType === 1 && !isBox(sib)) sib = sib.firstChild;
+        return sib && isBox(sib) ? sib : null;
+      }
+      n = n.parentNode;
+    }
+    return null;
+  }
+
+  const isBox = (n) => n.nodeType === 1 && (n.nodeName === 'CODE' || isHighlight(n));
 
   // Replaces `range` with <code>text</code>, followed by an invisible
   // separator (keeps the caret outside the code). Straight in the DOM:
   // Chromium's insertHTML would copy styles into it.
-  function insertCode(range, text) {
+  function insertCode(range, text, after = '') {
     range.deleteContents();
     const code = document.createElement('code');
     code.spellcheck = false;
     code.textContent = text;
-    const gap = document.createTextNode('\u200b');
+    const gap = document.createTextNode('\u200b' + after);
     range.insertNode(gap);
     range.insertNode(code);
-    const after = document.createRange();
-    after.setStartAfter(gap);
-    after.collapse(true);
+    const caret = document.createRange();
+    caret.setStartAfter(gap);
+    caret.collapse(true);
     getSelection().removeAllRanges();
-    getSelection().addRange(after);
+    getSelection().addRange(caret);
   }
 
   // Raw text of a fragment, with <br> as a line break (keeps the last one).
@@ -1013,6 +1189,22 @@
       return;
     }
 
+    // ArrowLeft walks to the first letter of an inline code or highlight,
+    // then one more press leaves it, the way it goes before a list marker:
+    // the caret stops just before the box, where typing writes plain text.
+    if (e.key === 'ArrowLeft' && !e.shiftKey && !mod && !e.altKey && boxArrowLeft()) {
+      e.preventDefault();
+      return;
+    }
+    // ArrowRight mirrors it: entering a list item or code block from the end
+    // of the line above stops before its marker first, entering an inline
+    // code or highlight stops before its first letter, and leaving one stops
+    // just after it.
+    if (e.key === 'ArrowRight' && !e.shiftKey && !mod && !e.altKey && arrowRight(wasBeforeMarker)) {
+      e.preventDefault();
+      return;
+    }
+
     // Undo / redo through the editor's own history (see "undo").
     if (mod && !e.altKey && key === 'z') {
       e.preventDefault();
@@ -1044,7 +1236,7 @@
 
     const pre = currentPre();
     if (pre) {
-      onCodeBlockKeydown(e, pre, mod);
+      onCodeBlockKeydown(e, pre, mod, wasBeforeMarker === pre);
       return;
     }
 
@@ -1076,7 +1268,7 @@
 
     const block = currentBlock();
     if (!block || !isListItem(block)) return;
-    const atStart = getSelection().isCollapsed && textBeforeCaret(block).toString() === '';
+    const atStart = getSelection().isCollapsed && textBeforeCaret(block).toString().replace(ZWSP, '') === '';
 
     const plainKey = !e.shiftKey && !mod && !e.altKey;
     const before = wasBeforeMarker === block && atStart;
@@ -1191,7 +1383,12 @@
       return;
     }
     let converted = false;
-    if (e.inputType === 'insertText' && ['`', ']', ' '].includes(e.data)) {
+    if (e.inputType === 'insertText' && e.data?.includes('`') && e.data !== '`') {
+      // A dead-key backtick that came with the next character.
+      recordHistory(typing);
+      converting = true;
+      try { converted = expandInlineCode(e.data); } finally { converting = false; }
+    } else if (e.inputType === 'insertText' && ['`', ']', ' '].includes(e.data)) {
       // Keep the text as typed, so undo after "[]" → box (or `x` → code,
       // "- " → bullet) brings back the characters instead of skipping them.
       recordHistory(typing);
@@ -1249,7 +1446,7 @@
   // ------------------------------------------------------------- images
   //
   // A pasted image is re-encoded on a canvas (at most IMAGE_SIDE px on its
-  // longest side) and stored inline as a data URL: lossless PNG when that is
+  // longest side) into a data URL (saved as a file by Rust): lossless PNG when that is
   // small (screenshots of text stay sharp), else WebP (JPEG where WebP can't
   // be encoded; PNG if it has transparency), shrunk until it fits
   // IMAGE_CHARS. A note keeps under NOTE_CHARS in all, so it still syncs as
@@ -1657,6 +1854,16 @@
   // ------------------------------------------------------------- events
 
   editor.addEventListener('input', onEditorInput);
+  // Dead keys (the backtick on ABNT2 / US-International keyboards) can
+  // arrive as a composition, which the input handler doesn't convert.
+  editor.addEventListener('compositionend', (e) => {
+    if (!e.data?.includes('`') || currentPre()) return;
+    recordHistory(false);
+    converting = true;
+    let converted;
+    try { converted = expandInlineCode(e.data); } finally { converting = false; }
+    if (converted) onContentChanged();
+  });
   // Undo/Redo from the context menu (or any other source) also go through
   // the editor's own history.
   editor.addEventListener('beforeinput', (e) => {
@@ -1719,8 +1926,8 @@
     renderImageFrame();
     // The caret left the start of the item: no longer before its marker.
     if (beforeMarker) {
-      const block = currentBlock();
-      if (!getSelection().isCollapsed || block !== beforeMarker || textBeforeCaret(block).toString() !== '') {
+      const block = currentPre() || currentBlock();
+      if (!getSelection().isCollapsed || block !== beforeMarker || textBeforeCaret(block).toString().replace(ZWSP, '') !== '') {
         setBeforeMarker(null);
       }
     }
@@ -1767,7 +1974,7 @@
       customColor.value = isCustomColor(note.color)
         ? note.color
         : (getComputedStyle(frame).getPropertyValue('--note-color').trim().match(/^#[0-9a-f]{6}$/i) || ['#f2c94c'])[0];
-      customColor.click();
+      MemoColorPicker.open(customColor, sw);
       return;
     }
     setColor(sw.dataset.color);

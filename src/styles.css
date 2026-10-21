@@ -8,11 +8,10 @@
    <html data-theme="light|dark">, or no attribute to follow the OS. */
 
 /* Embedded mode (index.html?defaults, inside the manager): just the editor,
-   with no titlebar, status bar or colour stripe, on the manager field's
+   with no titlebar, status bar or group stripe, on the manager field's
    background. */
 html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .embedded .frame { box-shadow: none; }
-.embedded .frame::before,
 .embedded .group-tint,
 .embedded .titlebar,
 .embedded .statusbar { display: none; }
@@ -140,7 +139,9 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 .editor pre.code {
   position: relative;
   margin: 6px 0;
-  padding: 8px 12px;
+  /* The top padding is a header row for the language picker and the copy
+     button (app.js "code"), so they never cover the first line. */
+  padding: 26px 12px 8px;
   border-radius: var(--radius-button);
   background: var(--overlay-subtle);
   box-shadow: var(--hairline);
@@ -232,7 +233,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   color: var(--color-bone);
 }
 
-/* Language picker in the block's top-right corner. */
+/* Language picker in the block's top-left corner, in its header row. */
 .code-lang {
   position: absolute;
   top: 3px;
@@ -257,15 +258,16 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   text-transform: uppercase;
   pointer-events: auto;
   cursor: default;
-  /* Only while the mouse is over the block or the picker, or its list is
-     open; opaque so it covers the code underneath cleanly. */
-  visibility: hidden;
-  background-color: var(--color-obsidian);
-  box-shadow: var(--shadow-popover);
+  /* Always shows the language as a quiet label; a button while the mouse is
+     over the block or the picker, or its list is open. */
+  background-color: transparent;
 }
 .code-hl.is-hovered .code-lang,
 .code-lang:hover,
-.code-lang:focus { visibility: visible; }
+.code-lang:focus {
+  background-color: var(--color-obsidian);
+  box-shadow: var(--shadow-popover);
+}
 
 /* Copy button in the block's top-right corner, shown with the language
    picker while the mouse is over the block. */

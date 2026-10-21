@@ -172,10 +172,25 @@ button { font: inherit; color: inherit; }
 .swatch[data-color="iris"]     { --sw: var(--color-iris-violet); }
 .swatch[data-color="lavender"] { --sw: var(--color-lavender); }
 .swatch[data-color="mono"]     { --sw: var(--color-paper); }
-/* Custom: a rainbow until one is picked; then shows the note's colour
-   (--sw comes from app.js). */
-.swatch[data-color="custom"]::after {
-  background: var(--sw, conic-gradient(#eb5757, #f2c94c, #27a644, #02b8cc, #6366f1, #8b5cf6, #eb5757));
+/* Icons drawn as masks, so they take any colour (the eyedropper, the
+   picked custom colour). */
+:root {
+  --icon-eyedropper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2 22 1-1h3l9-9'/%3E%3Cpath d='M3 21v-3l9-9'/%3E%3Cpath d='m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z'/%3E%3C/svg%3E");
+  --icon-shuffle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m18 14 4 4-4 4'/%3E%3Cpath d='m18 2 4 4-4 4'/%3E%3Cpath d='M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22'/%3E%3Cpath d='M2 6h1.9c1.5 0 2.9.9 3.6 2.2'/%3E%3Cpath d='M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8'/%3E%3C/svg%3E");
+}
+/* Custom: an eyedropper, grey until a colour is picked; then in that colour
+   (--sw comes from the page's JS). Random (default group colour): shuffle. */
+.swatch[data-color="custom"]::after,
+.swatch[data-color="random"]::after {
+  inset: 5px;
+  border-radius: 0;
+  background: var(--sw, var(--color-fog));
+  -webkit-mask: var(--icon-eyedropper) center / contain no-repeat;
+  mask: var(--icon-eyedropper) center / contain no-repeat;
+}
+.swatch[data-color="random"]::after {
+  -webkit-mask-image: var(--icon-shuffle);
+  mask-image: var(--icon-shuffle);
 }
 .custom-color {
   position: absolute;
@@ -209,17 +224,6 @@ html, body {
   height: 100%;
   background: var(--color-carbon);
   box-shadow: var(--hairline);
-}
-
-/* Colour label: a 2px vertical stripe on the left edge. */
-.frame::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: var(--note-color);
-  z-index: 3;
-  pointer-events: none;
 }
 
 .titlebar {

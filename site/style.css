@@ -5,8 +5,8 @@
   --muted: #62666d;
   --line: #e4e5e7;
   --chip: #f1f2f4;
-  --accent: #e4f222;
-  --accent-ink: #16171a;
+  --accent: #6366f1;
+  --accent-ink: #ffffff;
   --shadow: 0 1px 2px rgba(16, 17, 20, .06), 0 12px 32px rgba(16, 17, 20, .10);
   color-scheme: light;
 }

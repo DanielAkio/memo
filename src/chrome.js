@@ -35,6 +35,22 @@ window.MemoZoom = {
   },
 };
 
+// Opens the system colour picker of a hidden <input type="color"> next to
+// the swatch that asked for it. The input moves under the swatch (where
+// Chromium anchors its picker) and, on Windows, where the system dialog
+// opens on its own, Rust moves it next to the pointer (place_color_picker).
+window.MemoColorPicker = {
+  open(input, anchor) {
+    const r = anchor.getBoundingClientRect();
+    input.style.position = 'fixed';
+    input.style.left = `${Math.round(r.left)}px`;
+    input.style.top = `${Math.round(r.bottom)}px`;
+    const tauri = window.__TAURI__ || window.parent.__TAURI__;
+    tauri.core.invoke('place_color_picker').catch((err) => console.error('place_color_picker', err));
+    input.click();
+  },
+};
+
 window.MemoChrome = {
   // `resizeEdges`: which edges/corners get a resize handle (a group bar only
   // changes width). `onDoubleClick` receives the mousedown event.

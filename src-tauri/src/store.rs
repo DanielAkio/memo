@@ -4,6 +4,7 @@
 //! pending, so dragging or resizing a note doesn't hit the disk on every
 //! pixel. Writes are atomic (temporary file + rename).
 
+use crate::images;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -35,8 +36,31 @@ pub fn is_valid_color(color: &str) -> bool {
             && color[1..].chars().all(|c| c.is_ascii_hexdigit()))
 }
 
-/// Colour every new note starts with.
+/// A random label from `RANDOM_COLORS`, among those the fewest of `used`
+/// (the colours of the existing notes or groups) have, so new ones tell
+/// apart at a glance.
+fn random_color<'a>(used: impl Iterator<Item = &'a str> + Clone) -> String {
+    let uses = |c: &str| used.clone().filter(|u| *u == c).count();
+    let least = RANDOM_COLORS.iter().map(|c| uses(c)).min().unwrap_or(0);
+    let pool: Vec<&str> = RANDOM_COLORS.iter().copied().filter(|c| uses(c) == least).collect();
+    let mut bytes = [0u8; 4];
+    let roll = getrandom::fill(&mut bytes).map(|_| u32::from_le_bytes(bytes)).unwrap_or(0);
+    pool[roll as usize % pool.len()].to_string()
+}
+
+/// The app's own colour (the manager window, and groups whose colour is
+/// unreadable).
 pub const DEFAULT_COLOR: &str = "iris";
+
+/// Colour new notes start with unless one is chosen in the manager: none.
+pub const DEFAULT_NOTE_COLOR: &str = "";
+
+/// Labels a new note or group draws its colour from when its default colour
+/// is "random" (the default for groups).
+pub const RANDOM_COLORS: [&str; 5] = ["yellow", "green", "coral", "teal", "iris"];
+
+/// Default group colour meaning "a random label for each new group".
+pub const RANDOM_COLOR: &str = "random";
 
 /// How long a note stays in the trash before being permanently deleted (30 days).
 pub const TRASH_TTL_MS: u64 = 30 * 86_400_000;
@@ -150,7 +174,7 @@ impl Default for Note {
             width: DEFAULT_W,
             height: DEFAULT_H,
             pinned: false,
-            color: DEFAULT_COLOR.to_string(),
+            color: DEFAULT_NOTE_COLOR.to_string(),
             created_at: 0,
             updated_at: 0,
             trashed_at: None,
@@ -174,7 +198,8 @@ struct FileData {
     language: String,
     /// Position, size and state of the manager window.
     manager: ManagerState,
-    /// Colour for new notes, chosen in the manager; `None` = `DEFAULT_COLOR`.
+    /// Colour for new notes, chosen in the manager (`RANDOM_COLOR` = a
+    /// random label for each); `None` = `DEFAULT_NOTE_COLOR` (no colour).
     default_color: Option<String>,
     /// Title and text (plain, with "[ ] " for checklist items) of new notes,
     /// set in the manager. Empty = blank note.
@@ -182,8 +207,8 @@ struct FileData {
     default_text: String,
     /// The same default text with formatting (HTML from the note editor).
     default_html: String,
-    /// Colour new groups start with, set in the manager; `None` =
-    /// `DEFAULT_COLOR` (iris, as for notes).
+    /// Colour new groups start with, set in the manager; `None` = a random
+    /// label for each new group (`RANDOM_COLORS`).
     default_group_color: Option<String>,
     /// Name new groups start with; empty = unnamed.
     default_group_title: String,
@@ -429,6 +454,9 @@ pub struct Config {
     /// E-mail of the Google account connected for cloud sync on this
     /// computer (its token is in the OS credential store, see cloud.rs).
     pub google_account: Option<String>,
+    /// AI assistants may control Memo through MCP on this computer (see
+    /// mcp.rs). Off by default.
+    pub ai_control: bool,
 }
 
 impl Config {
@@ -504,6 +532,20 @@ fn set_content(note: &mut Note, content: NoteContent) {
     note.trashed_at = content.trashed_at;
 }
 
+/// Moves inline images (data URLs) into files in `dir`; true if any moved.
+fn store_all_images(data: &mut FileData, dir: &Path) -> bool {
+    let mut moved = false;
+    let htmls = data.notes.iter_mut().map(|n| &mut n.html);
+    for html in htmls.chain(std::iter::once(&mut data.default_html)) {
+        let stored = images::store_images(html, dir);
+        if stored != *html {
+            *html = stored;
+            moved = true;
+        }
+    }
+    moved
+}
+
 /// Records the ids as deleted for good.
 fn bury(data: &mut FileData, ids: impl IntoIterator<Item = String>, now: u64) {
     for id in ids {
@@ -526,11 +568,16 @@ impl Store {
             Err(_) => FileData::default(),
         };
         normalize(&mut data);
+        // Older versions kept images inside notes.json: keep that file.
+        let migrated = store_all_images(&mut data, &images::dir_for(&path));
+        if migrated {
+            let _ = fs::copy(&path, path.with_extension(format!("backup-{}.json", now_ms())));
+        }
 
         let store = Self {
             path: Mutex::new(path),
             data: Mutex::new(data),
-            dirty: AtomicBool::new(false),
+            dirty: AtomicBool::new(migrated),
         };
         store.purge_trash(now_ms());
         store
@@ -539,6 +586,29 @@ impl Store {
     /// Path of the current `notes.json`.
     pub fn path(&self) -> PathBuf {
         self.path.lock().unwrap().clone()
+    }
+
+    /// Folder of the pasted images, beside `notes.json` (see images.rs).
+    pub fn images_dir(&self) -> PathBuf {
+        images::dir_for(&self.path())
+    }
+
+    /// Saves the inline images of an HTML as files; returns the HTML with
+    /// references to them (what the store keeps).
+    pub fn store_images(&self, html: &str) -> String {
+        images::store_images(html, &self.images_dir())
+    }
+
+    /// The HTML with its images inline again (what a window shows).
+    pub fn inline_images(&self, html: &str) -> String {
+        images::inline_images(html, &self.images_dir())
+    }
+
+    /// Every stored HTML (notes, trashed ones included, and the new-note
+    /// default), to find the images in use.
+    pub fn all_html(&self) -> Vec<String> {
+        let data = self.data.lock().unwrap();
+        data.notes.iter().map(|n| n.html.clone()).chain([data.default_html.clone()]).collect()
     }
 
     /// Moves the store to `path` (a `notes.json` in another folder). If a
@@ -560,9 +630,16 @@ impl Store {
         if path.exists() && load_existing {
             let mut data = read(&path)?;
             normalize(&mut data);
+            let migrated = store_all_images(&mut data, &images::dir_for(&path));
+            if migrated {
+                let _ = fs::copy(&path, path.with_extension(format!("backup-{}.json", now_ms())));
+            }
             *self.data.lock().unwrap() = data;
             *current = path;
             drop(current);
+            if migrated {
+                self.mark_dirty();
+            }
             self.purge_trash(now_ms());
             Ok(true)
         } else {
@@ -571,6 +648,11 @@ impl Store {
                     &path,
                     path.with_extension(format!("backup-{}.json", now_ms())),
                 )?;
+            }
+            // The images go along (the old folder keeps its copies).
+            let (from, to) = (images::dir_for(&current), images::dir_for(&path));
+            for html in self.all_html() {
+                images::copy_refs(&html, &from, &to)?;
             }
             self.write(&path)?;
             *current = path;
@@ -582,8 +664,14 @@ impl Store {
     /// same format as `notes.json` (so an export can also serve as a data
     /// folder's file).
     pub fn export_to(&self, path: &Path) -> io::Result<()> {
+        let dir = self.images_dir();
         let json = {
             let mut copy = self.data.lock().unwrap().clone();
+            // One self-contained file: the images go inside it.
+            for note in &mut copy.notes {
+                note.html = images::inline_images(&note.html, &dir);
+            }
+            copy.default_html = images::inline_images(&copy.default_html, &dir);
             copy.version = 1;
             copy.notes.retain(|n| n.trashed_at.is_none());
             copy.groups.retain(|g| g.trashed_at.is_none());
@@ -600,7 +688,12 @@ impl Store {
     /// is newer; its groups are added when unknown. Settings in the file are
     /// ignored. Returns the ids added or replaced.
     pub fn import_from(&self, path: &Path) -> io::Result<Vec<String>> {
-        let imported = read(path)?;
+        let mut imported = read(path)?;
+        // Images inside the file (an export) or beside it (a notes.json).
+        let (from, to) = (images::dir_for(path), self.images_dir());
+        for note in &mut imported.notes {
+            note.html = images::store_images(&images::inline_images(&note.html, &from), &to);
+        }
         let mut changed = Vec::new();
         {
             let mut data = self.data.lock().unwrap();
@@ -664,7 +757,7 @@ impl Store {
             data.next_group_seq = seq + 1;
             let color = match &data.default_group_color {
                 Some(c) if is_valid_color(c) => c.clone(),
-                _ => DEFAULT_COLOR.to_string(),
+                _ => random_color(data.groups.iter().map(|g| g.color.as_str())),
             };
             let now = now_ms();
             let group = Group {
@@ -867,13 +960,30 @@ impl Store {
         }
     }
 
-    /// Colour new notes start with.
+    /// Colour new notes start with, as chosen in the manager: a colour or
+    /// `RANDOM_COLOR`.
     pub fn default_color(&self) -> String {
         let data = self.data.lock().unwrap();
         match &data.default_color {
-            Some(c) if is_valid_color(c) => c.clone(),
-            _ => DEFAULT_COLOR.to_string(),
+            Some(c) if c == RANDOM_COLOR || is_valid_color(c) => c.clone(),
+            _ => DEFAULT_NOTE_COLOR.to_string(),
         }
+    }
+
+    /// The colour for a note created now (`RANDOM_COLOR` resolved, among
+    /// the least used by the notes not in the trash).
+    fn new_note_color(&self) -> String {
+        let color = self.default_color();
+        if color != RANDOM_COLOR {
+            return color;
+        }
+        let data = self.data.lock().unwrap();
+        random_color(
+            data.notes
+                .iter()
+                .filter(|n| n.trashed_at.is_none())
+                .map(|n| n.color.as_str()),
+        )
     }
 
     pub fn set_default_color(&self, color: &str) {
@@ -902,20 +1012,21 @@ impl Store {
         self.mark_dirty();
     }
 
-    /// Colour (iris unless chosen, as for notes) and name new groups start
-    /// with.
+    /// Colour (`RANDOM_COLOR` unless one is chosen) and name new groups
+    /// start with.
     pub fn group_defaults(&self) -> (String, String) {
         let data = self.data.lock().unwrap();
         let color = match &data.default_group_color {
             Some(c) if is_valid_color(c) => c.clone(),
-            _ => DEFAULT_COLOR.to_string(),
+            _ => RANDOM_COLOR.to_string(),
         };
         (color, data.default_group_title.clone())
     }
 
+    /// `RANDOM_COLOR` goes back to a random label for each new group.
     pub fn set_default_group_color(&self, color: &str) {
         let mut data = self.data.lock().unwrap();
-        data.default_group_color = Some(color.to_string());
+        data.default_group_color = (color != RANDOM_COLOR).then(|| color.to_string());
         data.defaults_updated_at = now_ms();
         drop(data);
         self.mark_dirty();
@@ -939,9 +1050,16 @@ impl Store {
     }
 
     /// The note is as it was created: nothing beyond the default title and
-    /// text, the default colour, and in no group (joining one is a change).
+    /// text, the default colour (with random colours: the one it was given,
+    /// i.e. never edited), and in no group (joining one is a change).
     pub fn is_pristine(&self, note: &Note) -> bool {
-        if !note.group_id.is_empty() || note.color != self.default_color() {
+        let color = self.default_color();
+        let default_color = if color == RANDOM_COLOR {
+            RANDOM_COLORS.contains(&note.color.as_str()) && note.updated_at == note.created_at
+        } else {
+            note.color == color
+        };
+        if !note.group_id.is_empty() || !default_color {
             return false;
         }
         if note.is_blank() {
@@ -952,22 +1070,27 @@ impl Store {
     }
 
     /// The group is as it was created: no name beyond the default one, the
-    /// default colour, and no notes (trashed ones aside).
+    /// default colour (with random colours: the one it was given, i.e. never
+    /// edited), and no notes (trashed ones aside).
     pub fn is_pristine_group(&self, id: &str) -> bool {
         let Some(group) = self.group(id) else {
             return false;
         };
         let (title, color) = {
             let data = self.data.lock().unwrap();
-            let color = match &data.default_group_color {
-                Some(c) if is_valid_color(c) => c.clone(),
-                _ => DEFAULT_COLOR.to_string(),
-            };
+            let color = data.default_group_color.clone().filter(|c| is_valid_color(c));
             (data.default_group_title.clone(), color)
         };
         let name = group.name.trim();
+        let default_color = match color {
+            Some(c) => group.color == c,
+            None => {
+                RANDOM_COLORS.contains(&group.color.as_str())
+                    && group.updated_at == group.created_at
+            }
+        };
         (name.is_empty() || name == title.trim())
-            && group.color == color
+            && default_color
             && self.members(id).is_empty()
     }
 
@@ -1022,7 +1145,7 @@ impl Store {
     }
 
     pub fn create(&self, pos: Option<(i32, i32)>) -> Note {
-        let color = self.default_color();
+        let color = self.new_note_color();
         let (title, text, html) = self.new_note_defaults();
         let note = {
             let mut data = self.data.lock().unwrap();
@@ -1119,7 +1242,7 @@ impl Store {
             let color = if is_valid_color(&doc.color) {
                 doc.color.clone()
             } else {
-                DEFAULT_COLOR.to_string()
+                DEFAULT_NOTE_COLOR.to_string()
             };
             let content = NoteContent {
                 title: doc.title.chars().take(TITLE_MAX).collect(),
@@ -1236,7 +1359,10 @@ impl Store {
 
     pub fn apply_settings_doc(&self, doc: &SettingsDoc) {
         let mut data = self.data.lock().unwrap();
-        data.default_color = doc.default_color.clone().filter(|c| is_valid_color(c));
+        data.default_color = doc
+            .default_color
+            .clone()
+            .filter(|c| c == RANDOM_COLOR || is_valid_color(c));
         data.default_title = doc.default_title.chars().take(TITLE_MAX).collect();
         data.default_text = doc.default_text.chars().take(DEFAULT_TEXT_MAX).collect();
         data.default_html = doc.default_html.clone();
@@ -1266,7 +1392,7 @@ impl Store {
             title: title.chars().take(TITLE_MAX).collect(),
             text: doc.text.clone(),
             html: doc.html.clone(),
-            color: if is_valid_color(&doc.color) { doc.color.clone() } else { DEFAULT_COLOR.to_string() },
+            color: if is_valid_color(&doc.color) { doc.color.clone() } else { DEFAULT_NOTE_COLOR.to_string() },
             created_at: now,
             updated_at: now,
             trashed_at: Some(now),

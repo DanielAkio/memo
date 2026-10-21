@@ -36,7 +36,7 @@
   // Memories and Groups each list either the current ones or the trash.
   const scopes = { notes: 'current', groups: 'current' };
   const inTrash = () => scopes[view] === 'trash';
-  let defaultColor = 'iris';
+  let defaultColor = '';
   let reloadTimer = null;
   // State of this window itself (pinned), saved by Rust.
   let win = { pinned: false };
@@ -398,14 +398,14 @@
   // own. Only the title is handled here.
 
   // ----------------------------------------------------- group defaults
-  // Colour and name new groups start with (by default iris and unnamed,
-  // like a new note).
+  // Colour and name new groups start with (by default a random label for
+  // each group, 'random', and unnamed like a new note).
 
   const groupSwatches = $('groupSwatches');
   const groupCustomSwatch = groupSwatches.querySelector('.swatch[data-color="custom"]');
   const groupCustomColor = $('groupCustomColor');
   const groupDefaultTitle = $('groupDefaultTitle');
-  let groupDefaultColor = 'iris';
+  let groupDefaultColor = 'random';
   let groupTitleTimer = null;
 
   function renderGroupDefaultColor() {
@@ -444,7 +444,7 @@
     if (!sw) return;
     if (sw === groupCustomSwatch) {
       groupCustomColor.value = isCustomColor(groupDefaultColor) ? groupDefaultColor : '#f2c94c';
-      groupCustomColor.click();
+      MemoColorPicker.open(groupCustomColor, sw);
       return;
     }
     setGroupDefaultColor(sw.dataset.color);
@@ -644,7 +644,7 @@
     if (!sw) return;
     if (sw === customSwatch) {
       customColor.value = isCustomColor(defaultColor) ? defaultColor : '#f2c94c';
-      customColor.click();
+      MemoColorPicker.open(customColor, sw);
       return;
     }
     setDefaultColor(sw.dataset.color);
@@ -745,7 +745,7 @@
     if (!sw) return;
     if (sw === mgrCustomSwatch) {
       mgrCustomColor.value = isCustomColor(win.color) ? win.color : '#f2c94c';
-      mgrCustomColor.click();
+      MemoColorPicker.open(mgrCustomColor, sw);
       return;
     }
     setMgrColor(sw.dataset.color);
@@ -1037,6 +1037,7 @@
     renderMonoName();
     renderHelp();
     renderCloud();
+    renderAi(aiSwitch.getAttribute('aria-checked') === 'true');
     render();
   }
 
@@ -1086,6 +1087,77 @@
   invoke('get_autostart').then(renderAutostart).catch((err) => {
     autostartSwitch.disabled = true;
     console.error('get_autostart', err);
+  });
+
+  // The running version, from tauri.conf.json.
+  window.__TAURI__.app.getVersion()
+    .then((v) => { $('appVersion').textContent = v; })
+    .catch((err) => console.error('getVersion', err));
+  // AI control (MCP, mcp.rs): the switch, and the setup for any MCP client,
+  // which launches "<Memo's executable> --mcp" (stdio): pick the client's
+  // config format, copy, paste.
+  const aiSwitch = $('aiControlSwitch');
+  let aiExe = '';
+  let aiCopied = '';
+  const quoteArg = (s) => (/^[\w./:\\-]+$/.test(s) ? s : `"${s.replace(/"/g, '\\"')}"`);
+  const aiCommand = () => `${quoteArg(aiExe)} --mcp`;
+  const AI_SETUPS = {
+    json: { hint: 'aiHintJson', text: () => JSON.stringify({ mcpServers: { memo: { command: aiExe, args: ['--mcp'] } } }, null, 2) },
+    vscode: { hint: 'aiHintVscode', text: () => JSON.stringify({ servers: { memo: { type: 'stdio', command: aiExe, args: ['--mcp'] } } }, null, 2) },
+    claude: { hint: 'aiHintTerminal', text: () => `claude mcp add --scope user memo -- ${aiCommand()}` },
+    codex: { hint: 'aiHintTerminal', text: () => `codex mcp add memo -- ${aiCommand()}` },
+    command: { hint: 'aiHintCommand', text: aiCommand },
+  };
+  function renderAi(on) {
+    aiSwitch.setAttribute('aria-checked', String(on));
+    $('aiSetup').hidden = !on || !aiExe;
+    $('aiStatus').textContent = t(aiCopied || 'aiPickApp', { cmd: aiCommand() });
+  }
+  aiSwitch.addEventListener('click', async () => {
+    const on = aiSwitch.getAttribute('aria-checked') !== 'true';
+    aiCopied = '';
+    renderAi(on);
+    try {
+      renderAi(await invoke('set_ai_control', { on }));
+    } catch (err) {
+      renderAi(!on);
+      console.error('set_ai_control', err);
+    }
+  });
+  // The tray's "AI control" item.
+  listen('ai-control-changed', (e) => renderAi(e.payload));
+  invoke('get_ai_control').then(([on, exe]) => {
+    aiExe = exe;
+    renderAi(on);
+  }).catch((err) => {
+    aiSwitch.disabled = true;
+    console.error('get_ai_control', err);
+  });
+
+  async function copyText(text) {
+    const fill = (e) => {
+      e.clipboardData.setData('text/plain', text);
+      e.preventDefault();
+    };
+    document.addEventListener('copy', fill, { once: true });
+    const copied = document.execCommand('copy');
+    document.removeEventListener('copy', fill);
+    if (!copied) await navigator.clipboard.writeText(text);
+  }
+  $('aiAppSelect').addEventListener('change', () => {
+    aiCopied = '';
+    renderAi(true);
+  });
+  $('aiCopyBtn').addEventListener('click', async () => {
+    const setup = AI_SETUPS[$('aiAppSelect').value];
+    try {
+      await copyText(setup.text());
+      aiCopied = setup.hint;
+    } catch (err) {
+      aiCopied = 'aiCopyFailed';
+      console.error('copy', err);
+    }
+    renderAi(true);
   });
 
   // The tray's Trash, Settings and Help items open the manager on that tab.

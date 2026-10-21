@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cloud;
+mod images;
+mod mcp;
 mod store;
 mod sync;
 mod welcome;
@@ -16,7 +18,7 @@ use std::{
 
 use store::{
     is_valid_color, now_ms, Config, Group, ManagerState, Note, Store, DEFAULT_H, DEFAULT_TEXT_MAX,
-    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
+    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, RANDOM_COLOR, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
 };
 use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
@@ -257,6 +259,7 @@ struct TrayLabels {
     dark: &'static str,
     language: &'static str,
     autostart: &'static str,
+    ai_control: &'static str,
     sync: &'static str,
     quit: &'static str,
 }
@@ -277,6 +280,7 @@ fn tray_labels(lang: &str) -> TrayLabels {
             dark: "Dark",
             language: "Language",
             autostart: "Start with the system",
+            ai_control: "AI control (MCP)",
             sync: "Sync now",
             quit: "Quit Memo",
         }
@@ -295,6 +299,7 @@ fn tray_labels(lang: &str) -> TrayLabels {
             dark: "Escuro",
             language: "Idioma",
             autostart: "Iniciar com o sistema",
+            ai_control: "Controle por IA (MCP)",
             sync: "Sincronizar agora",
             quit: "Sair do Memo",
         }
@@ -1260,7 +1265,9 @@ fn get_theme(store: State<'_, Shared>) -> String {
 
 #[tauri::command]
 fn load_note(window: WebviewWindow, store: State<'_, Shared>) -> Option<Note> {
-    store.get(&id_of(&window))
+    let mut note = store.get(&id_of(&window))?;
+    note.html = store.inline_images(&note.html);
+    Some(note)
 }
 
 /// Names the note; returns the name as saved.
@@ -1285,6 +1292,8 @@ fn save_text(
     html: String,
     store: State<'_, Shared>,
 ) {
+    // Images are kept as files; the note refers to them (images.rs).
+    let html = store.store_images(&html);
     let mut changed = false;
     store.update(&id_of(&window), |n| {
         if n.text != text || n.html != html {
@@ -1412,19 +1421,140 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
 /// goes the way `trash` sends it: deleted outright.
 #[tauri::command]
 async fn close_note(app: AppHandle, window: WebviewWindow) {
-    let id = id_of(&window);
+    close_note_by_id(&app, &id_of(&window));
+}
+
+fn close_note_by_id(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
-    match store.get(&id) {
-        Some(note) if note.welcome_copy || store.is_pristine(&note) => trash(&app, &id),
+    match store.get(id) {
+        Some(note) if note.welcome_copy || store.is_pristine(&note) => trash(app, id),
         Some(_) => {
-            store.update(&id, |n| n.hidden = true);
+            store.update(id, |n| n.hidden = true);
             store.flush();
-            let _ = window.destroy();
-            notify(&app);
+            if let Some(window) = app.get_webview_window(&label_for(id)) {
+                let _ = window.destroy();
+            }
+            notify(app);
         }
         None => {}
     }
 }
+
+// ---------------------------------------------------------------------------
+// System colour picker
+// ---------------------------------------------------------------------------
+
+/// Called just before a page opens the system colour picker (chrome.js,
+/// `MemoColorPicker`).
+#[tauri::command]
+fn place_color_picker() {
+    place_color_dialog();
+}
+
+/// Moves the system colour dialog next to the mouse pointer (the swatch just
+/// clicked). Windows opens it where the WebView2 browser process sees fit,
+/// often far from the window that asked; the dialog belongs to that process,
+/// so it is found by its owner: one of Memo's windows. Elsewhere the system
+/// places its picker itself (GTK dialog, NSColorPanel), so nothing to do.
+#[cfg(windows)]
+fn place_color_dialog() {
+    use std::{thread, time::Duration};
+    use windows_sys::Win32::{
+        Foundation::{HWND, LPARAM, POINT, RECT},
+        Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST},
+        System::Threading::GetCurrentProcessId,
+        UI::WindowsAndMessaging::{
+            EnumWindows, GetAncestor, GetClassNameW, GetCursorPos, GetWindow, GetWindowRect,
+            GetWindowThreadProcessId, IsWindowVisible, SetWindowPos, GA_ROOT, GW_OWNER,
+            SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+        },
+    };
+
+    // A visible "#32770" (dialog class) window owned by one of ours.
+    unsafe extern "system" fn find(hwnd: HWND, found: LPARAM) -> i32 {
+        // SAFETY: plain Win32 queries; `found` points at the caller's HWND.
+        unsafe {
+            if IsWindowVisible(hwnd) == 0 {
+                return 1;
+            }
+            let mut class = [0u16; 16];
+            let len = GetClassNameW(hwnd, class.as_mut_ptr(), class.len() as i32);
+            if String::from_utf16_lossy(&class[..len.max(0) as usize]) != "#32770" {
+                return 1;
+            }
+            let owner = GetAncestor(GetWindow(hwnd, GW_OWNER), GA_ROOT);
+            let mut pid = 0;
+            GetWindowThreadProcessId(owner, &mut pid);
+            if owner.is_null() || pid != GetCurrentProcessId() {
+                return 1;
+            }
+            *(found as *mut HWND) = hwnd;
+            0
+        }
+    }
+
+    let mut cursor = POINT { x: 0, y: 0 };
+    // SAFETY: writes into the local POINT.
+    if unsafe { GetCursorPos(&mut cursor) } == 0 {
+        return;
+    }
+    thread::spawn(move || {
+        // The dialog shows up a moment after the click: look for it for 2 s.
+        for _ in 0..80 {
+            thread::sleep(Duration::from_millis(25));
+            let mut dialog: HWND = std::ptr::null_mut();
+            // SAFETY: `find` only writes the HWND it was given.
+            unsafe { EnumWindows(Some(find), &mut dialog as *mut HWND as LPARAM) };
+            if dialog.is_null() {
+                continue;
+            }
+            let mut rect = RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            };
+            let mut info: MONITORINFO = unsafe { std::mem::zeroed() };
+            info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+            // SAFETY: plain Win32 calls on locals; a failed one leaves the
+            // dialog where it is.
+            unsafe {
+                if GetWindowRect(dialog, &mut rect) == 0
+                    || GetMonitorInfoW(
+                        MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST),
+                        &mut info,
+                    ) == 0
+                {
+                    return;
+                }
+                // Below and to the right of the pointer, kept on its monitor.
+                let (w, h) = (rect.right - rect.left, rect.bottom - rect.top);
+                let area = info.rcWork;
+                let x = (cursor.x - 16).min(area.right - w).max(area.left);
+                let y = if cursor.y + 16 + h <= area.bottom {
+                    cursor.y + 16
+                } else {
+                    cursor.y - 16 - h
+                };
+                let y = y.min(area.bottom - h).max(area.top);
+                SetWindowPos(
+                    dialog,
+                    std::ptr::null_mut(),
+                    x,
+                    y,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                );
+            }
+            return;
+        }
+    });
+}
+
+#[cfg(not(windows))]
+fn place_color_dialog() {}
+
 
 // ---------------------------------------------------------------------------
 // Manager commands
@@ -1618,7 +1748,8 @@ fn get_default_color(store: State<'_, Shared>) -> String {
 /// Default title, text and HTML for new notes, for the manager.
 #[tauri::command]
 fn get_new_note_defaults(store: State<'_, Shared>) -> (String, String, String) {
-    store.new_note_defaults()
+    let (title, text, html) = store.new_note_defaults();
+    (title, text, store.inline_images(&html))
 }
 
 #[tauri::command]
@@ -1634,7 +1765,7 @@ fn get_group_defaults(store: State<'_, Shared>) -> (String, String) {
 
 #[tauri::command]
 fn set_default_group_color(color: String, store: State<'_, Shared>) -> Result<(), String> {
-    if !is_valid_color(&color) {
+    if color != RANDOM_COLOR && !is_valid_color(&color) {
         return Err(format!("unknown color: {color}"));
     }
     store.set_default_group_color(&color);
@@ -1651,7 +1782,7 @@ fn set_default_group_title(title: String, store: State<'_, Shared>) {
 #[tauri::command]
 fn set_default_content(text: String, html: String, store: State<'_, Shared>) {
     let text = text.chars().take(DEFAULT_TEXT_MAX).collect();
-    let html = html.chars().take(DEFAULT_TEXT_MAX * 10).collect();
+    let html = store.store_images(&html).chars().take(DEFAULT_TEXT_MAX * 10).collect();
     store.set_default_content(text, html);
 }
 
@@ -1661,7 +1792,7 @@ fn set_default_color(
     color: String,
     store: State<'_, Shared>,
 ) -> Result<(), String> {
-    if !is_valid_color(&color) {
+    if color != RANDOM_COLOR && !is_valid_color(&color) {
         return Err(format!("unknown color: {color}"));
     }
     store.set_default_color(&color);
@@ -2386,6 +2517,31 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
     manager.is_enabled().map_err(|e| e.to_string())
 }
 
+/// Settings → AI control: whether it is on, and the executable MCP clients
+/// launch (`<path> --mcp`), for the setup snippets.
+#[tauri::command]
+fn get_ai_control(app: AppHandle) -> Result<(bool, String), String> {
+    let dir = default_data_dir(&app).map_err(|e| e.to_string())?;
+    let exe = mcp::app_path().map(|p| p.display().to_string()).unwrap_or_default();
+    Ok((mcp::enabled(&dir), exe))
+}
+
+#[tauri::command]
+fn set_ai_control(app: AppHandle, on: bool) -> Result<bool, String> {
+    toggle_ai_control(&app, on)?;
+    Ok(on)
+}
+
+/// Turns AI control on or off (Settings switch or tray item); the manager's
+/// switch and the tray follow.
+fn toggle_ai_control(app: &AppHandle, on: bool) -> Result<(), String> {
+    let dir = default_data_dir(app).map_err(|e| e.to_string())?;
+    mcp::set_enabled(app, &dir, on)?;
+    let _ = app.emit("ai-control-changed", on);
+    refresh_tray(app);
+    Ok(())
+}
+
 /// Configurações → Sincronização: whether this build can connect a Google
 /// account, the one connected on this computer and how syncing goes.
 #[tauri::command]
@@ -2617,6 +2773,9 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         None::<&str>,
     )?;
 
+    let ai_control = default_data_dir(app).is_ok_and(|dir| mcp::enabled(&dir));
+    let ai_control_item = check("ai-control", l.ai_control, ai_control)?;
+
     let new_note = item("new", l.new_note)?;
     let new_group = item("new-group", l.new_group)?;
     let show = item("show", l.show)?;
@@ -2626,6 +2785,14 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let help = item("help", l.help)?;
     let sync = item("sync", l.sync)?;
     let quit = item("quit", l.quit)?;
+    // The running version, greyed out: shows at a glance which build is open.
+    let version = MenuItem::with_id(
+        app,
+        "version",
+        format!("Memo {}", app.package_info().version),
+        false,
+        None::<&str>,
+    )?;
     let separators = [
         PredefinedMenuItem::separator(app)?,
         PredefinedMenuItem::separator(app)?,
@@ -2644,12 +2811,14 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &theme_menu,
         &language_menu,
         &autostart_item,
+        &ai_control_item,
     ];
     // "Sync now" only with a Google account connected on this computer.
     if cloud_account(app).is_some() {
         items.push(&sync);
     }
     items.push(&separators[2]);
+    items.push(&version);
     items.push(&quit);
     Menu::with_items(app, &items)
 }
@@ -2688,6 +2857,13 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
             // The manager's switch follows.
             let _ = app.emit("autostart-changed", manager.is_enabled().unwrap_or(false));
             refresh_tray(app);
+        }
+        "ai-control" => {
+            let on = default_data_dir(app).is_ok_and(|dir| !mcp::enabled(&dir));
+            if let Err(err) = toggle_ai_control(app, on) {
+                eprintln!("memo: ai control: {err}");
+                refresh_tray(app);
+            }
         }
         "sync" => sync::sync_now(app),
         "quit" => {
@@ -2769,6 +2945,12 @@ fn migrate_old_data(dir: &Path) {
 }
 
 fn main() {
+    // `memo --mcp`: the stdio MCP server AI assistants launch (mcp.rs), not
+    // the app.
+    if std::env::args().any(|a| a == mcp::ARG) {
+        std::process::exit(mcp::bridge());
+    }
+
     // On Wayland the compositor ignores "always on top". Running through
     // XWayland, pinning works on GNOME, KDE and the like.
     #[cfg(target_os = "linux")]
@@ -2811,6 +2993,7 @@ fn main() {
             set_pinned,
             set_color,
             set_title,
+            place_color_picker,
             new_note,
             close_note,
             load_manager,
@@ -2856,6 +3039,8 @@ fn main() {
             delete_group_forever,
             get_autostart,
             set_autostart,
+            get_ai_control,
+            set_ai_control,
             get_cloud_account,
             connect_cloud,
             cancel_cloud_connect,
@@ -2924,6 +3109,11 @@ fn main() {
                 }
             }
             sync::start(&handle);
+            if mcp::enabled(&default_dir) {
+                if let Err(err) = mcp::start(&handle, &default_dir) {
+                    eprintln!("memo: mcp: {err}");
+                }
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -2936,7 +3126,10 @@ fn main() {
                 api.prevent_exit();
             }
         }
-        RunEvent::Exit => app.state::<Shared>().flush(),
+        RunEvent::Exit => {
+            app.state::<Shared>().flush();
+            mcp::stop();
+        }
         // Clicking the Dock icon brings the notes to the front and opens the manager.
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => {

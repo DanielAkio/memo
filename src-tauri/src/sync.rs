@@ -11,6 +11,12 @@
 //! or received: anything newer here is pushed, anything newer there is
 //! applied.
 //!
+//! Pasted images (files beside `notes.json`, see images.rs) go as files of
+//! their own, `image-<name>`, sent before the first note that uses them and
+//! fetched when a note from the cloud refers to one missing here. They never
+//! change (the name is a hash of the bytes), so they carry no stamp to
+//! compare and are sent once.
+//!
 //! Conflicts (changed here and there since the last sync): the newer version
 //! wins and the other one is kept as a copy in the trash, so no text is lost.
 //! An edit beats a deletion. A cloud change to a note whose window is focused
@@ -21,7 +27,7 @@
 //! and on "Sync now". Errors are `cloud::ERR_*` codes shown by the manager.
 
 use crate::{
-    cloud, group_label, label_for, notify,
+    cloud, group_label, images, label_for, notify,
     store::{Applied, GroupDoc, Note, NoteDoc, SettingsDoc, SyncState, SyncedFile},
     welcome, Config, Shared, CONFIG,
 };
@@ -39,6 +45,8 @@ use tokio::sync::Notify;
 
 const API: &str = "https://www.googleapis.com";
 const SETTINGS_FILE: &str = "settings.json";
+/// Start of an image's file name in the Drive (`image-<name>`).
+const IMAGE_PREFIX: &str = "image-";
 
 /// How often the task wakes up to see whether a sync is due.
 const TICK: Duration = Duration::from_secs(5);
@@ -192,11 +200,13 @@ fn note_doc(note: &Note) -> NoteDoc {
     }
 }
 
-/// One file to send: its name, stamp and JSON body.
+/// One file to send: its name, stamp and JSON body, and the images it
+/// refers to (sent first).
 struct Upload {
     name: String,
     stamp: u64,
     body: String,
+    images: Vec<String>,
 }
 
 /// What changed here since the last sync, ready to send. Skips notes never
@@ -226,7 +236,7 @@ fn uploads(store: &Shared, state: &SyncState) -> Vec<Upload> {
             trashed_at: group.trashed_at,
             ..Default::default()
         };
-        out.push(Upload { stamp: group.updated_at, body: json(&doc), name });
+        out.push(Upload { stamp: group.updated_at, body: json(&doc), name, images: Vec::new() });
     }
     for note in &snap.notes {
         let name = note_file(&note.id);
@@ -243,7 +253,8 @@ fn uploads(store: &Shared, state: &SyncState) -> Vec<Upload> {
             }
             _ => {}
         }
-        out.push(Upload { stamp: note.updated_at, body: json(&note_doc(note)), name });
+        let images = images::refs(&note.html).into_iter().collect();
+        out.push(Upload { stamp: note.updated_at, body: json(&note_doc(note)), name, images });
     }
     for tomb in &snap.deleted {
         let is_group = snap.state.files.contains_key(&group_file(&tomb.id));
@@ -258,11 +269,11 @@ fn uploads(store: &Shared, state: &SyncState) -> Vec<Upload> {
         } else {
             json(&NoteDoc { version: 1, id: tomb.id.clone(), deleted: true, deleted_at: tomb.deleted_at, ..Default::default() })
         };
-        out.push(Upload { name, stamp: tomb.deleted_at, body });
+        out.push(Upload { name, stamp: tomb.deleted_at, body, images: Vec::new() });
     }
     let settings = snap.settings;
     if settings.updated_at > 0 && synced(SETTINGS_FILE).map_or(true, |s| settings.updated_at > s) {
-        out.push(Upload { name: SETTINGS_FILE.into(), stamp: settings.updated_at, body: json(&settings) });
+        out.push(Upload { name: SETTINGS_FILE.into(), stamp: settings.updated_at, body: json(&settings), images: Vec::new() });
     }
     out
 }
@@ -353,10 +364,15 @@ async fn run_with(store: &Shared, ui: &(dyn Ui + Sync), drive: &Drive, email: &s
     for doc in deferred {
         ctx.receive_note(doc, None);
     }
-    // Groups before notes, so a new note's group already exists.
+    // Images first (their ids are needed to fetch them), then groups before
+    // notes, so a new note's group already exists.
     let mut remote = remote;
-    remote.sort_by_key(|f| (!f.name.starts_with("group-"), f.name.clone()));
+    remote.sort_by_key(|f| (!f.name.starts_with(IMAGE_PREFIX), !f.name.starts_with("group-"), f.name.clone()));
     for file in remote {
+        if file.name.starts_with(IMAGE_PREFIX) {
+            ctx.state.files.insert(file.name, SyncedFile { file_id: file.id, synced: file.stamp });
+            continue;
+        }
         let known = ctx.state.files.get(&file.name).map(|f| f.synced);
         if known.is_some_and(|s| file.stamp <= s) {
             // Our own upload coming back, or nothing new.
@@ -379,10 +395,17 @@ async fn run_with(store: &Shared, ui: &(dyn Ui + Sync), drive: &Drive, email: &s
             }
             ctx.state.files.insert(file.name, SyncedFile { file_id: file.id, synced: file.stamp });
         } else if file.name.starts_with("note-") {
-            if let Ok(doc) = serde_json::from_str::<NoteDoc>(&body) {
+            if let Ok(mut doc) = serde_json::from_str::<NoteDoc>(&body) {
+                // Inline images from older versions become files too.
+                doc.html = store.store_images(&doc.html);
+                fetch_images(drive, store, &ctx.state.files, &doc.html).await;
                 ctx.receive_note(doc, Some(file.id));
             }
         }
+    }
+    // Images that failed to arrive before.
+    for html in store.all_html() {
+        fetch_images(drive, store, &ctx.state.files, &html).await;
     }
     let (groups_changed, notes_changed) = (ctx.groups_changed, ctx.notes_changed);
     state.page_token = Some(next_token);
@@ -391,6 +414,15 @@ async fn run_with(store: &Shared, ui: &(dyn Ui + Sync), drive: &Drive, email: &s
 
     // Push.
     for up in uploads(store, &state) {
+        for image in &up.images {
+            let name = format!("{IMAGE_PREFIX}{image}");
+            if state.files.contains_key(&name) {
+                continue;
+            }
+            let Ok(bytes) = std::fs::read(store.images_dir().join(image)) else { continue };
+            let id = drive.upload_bytes(None, &name, 1, images::mime(image), &bytes).await?;
+            state.files.insert(name, SyncedFile { file_id: id, synced: 1 });
+        }
         let file_id = state.files.get(&up.name).map(|f| f.file_id.clone()).filter(|id| !id.is_empty());
         let id = drive.upload(file_id.as_deref(), &up.name, up.stamp, &up.body).await?;
         state.files.insert(up.name, SyncedFile { file_id: id, synced: up.stamp });
@@ -398,6 +430,27 @@ async fn run_with(store: &Shared, ui: &(dyn Ui + Sync), drive: &Drive, email: &s
     }
     store.update_sync(|s| s.last_sync = crate::now_ms());
     Ok(())
+}
+
+/// Downloads the images `html` refers to that are missing here and known in
+/// the Drive. A failure is skipped (the note keeps the reference; the next
+/// sync tries again).
+async fn fetch_images(drive: &Drive, store: &Shared, files: &HashMap<String, SyncedFile>, html: &str) {
+    let dir = store.images_dir();
+    for image in images::refs(html) {
+        if dir.join(&image).exists() {
+            continue;
+        }
+        let Some(file) = files.get(&format!("{IMAGE_PREFIX}{image}")) else { continue };
+        match drive.download_bytes(&file.file_id).await {
+            Ok(bytes) => {
+                if let Err(err) = images::write(&dir, &image, &bytes) {
+                    eprintln!("memo: failed to save image {image}: {err}");
+                }
+            }
+            Err(err) => eprintln!("memo: failed to fetch image {image}: {err}"),
+        }
+    }
 }
 
 /// Applying one pull.
@@ -521,7 +574,7 @@ struct RemoteFile {
 
 impl RemoteFile {
     fn from_meta(meta: FileMeta) -> Option<Self> {
-        if meta.trashed || !meta.name.ends_with(".json") {
+        if meta.trashed || !(meta.name.ends_with(".json") || meta.name.starts_with(IMAGE_PREFIX)) {
             return None;
         }
         let stamp = meta.app_properties.get("stamp")?.parse().ok()?;
@@ -674,26 +727,44 @@ impl Drive {
             .map_err(|_| cloud::ERR_NETWORK.to_string())
     }
 
+    async fn download_bytes(&self, id: &str) -> Result<Vec<u8>, String> {
+        let response = self.get(&format!("{}/drive/v3/files/{id}", self.base), &[("alt", "media")]).await?;
+        let bytes = response.bytes().await.map_err(|_| cloud::ERR_NETWORK.to_string())?;
+        Ok(bytes.to_vec())
+    }
+
     /// Creates the file (no `file_id`) or replaces its content; returns its
     /// id. A file removed in the Drive meanwhile is created again.
     async fn upload(&self, file_id: Option<&str>, name: &str, stamp: u64, body: &str) -> Result<String, String> {
+        self.upload_bytes(file_id, name, stamp, "application/json", body.as_bytes()).await
+    }
+
+    async fn upload_bytes(
+        &self,
+        file_id: Option<&str>,
+        name: &str,
+        stamp: u64,
+        content_type: &str,
+        body: &[u8],
+    ) -> Result<String, String> {
         if let Some(id) = file_id {
-            match self.send_upload(Some(id), name, stamp, body).await {
+            match self.send_upload(Some(id), name, stamp, content_type, body).await {
                 Err(status) if status == reqwest::StatusCode::NOT_FOUND => {}
                 Err(status) => return Err(http_error(status)),
                 Ok(id) => return Ok(id),
             }
         }
-        self.send_upload(None, name, stamp, body).await.map_err(http_error)
+        self.send_upload(None, name, stamp, content_type, body).await.map_err(http_error)
     }
 
-    /// One multipart upload (metadata + JSON content).
+    /// One multipart upload (metadata + content).
     async fn send_upload(
         &self,
         file_id: Option<&str>,
         name: &str,
         stamp: u64,
-        body: &str,
+        content_type: &str,
+        body: &[u8],
     ) -> Result<String, reqwest::StatusCode> {
         #[derive(Deserialize)]
         struct Created {
@@ -706,10 +777,13 @@ impl Drive {
         }
         // Random, so no note text can contain it.
         let boundary = format!("memo-{}", cloud::random_b64(18));
-        let payload = format!(
+        let mut payload = format!(
             "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n\
-             --{boundary}\r\nContent-Type: application/json\r\n\r\n{body}\r\n--{boundary}--"
-        );
+             --{boundary}\r\nContent-Type: {content_type}\r\n\r\n"
+        )
+        .into_bytes();
+        payload.extend_from_slice(body);
+        payload.extend_from_slice(format!("\r\n--{boundary}--").as_bytes());
         let request = match file_id {
             Some(id) => self.http.patch(format!("{}/upload/drive/v3/files/{id}", self.base)),
             None => self.http.post(format!("{}/upload/drive/v3/files", self.base)),
@@ -873,7 +947,8 @@ mod tests {
     #[test]
     fn two_computers() {
         let _ = rustls::crypto::ring::default_provider().install_default();
-        let base = serve(Arc::new(Mutex::new(FakeDrive::default())));
+        let fake = Arc::new(Mutex::new(FakeDrive::default()));
+        let base = serve(fake.clone());
         let ui = TestUi::default();
         let (a, b) = (computer("a"), computer("b"));
 
@@ -945,5 +1020,26 @@ mod tests {
         sync(&b, &ui, &base);
         sync(&a, &ui, &base);
         assert!(a.get(&blank.id).is_none());
+
+        // A pasted image goes once as a file of its own and arrives as a file.
+        use base64::Engine;
+        let png = base64::engine::general_purpose::STANDARD.encode(b"a tiny fake png");
+        let inline = format!(r#"<div>see<img src="data:image/png;base64,{png}"></div>"#);
+        let p = a.create(None);
+        let html = a.store_images(&inline);
+        assert!(html.contains(r#"src="images/"#));
+        a.update(&p.id, |n| {
+            n.text = "see[image]".into();
+            n.html = html.clone();
+        });
+        sync(&a, &ui, &base);
+        a.update(&p.id, |n| n.text = "see the [image]".into());
+        sync(&a, &ui, &base);
+        sync(&b, &ui, &base);
+        let on_b = b.get(&p.id).expect("note with an image reached B");
+        assert_eq!(on_b.html, html);
+        assert_eq!(b.inline_images(&on_b.html), inline, "the image file reached B");
+        let sent = fake.lock().unwrap().files.values().filter(|f| f.0.starts_with(IMAGE_PREFIX)).count();
+        assert_eq!(sent, 1, "the image is sent once");
     }
 }

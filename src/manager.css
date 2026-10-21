@@ -692,11 +692,13 @@ textarea.field { resize: vertical; min-height: 84px; }
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* Header row with the language, as in the editor (styles.css pre.code). */
+.help-demo pre.code[data-lang] { padding-top: 22px; }
 .help-demo pre.code[data-lang]::before {
   content: attr(data-lang);
   position: absolute;
   top: 4px;
-  right: 8px;
+  left: 10px;
   font-family: var(--font-ui);
   font-size: 10px;
   letter-spacing: 0.04em;
@@ -764,8 +766,6 @@ textarea.field { resize: vertical; min-height: 84px; }
 }
 .demo-bar { border-radius: var(--radius-button); background: var(--color-obsidian); box-shadow: var(--hairline); }
 .demo-bar .demo-name { flex: 1; }
-/* A coloured group bar: stripe on the left and the folder in its colour. */
-.demo-bar[data-color] { box-shadow: inset 2px 0 0 var(--note-color), var(--hairline); }
 .help-demo .icon-btn.demo-tint { color: var(--note-color); }
 /* A group bar (or a member note's titlebar) washed in its group colour. */
 .demo-bar.demo-grouped {
@@ -811,8 +811,15 @@ textarea.field { resize: vertical; min-height: 84px; }
   border-radius: 9999px;
   background: var(--note-color);
 }
-.demo-dot[data-color=""] { box-shadow: inset 0 0 0 1px var(--color-smoke); }
-.demo-rainbow { background: conic-gradient(#eb5757, #f2c94c, #27a644, #02b8cc, #6366f1, #8b5cf6, #eb5757); }
+.demo-dot[data-color=""] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.demo-eyedropper {
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--color-fog);
+  -webkit-mask: var(--icon-eyedropper) center / contain no-repeat;
+  mask: var(--icon-eyedropper) center / contain no-repeat;
+}
 .demo-meta { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-ash); }
 .demo-field {
   display: inline-flex;
@@ -936,6 +943,9 @@ textarea.field { resize: vertical; min-height: 84px; }
 .storage-status[hidden] { display: none; }
 /* Cloud sync rows: hidden in builds without a Google OAuth client. */
 [data-cloud][hidden] { display: none; }
+.setting[hidden] { display: none; }
+/* AI control: the client picker takes the row, the Copy button keeps its size. */
+.ai-setup .select { flex: 1 1 12em; min-width: 0; }
 .setting-label .info { margin-left: 4px; vertical-align: 1px; }
 
 /* Current data folder: full path, selectable so it can be copied. */
@@ -947,6 +957,12 @@ textarea.field { resize: vertical; min-height: 84px; }
 }
 .data-dir-row .btn { flex: none; }
 .reset-dir { margin-top: 8px; }
+.app-version {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-fog);
+  user-select: text;
+}
 .data-dir {
   flex: 1;
   min-width: 0;

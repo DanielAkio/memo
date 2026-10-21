@@ -54,8 +54,8 @@
         <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
         <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
         <button type="button" class="swatch" data-color="mono"></button>
-        <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
         <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+        <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
       </div>
       <input type="color" class="custom-color" id="mgrCustomColor" tabindex="-1" aria-hidden="true">
     </div>
@@ -159,8 +159,9 @@
             <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
             <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
             <button type="button" class="swatch" data-color="mono"></button>
-            <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
             <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+            <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+            <button type="button" class="swatch" data-color="random" data-i18n-attr="aria-label=randomColor,title=randomColor"></button>
           </div>
         </div>
         <div class="setting">
@@ -189,8 +190,9 @@
             <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
             <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
             <button type="button" class="swatch" data-color="mono"></button>
-            <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
             <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+            <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+            <button type="button" class="swatch" data-color="random" data-i18n-attr="aria-label=randomColor,title=randomColor"></button>
           </div>
         </div>
         <div class="setting">
@@ -214,6 +216,33 @@
               <button type="button" class="btn" id="cloudDisconnectBtn" data-i18n="cloudDisconnect" hidden></button>
             </div>
             <p class="storage-status" id="cloudStatus" role="status"></p>
+          </div>
+        </div>
+        <h2 class="settings-title">
+          <span data-i18n="aiControl"></span>
+          <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=aiControlTip,data-tip=aiControlTip">i</span>
+        </h2>
+        <div class="setting">
+          <span class="setting-label" id="aiControlLabel" data-i18n="aiControlAllow"></span>
+          <!-- On/off switch: the MCP server (mcp.rs). Off by default. -->
+          <button type="button" class="switch" id="aiControlSwitch" role="switch" aria-checked="false" aria-labelledby="aiControlLabel"></button>
+        </div>
+        <div class="setting setting-top" id="aiSetup" hidden>
+          <span class="setting-label" data-i18n="aiConnect"></span>
+          <div class="field-wrap">
+            <!-- Any MCP client: pick its config format, copy, paste. App names
+                 are not translated. -->
+            <div class="app-actions ai-setup">
+              <select class="field select" id="aiAppSelect" data-i18n-attr="aria-label=aiApp,title=aiApp">
+                <option value="json">JSON: Claude Desktop, Cursor, Gemini…</option>
+                <option value="vscode">VS Code (GitHub Copilot)</option>
+                <option value="claude">Claude Code</option>
+                <option value="codex">Codex CLI</option>
+                <option value="command" data-i18n="aiAppOther"></option>
+              </select>
+              <button type="button" class="btn" id="aiCopyBtn" data-i18n="aiCopy"></button>
+            </div>
+            <p class="storage-status" id="aiStatus" role="status"></p>
           </div>
         </div>
         <h2 class="settings-title">
@@ -250,6 +279,12 @@
           <!-- On/off switch: opens Memo when the user logs in (only its
                memories; the manager stays closed). -->
           <button type="button" class="switch" id="autostartSwitch" role="switch" aria-checked="false" aria-labelledby="autostartLabel"></button>
+        </div>
+        <div class="setting">
+          <span class="setting-label" data-i18n="version"></span>
+          <!-- The running build's version (tauri.conf.json), to tell an old
+               install from a new one. -->
+          <span class="app-version" id="appVersion"></span>
         </div>
         <div class="setting">
           <span class="setting-label" data-i18n="exit"></span>

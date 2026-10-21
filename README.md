@@ -73,6 +73,15 @@ they were. Drop a memory on a bar to add it.
 The **Memo Manager** lists every memory, open or closed. Search them, reopen one with a click, move it to a group or
 sort the list. Sent something to the trash by mistake? Restore it: the trash keeps memories for 30 days.
 
+## Let your AI assistant take notes
+
+Turn on **AI control** in Settings and connect your AI assistant with one copy and paste: Claude, ChatGPT's Codex,
+GitHub Copilot in VS Code, Cursor, Windsurf, Gemini CLI or any other app that speaks
+[MCP](https://modelcontextprotocol.io). Then just ask: *"put my shopping list in a yellow memory and pin it"*, *"what's in my Work group?"*,
+*"tick off coffee"*. Your assistant finds, reads, writes, pins, colors and groups memories, and you watch them
+change on screen. It's off until you turn it on, only apps on your computer can connect, and deleting for good stays
+in your hands.
+
 ## Get Memo
 
 Download the installer for your computer from the **[latest release](https://github.com/DanielAkio/memo/releases/latest)**:
