@@ -19,7 +19,7 @@ use store::{
     DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
 };
 use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
+    menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
@@ -164,6 +164,34 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
     Ok(window)
 }
 
+/// Manager tab (and list scope) the tray asked for, picked up by a manager
+/// window that is still loading (`take_manager_view`).
+#[derive(Clone, serde::Serialize)]
+struct ManagerView {
+    view: &'static str,
+    scope: Option<&'static str>,
+}
+
+static MANAGER_VIEW: Mutex<Option<ManagerView>> = Mutex::new(None);
+
+/// Opens the manager on `view` ("notes", "groups", "settings", "help"), with
+/// the list showing `scope` ("current" or "trash").
+fn open_manager_view(app: &AppHandle, view: &'static str, scope: Option<&'static str>) {
+    let target = ManagerView { view, scope };
+    if app.get_webview_window(MANAGER).is_some() {
+        let _ = app.emit_to(MANAGER, "manager-view", target);
+    } else {
+        *MANAGER_VIEW.lock().unwrap() = Some(target);
+    }
+    let _ = open_manager(app);
+}
+
+/// The tab a new manager window opens on (see `open_manager_view`).
+#[tauri::command]
+fn take_manager_view() -> Option<ManagerView> {
+    MANAGER_VIEW.lock().unwrap().take()
+}
+
 /// Opens the manager window, where notes and the trash are managed. It behaves
 /// like a note (frameless, own titlebar, snapping, pin) but has no
 /// title or text. It also holds the theme, help and "Quit".
@@ -214,22 +242,62 @@ fn manager_title(lang: &str) -> &'static str {
     }
 }
 
-/// Tray menu labels in the UI language.
-fn tray_labels(lang: &str) -> [&'static str; 4] {
+/// Tray menu labels in the UI language (the same words as `i18n.js`).
+struct TrayLabels {
+    new_note: &'static str,
+    new_group: &'static str,
+    show: &'static str,
+    manager: &'static str,
+    trash: &'static str,
+    settings: &'static str,
+    help: &'static str,
+    theme: &'static str,
+    system: &'static str,
+    light: &'static str,
+    dark: &'static str,
+    language: &'static str,
+    autostart: &'static str,
+    sync: &'static str,
+    quit: &'static str,
+}
+
+fn tray_labels(lang: &str) -> TrayLabels {
     if lang == "en" {
-        [
-            "New memory",
-            "Show all memories",
-            "Memo Manager",
-            "Quit Memo",
-        ]
+        TrayLabels {
+            new_note: "New memory",
+            new_group: "New group",
+            show: "Show all memories",
+            manager: "Memo Manager",
+            trash: "Trash",
+            settings: "Settings",
+            help: "Help",
+            theme: "Theme",
+            system: "System",
+            light: "Light",
+            dark: "Dark",
+            language: "Language",
+            autostart: "Start with the system",
+            sync: "Sync now",
+            quit: "Quit Memo",
+        }
     } else {
-        [
-            "Nova memória",
-            "Mostrar todas as memórias",
-            "Gerenciador do Memo",
-            "Sair do Memo",
-        ]
+        TrayLabels {
+            new_note: "Nova memória",
+            new_group: "Novo grupo",
+            show: "Mostrar todas as memórias",
+            manager: "Gerenciador do Memo",
+            trash: "Lixeira",
+            settings: "Configurações",
+            help: "Ajuda",
+            theme: "Tema",
+            system: "Sistema",
+            light: "Claro",
+            dark: "Escuro",
+            language: "Idioma",
+            autostart: "Iniciar com o sistema",
+            sync: "Sincronizar agora",
+            quit: "Sair do Memo",
+        }
     }
 }
 
@@ -246,7 +314,7 @@ fn set_language(app: &AppHandle, language: &str) {
     refresh_tray(app);
 }
 
-/// Rebuilds the tray menu (the language changed). Menus can only be changed
+/// Rebuilds the tray menu (language, theme, autostart or cloud account changed). Menus can only be changed
 /// on the main thread (a macOS requirement).
 fn refresh_tray(app: &AppHandle) {
     let handle = app.clone();
@@ -276,6 +344,7 @@ fn set_theme(app: &AppHandle, theme: &str) {
         apply_background(window, theme);
     }
     let _ = app.emit("theme-changed", theme);
+    refresh_tray(app);
 }
 
 /// A saved position is only used if the titlebar is still visible on some
@@ -2296,6 +2365,7 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
         manager.disable()
     }
     .map_err(|e| e.to_string())?;
+    refresh_tray(&app);
     manager.is_enabled().map_err(|e| e.to_string())
 }
 
@@ -2303,10 +2373,16 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
 /// account, the one connected on this computer and how syncing goes.
 #[tauri::command]
 fn get_cloud_account(app: AppHandle) -> (bool, Option<String>, sync::Status) {
-    let account = default_data_dir(&app)
-        .ok()
-        .and_then(|dir| Config::load(&dir.join(CONFIG)).google_account);
-    (cloud::available(), account.filter(|_| cloud::available()), sync::status())
+    (cloud::available(), cloud_account(&app), sync::status())
+}
+
+/// The Google account connected on this computer, if this build can sync.
+fn cloud_account(app: &AppHandle) -> Option<String> {
+    if !cloud::available() {
+        return None;
+    }
+    let dir = default_data_dir(app).ok()?;
+    Config::load(&dir.join(CONFIG)).google_account
 }
 
 /// "Sync now".
@@ -2327,6 +2403,7 @@ async fn connect_cloud(app: AppHandle) -> Result<String, String> {
     config.save(&path).map_err(|e| e.to_string())?;
     sync::on_connected(&app);
     let _ = app.emit("cloud-changed", ());
+    refresh_tray(&app);
     Ok(email)
 }
 
@@ -2346,6 +2423,7 @@ fn disconnect_cloud(app: AppHandle) -> Result<(), String> {
     config.save(&path).map_err(|e| e.to_string())?;
     sync::reset(&app);
     let _ = app.emit("cloud-changed", ());
+    refresh_tray(&app);
     Ok(())
 }
 
@@ -2477,27 +2555,136 @@ async fn import_notes(app: AppHandle, window: WebviewWindow) -> Result<Option<us
 // Tray / menu bar icon
 // ---------------------------------------------------------------------------
 
-/// Tray menu: shortcuts and "Quit". Theme and help live in the manager.
+/// Tray menu: the app's commands that make sense without a window (creating,
+/// showing, the manager's tabs, appearance, sync) and "Quit". Rebuilt by
+/// `refresh_tray` whenever a checked item or a label changes.
 fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let [new_label, show_label, manager_label, quit_label] =
-        tray_labels(app.state::<Shared>().effective_language());
-    let new_item = MenuItem::with_id(app, "new", new_label, true, None::<&str>)?;
-    let show_item = MenuItem::with_id(app, "show", show_label, true, None::<&str>)?;
-    let separator = PredefinedMenuItem::separator(app)?;
-    let manager_item = MenuItem::with_id(app, "manager", manager_label, true, None::<&str>)?;
-    let separator2 = PredefinedMenuItem::separator(app)?;
-    let quit_item = MenuItem::with_id(app, "quit", quit_label, true, None::<&str>)?;
-    Menu::with_items(
+    let store = app.state::<Shared>();
+    let l = tray_labels(store.effective_language());
+    let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
+    let check = |id: &str, text: &str, on: bool| CheckMenuItem::with_id(app, id, text, true, on, None::<&str>);
+
+    let theme = store.theme();
+    let theme_menu = Submenu::with_items(
         app,
+        l.theme,
+        true,
         &[
-            &new_item,
-            &show_item,
-            &separator,
-            &manager_item,
-            &separator2,
-            &quit_item,
+            &check("theme:system", l.system, theme == "system")?,
+            &check("theme:light", l.light, theme == "light")?,
+            &check("theme:dark", l.dark, theme == "dark")?,
         ],
-    )
+    )?;
+    // Language names stay in their own language, as in Settings.
+    let language = store.language();
+    let language_menu = Submenu::with_items(
+        app,
+        l.language,
+        true,
+        &[
+            &check("language:system", l.system, language == "system")?,
+            &check("language:pt-BR", "Português", language == "pt-BR")?,
+            &check("language:en", "English", language == "en")?,
+        ],
+    )?;
+    let autostart = {
+        use tauri_plugin_autostart::ManagerExt;
+        app.autolaunch().is_enabled()
+    };
+    let autostart_item = CheckMenuItem::with_id(
+        app,
+        "autostart",
+        l.autostart,
+        autostart.is_ok(),
+        autostart.unwrap_or(false),
+        None::<&str>,
+    )?;
+
+    let new_note = item("new", l.new_note)?;
+    let new_group = item("new-group", l.new_group)?;
+    let show = item("show", l.show)?;
+    let manager = item("manager", l.manager)?;
+    let trash = item("trash", l.trash)?;
+    let settings = item("settings", l.settings)?;
+    let help = item("help", l.help)?;
+    let sync = item("sync", l.sync)?;
+    let quit = item("quit", l.quit)?;
+    let separators = [
+        PredefinedMenuItem::separator(app)?,
+        PredefinedMenuItem::separator(app)?,
+        PredefinedMenuItem::separator(app)?,
+    ];
+    let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![
+        &new_note,
+        &new_group,
+        &show,
+        &separators[0],
+        &manager,
+        &trash,
+        &settings,
+        &help,
+        &separators[1],
+        &theme_menu,
+        &language_menu,
+        &autostart_item,
+    ];
+    // "Sync now" only with a Google account connected on this computer.
+    if cloud_account(app).is_some() {
+        items.push(&sync);
+    }
+    items.push(&separators[2]);
+    items.push(&quit);
+    Menu::with_items(app, &items)
+}
+
+/// A tray menu click.
+fn on_tray_menu(app: &AppHandle, id: &str) {
+    match id {
+        "new" => {
+            let _ = create_and_open(app, None);
+        }
+        "new-group" => {
+            let group = app.state::<Shared>().create_group(None);
+            if let Ok(window) = open_group_window(app, &group) {
+                let _ = window.set_focus();
+            }
+            groups_changed(app);
+        }
+        "show" => show_all(app),
+        "manager" => {
+            let _ = open_manager(app);
+        }
+        "trash" => open_manager_view(app, "notes", Some("trash")),
+        "settings" => open_manager_view(app, "settings", None),
+        "help" => open_manager_view(app, "help", None),
+        "autostart" => {
+            use tauri_plugin_autostart::ManagerExt;
+            let manager = app.autolaunch();
+            let result = match manager.is_enabled() {
+                Ok(true) => manager.disable(),
+                Ok(false) => manager.enable(),
+                Err(err) => Err(err),
+            };
+            if let Err(err) = result {
+                eprintln!("memo: autostart: {err}");
+            }
+            // The manager's switch follows.
+            let _ = app.emit("autostart-changed", manager.is_enabled().unwrap_or(false));
+            refresh_tray(app);
+        }
+        "sync" => sync::sync_now(app),
+        "quit" => {
+            app.state::<Shared>().flush();
+            app.exit(0);
+        }
+        _ => {
+            if let Some(theme) = id.strip_prefix("theme:") {
+                set_theme(app, theme);
+            } else if let Some(language) = id.strip_prefix("language:") {
+                set_language(app, language);
+            }
+        }
+    }
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -2515,20 +2702,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .tooltip("Memo")
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id.as_ref() {
-            "new" => {
-                let _ = create_and_open(app, None);
-            }
-            "show" => show_all(app),
-            "manager" => {
-                let _ = open_manager(app);
-            }
-            "quit" => {
-                app.state::<Shared>().flush();
-                app.exit(0);
-            }
-            _ => {}
-        })
+        .on_menu_event(|app, event| on_tray_menu(app, event.id.as_ref()))
         // A click on the tray icon opens the manager (Linux trays send no
         // clicks: the menu has the manager item).
         .on_tray_icon_event(|tray, event| {
@@ -2623,6 +2797,7 @@ fn main() {
             new_note,
             close_note,
             load_manager,
+            take_manager_view,
             close_manager,
             bring_notes_to_front,
             list_notes,

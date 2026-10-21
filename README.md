@@ -72,6 +72,7 @@ doesn't quit the app: it stays in the tray (the menu bar, on Mac).
 | Delete | Only with the Manager's trash button (restorable for 30 days) |
 | Group | In the Manager, the folder-with-`+` button, or "New group" in a memory's footer; then drop memories on the bar |
 | See everything, search, settings | Memo Manager: Memories, Groups, Settings and Help tabs |
+| Tray menu | Right-click the Memo tray icon: new memory or group, show all, Manager, Trash, Settings, Help, theme, language, start with the system, sync now, quit |
 | Quit | Tray icon → Quit Memo |
 
 The Manager's **Help** tab has a full guide to every feature, with demos and shortcuts.
