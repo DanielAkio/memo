@@ -36,10 +36,11 @@ pub fn is_valid_color(color: &str) -> bool {
             && color[1..].chars().all(|c| c.is_ascii_hexdigit()))
 }
 
-/// A random label from `RANDOM_COLORS`, among those the fewest groups (in
-/// the trash or not) use, so new groups tell apart at a glance.
-fn random_group_color(groups: &[Group]) -> String {
-    let uses = |c: &str| groups.iter().filter(|g| g.color == c).count();
+/// A random label from `RANDOM_COLORS`, among those the fewest of `used`
+/// (the colours of the existing notes or groups) have, so new ones tell
+/// apart at a glance.
+fn random_color<'a>(used: impl Iterator<Item = &'a str> + Clone) -> String {
+    let uses = |c: &str| used.clone().filter(|u| *u == c).count();
     let least = RANDOM_COLORS.iter().map(|c| uses(c)).min().unwrap_or(0);
     let pool: Vec<&str> = RANDOM_COLORS.iter().copied().filter(|c| uses(c) == least).collect();
     let mut bytes = [0u8; 4];
@@ -54,8 +55,8 @@ pub const DEFAULT_COLOR: &str = "iris";
 /// Colour new notes start with unless one is chosen in the manager: none.
 pub const DEFAULT_NOTE_COLOR: &str = "";
 
-/// Labels a new group draws its colour from when the default group colour
-/// is "random" (the default).
+/// Labels a new note or group draws its colour from when its default colour
+/// is "random" (the default for groups).
 pub const RANDOM_COLORS: [&str; 5] = ["yellow", "green", "coral", "teal", "iris"];
 
 /// Default group colour meaning "a random label for each new group".
@@ -197,8 +198,8 @@ struct FileData {
     language: String,
     /// Position, size and state of the manager window.
     manager: ManagerState,
-    /// Colour for new notes, chosen in the manager; `None` =
-    /// `DEFAULT_NOTE_COLOR` (no colour).
+    /// Colour for new notes, chosen in the manager (`RANDOM_COLOR` = a
+    /// random label for each); `None` = `DEFAULT_NOTE_COLOR` (no colour).
     default_color: Option<String>,
     /// Title and text (plain, with "[ ] " for checklist items) of new notes,
     /// set in the manager. Empty = blank note.
@@ -756,7 +757,7 @@ impl Store {
             data.next_group_seq = seq + 1;
             let color = match &data.default_group_color {
                 Some(c) if is_valid_color(c) => c.clone(),
-                _ => random_group_color(&data.groups),
+                _ => random_color(data.groups.iter().map(|g| g.color.as_str())),
             };
             let now = now_ms();
             let group = Group {
@@ -959,13 +960,30 @@ impl Store {
         }
     }
 
-    /// Colour new notes start with.
+    /// Colour new notes start with, as chosen in the manager: a colour or
+    /// `RANDOM_COLOR`.
     pub fn default_color(&self) -> String {
         let data = self.data.lock().unwrap();
         match &data.default_color {
-            Some(c) if is_valid_color(c) => c.clone(),
+            Some(c) if c == RANDOM_COLOR || is_valid_color(c) => c.clone(),
             _ => DEFAULT_NOTE_COLOR.to_string(),
         }
+    }
+
+    /// The colour for a note created now (`RANDOM_COLOR` resolved, among
+    /// the least used by the notes not in the trash).
+    fn new_note_color(&self) -> String {
+        let color = self.default_color();
+        if color != RANDOM_COLOR {
+            return color;
+        }
+        let data = self.data.lock().unwrap();
+        random_color(
+            data.notes
+                .iter()
+                .filter(|n| n.trashed_at.is_none())
+                .map(|n| n.color.as_str()),
+        )
     }
 
     pub fn set_default_color(&self, color: &str) {
@@ -1032,9 +1050,16 @@ impl Store {
     }
 
     /// The note is as it was created: nothing beyond the default title and
-    /// text, the default colour, and in no group (joining one is a change).
+    /// text, the default colour (with random colours: the one it was given,
+    /// i.e. never edited), and in no group (joining one is a change).
     pub fn is_pristine(&self, note: &Note) -> bool {
-        if !note.group_id.is_empty() || note.color != self.default_color() {
+        let color = self.default_color();
+        let default_color = if color == RANDOM_COLOR {
+            RANDOM_COLORS.contains(&note.color.as_str()) && note.updated_at == note.created_at
+        } else {
+            note.color == color
+        };
+        if !note.group_id.is_empty() || !default_color {
             return false;
         }
         if note.is_blank() {
@@ -1120,7 +1145,7 @@ impl Store {
     }
 
     pub fn create(&self, pos: Option<(i32, i32)>) -> Note {
-        let color = self.default_color();
+        let color = self.new_note_color();
         let (title, text, html) = self.new_note_defaults();
         let note = {
             let mut data = self.data.lock().unwrap();
@@ -1334,7 +1359,10 @@ impl Store {
 
     pub fn apply_settings_doc(&self, doc: &SettingsDoc) {
         let mut data = self.data.lock().unwrap();
-        data.default_color = doc.default_color.clone().filter(|c| is_valid_color(c));
+        data.default_color = doc
+            .default_color
+            .clone()
+            .filter(|c| c == RANDOM_COLOR || is_valid_color(c));
         data.default_title = doc.default_title.chars().take(TITLE_MAX).collect();
         data.default_text = doc.default_text.chars().take(DEFAULT_TEXT_MAX).collect();
         data.default_html = doc.default_html.clone();

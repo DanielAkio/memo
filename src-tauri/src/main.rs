@@ -1676,7 +1676,7 @@ fn set_default_color(
     color: String,
     store: State<'_, Shared>,
 ) -> Result<(), String> {
-    if !is_valid_color(&color) {
+    if color != RANDOM_COLOR && !is_valid_color(&color) {
         return Err(format!("unknown color: {color}"));
     }
     store.set_default_color(&color);
