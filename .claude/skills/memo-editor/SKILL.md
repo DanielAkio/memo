@@ -13,7 +13,7 @@ Titlebar: pin far left, colour dot (`#colorBtn` → swatch popover `#colorMenu`)
 
 ## Stored format
 
-`#editor` is a `contenteditable` div; each line is a `<div>`. The note stores `html` (the editor's `innerHTML`, re-sanitised on load by `sanitize` to this whitelist) and `text` (plain text via `toPlain`). Rust only reads `text` (`is_blank`); a note with empty `html` is rebuilt from `text` (`fromPlain`). Paste is always plain text.
+`#editor` is a `contenteditable` div; each line is a `<div>`. The note stores `html` (the editor's `innerHTML`, re-sanitised on load by `sanitize` to this whitelist) and `text` (plain text via `toPlain`). Rust only reads `text` (`is_blank`); a note with empty `html` is rebuilt from `text` (`fromPlain`). Paste is always plain text (images apart: see app.js "images"; they are data URLs in the editor, files on disk, see `memo-storage`).
 
 - Bold/italic/underline: `<b>`/`<i>`/`<u>` (`styleWithCSS` off). Bold must render at weight ≥ 600 or `queryCommandState('bold')` (and Ctrl+B toggling off) breaks.
 - Highlight: `<span style="background-color: rgb(255, 230, 0)">` from `execCommand('hiliteColor')` — only that exact sentinel counts (Chromium creates other background spans). WebKit (macOS/Linux) puts the style on the `<b>`/`<i>`/`<u>`/`<font>` itself when the selection is exactly that element, so `sanitize` keeps the sentinel on those too and the CSS rule matches any element; removal sets `transparent`. Mod+Shift+H or the marker button.

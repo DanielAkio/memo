@@ -23,7 +23,7 @@ npm run build    # installers in src-tauri/target/release/bundle/
 cd src-tauri && cargo check && cargo clippy   # Rust-only checks
 ```
 
-No linters or JS build step; the only test is the sync one (`cargo test`, a fake Drive, no network). Windows installer without a toolchain: `docker compose -f docker/compose.yml run --build --rm windows` (NSIS `*-setup.exe` in `dist/`). More in `memo-checks`.
+No linters or JS build step; the only tests are the sync one (a fake Drive, no network) and the image-file ones in `images.rs` (`cargo test`). Windows installer without a toolchain: `docker compose -f docker/compose.yml run --build --rm windows` (NSIS `*-setup.exe` in `dist/`). More in `memo-checks`.
 
 ## Layout
 
@@ -41,6 +41,7 @@ src/                     frontend: plain HTML/CSS/JS, no bundler (frontendDist =
 src-tauri/
   src/main.rs            windows, commands, tray, lifecycle (~94 KB: grep by section, see memo-code-map)
   src/store.rs           Note/Group model + persistence
+  src/images.rs          pasted images as files in images/ beside notes.json (inline data URLs only in the editor and exports)
   src/cloud.rs           Google sign-in for cloud sync (OAuth loopback + PKCE, token in the OS credential store)
   src/sync.rs            Drive sync engine: pull (changes API), apply, push; conflicts; has the repo's only test (fake Drive)
   src/welcome.rs         first-run welcome note (HTML + matching plain text)

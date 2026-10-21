@@ -34,7 +34,7 @@ up the Google Cloud project is in [`google-cloud.md`](google-cloud.md).
 
 ## Data folder
 
-Memories, groups and settings live in `notes.json` and `config.json` in the data folder: Windows `%APPDATA%\memo\`,
+Memories, groups and settings live in `notes.json` and `config.json` in the data folder (pasted images as files in its `images/` subfolder): Windows `%APPDATA%\memo\`,
 macOS `~/Library/Application Support/memo/`, Linux `~/.local/share/memo/`, or the folder picked in Settings → Storage. Older versions saved to a folder named `br.memo.notas` (or `br.taxinha.notas`); on
 first launch Memo copies that data into `memo` and keeps the old folder as a backup.
 
