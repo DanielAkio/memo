@@ -2626,6 +2626,14 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let help = item("help", l.help)?;
     let sync = item("sync", l.sync)?;
     let quit = item("quit", l.quit)?;
+    // The running version, greyed out: shows at a glance which build is open.
+    let version = MenuItem::with_id(
+        app,
+        "version",
+        format!("Memo {}", app.package_info().version),
+        false,
+        None::<&str>,
+    )?;
     let separators = [
         PredefinedMenuItem::separator(app)?,
         PredefinedMenuItem::separator(app)?,
@@ -2650,6 +2658,7 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         items.push(&sync);
     }
     items.push(&separators[2]);
+    items.push(&version);
     items.push(&quit);
     Menu::with_items(app, &items)
 }
