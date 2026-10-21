@@ -907,6 +907,17 @@
       setBeforeMarker(pre);
       return;
     }
+    // Typing there writes on a new line above the block: the caret moves
+    // into it and the browser types the character (or composes a dead key)
+    // there.
+    const typed = e.key.length === 1 || e.key === 'Dead' || e.key === 'Process';
+    if (before && typed && !e.metaKey && !(e.ctrlKey && !e.altKey)) {
+      const line = document.createElement('div');
+      line.appendChild(document.createElement('br'));
+      pre.before(line);
+      caretIn(line);
+      return;
+    }
     if (e.key === 'Tab' && !mod && !e.altKey) {
       e.preventDefault();
       if (!e.shiftKey) document.execCommand('insertText', false, '  ');
