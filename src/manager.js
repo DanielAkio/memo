@@ -444,7 +444,7 @@
     if (!sw) return;
     if (sw === groupCustomSwatch) {
       groupCustomColor.value = isCustomColor(groupDefaultColor) ? groupDefaultColor : '#f2c94c';
-      groupCustomColor.click();
+      MemoColorPicker.open(groupCustomColor, sw);
       return;
     }
     setGroupDefaultColor(sw.dataset.color);
@@ -644,7 +644,7 @@
     if (!sw) return;
     if (sw === customSwatch) {
       customColor.value = isCustomColor(defaultColor) ? defaultColor : '#f2c94c';
-      customColor.click();
+      MemoColorPicker.open(customColor, sw);
       return;
     }
     setDefaultColor(sw.dataset.color);
@@ -745,7 +745,7 @@
     if (!sw) return;
     if (sw === mgrCustomSwatch) {
       mgrCustomColor.value = isCustomColor(win.color) ? win.color : '#f2c94c';
-      mgrCustomColor.click();
+      MemoColorPicker.open(mgrCustomColor, sw);
       return;
     }
     setMgrColor(sw.dataset.color);

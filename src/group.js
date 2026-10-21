@@ -184,7 +184,7 @@
     if (sw === customSwatch) {
       // The system picker opens on the current colour.
       customColor.value = isCustomColor(group.color) ? group.color : '#f2c94c';
-      customColor.click();
+      MemoColorPicker.open(customColor, sw);
       return;
     }
     setColor(sw.dataset.color);

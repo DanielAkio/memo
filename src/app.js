@@ -1974,7 +1974,7 @@
       customColor.value = isCustomColor(note.color)
         ? note.color
         : (getComputedStyle(frame).getPropertyValue('--note-color').trim().match(/^#[0-9a-f]{6}$/i) || ['#f2c94c'])[0];
-      customColor.click();
+      MemoColorPicker.open(customColor, sw);
       return;
     }
     setColor(sw.dataset.color);
