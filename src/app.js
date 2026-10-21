@@ -955,24 +955,37 @@
     return true;
   }
 
-  // Caret at the start of an inline code: moves it just before the code,
-  // into the text there (an invisible separator when there is none).
-  function leaveCodeLeft() {
+  // ArrowLeft inside an inline code. One letter from its start, stops right
+  // before that letter, still inside (the browser would jump out past it);
+  // at its start, moves just before the code, into the text there (an
+  // invisible separator when there is none).
+  function codeArrowLeft() {
     const sel = getSelection();
     const code = sel.isCollapsed && currentCode();
     if (!code) return false;
     const r = document.createRange();
     r.setStart(code, 0);
     r.setEnd(sel.anchorNode, sel.anchorOffset);
-    if (r.toString().replace(ZWSP, '')) return false;
-    let prev = code.previousSibling;
-    if (!(prev && prev.nodeType === 3)) {
-      prev = document.createTextNode('');
-      code.before(prev);
-    }
-    if (!prev.length) prev.data = '\u200b';
+    const before = [...r.toString().replace(ZWSP, '')];
+    if (before.length > 1) return false;
     const at = document.createRange();
-    at.setStart(prev, prev.length);
+    const first = code.firstChild;
+    if (!(first && first.nodeType === 3)) return false;
+    if (before.length === 1) {
+      // After an invisible separator: right at the code's start, the browser
+      // would type into the text before it.
+      if (!first.data.startsWith('\u200b')) first.insertData(0, '\u200b');
+      at.setStart(first, 1);
+    } else {
+      if (first.data.startsWith('\u200b') && first.length > 1) first.deleteData(0, 1);
+      let prev = code.previousSibling;
+      if (!(prev && prev.nodeType === 3)) {
+        prev = document.createTextNode('');
+        code.before(prev);
+      }
+      if (!prev.length) prev.data = '\u200b';
+      at.setStart(prev, prev.length);
+    }
     sel.removeAllRanges();
     sel.addRange(at);
     return true;
@@ -1047,10 +1060,10 @@
       return;
     }
 
-    // ArrowLeft at the start of an inline code leaves it, the way it goes
-    // before a list marker: the caret stops just before the code, where
-    // typing writes plain text (the browser would skip that spot).
-    if (e.key === 'ArrowLeft' && !e.shiftKey && !mod && !e.altKey && leaveCodeLeft()) {
+    // ArrowLeft walks to the first letter of an inline code, then one more
+    // press leaves it, the way it goes before a list marker: the caret stops
+    // just before the code, where typing writes plain text.
+    if (e.key === 'ArrowLeft' && !e.shiftKey && !mod && !e.altKey && codeArrowLeft()) {
       e.preventDefault();
       return;
     }
