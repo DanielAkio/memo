@@ -313,7 +313,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 
 /* Highlight: the HTML stores a sentinel colour; the theme colour applies here. */
-.editor span[style*="rgb(255, 230, 0)"] {
+.editor [style*="rgb(255, 230, 0)"] {
   background-color: var(--highlight) !important;
   border-radius: 2px;
   box-decoration-break: clone;
