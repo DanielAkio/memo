@@ -228,9 +228,17 @@
         <div class="setting setting-top" id="aiSetup" hidden>
           <span class="setting-label" data-i18n="aiConnect"></span>
           <div class="field-wrap">
-            <div class="app-actions">
-              <button type="button" class="btn" id="aiDesktopBtn" data-i18n="aiCopyDesktop"></button>
-              <button type="button" class="btn" id="aiCodeBtn" data-i18n="aiCopyCode"></button>
+            <!-- Any MCP client: pick its config format, copy, paste. App names
+                 are not translated. -->
+            <div class="app-actions ai-setup">
+              <select class="field select" id="aiAppSelect" data-i18n-attr="aria-label=aiApp,title=aiApp">
+                <option value="json">JSON: Claude Desktop, Cursor, Gemini…</option>
+                <option value="vscode">VS Code (GitHub Copilot)</option>
+                <option value="claude">Claude Code</option>
+                <option value="codex">Codex CLI</option>
+                <option value="command" data-i18n="aiAppOther"></option>
+              </select>
+              <button type="button" class="btn" id="aiCopyBtn" data-i18n="aiCopy"></button>
             </div>
             <p class="storage-status" id="aiStatus" role="status"></p>
           </div>

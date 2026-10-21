@@ -51,7 +51,7 @@ pub const PT: Welcome = Welcome {
         r#"<div class="bullet">na Ajuda, vê tudo o que o Memo faz</div>"#,
         r#"<div><br></div>"#,
         r#"<div><font size="2">Dica: em Configurações, sincronize com o Google Drive para usar as mesmas memórias em outros computadores.</font></div>"#,
-        r#"<div><font size="2">Dica: ligue o Controle por IA em Configurações para pedir ao Claude (ou a outro assistente com MCP) que crie e organize memórias por você.</font></div>"#,
+        r#"<div><font size="2">Dica: ligue o Controle por IA em Configurações para pedir ao seu assistente de IA (Claude, Copilot, Cursor, Gemini ou outro com MCP) que crie e organize memórias por você.</font></div>"#,
     ),
     text: "Olá!
 Memórias rápidas que ficam por cima de tudo.
@@ -87,7 +87,7 @@ Abre com o app ou pelo ícone do Memo na bandeja (o botão direito nele mostra u
 - na Ajuda, vê tudo o que o Memo faz
 
 Dica: em Configurações, sincronize com o Google Drive para usar as mesmas memórias em outros computadores.
-Dica: ligue o Controle por IA em Configurações para pedir ao Claude (ou a outro assistente com MCP) que crie e organize memórias por você.",
+Dica: ligue o Controle por IA em Configurações para pedir ao seu assistente de IA (Claude, Copilot, Cursor, Gemini ou outro com MCP) que crie e organize memórias por você.",
 };
 
 pub const EN: Welcome = Welcome {
@@ -125,7 +125,7 @@ pub const EN: Welcome = Welcome {
         r#"<div class="bullet">in Help, see everything Memo does</div>"#,
         r#"<div><br></div>"#,
         r#"<div><font size="2">Tip: in Settings, sync with Google Drive to use the same memories on other computers.</font></div>"#,
-        r#"<div><font size="2">Tip: turn on AI control in Settings to have Claude (or another MCP assistant) create and organize memories for you.</font></div>"#,
+        r#"<div><font size="2">Tip: turn on AI control in Settings to have your AI assistant (Claude, Copilot, Cursor, Gemini or any other with MCP) create and organize memories for you.</font></div>"#,
     ),
     text: "Hi!
 Quick memories that stay on top of everything.
@@ -161,7 +161,7 @@ Opens with the app or from the Memo icon in the system tray (right-click it for 
 - in Help, see everything Memo does
 
 Tip: in Settings, sync with Google Drive to use the same memories on other computers.
-Tip: turn on AI control in Settings to have Claude (or another MCP assistant) create and organize memories for you.",
+Tip: turn on AI control in Settings to have your AI assistant (Claude, Copilot, Cursor, Gemini or any other with MCP) create and organize memories for you.",
 };
 
 /// Earlier versions of the welcome note's HTML (pt, en), so an untouched copy

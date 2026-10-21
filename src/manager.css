@@ -939,6 +939,8 @@ textarea.field { resize: vertical; min-height: 84px; }
 /* Cloud sync rows: hidden in builds without a Google OAuth client. */
 [data-cloud][hidden] { display: none; }
 .setting[hidden] { display: none; }
+/* AI control: the client picker takes the row, the Copy button keeps its size. */
+.ai-setup .select { flex: 1 1 12em; min-width: 0; }
 .setting-label .info { margin-left: 4px; vertical-align: 1px; }
 
 /* Current data folder: full path, selectable so it can be copied. */

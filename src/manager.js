@@ -1093,16 +1093,25 @@
   window.__TAURI__.app.getVersion()
     .then((v) => { $('appVersion').textContent = v; })
     .catch((err) => console.error('getVersion', err));
-  // AI control (MCP, mcp.rs): the switch, and the setup to paste into Claude
-  // Desktop / Claude Code, which launch "<Memo's executable> --mcp".
+  // AI control (MCP, mcp.rs): the switch, and the setup for any MCP client,
+  // which launches "<Memo's executable> --mcp" (stdio): pick the client's
+  // config format, copy, paste.
   const aiSwitch = $('aiControlSwitch');
   let aiExe = '';
   let aiCopied = '';
   const quoteArg = (s) => (/^[\w./:\\-]+$/.test(s) ? s : `"${s.replace(/"/g, '\\"')}"`);
+  const aiCommand = () => `${quoteArg(aiExe)} --mcp`;
+  const AI_SETUPS = {
+    json: { hint: 'aiHintJson', text: () => JSON.stringify({ mcpServers: { memo: { command: aiExe, args: ['--mcp'] } } }, null, 2) },
+    vscode: { hint: 'aiHintVscode', text: () => JSON.stringify({ servers: { memo: { type: 'stdio', command: aiExe, args: ['--mcp'] } } }, null, 2) },
+    claude: { hint: 'aiHintTerminal', text: () => `claude mcp add --scope user memo -- ${aiCommand()}` },
+    codex: { hint: 'aiHintTerminal', text: () => `codex mcp add memo -- ${aiCommand()}` },
+    command: { hint: 'aiHintCommand', text: aiCommand },
+  };
   function renderAi(on) {
     aiSwitch.setAttribute('aria-checked', String(on));
     $('aiSetup').hidden = !on || !aiExe;
-    $('aiStatus').textContent = aiCopied ? t(aiCopied) : t('aiOtherApps', { cmd: `${quoteArg(aiExe)} --mcp` });
+    $('aiStatus').textContent = t(aiCopied || 'aiPickApp', { cmd: aiCommand() });
   }
   aiSwitch.addEventListener('click', async () => {
     const on = aiSwitch.getAttribute('aria-checked') !== 'true';
@@ -1135,20 +1144,21 @@
     document.removeEventListener('copy', fill);
     if (!copied) await navigator.clipboard.writeText(text);
   }
-  async function copyAiSetup(text, done) {
+  $('aiAppSelect').addEventListener('change', () => {
+    aiCopied = '';
+    renderAi(true);
+  });
+  $('aiCopyBtn').addEventListener('click', async () => {
+    const setup = AI_SETUPS[$('aiAppSelect').value];
     try {
-      await copyText(text);
-      aiCopied = done;
+      await copyText(setup.text());
+      aiCopied = setup.hint;
     } catch (err) {
       aiCopied = 'aiCopyFailed';
       console.error('copy', err);
     }
     renderAi(true);
-  }
-  $('aiDesktopBtn').addEventListener('click', () => copyAiSetup(JSON.stringify(
-    { mcpServers: { memo: { command: aiExe, args: ['--mcp'] } } }, null, 2), 'aiCopiedDesktop'));
-  $('aiCodeBtn').addEventListener('click', () => copyAiSetup(
-    `claude mcp add --scope user memo -- ${quoteArg(aiExe)} --mcp`, 'aiCopiedCode'));
+  });
 
   // The tray's Trash, Settings and Help items open the manager on that tab.
   function setView(target) {
