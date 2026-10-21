@@ -1,5 +1,5 @@
-//! AI control: an MCP (Model Context Protocol) server, so AI assistants
-//! (Claude Desktop, Claude Code and other MCP clients) can read and change
+//! AI control: an MCP (Model Context Protocol) server, so any MCP client
+//! (Claude, Codex, Copilot in VS Code, Cursor, Gemini CLI…) can read and change
 //! memories and groups. Off until turned on in Settings or the tray.
 //!
 //! Two halves, in the same executable:
@@ -700,7 +700,11 @@ fn reply(msg: &Value, call: &dyn Fn(&str, &Value) -> Value) -> Option<Value> {
                 "instructions": INSTRUCTIONS,
             })
         }
-        "ping" => json!({}),
+        "ping" | "logging/setLevel" => json!({}),
+        // Not offered (see capabilities), but some clients ask anyway.
+        "resources/list" => json!({ "resources": [] }),
+        "resources/templates/list" => json!({ "resourceTemplates": [] }),
+        "prompts/list" => json!({ "prompts": [] }),
         "tools/list" => json!({ "tools": tools() }),
         "tools/call" => {
             let name = params.get("name").and_then(Value::as_str).unwrap_or("");
