@@ -18,7 +18,7 @@ use std::{
 
 use store::{
     is_valid_color, now_ms, Config, Group, ManagerState, Note, Store, DEFAULT_H, DEFAULT_TEXT_MAX,
-    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
+    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, RANDOM_COLOR, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
 };
 use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
@@ -1649,7 +1649,7 @@ fn get_group_defaults(store: State<'_, Shared>) -> (String, String) {
 
 #[tauri::command]
 fn set_default_group_color(color: String, store: State<'_, Shared>) -> Result<(), String> {
-    if !is_valid_color(&color) {
+    if color != RANDOM_COLOR && !is_valid_color(&color) {
         return Err(format!("unknown color: {color}"));
     }
     store.set_default_group_color(&color);

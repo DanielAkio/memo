@@ -26,7 +26,7 @@ pub const PT: Welcome = Welcome {
         r#"<div class="check done">Instalar Memo!</div>"#,
         r#"<div class="check">Fixar por cima de tudo: clique na tachinha</div>"#,
         r#"<div class="check">Dar um título: clique duplo na barra de cima</div>"#,
-        r#"<div class="check">Trocar a cor: clique na bolinha colorida ao lado do título</div>"#,
+        r#"<div class="check">Trocar a cor: clique na bolinha ao lado do título</div>"#,
         r#"<div class="check">Criar outra memória: botão + ou Ctrl+N (⌘N no Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Organizar</b></div>"#,
@@ -60,7 +60,7 @@ Básico
 [x] Instalar Memo!
 [ ] Fixar por cima de tudo: clique na tachinha
 [ ] Dar um título: clique duplo na barra de cima
-[ ] Trocar a cor: clique na bolinha colorida ao lado do título
+[ ] Trocar a cor: clique na bolinha ao lado do título
 [ ] Criar outra memória: botão + ou Ctrl+N (⌘N no Mac)
 
 Organizar
@@ -100,7 +100,7 @@ pub const EN: Welcome = Welcome {
         r#"<div class="check done">Install Memo!</div>"#,
         r#"<div class="check">Keep it on top: click the pin</div>"#,
         r#"<div class="check">Give it a title: double-click the top bar</div>"#,
-        r#"<div class="check">Change the color: click the colored dot next to the title</div>"#,
+        r#"<div class="check">Change the color: click the dot next to the title</div>"#,
         r#"<div class="check">Create another memory: the + button or Ctrl+N (⌘N on Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Organizing</b></div>"#,
@@ -134,7 +134,7 @@ Basics
 [x] Install Memo!
 [ ] Keep it on top: click the pin
 [ ] Give it a title: double-click the top bar
-[ ] Change the color: click the colored dot next to the title
+[ ] Change the color: click the dot next to the title
 [ ] Create another memory: the + button or Ctrl+N (⌘N on Mac)
 
 Organizing
@@ -175,7 +175,7 @@ const PREVIOUS_HTML: [&str; 8] = [
         r#"<div class="check done">Instalar Memo!</div>"#,
         r#"<div class="check">Fixar por cima de tudo: clique na tachinha</div>"#,
         r#"<div class="check">Dar um título: clique duplo na barra de cima</div>"#,
-        r#"<div class="check">Trocar a cor: clique na bolinha colorida ao lado do título</div>"#,
+        r#"<div class="check">Trocar a cor: clique na bolinha ao lado do título</div>"#,
         r#"<div class="check">Criar outra memória: botão + ou Ctrl+N (⌘N no Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Organizar</b></div>"#,
@@ -209,7 +209,7 @@ const PREVIOUS_HTML: [&str; 8] = [
         r#"<div class="check done">Install Memo!</div>"#,
         r#"<div class="check">Keep it on top: click the pin</div>"#,
         r#"<div class="check">Give it a title: double-click the top bar</div>"#,
-        r#"<div class="check">Change the color: click the colored dot next to the title</div>"#,
+        r#"<div class="check">Change the color: click the dot next to the title</div>"#,
         r#"<div class="check">Create another memory: the + button or Ctrl+N (⌘N on Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Organizing</b></div>"#,
@@ -243,7 +243,7 @@ const PREVIOUS_HTML: [&str; 8] = [
         r#"<div class="check done">Instalar Memo!</div>"#,
         r#"<div class="check">Fixar por cima de tudo: clique na tachinha</div>"#,
         r#"<div class="check">Dar um título: clique duplo na barra de cima</div>"#,
-        r#"<div class="check">Trocar a cor: clique na bolinha colorida ao lado do título</div>"#,
+        r#"<div class="check">Trocar a cor: clique na bolinha ao lado do título</div>"#,
         r#"<div class="check">Criar outra memória: botão + ou Ctrl+N (⌘N no Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Organizar</b></div>"#,
@@ -276,7 +276,7 @@ const PREVIOUS_HTML: [&str; 8] = [
         r#"<div class="check done">Install Memo!</div>"#,
         r#"<div class="check">Keep it on top: click the pin</div>"#,
         r#"<div class="check">Give it a title: double-click the top bar</div>"#,
-        r#"<div class="check">Change the color: click the colored dot next to the title</div>"#,
+        r#"<div class="check">Change the color: click the dot next to the title</div>"#,
         r#"<div class="check">Create another memory: the + button or Ctrl+N (⌘N on Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Organizing</b></div>"#,
@@ -309,7 +309,7 @@ const PREVIOUS_HTML: [&str; 8] = [
         r#"<div class="check done">Instalar Memo!</div>"#,
         r#"<div class="check">Fixar por cima de tudo: clique na tachinha</div>"#,
         r#"<div class="check">Dar um título: clique duplo na barra de cima</div>"#,
-        r#"<div class="check">Trocar a cor: clique na bolinha colorida ao lado do título</div>"#,
+        r#"<div class="check">Trocar a cor: clique na bolinha ao lado do título</div>"#,
         r#"<div class="check">Criar outra memória: botão + ou Ctrl+N (⌘N no Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Escrever</b></div>"#,
@@ -336,7 +336,7 @@ const PREVIOUS_HTML: [&str; 8] = [
         r#"<div class="check done">Install Memo!</div>"#,
         r#"<div class="check">Keep it on top: click the pin</div>"#,
         r#"<div class="check">Give it a title: double-click the top bar</div>"#,
-        r#"<div class="check">Change the color: click the colored dot next to the title</div>"#,
+        r#"<div class="check">Change the color: click the dot next to the title</div>"#,
         r#"<div class="check">Create another memory: the + button or Ctrl+N (⌘N on Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Writing</b></div>"#,
@@ -363,7 +363,7 @@ const PREVIOUS_HTML: [&str; 8] = [
         r#"<div class="check done">Instalar Memo!</div>"#,
         r#"<div class="check">Fixar por cima de tudo: clique na tachinha</div>"#,
         r#"<div class="check">Dar um título: clique duplo na barra de cima</div>"#,
-        r#"<div class="check">Trocar a cor: clique na bolinha colorida ao lado do título</div>"#,
+        r#"<div class="check">Trocar a cor: clique na bolinha ao lado do título</div>"#,
         r#"<div class="check">Criar outra memória: botão + ou Ctrl+N (⌘N no Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Organizar</b></div>"#,
@@ -397,7 +397,7 @@ const PREVIOUS_HTML: [&str; 8] = [
         r#"<div class="check done">Install Memo!</div>"#,
         r#"<div class="check">Keep it on top: click the pin</div>"#,
         r#"<div class="check">Give it a title: double-click the top bar</div>"#,
-        r#"<div class="check">Change the color: click the colored dot next to the title</div>"#,
+        r#"<div class="check">Change the color: click the dot next to the title</div>"#,
         r#"<div class="check">Create another memory: the + button or Ctrl+N (⌘N on Mac)</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Organizing</b></div>"#,

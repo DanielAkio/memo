@@ -60,8 +60,9 @@ Memory text is plain text with a few conventions: one line per paragraph, \"[ ] 
 \"[x] item\" for checklist items, \"- item\" for bullets (two leading spaces per extra level, up \
 to 4), `inline code`, and ``` fences (optionally with a language) for code blocks. Images show \
 as \"[image]\"/\"[imagem]\" and cannot be created here. Colours: yellow, green, coral, teal, \
-iris (purple, the default), mono (white in the dark theme, black in the light one), \"\" for none, \
-or a custom \"#rrggbb\". Deleting for good is only possible in Memo's manager: trashed items can \
+iris (purple), mono (white in the dark theme, black in the light one), \"\" for none, \
+or a custom \"#rrggbb\". Unless Memo's settings say otherwise, new memories start with no colour \
+and new groups with a random one. Deleting for good is only possible in Memo's manager: trashed items can \
 be restored for 30 days.";
 
 // ---------------------------------------------------------------------------
