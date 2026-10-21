@@ -924,42 +924,49 @@
     }
   }
 
-  // `text` typed in a line becomes inline code.
-  function expandInlineCode() {
+  // `text` typed in a line becomes inline code. `typed` is what the last
+  // input inserted: usually just the closing backtick, but where the
+  // backtick is a dead key (ABNT2, US-International) it can come with the
+  // next character ("`," or "` ") or only when the composition ends.
+  function expandInlineCode(typed = '`') {
+    const tail = typed.length - 1 - typed.lastIndexOf('`');
     const sel = getSelection();
-    if (!sel.isCollapsed) return false;
+    if (!sel.isCollapsed || !sel.anchorNode) return false;
+    // A composition can leave the line split in several text nodes.
+    if (sel.anchorNode.nodeType === 3) sel.anchorNode.parentNode.normalize();
     const node = sel.anchorNode;
     if (!node || node.nodeType !== 3 || node.parentElement.closest('code, pre')) return false;
     const pos = sel.anchorOffset;
     const text = node.data.slice(0, pos);
-    if (!text.endsWith('`')) return false;
-    const open = text.lastIndexOf('`', pos - 2);
+    const close = pos - 1 - tail;
+    if (close < 1 || text[close] !== '`') return false;
+    const open = text.lastIndexOf('`', close - 1);
     if (open < 0) return false;
-    const inner = text.slice(open + 1, pos - 1);
+    const inner = text.slice(open + 1, close);
     if (!inner.trim() || text[open - 1] === '`') return false;
     const r = document.createRange();
     r.setStart(node, open);
     r.setEnd(node, pos);
-    insertCode(r, inner);
+    insertCode(r, inner, text.slice(close + 1));
     return true;
   }
 
   // Replaces `range` with <code>text</code>, followed by an invisible
   // separator (keeps the caret outside the code). Straight in the DOM:
   // Chromium's insertHTML would copy styles into it.
-  function insertCode(range, text) {
+  function insertCode(range, text, after = '') {
     range.deleteContents();
     const code = document.createElement('code');
     code.spellcheck = false;
     code.textContent = text;
-    const gap = document.createTextNode('\u200b');
+    const gap = document.createTextNode('\u200b' + after);
     range.insertNode(gap);
     range.insertNode(code);
-    const after = document.createRange();
-    after.setStartAfter(gap);
-    after.collapse(true);
+    const caret = document.createRange();
+    caret.setStartAfter(gap);
+    caret.collapse(true);
     getSelection().removeAllRanges();
-    getSelection().addRange(after);
+    getSelection().addRange(caret);
   }
 
   // Raw text of a fragment, with <br> as a line break (keeps the last one).
@@ -1191,7 +1198,12 @@
       return;
     }
     let converted = false;
-    if (e.inputType === 'insertText' && ['`', ']', ' '].includes(e.data)) {
+    if (e.inputType === 'insertText' && e.data?.includes('`') && e.data !== '`') {
+      // A dead-key backtick that came with the next character.
+      recordHistory(typing);
+      converting = true;
+      try { converted = expandInlineCode(e.data); } finally { converting = false; }
+    } else if (e.inputType === 'insertText' && ['`', ']', ' '].includes(e.data)) {
       // Keep the text as typed, so undo after "[]" → box (or `x` → code,
       // "- " → bullet) brings back the characters instead of skipping them.
       recordHistory(typing);
@@ -1657,6 +1669,16 @@
   // ------------------------------------------------------------- events
 
   editor.addEventListener('input', onEditorInput);
+  // Dead keys (the backtick on ABNT2 / US-International keyboards) can
+  // arrive as a composition, which the input handler doesn't convert.
+  editor.addEventListener('compositionend', (e) => {
+    if (!e.data?.includes('`') || currentPre()) return;
+    recordHistory(false);
+    converting = true;
+    let converted;
+    try { converted = expandInlineCode(e.data); } finally { converting = false; }
+    if (converted) onContentChanged();
+  });
   // Undo/Redo from the context menu (or any other source) also go through
   // the editor's own history.
   editor.addEventListener('beforeinput', (e) => {
