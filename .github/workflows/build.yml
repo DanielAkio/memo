@@ -13,7 +13,23 @@ permissions:
   actions: read # SignPath downloads the unsigned artifact
 
 jobs:
+  # The build jobs run in parallel and tauri-action creates the draft release
+  # if it finds none, so two jobs could each create one. Creating it here
+  # first leaves a single draft that every job uploads to.
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create the draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag --title "Memo $TAG" --notes ""
+
   build:
+    needs: release
     strategy:
       fail-fast: false
       matrix:
