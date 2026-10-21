@@ -44,6 +44,7 @@ src-tauri/
   src/images.rs          pasted images as files in images/ beside notes.json (inline data URLs only in the editor and exports)
   src/cloud.rs           Google sign-in for cloud sync (OAuth loopback + PKCE, token in the OS credential store)
   src/mcp.rs             AI control: MCP tools; local HTTP endpoint in the app + `memo --mcp` stdio bridge (opt-in)
+  src/clients.rs         AI control setup: finds MCP clients here and adds/removes Memo in their config files
   src/sync.rs            Drive sync engine: pull (changes API), apply, push; conflicts; has the repo's only test (fake Drive)
   src/welcome.rs         first-run welcome note (HTML + matching plain text)
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
