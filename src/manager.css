@@ -938,6 +938,7 @@ textarea.field { resize: vertical; min-height: 84px; }
 .storage-status[hidden] { display: none; }
 /* Cloud sync rows: hidden in builds without a Google OAuth client. */
 [data-cloud][hidden] { display: none; }
+.setting[hidden] { display: none; }
 .setting-label .info { margin-left: 4px; vertical-align: 1px; }
 
 /* Current data folder: full path, selectable so it can be copied. */

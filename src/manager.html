@@ -217,6 +217,25 @@
           </div>
         </div>
         <h2 class="settings-title">
+          <span data-i18n="aiControl"></span>
+          <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=aiControlTip,data-tip=aiControlTip">i</span>
+        </h2>
+        <div class="setting">
+          <span class="setting-label" id="aiControlLabel" data-i18n="aiControlAllow"></span>
+          <!-- On/off switch: the MCP server (mcp.rs). Off by default. -->
+          <button type="button" class="switch" id="aiControlSwitch" role="switch" aria-checked="false" aria-labelledby="aiControlLabel"></button>
+        </div>
+        <div class="setting setting-top" id="aiSetup" hidden>
+          <span class="setting-label" data-i18n="aiConnect"></span>
+          <div class="field-wrap">
+            <div class="app-actions">
+              <button type="button" class="btn" id="aiDesktopBtn" data-i18n="aiCopyDesktop"></button>
+              <button type="button" class="btn" id="aiCodeBtn" data-i18n="aiCopyCode"></button>
+            </div>
+            <p class="storage-status" id="aiStatus" role="status"></p>
+          </div>
+        </div>
+        <h2 class="settings-title">
           <span data-i18n="storage"></span>
           <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=storageTip,data-tip=storageTip">i</span>
         </h2>
