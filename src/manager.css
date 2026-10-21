@@ -947,6 +947,12 @@ textarea.field { resize: vertical; min-height: 84px; }
 }
 .data-dir-row .btn { flex: none; }
 .reset-dir { margin-top: 8px; }
+.app-version {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-fog);
+  user-select: text;
+}
 .data-dir {
   flex: 1;
   min-width: 0;

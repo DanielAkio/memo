@@ -1088,6 +1088,11 @@
     console.error('get_autostart', err);
   });
 
+  // The running version, from tauri.conf.json.
+  window.__TAURI__.app.getVersion()
+    .then((v) => { $('appVersion').textContent = v; })
+    .catch((err) => console.error('getVersion', err));
+
   // The tray's Trash, Settings and Help items open the manager on that tab.
   function setView(target) {
     if (!target) return;
