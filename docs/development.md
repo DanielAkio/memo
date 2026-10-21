@@ -32,6 +32,23 @@ The sync section only shows in builds made with a Google OAuth client. For local
 repository root (template: `.env.example`); CI reads the `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` secrets. Setting
 up the Google Cloud project is in [`google-cloud.md`](google-cloud.md).
 
+## AI control (MCP)
+
+`src-tauri/src/mcp.rs`. With AI control on, the app listens on `127.0.0.1` (random port, bearer token, both written to
+`mcp.json` in the default data folder while it runs; browser requests with an `Origin` or a foreign `Host` are
+refused). MCP clients don't talk to that port: they launch `memo --mcp`, a stdio server in the same executable that
+answers `initialize` / `tools/list` itself and forwards each tool call to the app, opening Memo (`--autostart`) when it
+isn't running. Tools change memories through the same functions as the windows, so the screen follows.
+
+Try it without a client:
+
+```bash
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_memories","arguments":{}}}' \
+  | src-tauri/target/debug/memo --mcp
+```
+
+or with the MCP Inspector: `npx @modelcontextprotocol/inspector src-tauri/target/debug/memo --mcp`.
+
 ## Data folder
 
 Memories, groups and settings live in `notes.json` and `config.json` in the data folder (pasted images as files in its `images/` subfolder): Windows `%APPDATA%\memo\`,

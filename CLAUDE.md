@@ -43,6 +43,7 @@ src-tauri/
   src/store.rs           Note/Group model + persistence
   src/images.rs          pasted images as files in images/ beside notes.json (inline data URLs only in the editor and exports)
   src/cloud.rs           Google sign-in for cloud sync (OAuth loopback + PKCE, token in the OS credential store)
+  src/mcp.rs             AI control: MCP tools; local HTTP endpoint in the app + `memo --mcp` stdio bridge (opt-in)
   src/sync.rs            Drive sync engine: pull (changes API), apply, push; conflicts; has the repo's only test (fake Drive)
   src/welcome.rs         first-run welcome note (HTML + matching plain text)
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
@@ -69,8 +70,9 @@ Tokens spent on things that don't help understand or change the project are wast
 - **One window per note.** Labels: `note-{id}`, `group-{id}`, `manager`, plus the hidden `snap-preview`. Rust derives the note id from the calling window's label (`id_of`), so note commands take no id (`invoke('save_text', { text, html })`); manager commands take explicit ids. All note windows load `index.html`, which calls `load_note`. Code that iterates windows tells them apart with `is_note` / `is_group` / `is_app_window` (the last excludes the Snap preview).
 - **Rust is the source of truth.** `Store` (`store.rs`) holds everything in a `Mutex`, marks it dirty, and a saver thread flushes atomically every 800 ms. Never overwrite user data: unreadable files are backed up, old files are never deleted. Default data folder is `<OS data folder>/memo` — **never** use Tauri's `app_data_dir()` for notes or config.
 - **Tauri commands** live in `main.rs` and must be registered in `generate_handler!`; a new JS window API needs its permission in `capabilities/default.json`. Commands that create/destroy windows are `async` on purpose (sync ones can deadlock on Windows). Rust errors returned to JS are English `String`s (logged, not shown).
-- **Events** keep windows in step: `notes-changed`, `groups-changed`, `store-replaced`, `theme-changed`, `language-changed`, `zoom-changed`, `drop-hover`, `cloud-changed`.
+- **Events** keep windows in step: `notes-changed`, `groups-changed`, `store-replaced`, `theme-changed`, `language-changed`, `zoom-changed`, `drop-hover`, `cloud-changed`, `ai-control-changed`.
 - **Content vs layout (sync groundwork):** `Note::content` / `Group::content` hold what is the same on every device; position, size, pin, `hidden`, `open` are local layout. Keep new content fields inside `content()` and route mutations through `Store::update` / `update_group` (they bump `updatedAt` only on content changes); permanent removals leave tombstones. Details in `memo-storage`.
+- **AI control (MCP)** (`mcp.rs`): tools are the outside view of the same features; a new user-facing feature that an assistant could use (create, edit, organise) gets a tool or a field there, calling the same functions as the windows. Off by default (`Config.ai_control`); `memo --mcp` must stay a plain stdio process (no Tauri).
 - **Close ≠ trash.** ✕ / middle click only close (`Note.hidden`); only the manager's trash buttons trash. Details in `memo-windows`.
 
 ## Conventions

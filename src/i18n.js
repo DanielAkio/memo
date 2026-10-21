@@ -497,7 +497,7 @@ window.MemoI18n = (() => {
         title: 'Gerenciador do Memo',
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
-          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema, sincronizar agora e sair.'],
+          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema e o controle por IA, sincronizar agora e sair.'],
           ['Aba Grupos', 'Lista os grupos como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele para a frente; os botões da linha soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
           ['Novo grupo', 'O botão de pasta com + na barra do Gerenciador cria um grupo vazio ao lado dele.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
@@ -526,6 +526,8 @@ window.MemoI18n = (() => {
           ['Sincronização', 'Conecte sua conta Google para usar as mesmas memórias em vários computadores. Só o conteúdo vai para uma pasta oculta do seu Google Drive; a posição das janelas fica em cada computador. Uma memória criada em outro computador aparece fechada aqui no Gerenciador. Se a mesma memória for editada em dois lugares antes de sincronizar, fica a versão mais nova e a outra vai para a lixeira com "(conflito)" no título.'],
           ['Armazenamento', 'Pasta onde as memórias ficam salvas (uma pasta do Dropbox ou OneDrive leva para outros computadores) e backup: exportar e importar.'],
           ['Iniciar com o sistema', 'O Memo abre sozinho quando você entra no computador, só com as memórias (o Gerenciador fica fechado). Vem ligado: no Windows, o instalador pergunta; mude em Configurações → Aplicativo.',
+            '<span class="demo-switch on"></span>'],
+          ['Controle por IA (MCP)', 'Ligue em Configurações → Controle por IA (ou no menu da bandeja) e use os botões para conectar o Claude Desktop ou o Claude Code. Depois é só pedir, como "crie uma memória com a lista de compras" ou "fixe a memória do projeto": a IA lista, lê, cria, edita, fixa, colore, agrupa e manda para a lixeira. Vem desligado; excluir de vez continua só no Gerenciador.',
             '<span class="demo-switch on"></span>'],
           ['Sair', 'Fechar as memórias não encerra o app, que continua na bandeja. Use "Sair do Memo" na bandeja ou em Configurações.'],
         ],
@@ -612,7 +614,7 @@ window.MemoI18n = (() => {
         title: 'Memo Manager',
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
-          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system on or off, sync now and quit.'],
+          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system and AI control on or off, sync now and quit.'],
           ['Groups tab', 'Lists the groups like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar to the front; the row’s buttons take its memories out / put them away and move the group to the trash.'],
           ['New group', 'The folder-with-+ button in the Manager’s titlebar creates an empty group next to it.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
@@ -641,6 +643,8 @@ window.MemoI18n = (() => {
           ['Sync', 'Connect your Google account to use the same memories on several computers. Only the content goes to a hidden folder in your Google Drive; window positions stay on each computer. A memory created on another computer shows up closed here in the Manager. If the same memory is edited in two places before syncing, the newer version stays and the other goes to the trash with "(conflict)" in its title.'],
           ['Storage', 'Folder where memories are saved (a Dropbox or OneDrive folder takes them to other computers) and backup: export and import.'],
           ['Start with the system', 'Memo opens by itself when you log in, with just your memories (the Manager stays closed). It starts on: on Windows the installer asks; change it in Settings → App.',
+            '<span class="demo-switch on"></span>'],
+          ['AI control (MCP)', 'Turn it on in Settings → AI control (or in the tray menu) and use the buttons to connect Claude Desktop or Claude Code. Then just ask, like "create a memory with the shopping list" or "pin the project memory": the AI lists, reads, creates, edits, pins, colors, groups and trashes. It starts off; deleting for good stays in the Manager only.',
             '<span class="demo-switch on"></span>'],
           ['Quit', 'Closing memories doesn’t quit the app, which stays in the tray. Use "Quit Memo" in the tray or in Settings.'],
         ],
