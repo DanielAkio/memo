@@ -616,10 +616,11 @@
     onContentChanged();
   }
 
-  // "Before the marker": the caret at the start of a list item, drawn left of
-  // its box or dot (#markerCaret; the real caret is hidden meanwhile). There
-  // Enter pushes the item down. Set by clicking left of the box or ArrowLeft
-  // at the item's start; any other key or caret move clears it.
+  // "Before the marker": the caret at the start of a list item (or a code
+  // block), drawn left of its box or dot (#markerCaret; the real caret is
+  // hidden meanwhile). There Enter pushes the item down. Set by clicking left
+  // of the box or ArrowLeft at the item's start; any other key or caret move
+  // clears it.
   const markerCaret = $('markerCaret');
   let beforeMarker = null;
 
@@ -884,7 +885,28 @@
   // Inside the block: Enter breaks the line, Tab indents; Enter on an empty
   // last line leaves the block; Backspace in an empty block turns it back
   // into a regular line.
-  function onCodeBlockKeydown(e, pre, mod) {
+  function onCodeBlockKeydown(e, pre, mod, before) {
+    // Like a list item: ArrowLeft at the block's start puts the caret before
+    // the block (the browser would jump to the line above, or nowhere when the
+    // block starts the note), and Enter there pushes the block down.
+    const plainKey = !e.shiftKey && !mod && !e.altKey;
+    const sel = getSelection();
+    const atStart = sel.isCollapsed && textBeforeCaret(pre).toString().replace(ZWSP, '') === '';
+    if (e.key === 'ArrowLeft' && plainKey && atStart && !before) {
+      e.preventDefault();
+      setBeforeMarker(pre);
+      return;
+    }
+    if (e.key === 'Enter' && plainKey && before) {
+      e.preventDefault();
+      const line = document.createElement('div');
+      line.appendChild(document.createElement('br'));
+      pre.before(line);
+      caretIn(pre);
+      onContentChanged();
+      setBeforeMarker(pre);
+      return;
+    }
     if (e.key === 'Tab' && !mod && !e.altKey) {
       e.preventDefault();
       if (!e.shiftKey) document.execCommand('insertText', false, '  ');
@@ -1112,7 +1134,7 @@
 
     const pre = currentPre();
     if (pre) {
-      onCodeBlockKeydown(e, pre, mod);
+      onCodeBlockKeydown(e, pre, mod, wasBeforeMarker === pre);
       return;
     }
 
@@ -1802,7 +1824,7 @@
     renderImageFrame();
     // The caret left the start of the item: no longer before its marker.
     if (beforeMarker) {
-      const block = currentBlock();
+      const block = currentPre() || currentBlock();
       if (!getSelection().isCollapsed || block !== beforeMarker || textBeforeCaret(block).toString().replace(ZWSP, '') !== '') {
         setBeforeMarker(null);
       }
