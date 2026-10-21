@@ -955,6 +955,29 @@
     return true;
   }
 
+  // Caret at the start of an inline code: moves it just before the code,
+  // into the text there (an invisible separator when there is none).
+  function leaveCodeLeft() {
+    const sel = getSelection();
+    const code = sel.isCollapsed && currentCode();
+    if (!code) return false;
+    const r = document.createRange();
+    r.setStart(code, 0);
+    r.setEnd(sel.anchorNode, sel.anchorOffset);
+    if (r.toString().replace(ZWSP, '')) return false;
+    let prev = code.previousSibling;
+    if (!(prev && prev.nodeType === 3)) {
+      prev = document.createTextNode('');
+      code.before(prev);
+    }
+    if (!prev.length) prev.data = '\u200b';
+    const at = document.createRange();
+    at.setStart(prev, prev.length);
+    sel.removeAllRanges();
+    sel.addRange(at);
+    return true;
+  }
+
   // Replaces `range` with <code>text</code>, followed by an invisible
   // separator (keeps the caret outside the code). Straight in the DOM:
   // Chromium's insertHTML would copy styles into it.
@@ -1024,6 +1047,14 @@
       return;
     }
 
+    // ArrowLeft at the start of an inline code leaves it, the way it goes
+    // before a list marker: the caret stops just before the code, where
+    // typing writes plain text (the browser would skip that spot).
+    if (e.key === 'ArrowLeft' && !e.shiftKey && !mod && !e.altKey && leaveCodeLeft()) {
+      e.preventDefault();
+      return;
+    }
+
     // Undo / redo through the editor's own history (see "undo").
     if (mod && !e.altKey && key === 'z') {
       e.preventDefault();
@@ -1087,7 +1118,7 @@
 
     const block = currentBlock();
     if (!block || !isListItem(block)) return;
-    const atStart = getSelection().isCollapsed && textBeforeCaret(block).toString() === '';
+    const atStart = getSelection().isCollapsed && textBeforeCaret(block).toString().replace(ZWSP, '') === '';
 
     const plainKey = !e.shiftKey && !mod && !e.altKey;
     const before = wasBeforeMarker === block && atStart;
@@ -1746,7 +1777,7 @@
     // The caret left the start of the item: no longer before its marker.
     if (beforeMarker) {
       const block = currentBlock();
-      if (!getSelection().isCollapsed || block !== beforeMarker || textBeforeCaret(block).toString() !== '') {
+      if (!getSelection().isCollapsed || block !== beforeMarker || textBeforeCaret(block).toString().replace(ZWSP, '') !== '') {
         setBeforeMarker(null);
       }
     }

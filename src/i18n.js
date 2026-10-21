@@ -439,7 +439,7 @@ window.MemoI18n = (() => {
           ['Recuo de itens', '{{Tab}} recua e {{Shift+Tab}} volta. Clique à esquerda do quadrado ou do ponto (ou {{←}} no início do item) e {{Enter}} empurra o item para baixo, deixando uma linha de texto acima. {{Enter}} num item vazio sai da lista, exceto no primeiro, que cria o próximo; {{Backspace}} no início também sai.',
             '<div class="bullet">Viagem</div><div class="check done" data-level="1">reservar hotel</div>'
             + '<div class="check" data-level="1">renovar passaporte</div>'],
-          ['Código na linha', 'Texto entre crases, como {{`código`}}, ou {{Mod+E}}.',
+          ['Código na linha', 'Texto entre crases, como {{`código`}}, ou {{Mod+E}}. {{←}} no início do código põe o cursor fora dele.',
             'Rode <code>npm run dev</code> no terminal.'],
           ['Bloco de código', 'Digite {{```}} (ou {{```sql}}) e {{Enter}}. Passe o mouse sobre o bloco: à esquerda escolhe a linguagem, à direita copia o código. {{Enter}} numa linha vazia no fim sai do bloco.',
             '<pre class="code" data-lang="sql">select titulo\nfrom memorias\nwhere fixada = true; -- só as fixadas</pre>'],
@@ -554,7 +554,7 @@ window.MemoI18n = (() => {
           ['Indenting items', '{{Tab}} indents and {{Shift+Tab}} outdents. Click left of the box or dot (or {{←}} at the item’s start) and {{Enter}} pushes the item down, leaving a text line above. {{Enter}} on an empty item leaves the list, except on the first one, where it adds the next; {{Backspace}} at its start also leaves.',
             '<div class="bullet">Trip</div><div class="check done" data-level="1">book the hotel</div>'
             + '<div class="check" data-level="1">renew passport</div>'],
-          ['Inline code', 'Text between backticks, like {{`code`}}, or {{Mod+E}}.',
+          ['Inline code', 'Text between backticks, like {{`code`}}, or {{Mod+E}}. {{←}} at the start of the code puts the caret outside it.',
             'Run <code>npm run dev</code> in the terminal.'],
           ['Code block', 'Type {{```}} (or {{```sql}}) and {{Enter}}. Hover over the block: pick its language on the left, copy the code on the right. {{Enter}} on an empty last line leaves the block.',
             '<pre class="code" data-lang="sql">select title\nfrom memories\nwhere pinned = true; -- pinned only</pre>'],
