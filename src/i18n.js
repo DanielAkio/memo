@@ -475,6 +475,7 @@ window.MemoI18n = (() => {
         title: 'Gerenciador do Memo',
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
+          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema, sincronizar agora e sair.'],
           ['Aba Grupos', 'Lista os grupos como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele para a frente; os botões da linha soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
           ['Novo grupo', 'O botão de pasta com + na barra do Gerenciador cria um grupo vazio ao lado dele.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
@@ -589,6 +590,7 @@ window.MemoI18n = (() => {
         title: 'Memo Manager',
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
+          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system on or off, sync now and quit.'],
           ['Groups tab', 'Lists the groups like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar to the front; the row’s buttons take its memories out / put them away and move the group to the trash.'],
           ['New group', 'The folder-with-+ button in the Manager’s titlebar creates an empty group next to it.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'

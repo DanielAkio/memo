@@ -1081,13 +1081,27 @@
       console.error('set_autostart', err);
     }
   });
+  // The tray's "Start with the system" item.
+  listen('autostart-changed', (e) => renderAutostart(e.payload));
   invoke('get_autostart').then(renderAutostart).catch((err) => {
     autostartSwitch.disabled = true;
     console.error('get_autostart', err);
   });
 
+  // The tray's Trash, Settings and Help items open the manager on that tab.
+  function setView(target) {
+    if (!target) return;
+    view = target.view;
+    if (target.scope && view in scopes) scopes[view] = target.scope;
+  }
+
   async function init() {
     win = await invoke('load_manager');
+    setView(await invoke('take_manager_view'));
+    listen('manager-view', (e) => {
+      setView(e.payload);
+      render();
+    });
     renderZoom(await invoke('get_zoom'));
     listen('zoom-changed', (e) => renderZoom(e.payload));
     let lang;
