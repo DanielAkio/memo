@@ -1,6 +1,7 @@
 // No console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod clients;
 mod cloud;
 mod images;
 mod mcp;
@@ -2522,8 +2523,29 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
 #[tauri::command]
 fn get_ai_control(app: AppHandle) -> Result<(bool, String), String> {
     let dir = default_data_dir(&app).map_err(|e| e.to_string())?;
-    let exe = mcp::app_path().map(|p| p.display().to_string()).unwrap_or_default();
-    Ok((mcp::enabled(&dir), exe))
+    Ok((mcp::enabled(&dir), ai_exe()))
+}
+
+/// Settings → AI control: the MCP clients installed here and whether each
+/// one has Memo.
+#[tauri::command]
+fn get_ai_clients() -> Vec<clients::Status> {
+    clients::list(&ai_exe())
+}
+
+/// Adds Memo to MCP client `id` (or removes it); returns the new list.
+#[tauri::command]
+fn connect_ai_client(id: String, on: bool) -> Result<Vec<clients::Status>, String> {
+    let exe = ai_exe();
+    if exe.is_empty() {
+        return Err("no executable path".into());
+    }
+    clients::connect(&id, &exe, on)?;
+    Ok(clients::list(&exe))
+}
+
+fn ai_exe() -> String {
+    mcp::app_path().map(|p| p.display().to_string()).unwrap_or_default()
 }
 
 #[tauri::command]
@@ -3041,6 +3063,8 @@ fn main() {
             set_autostart,
             get_ai_control,
             set_ai_control,
+            get_ai_clients,
+            connect_ai_client,
             get_cloud_account,
             connect_cloud,
             cancel_cloud_connect,
