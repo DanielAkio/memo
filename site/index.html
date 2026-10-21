@@ -4,41 +4,138 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Memo: sticky memories you pin on top of everything</title>
-  <meta name="description" content="Memo is a free, open-source sticky-notes app for Windows, macOS and Linux.">
+  <meta name="description" content="Memo is a small, free notes app for Windows, macOS and Linux. Pin a memory and it stays on top of every other app.">
+  <meta property="og:title" content="Memo: sticky memories you pin on top of everything">
+  <meta property="og:description" content="A small, free notes app for Windows, macOS and Linux. Pin a memory and it stays on top of every other app.">
+  <meta property="og:image" content="https://danielakio.github.io/memo/media/pin-dark-en.gif">
+  <link rel="icon" href="media/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="home">
 <main>
   <nav>
     <a class="brand" href="./">Memo</a>
-    <span class="links"><a href="privacy.html">Privacy</a><a href="pt/">Português</a></span>
+    <span class="links"><a href="#download">Download</a><a href="privacy.html">Privacy</a><a href="pt/">Português</a></span>
   </nav>
 
-  <h1>Sticky memories you pin on top of everything.</h1>
-  <p class="lead">Memo is a free, open-source sticky-notes app for Windows, macOS and Linux. Each memory is its own
-    little window, and one click on the pin keeps it on top of every other app.</p>
-  <p><a class="button" href="https://github.com/DanielAkio/memo/releases">Download</a></p>
+  <section class="hero">
+    <h1>Sticky memories you pin on top of everything.</h1>
+    <p class="lead">Memo is a small, free notes app. Write something down, click the pin, and it stays in sight over
+      every other app while you work.</p>
+    <div class="cta">
+      <a class="button" data-download href="https://github.com/DanielAkio/memo/releases/latest">Download Memo</a>
+      <a class="button ghost" href="#features">See how it works</a>
+    </div>
+    <p class="facts"><span>Free</span><span>No account</span><span>Works offline</span><span>Windows, macOS, Linux</span></p>
+  </section>
 
-  <h2>What it does</h2>
-  <ul>
-    <li><strong>Pin on top of everything</strong>: the to-do list next to the spreadsheet, the command you always
-      forget above the terminal.</li>
-    <li><strong>Quick, formatted writing</strong>: checklists, bullets, highlight, text sizes and code blocks.</li>
-    <li><strong>Colours, titles and groups</strong> to find and put away memories at a glance.</li>
-    <li><strong>Works offline</strong>: everything is saved on your computer.</li>
-    <li><strong>Optional sync with Google Drive</strong>: sign in with Google to keep your memories in step across
-      your computers. They are stored in Memo's private folder in <em>your own</em> Drive; there is no Memo server.</li>
-  </ul>
+  <div class="shot">
+    <picture>
+      <source media="(prefers-color-scheme: light)" srcset="media/pin-light-en.gif">
+      <img src="media/pin-dark-en.gif" width="960" height="540" alt="A memory with a to-do list is pinned over a spreadsheet and stays in sight while the spreadsheet is being edited">
+    </picture>
+  </div>
 
-  <h2>Open source</h2>
-  <p>Memo is MIT-licensed. The code, issues and releases are on
-    <a href="https://github.com/DanielAkio/memo">GitHub</a>.</p>
+  <section class="benefits" id="features">
+    <div class="benefit">
+      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76V6h6v4.76l2 2.24v2H7v-2z"/><path d="M8 3h8"/></svg>
+      <h3>Always in sight</h3>
+      <p>One click on the pin keeps a memory over your spreadsheet, browser or video call.</p>
+    </div>
+    <div class="benefit">
+      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
+      <h3>Saves itself</h3>
+      <p>Just type. There's no save button and nothing to lose when you close it.</p>
+    </div>
+    <div class="benefit">
+      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <h3>Tidy in a click</h3>
+      <p>Colours, titles and groups you can put away and bring back exactly where they were.</p>
+    </div>
+    <div class="benefit">
+      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <h3>Private</h3>
+      <p>No sign-up, ads or tracking. Your memories stay on your computer.</p>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="text">
+      <h2>Jot it down in seconds</h2>
+      <p>Double-click the top bar to name it. Type <kbd>[]</kbd> for a checklist and tick items as you go,
+        <kbd>-</kbd> for a list, select a line to highlight it.</p>
+      <p>Pick a colour so you know what's what at a glance.</p>
+    </div>
+    <div class="shot">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="media/write-light-en.gif">
+        <img src="media/write-dark-en.gif" width="960" height="540" loading="lazy" alt="Naming a memory, typing a checklist, ticking two items, highlighting a line and changing the memory's colour">
+      </picture>
+    </div>
+  </section>
+
+  <section class="feature flip">
+    <div class="text">
+      <h2>Keep related memories together</h2>
+      <p>A group is a slim bar that holds memories. One click tucks them all away, another brings them back right
+        where they were.</p>
+      <p>Drop a memory on a bar to add it to the group.</p>
+    </div>
+    <div class="shot">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="media/group-light-en.gif">
+        <img src="media/group-dark-en.gif" width="960" height="540" loading="lazy" alt="A group bar puts its memories away and brings them back; a memory dropped on the bar joins the group">
+      </picture>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="text">
+      <h2>Everything in one place</h2>
+      <p>The Memo Manager lists every memory, open or closed. Search, sort, move one to a group or reopen it with a click.</p>
+      <p>Trashed something by mistake? Restore it: the trash keeps memories for 30 days.</p>
+    </div>
+    <div class="shot">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="media/manager-light-en.gif">
+        <img src="media/manager-dark-en.gif" width="960" height="540" loading="lazy" alt="The Memo Manager searches memories, moves one to the trash, restores it from the trash and reopens it">
+      </picture>
+    </div>
+  </section>
+
+  <section class="feature">
+    <div class="text">
+      <h2>On all your computers, if you want</h2>
+      <p>Sync is optional. Sign in with Google and your memories stay the same on every computer. They are stored in
+        Memo's private folder in <em>your own</em> Google Drive: there is no Memo server, and Memo can't see any other
+        file in your Drive.</p>
+      <p><a href="privacy.html">Read the privacy policy</a></p>
+    </div>
+    <div class="text">
+      <h2>Free and open source</h2>
+      <p>Memo is MIT-licensed and made in the open. The code, ideas and bug reports live on
+        <a href="https://github.com/DanielAkio/memo">GitHub</a>, in English or Portuguese.</p>
+    </div>
+  </section>
+
+  <section class="download" id="download">
+    <h2>Get Memo</h2>
+    <p class="lead">Free for Windows, macOS and Linux.</p>
+    <a class="button" data-download href="https://github.com/DanielAkio/memo/releases/latest">Download Memo</a>
+    <div class="platforms">
+      <a href="https://github.com/DanielAkio/memo/releases/latest">Windows 10 / 11</a>
+      <a href="https://github.com/DanielAkio/memo/releases/latest">macOS (Apple chip or Intel)</a>
+      <a href="https://github.com/DanielAkio/memo/releases/latest">Linux (.deb, .rpm, AppImage)</a>
+    </div>
+  </section>
 
   <footer>
     <a href="privacy.html">Privacy policy</a> ·
+    <a href="code-signing.html">Code signing policy</a> ·
     <a href="https://github.com/DanielAkio/memo/issues">Contact</a> ·
     © 2026 Daniel Akio Teixeira
   </footer>
 </main>
+<script src="site.js"></script>
 </body>
 </html>
