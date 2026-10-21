@@ -692,11 +692,13 @@ textarea.field { resize: vertical; min-height: 84px; }
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* Header row with the language, as in the editor (styles.css pre.code). */
+.help-demo pre.code[data-lang] { padding-top: 22px; }
 .help-demo pre.code[data-lang]::before {
   content: attr(data-lang);
   position: absolute;
   top: 4px;
-  right: 8px;
+  left: 10px;
   font-family: var(--font-ui);
   font-size: 10px;
   letter-spacing: 0.04em;
