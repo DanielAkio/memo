@@ -813,8 +813,15 @@ textarea.field { resize: vertical; min-height: 84px; }
   border-radius: 9999px;
   background: var(--note-color);
 }
-.demo-dot[data-color=""] { box-shadow: inset 0 0 0 1px var(--color-smoke); }
-.demo-rainbow { background: conic-gradient(#eb5757, #f2c94c, #27a644, #02b8cc, #6366f1, #8b5cf6, #eb5757); }
+.demo-dot[data-color=""] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.demo-eyedropper {
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--color-fog);
+  -webkit-mask: var(--icon-eyedropper) center / contain no-repeat;
+  mask: var(--icon-eyedropper) center / contain no-repeat;
+}
 .demo-meta { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-ash); }
 .demo-field {
   display: inline-flex;
