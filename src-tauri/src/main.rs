@@ -927,7 +927,14 @@ fn build_snap_preview(app: &AppHandle) -> tauri::Result<()> {
         .focusable(false)
         .visible(false)
         .build()?;
-    window.set_ignore_cursor_events(true)
+    // On Linux the GTK window has no GDK window until it is first shown, and
+    // tao panics setting its input shape before that: `show_snap_preview`
+    // makes it click-through there instead.
+    #[cfg(not(target_os = "linux"))]
+    window.set_ignore_cursor_events(true)?;
+    #[cfg(target_os = "linux")]
+    let _ = window;
+    Ok(())
 }
 
 /// Shows the preview over `rect`, or hides it (`None`).
@@ -942,6 +949,8 @@ fn show_snap_preview(app: &AppHandle, rect: Option<Rect>) {
             let _ = preview.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
             if !preview.is_visible().unwrap_or(false) {
                 let _ = preview.show();
+                #[cfg(target_os = "linux")]
+                let _ = preview.set_ignore_cursor_events(true);
             }
         }
         None => {
@@ -1719,7 +1728,10 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
         .title(group_title(&group.name))
         .inner_size(group.width, TITLEBAR_H * app.state::<Shared>().zoom())
         .decorations(false)
-        .resizable(false)
+        // GTK sizes a non-resizable window to its content's natural size,
+        // which for a webview is at least 200 px tall: on Linux the bar would
+        // be a tall block instead of a titlebar.
+        .resizable(cfg!(target_os = "linux"))
         .always_on_top(group.pinned)
         .background_color(CARBON)
         // macOS: the first click on an inactive window reaches the page, so
@@ -1776,7 +1788,12 @@ fn take_out(app: &AppHandle, id: &str) {
             app.state::<Sliding>().0.lock().unwrap().remove(&label);
             continue;
         };
-        let target = window.outer_position().map(|p| (p.x, p.y));
+        // The saved place (where `build_note_window` put it): a hidden window
+        // reports (0, 0) as its position on Linux until it is mapped.
+        let target = match (note.x, note.y) {
+            (Some(x), Some(y)) if is_on_screen(&window, x, y) => Ok((x, y)),
+            _ => window.outer_position().map(|p| (p.x, p.y)),
+        };
         match (anchor, target) {
             (Some(from), Ok(to)) => {
                 let _ = window.set_position(PhysicalPosition::new(from.0, from.1));
