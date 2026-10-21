@@ -1,167 +1,122 @@
-# Memo
+<p align="center">
+  <img src="assets/icon.svg" width="88" alt="">
+</p>
 
-**Sticky memories you pin on top of everything.**
+<h1 align="center">Memo</h1>
 
-Memo is a sticky-notes app for **Windows, macOS and Linux**. Each memory is its own little window on your screen,
-and **one click on the pin** keeps it on top of every other app: the to-do list next to the spreadsheet, the command
-you always forget above the terminal, the reminder that must not hide behind the browser. It is free, open source and
-works fully offline.
+<p align="center">
+  <b>Sticky memories you pin on top of everything.</b><br>
+  A small, free notes app for Windows, macOS and Linux.
+</p>
 
-## What it does
+<p align="center">
+  <a href="https://github.com/DanielAkio/memo/releases/latest"><b>Download</b></a> ·
+  <a href="https://danielakio.github.io/memo/">Website</a> ·
+  <a href="https://danielakio.github.io/memo/pt/">Em português</a>
+</p>
 
-- **Pin on top of everything**: the pin in the memory's corner (or `Ctrl+Shift+P`) keeps it always visible.
-- **Quick, formatted writing**: checklists with `[]`, bullets with `- `, bold, italic, underline, highlight, three
-  text sizes, code blocks with syntax highlighting and pasted images you resize by their corner.
-- **Colours and titles**: name and colour each memory to find it at a glance.
-- **Groups**: gather memories in a small bar, put them all away at once and take them back out where they were.
-- **Tidy screen**: drag a memory and it snaps to screen edges and other memories; push it against a screen edge to
-  fit it to half, a quarter or the whole screen.
-- **Manager**: see, search and sort every memory and group; restore from the trash for up to 30 days.
-- **Your data stays with you**: everything is saved automatically on your computer. You can choose another folder
-  (a Dropbox or OneDrive one, for example) and export or import a backup.
-- **Your way**: light or dark theme, text size, default colour and text for new memories, and start with the system.
-- Interface in **English and Portuguese**.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="site/media/pin-light-en.gif">
+    <img src="site/media/pin-dark-en.gif" width="860" alt="A memory with a to-do list is pinned over a spreadsheet and stays in sight while the spreadsheet is being edited">
+  </picture>
+</p>
 
-## Download
+Every memory is its own little window. Click the **pin** and it floats over every other app: the to-do list next to
+the spreadsheet, the phone number during the call, the command you always forget above the terminal. No more
+digging through windows to find what you wrote down.
 
-Installers are on the **[Releases](https://github.com/DanielAkio/memo/releases)** page. Pick the file for your
-system:
+## Why people like it
 
-| System | File |
+- **Always in sight.** One click on the pin and the memory stays on top while you work in anything else.
+- **Write without thinking.** Type and it's saved. `[]` starts a checklist, `-` starts a list, and a quick selection
+  lets you highlight what matters.
+- **Find things at a glance.** Give each memory a title and a colour, and gather related ones in a group you can put
+  away and bring back in one click.
+- **Yours, and only yours.** No sign-up, no ads, no tracking, and it works offline. Your memories live on your
+  computer, and if you want them on several computers, they sync through your own Google Drive
+  ([privacy policy](https://danielakio.github.io/memo/privacy.html)).
+
+## Jot it down in seconds
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="site/media/write-light-en.gif">
+    <img src="site/media/write-dark-en.gif" width="860" alt="Naming a memory, typing a checklist, ticking two items, highlighting a line and changing the memory's colour">
+  </picture>
+</p>
+
+Name it with a double-click on the top bar, type `[]` for a checklist, tick items as you go, highlight a line and pick
+a colour. That's all there is to learn.
+
+## Keep related memories together
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="site/media/group-light-en.gif">
+    <img src="site/media/group-dark-en.gif" width="860" alt="A group bar puts its memories away and brings them back; a memory dropped on the bar joins the group">
+  </picture>
+</p>
+
+A group is a slim bar that holds memories. The arrow tucks them all into the bar and brings them back exactly where
+they were. Drop a memory on a bar to add it.
+
+## Everything in one place
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="site/media/manager-light-en.gif">
+    <img src="site/media/manager-dark-en.gif" width="860" alt="The Memo Manager searches memories, moves one to the trash, restores it from the trash and reopens it">
+  </picture>
+</p>
+
+The **Memo Manager** lists every memory, open or closed. Search them, reopen one with a click, move it to a group or
+sort the list. Sent something to the trash by mistake? Restore it: the trash keeps memories for 30 days.
+
+## Get Memo
+
+Download the installer for your computer from the **[latest release](https://github.com/DanielAkio/memo/releases/latest)**:
+
+| Your computer | File to download |
 | --- | --- |
-| Windows 10/11 | `…-setup.exe` (recommended) or `.msi` |
-| macOS on Apple Silicon (M1, M2…) | `.dmg` with `aarch64` in its name |
-| macOS on Intel | `.dmg` with `x64` in its name |
-| Linux (Ubuntu, Debian, Mint…) | `.deb` |
-| Linux (Fedora, openSUSE…) | `.rpm` |
-| Linux (any distribution) | `.AppImage` |
+| Windows 10 or 11 | the one ending in `-setup.exe` |
+| Mac with Apple chip (M1, M2…) | the `.dmg` with `aarch64` in its name |
+| Mac with Intel chip | the `.dmg` with `x64` in its name |
+| Linux | `.deb` (Ubuntu, Debian, Mint), `.rpm` (Fedora, openSUSE) or `.AppImage` (any) |
 
-> No release yet? One is on its way: on GitHub, **Watch → Custom → Releases** tells you when it is out.
+Open it, and Memo greets you with a welcome memory that shows the basics. Closing a memory never deletes it, and
+closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.
 
-## First launch
+<details>
+<summary><b>Your computer warns you the first time?</b></summary>
 
-The installers are **not code-signed** yet, so your system may be wary the first time. That is expected and only
-happens once:
+Memo is new and its installers aren't signed yet, so your system may be cautious the first time. It only happens
+once:
 
-- **Windows**: if SmartScreen says "Windows protected your PC", click **More info → Run anyway**. The installer asks
-  whether Memo should start with the system.
-- **macOS**: drag Memo to Applications. The first time, right-click the app → **Open**; if macOS still blocks it, go
-  to **System Settings → Privacy & Security** and click **Open Anyway**. If it says the app "is damaged", run
+- **Windows**: if you see "Windows protected your PC", click **More info → Run anyway**.
+- **macOS**: drag Memo to Applications, then right-click it → **Open**. If macOS still refuses, go to **System
+  Settings → Privacy & Security** and click **Open Anyway**. If it says the app "is damaged", run
   `xattr -cr /Applications/Memo.app` in Terminal and open it again.
 - **Linux**: install the `.deb` or `.rpm` with your package manager, or make the `.AppImage` executable
   (`chmod +x Memo*.AppImage`) and run it.
 
-On launch, Memo shows the **Memo Manager** and a welcome memory that explains the basics. Closing the last memory
-doesn't quit the app: it stays in the tray (the menu bar, on Mac).
+</details>
 
-## Getting started
+## Ideas and bug reports
 
-| To… | Do |
-| --- | --- |
-| Create a memory | The `+` button, `Ctrl+N` (`⌘N` on Mac) or the Memo tray icon |
-| Pin it on top of everything | Click the pin on the left of the titlebar, or `Ctrl+Shift+P` (`⌘⇧P`) |
-| Give it a title | Double-click the titlebar; `Enter` saves, `Esc` cancels |
-| Change its colour | Click the coloured dot next to the title |
-| Titlebar commands | Right-click the titlebar: rename, pin, colour, new memory, close (groups and the manager too) |
-| Checklist | Type `[]` at the start of a line; click the box to check it |
-| Bulleted list | Type `- ` at the start of a line; `Tab` / `Shift+Tab` change the indent |
-| Format | Select text and use the bar that appears, or `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+H` |
-| Code | `` `text` `` for inline code; ` ```sql ` + `Enter` opens a code block |
-| Image | Paste it with `Ctrl+V` (`⌘V`); click it and drag its bottom-right corner to resize it |
-| Close | `✕` or a middle click on the titlebar; it stays in the Manager, where you reopen it |
-| Delete | Only with the Manager's trash button (restorable for 30 days) |
-| Group | In the Manager, the folder-with-`+` button, or "New group" in a memory's footer; then drop memories on the bar |
-| See everything, search, settings | Memo Manager: Memories, Groups, Settings and Help tabs |
-| Tray menu | Right-click the Memo tray icon: new memory or group, show all, Manager, Trash, Settings, Help, theme, language, start with the system, sync now, quit |
-| Quit | Tray icon → Quit Memo |
+Memo gets better with your feedback. **[Report a bug](https://github.com/DanielAkio/memo/issues/new?template=bug_report.yml)**
+or **[suggest an improvement](https://github.com/DanielAkio/memo/issues/new?template=feature_request.yml)**, in
+English or Portuguese. If someone already asked for the same thing in the
+[open issues](https://github.com/DanielAkio/memo/issues), a 👍 on it helps too.
 
-The Manager's **Help** tab has a full guide to every feature, with demos and shortcuts.
-
-## Where your memories live
-
-Everything is saved automatically, on your computer:
-
-- Windows: `%APPDATA%\memo\`
-- macOS: `~/Library/Application Support/memo/`
-- Linux: `~/.local/share/memo/`
-
-In **Settings → Storage** you can change the folder (a synced Dropbox or OneDrive folder takes your memories to other
-computers), export a `.json` backup and import it back.
-
-### Google Drive sync
-
-Memo can connect a Google account in Memo Manager → Settings → Sync, to keep the memories in a hidden Memo folder of
-your own Google Drive and use them on several computers. Only the content syncs (text, title, colour, group, trash);
-window positions, size and pin stay on each computer, and without connecting everything stays local. A memory created
-on another computer shows up closed in the Manager; if the same memory is edited in two places before syncing, the newer
-version wins and the other is kept in the trash with "(conflict)" in its title. The section only shows in builds made
-with a Google OAuth client (for local builds, put it in `.env`, see `.env.example`) — see [`docs/google-cloud.md`](docs/google-cloud.md).
-
-## Uninstalling
-
-- **Windows**: Settings → Apps → Installed apps → Memo → Uninstall.
-- **macOS**: quit Memo from the menu bar and drag `Memo.app` from Applications to the Trash.
-- **Linux**: `sudo apt remove memo` (`.deb`) or `sudo dnf remove memo` (`.rpm`); for the AppImage, delete the file.
-
-Uninstalling keeps your memories. To remove them too, delete the folder listed above (or the one you chose in
-Settings → Storage).
-
-## Linux and Wayland
-
-Wayland doesn't let an app put itself "always on top", so Memo runs through XWayland automatically and the pin works
-on GNOME, KDE and the like.
-
-## Found a problem or have an idea?
-
-Every suggestion and bug report helps Memo get better:
-
-- **[Report a bug](https://github.com/DanielAkio/memo/issues/new?template=bug_report.yml)**: tell what you did, what
-  you expected and what happened, and which system and Memo version you use.
-- **[Suggest an improvement](https://github.com/DanielAkio/memo/issues/new?template=feature_request.yml)**: describe
-  the idea and the problem it solves.
-
-Before opening one, check the [open issues](https://github.com/DanielAkio/memo/issues): if someone already asked for
-the same thing, a 👍 on it helps. You need a free GitHub account. Write in English or Portuguese.
+---
 
 ## For developers
 
-Memo is built with [Tauri 2](https://v2.tauri.app): a Rust backend (`src-tauri/`) and a plain HTML/CSS/JS frontend
-(`src/`, no bundler). Prerequisites: [Rust](https://rustup.rs), Node.js 18+ and
-[Tauri's system dependencies](https://v2.tauri.app/start/prerequisites/) (on Debian/Ubuntu:
-`sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev build-essential`).
-
-```bash
-npm install
-npm run dev      # run in development mode (also "Run in dev mode" in VS Code)
-npm run build    # installer for the current OS in src-tauri/target/release/bundle/
-```
-
-- **Windows installer without a toolchain**: with Docker running,
-  `docker compose -f docker/compose.yml run --build --rm windows` puts the NSIS `*-setup.exe` in `dist/`.
-- **All platforms**: the manual workflow in `.github/workflows/build.yml` (Actions → Build → Run workflow) builds
-  Windows, macOS (Apple Silicon and Intel) and Linux installers; run from a version tag, it also creates a draft
-  release. With SignPath set up it also signs the Windows installers ([`docs/code-signing.md`](docs/code-signing.md)).
-- The visual reference is [`docs/style.md`](docs/style.md); [`CLAUDE.md`](CLAUDE.md) describes the architecture and
-  conventions.
-
-Older versions saved to a folder named `br.memo.notas` (or `br.taxinha.notas`); on first launch Memo copies that data
-into `memo` and keeps the old folder as a backup.
-
-## Code signing policy
-
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
-[SignPath Foundation](https://signpath.org).
-
-- Committers and reviewers: [Daniel Akio Teixeira](https://github.com/DanielAkio)
-- Approvers: [Daniel Akio Teixeira](https://github.com/DanielAkio)
-
-Only the Windows installers built from this repository by its GitHub Actions workflow are signed, and each signing
-request is approved by hand.
-
-Privacy: this program will not transfer any information to other networked systems unless specifically requested
-by the user or the person installing or operating it. Cloud sync only talks to Google after you connect a Google
-account in the Manager.
+Memo is built with [Tauri 2](https://v2.tauri.app) (Rust + plain HTML/CSS/JS). How to build it, run it in
+development and make installers is in **[docs/development.md](docs/development.md)**. Windows installers are signed
+for free by SignPath Foundation under this [code signing policy](https://danielakio.github.io/memo/code-signing.html).
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). Free to use, share and change.

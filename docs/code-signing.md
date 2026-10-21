@@ -16,8 +16,8 @@ the installers stay unsigned.
 
 ## Setting it up
 
-1. Apply at <https://signpath.org/apply> with the repository URL. The README's "Code signing policy" section is the
-   policy SignPath asks for.
+1. Apply at <https://signpath.org/apply> with the repository URL. The code signing policy page
+   (`site/code-signing.html`, linked from the README) is the policy SignPath asks for.
 2. Once accepted, in SignPath:
    - link the GitHub trusted build system to the project;
    - name the project `memo`, the signing policy `release-signing` and the artifact configuration `installers`

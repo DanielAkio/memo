@@ -301,10 +301,12 @@
         } else if (INLINE[n.nodeName]) {
           const el = to.appendChild(document.createElement(INLINE[n.nodeName]));
           if (el.nodeName === 'CODE') el.spellcheck = false;
+          if (isHighlight(n)) el.style.backgroundColor = HIGHLIGHT;
           copy(n, el);
         } else if (n.nodeName === 'FONT' && SIZES.includes(n.getAttribute('size'))) {
           const font = to.appendChild(document.createElement('font'));
           font.setAttribute('size', n.getAttribute('size'));
+          if (isHighlight(n)) font.style.backgroundColor = HIGHLIGHT;
           copy(n, font);
         } else if (n.nodeName === 'SPAN' && isHighlight(n)) {
           const span = to.appendChild(document.createElement('span'));
@@ -1457,9 +1459,10 @@
   // size of each N. "3" is normal.
   const SIZES = ['2', '3', '5'];
 
-  // Highlight: Chromium (hiliteColor) produces <span style="background-color">.
-  // The stored colour is a fixed sentinel; the real one comes from the theme
-  // (--highlight).
+  // Highlight: Chromium (hiliteColor) produces <span style="background-color">;
+  // WebKit (macOS, Linux) puts the style on an existing <b>/<i>/<u>/<font>
+  // when the selection is exactly one, so those keep it too. The stored colour
+  // is a fixed sentinel; the real one comes from the theme (--highlight).
   const HIGHLIGHT = 'rgb(255, 230, 0)';
   const isHighlight = (n) => Boolean(n.style) && n.style.backgroundColor === HIGHLIGHT;
 
@@ -1470,7 +1473,7 @@
     let n = range.startContainer.childNodes[range.startOffset] || range.startContainer;
     while (n.firstChild) n = n.firstChild;
     for (; n && n !== editor; n = n.parentNode) {
-      if (n.nodeName === 'SPAN' && isHighlight(n)) return true;
+      if (isHighlight(n)) return true;
     }
     return false;
   }

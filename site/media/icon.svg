@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Memo — app icon. Só a tachinha, centralizada sobre fundo transparente
+       (a caixa da tachinha girada vai de -212 a 325 nos dois eixos). -->
+  <g transform="translate(512 512) scale(1.6) translate(-56.5 56.5) rotate(45)">
+    <!-- needle -->
+    <polygon points="-15,28 15,28 0,300" fill="#d0d6e0"/>
+    <!-- body -->
+    <polygon points="-104,-232 104,-232 132,-30 -132,-30" fill="#e4f222"/>
+    <!-- collar -->
+    <rect x="-200" y="-44" width="400" height="72" rx="30" fill="#e4f222"/>
+    <!-- cap -->
+    <rect x="-160" y="-300" width="320" height="72" rx="30" fill="#e4f222"/>
+  </g>
+</svg>

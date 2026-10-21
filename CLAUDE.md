@@ -47,7 +47,9 @@ src-tauri/
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
   capabilities/default.json  permissions for note-*, group-* and manager windows
 site/                    GitHub Pages home page + privacy policy (en, pt/) for Google's consent screen
+  media/                 demo GIFs (<scene>-<dark|light>-<en|pt>.gif), also used by README.md
 docs/google-cloud.md     Google Cloud project / OAuth client setup for cloud sync
+docs/development.md      building, running, installers, sync builds (moved out of the README)
 docs/code-signing.md     Windows installer signing through SignPath Foundation (CI setup)
 docs/style.md            visual reference ("Linear"-style dark system); base.css tokens are what the app uses
 ```
@@ -74,7 +76,7 @@ Tokens spent on things that don't help understand or change the project are wast
 
 - **Every feature works on Windows, macOS and Linux.** Native APIs get an implementation per OS (`#[cfg(windows)]` / `target_os = "macos"` / `"linux"`, crates already in the tree) plus a fallback. Linux runs under X11 (XWayland forced); macOS transparency needs `macos-private-api`. Verify other targets before claiming they work (`memo-checks`).
 - **Consistent usability across components — always.** Notes, group bars and the manager are the same kind of window: same titlebar order (pin far left, colour control, name, action buttons on the right, always visible), same icons for the same action (Help demos included), same gestures (`chrome.js` drag/Snap/resize; titlebar double-click renames notes and groups; middle click = ✕; Mod+Shift+P pins; Mod+N new note; Esc cancels, Enter confirms), same outcomes (names start empty and read "Sem título"/"Untitled"; same colour labels and picker; trash only from the manager; emptying the trash and quitting ask for a second click; reuse existing `i18n.js` keys). A change to one component applies to all where it makes sense, in the same change — or say why not. A feature shown in one place shows wherever that object appears (e.g. a group's name and colour in its bar, note footers, pickers and the manager).
-- Keep the Help tab (`HELP` in `i18n.js`, with demos), `welcome.rs`, README, this file and the skills in step with feature changes.
+- Keep the Help tab (`HELP` in `i18n.js`, with demos), `welcome.rs`, README, this file and the skills in step with feature changes. The README and `site/` speak to users, not developers: benefits and usage first, technical detail in `docs/development.md`.
 - **Tray menu:** every new feature that makes sense as a command (no window needed: create, open a tab, toggle a setting, run an action) also goes in the tray icon's right-click menu (`build_tray_menu` / `on_tray_menu`, labels in `tray_labels`; see `memo-windows`).
 - **Colour labels** stay in sync in three places: `COLORS` in `store.rs`, the `.swatch` buttons in `index.html` / `group.html` / `manager.html`, and `[data-color=...]` rules in `base.css`. `lavender` is legacy (valid, not offered). `""` = no colour; `mono` = `--color-paper` (white in dark, black in light); `#rrggbb` = custom (`is_valid_color`, inline `--note-color`, `data-color="custom"`); default `DEFAULT_COLOR` = `iris` (purple).
 - **Model:** `#[serde(rename_all = "camelCase", default)]` — new fields need a `Default` and appear camelCase in JS. File format `version: 1`.
