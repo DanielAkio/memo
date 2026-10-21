@@ -3,6 +3,7 @@
 
 mod cloud;
 mod images;
+mod mcp;
 mod store;
 mod sync;
 mod welcome;
@@ -258,6 +259,7 @@ struct TrayLabels {
     dark: &'static str,
     language: &'static str,
     autostart: &'static str,
+    ai_control: &'static str,
     sync: &'static str,
     quit: &'static str,
 }
@@ -278,6 +280,7 @@ fn tray_labels(lang: &str) -> TrayLabels {
             dark: "Dark",
             language: "Language",
             autostart: "Start with the system",
+            ai_control: "AI control (MCP)",
             sync: "Sync now",
             quit: "Quit Memo",
         }
@@ -296,6 +299,7 @@ fn tray_labels(lang: &str) -> TrayLabels {
             dark: "Escuro",
             language: "Idioma",
             autostart: "Iniciar com o sistema",
+            ai_control: "Controle por IA (MCP)",
             sync: "Sincronizar agora",
             quit: "Sair do Memo",
         }
@@ -1417,15 +1421,20 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
 /// goes the way `trash` sends it: deleted outright.
 #[tauri::command]
 async fn close_note(app: AppHandle, window: WebviewWindow) {
-    let id = id_of(&window);
+    close_note_by_id(&app, &id_of(&window));
+}
+
+fn close_note_by_id(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
-    match store.get(&id) {
-        Some(note) if note.welcome_copy || store.is_pristine(&note) => trash(&app, &id),
+    match store.get(id) {
+        Some(note) if note.welcome_copy || store.is_pristine(&note) => trash(app, id),
         Some(_) => {
-            store.update(&id, |n| n.hidden = true);
+            store.update(id, |n| n.hidden = true);
             store.flush();
-            let _ = window.destroy();
-            notify(&app);
+            if let Some(window) = app.get_webview_window(&label_for(id)) {
+                let _ = window.destroy();
+            }
+            notify(app);
         }
         None => {}
     }
@@ -2392,6 +2401,31 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
     manager.is_enabled().map_err(|e| e.to_string())
 }
 
+/// Settings → AI control: whether it is on, and the executable MCP clients
+/// launch (`<path> --mcp`), for the setup snippets.
+#[tauri::command]
+fn get_ai_control(app: AppHandle) -> Result<(bool, String), String> {
+    let dir = default_data_dir(&app).map_err(|e| e.to_string())?;
+    let exe = mcp::app_path().map(|p| p.display().to_string()).unwrap_or_default();
+    Ok((mcp::enabled(&dir), exe))
+}
+
+#[tauri::command]
+fn set_ai_control(app: AppHandle, on: bool) -> Result<bool, String> {
+    toggle_ai_control(&app, on)?;
+    Ok(on)
+}
+
+/// Turns AI control on or off (Settings switch or tray item); the manager's
+/// switch and the tray follow.
+fn toggle_ai_control(app: &AppHandle, on: bool) -> Result<(), String> {
+    let dir = default_data_dir(app).map_err(|e| e.to_string())?;
+    mcp::set_enabled(app, &dir, on)?;
+    let _ = app.emit("ai-control-changed", on);
+    refresh_tray(app);
+    Ok(())
+}
+
 /// Configurações → Sincronização: whether this build can connect a Google
 /// account, the one connected on this computer and how syncing goes.
 #[tauri::command]
@@ -2623,6 +2657,9 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         None::<&str>,
     )?;
 
+    let ai_control = default_data_dir(app).is_ok_and(|dir| mcp::enabled(&dir));
+    let ai_control_item = check("ai-control", l.ai_control, ai_control)?;
+
     let new_note = item("new", l.new_note)?;
     let new_group = item("new-group", l.new_group)?;
     let show = item("show", l.show)?;
@@ -2658,6 +2695,7 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &theme_menu,
         &language_menu,
         &autostart_item,
+        &ai_control_item,
     ];
     // "Sync now" only with a Google account connected on this computer.
     if cloud_account(app).is_some() {
@@ -2703,6 +2741,13 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
             // The manager's switch follows.
             let _ = app.emit("autostart-changed", manager.is_enabled().unwrap_or(false));
             refresh_tray(app);
+        }
+        "ai-control" => {
+            let on = default_data_dir(app).is_ok_and(|dir| !mcp::enabled(&dir));
+            if let Err(err) = toggle_ai_control(app, on) {
+                eprintln!("memo: ai control: {err}");
+                refresh_tray(app);
+            }
         }
         "sync" => sync::sync_now(app),
         "quit" => {
@@ -2784,6 +2829,12 @@ fn migrate_old_data(dir: &Path) {
 }
 
 fn main() {
+    // `memo --mcp`: the stdio MCP server AI assistants launch (mcp.rs), not
+    // the app.
+    if std::env::args().any(|a| a == mcp::ARG) {
+        std::process::exit(mcp::bridge());
+    }
+
     // On Wayland the compositor ignores "always on top". Running through
     // XWayland, pinning works on GNOME, KDE and the like.
     #[cfg(target_os = "linux")]
@@ -2871,6 +2922,8 @@ fn main() {
             delete_group_forever,
             get_autostart,
             set_autostart,
+            get_ai_control,
+            set_ai_control,
             get_cloud_account,
             connect_cloud,
             cancel_cloud_connect,
@@ -2939,6 +2992,11 @@ fn main() {
                 }
             }
             sync::start(&handle);
+            if mcp::enabled(&default_dir) {
+                if let Err(err) = mcp::start(&handle, &default_dir) {
+                    eprintln!("memo: mcp: {err}");
+                }
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -2951,7 +3009,10 @@ fn main() {
                 api.prevent_exit();
             }
         }
-        RunEvent::Exit => app.state::<Shared>().flush(),
+        RunEvent::Exit => {
+            app.state::<Shared>().flush();
+            mcp::stop();
+        }
         // Clicking the Dock icon brings the notes to the front and opens the manager.
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => {

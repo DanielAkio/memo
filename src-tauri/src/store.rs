@@ -430,6 +430,9 @@ pub struct Config {
     /// E-mail of the Google account connected for cloud sync on this
     /// computer (its token is in the OS credential store, see cloud.rs).
     pub google_account: Option<String>,
+    /// AI assistants may control Memo through MCP on this computer (see
+    /// mcp.rs). Off by default.
+    pub ai_control: bool,
 }
 
 impl Config {
