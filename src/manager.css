@@ -946,6 +946,16 @@ textarea.field { resize: vertical; min-height: 84px; }
 .setting[hidden] { display: none; }
 /* AI control: the client picker takes the row, the Copy button keeps its size. */
 .ai-setup .select { flex: 1 1 12em; min-width: 0; }
+/* AI control: one row per MCP client found, its state and its button. */
+.ai-clients { margin: 0; padding: 0; list-style: none; }
+.ai-client { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 2px 0; }
+.ai-client-text { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.ai-client-name,
+.ai-client-state { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-client-name { color: var(--color-mist); font-size: 13px; }
+.ai-client-state { color: var(--color-fog); font-size: 12px; }
+.ai-client-state:empty { display: none; }
+.ai-client .btn { flex: none; }
 .setting-label .info { margin-left: 4px; vertical-align: 1px; }
 
 /* Current data folder: full path, selectable so it can be copied. */

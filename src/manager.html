@@ -227,11 +227,20 @@
           <!-- On/off switch: the MCP server (mcp.rs). Off by default. -->
           <button type="button" class="switch" id="aiControlSwitch" role="switch" aria-checked="false" aria-labelledby="aiControlLabel"></button>
         </div>
-        <div class="setting setting-top" id="aiSetup" hidden>
-          <span class="setting-label" data-i18n="aiConnect"></span>
+        <div class="setting setting-top" id="aiClientsRow" hidden>
+          <span class="setting-label" data-i18n="aiApps"></span>
           <div class="field-wrap">
-            <!-- Any MCP client: pick its config format, copy, paste. App names
-                 are not translated. -->
+            <!-- The MCP clients installed here (clients.rs): Connect adds Memo
+                 to the app's config file. Filled by manager.js. -->
+            <ul class="ai-clients" id="aiClients"></ul>
+            <p class="storage-status" id="aiClientsStatus" role="status"></p>
+          </div>
+        </div>
+        <div class="setting setting-top" id="aiSetup" hidden>
+          <span class="setting-label" data-i18n="aiManual"></span>
+          <div class="field-wrap">
+            <!-- Any other MCP client: pick its config format, copy, paste. App
+                 names are not translated. -->
             <div class="app-actions ai-setup">
               <select class="field select" id="aiAppSelect" data-i18n-attr="aria-label=aiApp,title=aiApp">
                 <option value="json">JSON: Claude Desktop, Cursor, Gemini…</option>

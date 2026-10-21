@@ -1093,9 +1093,10 @@
   window.__TAURI__.app.getVersion()
     .then((v) => { $('appVersion').textContent = v; })
     .catch((err) => console.error('getVersion', err));
-  // AI control (MCP, mcp.rs): the switch, and the setup for any MCP client,
-  // which launches "<Memo's executable> --mcp" (stdio): pick the client's
-  // config format, copy, paste.
+  // AI control (MCP, mcp.rs): the switch; the MCP clients installed here,
+  // which Connect sets up by editing their config (clients.rs); and, for any
+  // other client, which launches "<Memo's executable> --mcp" (stdio): pick
+  // its config format, copy, paste.
   const aiSwitch = $('aiControlSwitch');
   let aiExe = '';
   let aiCopied = '';
@@ -1108,14 +1109,66 @@
     codex: { hint: 'aiHintTerminal', text: () => `codex mcp add memo -- ${aiCommand()}` },
     command: { hint: 'aiHintCommand', text: aiCommand },
   };
+  let aiClients = [];
+  let aiClientsNote = { key: 'aiAppsHint' };
   function renderAi(on) {
     aiSwitch.setAttribute('aria-checked', String(on));
     $('aiSetup').hidden = !on || !aiExe;
+    $('aiClientsRow').hidden = !on || !aiExe;
     $('aiStatus').textContent = t(aiCopied || 'aiPickApp', { cmd: aiCommand() });
+    renderAiClients();
+  }
+  function renderAiClients() {
+    const list = $('aiClients');
+    list.replaceChildren(...aiClients.map((client) => {
+      const row = document.createElement('li');
+      row.className = 'ai-client';
+      const name = document.createElement('span');
+      name.className = 'ai-client-name';
+      name.textContent = client.name;
+      const state = document.createElement('span');
+      state.className = 'ai-client-state';
+      state.textContent = client.unreadable ? t('aiUnreadable')
+        : client.current ? t('aiConnected')
+        : client.connected ? t('aiOtherCopy') : '';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn';
+      btn.disabled = client.unreadable;
+      btn.textContent = t(client.current ? 'aiDisconnect' : client.connected ? 'aiUpdate' : 'aiConnect');
+      btn.addEventListener('click', () => connectAiClient(client, !client.current));
+      const text = document.createElement('span');
+      text.className = 'ai-client-text';
+      text.append(name, state);
+      row.append(text, btn);
+      return row;
+    }));
+    const note = aiClients.length ? aiClientsNote : { key: 'aiNoApps' };
+    $('aiClientsStatus').textContent = t(note.key, { app: note.app });
+  }
+  async function loadAiClients() {
+    try {
+      aiClients = await invoke('get_ai_clients');
+    } catch (err) {
+      console.error('get_ai_clients', err);
+    }
+    renderAiClients();
+  }
+  async function connectAiClient(client, on) {
+    try {
+      aiClients = await invoke('connect_ai_client', { id: client.id, on });
+      aiClientsNote = { key: on ? 'aiDidConnect' : 'aiDidDisconnect', app: client.name };
+    } catch (err) {
+      aiClientsNote = { key: 'aiConnectFailed', app: client.name };
+      console.error('connect_ai_client', err);
+    }
+    renderAiClients();
   }
   aiSwitch.addEventListener('click', async () => {
     const on = aiSwitch.getAttribute('aria-checked') !== 'true';
     aiCopied = '';
+    aiClientsNote = { key: 'aiAppsHint' };
+    if (on) loadAiClients();
     renderAi(on);
     try {
       renderAi(await invoke('set_ai_control', { on }));
@@ -1125,10 +1178,18 @@
     }
   });
   // The tray's "AI control" item.
-  listen('ai-control-changed', (e) => renderAi(e.payload));
+  listen('ai-control-changed', (e) => {
+    renderAi(e.payload);
+    if (e.payload) loadAiClients();
+  });
+  // An app installed, or its config edited, while the manager was away.
+  window.addEventListener('focus', () => {
+    if (aiSwitch.getAttribute('aria-checked') === 'true') loadAiClients();
+  });
   invoke('get_ai_control').then(([on, exe]) => {
     aiExe = exe;
     renderAi(on);
+    if (on) loadAiClients();
   }).catch((err) => {
     aiSwitch.disabled = true;
     console.error('get_ai_control', err);
