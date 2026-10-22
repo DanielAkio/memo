@@ -100,6 +100,9 @@ Download the installer for your computer from the **[latest release](https://git
 Open it, and Memo greets you with a welcome memory that shows the basics. Closing a memory never deletes it, and
 closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.
 
+You only download it once: when a new version is out, Memo tells you in the tray menu and in Settings, and one click
+updates it and opens it again, memories and all.
+
 <details>
 <summary><b>Your computer warns you the first time?</b></summary>
 

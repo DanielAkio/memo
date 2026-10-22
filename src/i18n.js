@@ -551,7 +551,7 @@ window.MemoI18n = (() => {
         title: 'Gerenciador do Memo',
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
-          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema e o controle por IA, sincronizar agora e sair.'],
+          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema e o controle por IA, sincronizar agora, procurar atualizações e sair.'],
           ['Aba Grupos', 'Lista os grupos como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele para a frente; os botões da linha soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
           ['Novo grupo e trazer para a frente', 'O botão de pasta com + na barra do Gerenciador (ou "Novo grupo" no menu … de qualquer barra) cria um grupo vazio ao lado da janela. No menu … do Gerenciador, "Trazer todas as memórias para a frente" as coloca na frente das outras janelas, inclusive as minimizadas.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
@@ -580,6 +580,8 @@ window.MemoI18n = (() => {
             '<span class="demo-switch on"></span>'],
           ['Controle por IA (MCP)', 'Ligue em Configurações → Controle por IA (ou no menu da bandeja) e clique em Conectar ao lado do seu app de IA (Claude, Cursor, VS Code com Copilot, Gemini CLI, Cline, Codex…); para outro app compatível com MCP, copie a configuração. Depois é só pedir, como "crie uma memória com a lista de compras" ou "fixe a memória do projeto": a IA lista, lê, cria, edita, fixa, colore, agrupa e manda para a lixeira. Vem desligado; excluir de vez continua só no Gerenciador.',
             '<span class="demo-switch on"></span>'],
+          ['Atualizações', 'O Memo procura versões novas sozinho ao abrir e a cada poucas horas. Quando sai uma, aparece "Atualizar para a versão…" no menu da bandeja e "Atualizar e reiniciar" em Configurações → Aplicativo: um clique baixa, instala e abre o Memo de novo, sem perder nada. Para procurar na hora, use "Procurar atualizações" nos mesmos lugares; para não ser avisado, desligue "Avisar de novas versões".',
+            '<span class="demo-field">Atualizar e reiniciar</span>'],
           ['Sair', 'Fechar as memórias não encerra o app, que continua na bandeja. Use "Sair do Memo" na bandeja ou em Configurações.'],
         ],
       },
@@ -667,7 +669,7 @@ window.MemoI18n = (() => {
         title: 'Memo Manager',
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
-          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system and AI control on or off, sync now and quit.'],
+          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system and AI control on or off, sync now, check for updates and quit.'],
           ['Groups tab', 'Lists the groups like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar to the front; the row’s buttons take its memories out / put them away and move the group to the trash.'],
           ['New group and bring to front', 'The folder-with-+ button in the Manager’s bar (or "New group" in the … menu of any bar) creates an empty group next to the window. In the Manager’s … menu, "Bring all memories to the front" puts them in front of other windows, minimized ones included.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
@@ -696,6 +698,8 @@ window.MemoI18n = (() => {
             '<span class="demo-switch on"></span>'],
           ['AI control (MCP)', 'Turn it on in Settings → AI control (or in the tray menu) and click Connect next to your AI app (Claude, Cursor, VS Code with Copilot, Gemini CLI, Cline, Codex…); for any other MCP-compatible app, copy the setup. Then just ask, like "create a memory with the shopping list" or "pin the project memory": the AI lists, reads, creates, edits, pins, colors, groups and trashes. It starts off; deleting for good stays in the Manager only.',
             '<span class="demo-switch on"></span>'],
+          ['Updates', 'Memo looks for new versions by itself when it opens and every few hours. When one is out, "Update to version…" shows in the tray menu and "Update and restart" in Settings → App: one click downloads it, installs it and opens Memo again, without losing anything. To look right away, use "Check for updates" in the same places; to stop being told, turn off "Tell me about new versions".',
+            '<span class="demo-field">Update and restart</span>'],
           ['Quit', 'Closing memories doesn’t quit the app, which stays in the tray. Use "Quit Memo" in the tray or in Settings.'],
         ],
       },
