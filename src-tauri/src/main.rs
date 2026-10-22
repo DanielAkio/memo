@@ -263,6 +263,8 @@ struct TrayLabels {
     autostart: &'static str,
     ai_control: &'static str,
     sync: &'static str,
+    check_updates: &'static str,
+    update_to: &'static str,
     quit: &'static str,
 }
 
@@ -284,6 +286,8 @@ fn tray_labels(lang: &str) -> TrayLabels {
             autostart: "Start with the system",
             ai_control: "AI control (MCP)",
             sync: "Sync now",
+            check_updates: "Check for updates",
+            update_to: "Update to version",
             quit: "Quit Memo",
         }
     } else {
@@ -303,6 +307,8 @@ fn tray_labels(lang: &str) -> TrayLabels {
             autostart: "Iniciar com o sistema",
             ai_control: "Controle por IA (MCP)",
             sync: "Sincronizar agora",
+            check_updates: "Procurar atualizações",
+            update_to: "Atualizar para a versão",
             quit: "Sair do Memo",
         }
     }
@@ -2863,6 +2869,14 @@ fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKi
         items.push(item("sync", l.sync)?.kind());
     }
     items.push(separator()?);
+    // A newer version found (updater.rs) replaces "Check for updates".
+    items.push(
+        match updater::status().available {
+            Some(version) => item("update", &format!("{} {version}", l.update_to))?,
+            None => item("check-updates", l.check_updates)?,
+        }
+        .kind(),
+    );
     // The running version, greyed out: shows at a glance which build is open.
     items.push(
         MenuItem::with_id(
@@ -3035,6 +3049,17 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
             }
         }
         "sync" => sync::sync_now(app),
+        // Both answer in Settings, which shows the check and the download.
+        "check-updates" => {
+            open_manager_view(app, "settings", Some("update"));
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move { updater::check(&app, true).await });
+        }
+        "update" => {
+            open_manager_view(app, "settings", Some("update"));
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move { updater::install(&app).await });
+        }
         "quit" => {
             app.state::<Shared>().flush();
             app.exit(0);
