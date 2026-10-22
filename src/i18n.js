@@ -514,7 +514,7 @@ window.MemoI18n = (() => {
       {
         title: 'Escrever',
         items: [
-          ['Só com o mouse', 'Tudo o que se digita também tem botão. Com um trecho selecionado, a barrinha traz formatação, checklist, lista, lista numerada e bloco de código para as linhas selecionadas. O botão Aa no rodapé abre a barrinha embaixo do texto: com o cursor parado, cada botão insere um elemento novo e vazio para você escrever dentro (uma caixa, um item, um bloco de código ou um código na linha); com um trecho selecionado, formata o trecho. Qualquer clique fora dela a recolhe. E o menu … (ou o clique direito na barra) tem Formatar, com todos os comandos.'],
+          ['Só com o mouse', 'Tudo o que se digita também tem botão. Com um trecho selecionado, a barrinha traz formatação, checklist, lista, lista numerada e bloco de código para as linhas selecionadas. O botão Aa no rodapé abre a barrinha embaixo do texto: com o cursor parado, cada botão insere um elemento novo e vazio para você escrever dentro (uma caixa, um item, um bloco de código ou um código na linha); com um trecho selecionado, formata o trecho. Ela se recolhe depois de cada botão e com qualquer clique fora dela. E o menu … (ou o clique direito na barra) tem Formatar, com todos os comandos.'],
           ['Formatação', 'Selecione um trecho e use a barrinha que aparece, ou {{Mod+B}}, {{Mod+I}} e {{Mod+U}}. {{←}} e {{→}} param na borda do trecho formatado: ali você continua escrevendo com a formatação, e mais um toque para fora escreve sem ela.',
             '<b>negrito</b>, <i>itálico</i> e <u>sublinhado</u>'],
           ['Marca-texto', '{{Mod+Shift+H}} ou o marcador na barrinha. {{←}} e {{→}} param na borda do trecho marcado antes de entrar ou sair dele.',
@@ -636,7 +636,7 @@ window.MemoI18n = (() => {
       {
         title: 'Writing',
         items: [
-          ['Mouse only', 'Everything you can type also has a button. With text selected, the bar has formatting, checklist, bulleted and numbered lists and code block for the selected lines. The Aa button in the footer opens that bar under the text: with just the caret, each button adds a new, empty element to type in (a box, an item, a code block or inline code); with text selected, it formats it. Any click outside it folds it away. And the … menu (or a right click on the titlebar) has Format, with every command.'],
+          ['Mouse only', 'Everything you can type also has a button. With text selected, the bar has formatting, checklist, bulleted and numbered lists and code block for the selected lines. The Aa button in the footer opens that bar under the text: with just the caret, each button adds a new, empty element to type in (a box, an item, a code block or inline code); with text selected, it formats it. It folds away after each button and on any click outside it. And the … menu (or a right click on the titlebar) has Format, with every command.'],
           ['Formatting', 'Select some text and use the bar that appears, or {{Mod+B}}, {{Mod+I}} and {{Mod+U}}. {{←}} and {{→}} stop at the formatted text’s edge: typing there keeps the formatting, and one more press outwards types without it.',
             '<b>bold</b>, <i>italic</i> and <u>underline</u>'],
           ['Highlight', '{{Mod+Shift+H}} or the marker in the bar. {{←}} and {{→}} stop at the highlight’s edge before going in or out.',
