@@ -1762,19 +1762,26 @@
 
   // Lines (not code blocks) the selection touches, or the caret's line. A
   // selection ending at the very start of a line (a triple click) leaves
-  // that line out.
+  // that line out, and so does one starting at the very end of a line (a
+  // drag begun past the end of the line above).
   function touchedLines() {
     const sel = getSelection();
     if (!sel.rangeCount) return [];
     const range = sel.getRangeAt(0);
     const lines = selectedBlocks().filter((b) => b.nodeName === 'DIV');
-    return lines.filter((b, i) => {
-      if (i === 0 || range.collapsed) return true;
+    if (range.collapsed) return lines;
+    const touched = lines.filter((b, i) => {
       const r = document.createRange();
-      r.setStart(b, 0);
-      r.setEnd(range.endContainer, range.endOffset);
-      return r.toString() !== '' || b.querySelector('img');
+      if (i === 0) {
+        r.setStart(range.startContainer, range.startOffset);
+        r.setEnd(b, b.childNodes.length);
+      } else {
+        r.setStart(b, 0);
+        r.setEnd(range.endContainer, range.endOffset);
+      }
+      return r.toString().replace(ZWSP, '') !== '' || b.querySelector('img') || lines.length === 1;
     });
+    return touched.length ? touched : lines.slice(0, 1);
   }
 
   // Checklist / bulleted / numbered list from the buttons and menus: the
