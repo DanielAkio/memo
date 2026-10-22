@@ -555,11 +555,13 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   -webkit-user-select: none;
 }
 .format-bar[hidden] { display: none; }
+/* Wraps onto a second row in a narrow note instead of being cut. */
+.format-bar { flex-wrap: wrap; max-width: calc(100vw - 8px); }
 
 .fmt-btn {
   display: grid;
   place-items: center;
-  width: 28px;
+  width: 26px;
   height: 26px;
   padding: 0;
   border: 0;
@@ -578,9 +580,10 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 
 .fmt-mark svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .fmt-mark[aria-pressed="true"] { color: var(--color-paper); }
+.fmt-mark svg .fill { fill: currentColor; stroke: none; }
 .fmt-sep { width: 1px; margin: 4px 2px; background: var(--color-graphite); }
 .fmt-sizes { display: flex; gap: 2px; }
-.fmt-size { width: 24px; font-weight: 500; }
+.fmt-size { width: 22px; font-weight: 500; }
 .fmt-size.sz-s { font-size: 11px; }
 .fmt-size.sz-m { font-size: 14px; }
 .fmt-size.sz-l { font-size: 18px; }

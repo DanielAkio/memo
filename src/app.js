@@ -741,19 +741,22 @@
     return line && !isListItem(line) && /^```([\w+#.-]*)$/.exec(line.textContent.trim());
   }
 
-  function openCodeBlock(line, lang) {
+  // Replaces `line` with a code block, empty or holding `text` (then the
+  // caret goes to its end).
+  function openCodeBlock(line, lang, text = '') {
     const pre = document.createElement('pre');
     pre.className = 'code';
     pre.spellcheck = false;
     const clean = codeLang(lang);
     if (clean) pre.dataset.lang = clean;
-    pre.appendChild(document.createElement('br'));
+    if (text) pre.textContent = text;
+    else pre.appendChild(document.createElement('br'));
     line.replaceWith(pre);
     if (!pre.nextElementSibling) {
       pre.after(document.createElement('div'));
       pre.nextElementSibling.appendChild(document.createElement('br'));
     }
-    caretIn(pre);
+    caretIn(pre, Boolean(text));
     onContentChanged();
   }
 
@@ -1756,6 +1759,105 @@
     scheduleFormatBar();
   }
 
+  // Lines (not code blocks) the selection touches, or the caret's line. A
+  // selection ending at the very start of a line (a triple click) leaves
+  // that line out.
+  function touchedLines() {
+    const sel = getSelection();
+    if (!sel.rangeCount) return [];
+    const range = sel.getRangeAt(0);
+    const lines = selectedBlocks().filter((b) => b.nodeName === 'DIV');
+    return lines.filter((b, i) => {
+      if (i === 0 || range.collapsed) return true;
+      const r = document.createRange();
+      r.setStart(b, 0);
+      r.setEnd(range.endContainer, range.endOffset);
+      return r.toString() !== '' || b.querySelector('img');
+    });
+  }
+
+  // Checklist / bulleted / numbered list from the buttons and menus: the
+  // touched lines become items of that type, or plain lines again when they
+  // all are already.
+  function toggleList(type) {
+    editor.focus();
+    const lines = touchedLines();
+    if (!lines.length) return;
+    const off = lines.every((b) => b.classList.contains(type));
+    for (const b of lines) {
+      b.classList.remove(...LIST_TYPES, 'done');
+      if (off) delete b.dataset.level;
+      else b.classList.add(type);
+      if (!b.classList.length) b.removeAttribute('class');
+    }
+    onContentChanged();
+    scheduleFormatBar();
+  }
+
+  // Code block from the buttons and menus: the touched lines become one
+  // block with their text (an empty line, an empty block); inside a block,
+  // its text goes back to plain lines.
+  function toggleCodeBlock() {
+    editor.focus();
+    const pre = currentPre();
+    if (pre) {
+      const lines = preText(pre).split('\n').map((text) => {
+        const div = document.createElement('div');
+        if (text) div.textContent = text;
+        else div.appendChild(document.createElement('br'));
+        return div;
+      });
+      pre.replaceWith(...lines);
+      caretIn(lines[lines.length - 1], true);
+      onContentChanged();
+      scheduleFormatBar();
+      return;
+    }
+    const lines = touchedLines();
+    if (!lines.length || lines.some((b) => b.querySelector('img'))) return;
+    const text = lines.map((b) => b.textContent.replace(ZWSP, '')).join('\n');
+    for (const b of lines.slice(1)) b.remove();
+    openCodeBlock(lines[0], '', text);
+    scheduleFormatBar();
+  }
+
+  // Every formatting command by name, for the format bar, the "+" menu, the
+  // titlebar menu and the format tray.
+  const FORMAT_COMMANDS = {
+    bold: () => format('bold'),
+    italic: () => format('italic'),
+    underline: () => format('underline'),
+    highlight: toggleHighlight,
+    code: toggleCode,
+    check: () => toggleList('check'),
+    bullet: () => toggleList('bullet'),
+    number: () => toggleList('number'),
+    codeBlock: toggleCodeBlock,
+  };
+
+  // Whether a command is on for the selection or the caret's line.
+  function formatState(cmd) {
+    if (cmd === 'highlight') return currentHighlight();
+    if (cmd === 'code') return Boolean(currentCode());
+    if (cmd === 'codeBlock') return Boolean(currentPre());
+    if (LIST_TYPES.includes(cmd)) {
+      const lines = touchedLines();
+      return lines.length > 0 && lines.every((b) => b.classList.contains(cmd));
+    }
+    return document.queryCommandState(cmd);
+  }
+
+  // Pressed state of a toolbar's buttons (format bar, format tray).
+  function renderFormatState(bar) {
+    for (const btn of bar.querySelectorAll('[data-cmd]')) {
+      btn.setAttribute('aria-pressed', String(formatState(btn.dataset.cmd)));
+    }
+    const size = currentSize();
+    for (const btn of bar.querySelectorAll('[data-size]')) {
+      btn.setAttribute('aria-pressed', String(btn.dataset.size === size));
+    }
+  }
+
   // Ctrl+Shift+> / Ctrl+Shift+< step one size up or down.
   function stepSize(dir) {
     const i = SIZES.indexOf(currentSize());
@@ -1783,17 +1885,7 @@
     const rects = range ? [...range.getClientRects()].filter((r) => r.width || r.height) : [];
     if (!rects.length) { hideFormatBar(); return; }
 
-    for (const btn of formatBar.querySelectorAll('[data-cmd]')) {
-      const cmd = btn.dataset.cmd;
-      const on = cmd === 'highlight' ? currentHighlight()
-        : cmd === 'code' ? Boolean(currentCode())
-          : document.queryCommandState(cmd);
-      btn.setAttribute('aria-pressed', String(on));
-    }
-    const size = currentSize();
-    for (const btn of formatBar.querySelectorAll('[data-size]')) {
-      btn.setAttribute('aria-pressed', String(btn.dataset.size === size));
-    }
+    renderFormatState(formatBar);
     formatBar.hidden = false;
 
     const first = rects[0];
@@ -2001,9 +2093,7 @@
     const btn = e.target.closest('[data-cmd], [data-size]');
     if (!btn) return;
     if (btn.dataset.size) setSize(btn.dataset.size);
-    else if (btn.dataset.cmd === 'highlight') toggleHighlight();
-    else if (btn.dataset.cmd === 'code') toggleCode();
-    else format(btn.dataset.cmd);
+    else FORMAT_COMMANDS[btn.dataset.cmd]();
   });
 
   pinBtn.addEventListener('click', togglePin);
@@ -2198,6 +2288,9 @@
     for (const btn of formatBar.querySelectorAll('[data-key]')) {
       const combo = btn.dataset.shift ? keys('Mod', 'Shift', btn.dataset.key) : keys('Mod', btn.dataset.key);
       btn.title = `${btn.getAttribute('aria-label')} (${combo})`;
+    }
+    for (const btn of formatBar.querySelectorAll('[data-hint]')) {
+      btn.title = `${btn.getAttribute('aria-label')} (${t('typeHint', { hint: btn.dataset.hint })})`;
     }
     const sizeKeys = {
       2: ` (${t('smaller', { keys: keys('Mod', 'Shift', '<') })})`,
