@@ -24,7 +24,9 @@ cd src-tauri && cargo check && cargo clippy && cargo test
   `docker compose -f docker/compose.yml run --build --rm windows` puts the NSIS `*-setup.exe` in `dist/`.
 - **All platforms**: the manual workflow in `.github/workflows/build.yml` (Actions → Build → Run workflow) builds
   Windows, macOS (Apple Silicon and Intel) and Linux installers; run from a version tag, it also creates a draft
-  release. With SignPath set up it also signs the Windows installers ([`code-signing.md`](code-signing.md)).
+  release. With SignPath set up it also signs the Windows installers ([`code-signing.md`](code-signing.md)); with the
+  `TAURI_SIGNING_PRIVATE_KEY` secret it also publishes the signed update packages the app updates itself from
+  ([`updates.md`](updates.md)).
 
 ## Google Drive sync
 

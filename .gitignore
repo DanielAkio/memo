@@ -4,3 +4,5 @@ src-tauri/gen/
 .DS_Store
 dist/
 .env
+# The in-app update signing key (docs/updates.md): never commit it.
+*.key
