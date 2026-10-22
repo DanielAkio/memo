@@ -10,7 +10,7 @@
         "args": [
           "-NoProfile",
           "-Command",
-          "$exe = Join-Path '${workspaceFolder}' 'src-tauri\\target\\debug\\memo.exe'; Get-Process memo -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } | ForEach-Object { Stop-Process -Id $_.Id -Force; $_.WaitForExit(5000) | Out-Null }"
+          "$exe = Join-Path '${workspaceFolder}' 'src-tauri\\target\\debug\\memo.exe'; Get-Process memo -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } | ForEach-Object { Stop-Process -Id $_.Id -Force; $_.WaitForExit(5000) | Out-Null }; exit 0"
         ]
       },
       "osx": {
