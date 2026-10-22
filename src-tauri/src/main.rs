@@ -2929,12 +2929,35 @@ fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKi
 }
 
 /// One of a window's own commands in its titlebar menu (`null` in JS = a
-/// separator). `checked` makes it a check item (pin).
+/// separator). `checked` makes it a check item (pin); `items` a submenu
+/// (a note's "Format").
 #[derive(serde::Deserialize)]
 struct TitleMenuItem {
     id: String,
     label: String,
     checked: Option<bool>,
+    items: Option<Vec<Option<TitleMenuItem>>>,
+}
+
+/// The native entry for a `TitleMenuItem` (recursive for submenus), with
+/// its id behind `prefix`.
+fn title_menu_entry(app: &AppHandle, prefix: &str, item: Option<TitleMenuItem>) -> tauri::Result<MenuItemKind<tauri::Wry>> {
+    Ok(match item {
+        None => PredefinedMenuItem::separator(app)?.kind(),
+        Some(TitleMenuItem { id, label, items: Some(items), .. }) => {
+            let sub = Submenu::with_id(app, format!("{prefix}own:{id}"), label, true)?;
+            for item in items {
+                sub.append(&title_menu_entry(app, prefix, item)?)?;
+            }
+            sub.kind()
+        }
+        Some(TitleMenuItem { id, label, checked: Some(on), .. }) => {
+            CheckMenuItem::with_id(app, format!("{prefix}own:{id}"), label, true, on, None::<&str>)?.kind()
+        }
+        Some(TitleMenuItem { id, label, .. }) => {
+            MenuItem::with_id(app, format!("{prefix}own:{id}"), label, true, None::<&str>)?.kind()
+        }
+    })
 }
 
 /// Right click on a titlebar, or its "…" button: a native menu with the
@@ -2954,18 +2977,7 @@ async fn show_title_menu(
     let menu = Menu::new(&app).map_err(|e| e.to_string())?;
     let mut own = Vec::new();
     for item in items {
-        own.push(match item {
-            None => PredefinedMenuItem::separator(&app).map(|s| s.kind()),
-            Some(TitleMenuItem { id, label, checked: Some(on) }) => {
-                CheckMenuItem::with_id(&app, format!("{prefix}own:{id}"), label, true, on, None::<&str>)
-                    .map(|i| i.kind())
-            }
-            Some(TitleMenuItem { id, label, checked: None }) => {
-                MenuItem::with_id(&app, format!("{prefix}own:{id}"), label, true, None::<&str>)
-                    .map(|i| i.kind())
-            }
-        }
-        .map_err(|e| e.to_string())?);
+        own.push(title_menu_entry(&app, &prefix, item).map_err(|e| e.to_string())?);
     }
     if !own.is_empty() {
         own.push(PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?.kind());

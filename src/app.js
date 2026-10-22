@@ -1913,6 +1913,51 @@
     formatBar.hidden = true;
   }
 
+  // ------------------------------------------------------- format menu
+
+  // "Format" in the titlebar menu (… / right click): every formatting
+  // command, applied to the selection (or the caret's line) the editor had
+  // when the menu opened.
+  let menuRange = null;
+
+  function saveMenuSelection() {
+    const sel = getSelection();
+    const range = sel.rangeCount && sel.getRangeAt(0);
+    menuRange = range && editor.contains(range.commonAncestorContainer) ? range.cloneRange() : null;
+  }
+
+  function withMenuSelection(run) {
+    return () => {
+      editor.focus();
+      if (menuRange && editor.contains(menuRange.commonAncestorContainer)) {
+        getSelection().removeAllRanges();
+        getSelection().addRange(menuRange);
+      }
+      run();
+    };
+  }
+
+  function formatMenuItems() {
+    const cmd = (name, key) => ({ label: t(key), run: withMenuSelection(FORMAT_COMMANDS[name]) });
+    const size = (value, key) => ({ label: t(key), run: withMenuSelection(() => setSize(value)) });
+    return [
+      cmd('bold', 'bold'),
+      cmd('italic', 'italic'),
+      cmd('underline', 'underline'),
+      cmd('highlight', 'highlight'),
+      cmd('code', 'code'),
+      null,
+      cmd('check', 'checklist'),
+      cmd('bullet', 'bulletList'),
+      cmd('number', 'numberedList'),
+      cmd('codeBlock', 'codeBlock'),
+      null,
+      size('2', 'smallText'),
+      size('3', 'normalText'),
+      size('5', 'largeText'),
+    ];
+  }
+
   // ------------------------------------------------------------- insert
 
   // An empty line with the caret shows a "+" in the margin on its left; its
@@ -2307,12 +2352,14 @@
       titlebar,
       more: $('moreBtn'),
       items: () => (note ? [
+        { label: t('format'), items: formatMenuItems() },
+        null,
         { label: t('rename'), run: startRename },
         { label: t('pin'), checked: !!note.pinned, run: togglePin },
         { label: t('noteColor'), run: openColors },
         { label: t('closeNote'), run: closeNote },
       ] : []),
-      onOpen: () => { closeColors(); closeGroupMenu(); closeLineMenu(); hideFormatBar(); },
+      onOpen: () => { saveMenuSelection(); closeColors(); closeGroupMenu(); closeLineMenu(); hideFormatBar(); },
     });
   }
 
