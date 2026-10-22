@@ -706,6 +706,11 @@
     getSelection().addRange(r);
   }
 
+  // "```lang" on a regular line: the match, with the language in [1].
+  function fenceOf(line) {
+    return line && !isListItem(line) && /^```([\w+#.-]*)$/.exec(line.textContent.trim());
+  }
+
   function openCodeBlock(line, lang) {
     const pre = document.createElement('pre');
     pre.className = 'code';
@@ -1246,7 +1251,7 @@
     // "```lang" + Enter on a regular line opens a code block.
     if (e.key === 'Enter' && !e.shiftKey && !mod && !e.altKey) {
       const line = currentBlock();
-      const fence = line && !isListItem(line) && /^```([\w+#.-]*)$/.exec(line.textContent.trim());
+      const fence = fenceOf(line);
       if (fence) {
         e.preventDefault();
         openCodeBlock(line, fence[1]);
@@ -1384,6 +1389,19 @@
       onContentChanged(typing);
       if (wordEnd) lastTyping = 0;
       return;
+    }
+    // Where the backtick is a dead key (macOS), the Enter after "```" also
+    // ends its composition: the keydown comes marked as composing and is
+    // skipped, so the browser breaks the line. Undo that and open the block.
+    if (e.inputType === 'insertParagraph') {
+      const line = currentBlock();
+      const prev = line?.previousElementSibling;
+      const fence = !line?.textContent && prev?.nodeName === 'DIV' && fenceOf(prev);
+      if (fence) {
+        line.remove();
+        openCodeBlock(prev, fence[1]);
+        return;
+      }
     }
     let converted = false;
     if (e.inputType === 'insertText' && e.data?.includes('`') && e.data !== '`') {
