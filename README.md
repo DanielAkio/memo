@@ -103,8 +103,9 @@ Memo is new and its installers aren't signed yet, so your system may be cautious
 once:
 
 - **Windows**: if you see "Windows protected your PC", click **More info → Run anyway**.
-- **macOS**: drag Memo to Applications, then right-click it → **Open**. If macOS still refuses, go to **System
-  Settings → Privacy & Security** and click **Open Anyway**. If it says the app "is damaged", run
+- **macOS**: Apple only skips this warning for developers who pay for its Developer Program, and Memo doesn't. Drag
+  Memo to Applications and open it; when macOS blocks it, click **Done**, go to **System Settings → Privacy &
+  Security**, scroll down and click **Open Anyway**. If it says the app "is damaged", run
   `xattr -cr /Applications/Memo.app` in Terminal and open it again.
 - **Linux**: install the `.deb` or `.rpm` with your package manager, or make the `.AppImage` executable
   (`chmod +x Memo*.AppImage`) and run it.
