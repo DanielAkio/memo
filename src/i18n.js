@@ -535,6 +535,7 @@ window.MemoI18n = (() => {
           ['Adicionar memórias', 'Arraste uma memória e solte sobre o grupo, ou escolha o grupo no rodapé da memória ou no Gerenciador. O nome do grupo aparece no rodapé.',
             '<span class="demo-foot"><i data-icon="folder"></i>Trabalho</span><span class="demo-foot-meta">12 palavras</span>'],
           ['Renomear', 'Clique duplo na barra do grupo; {{Enter}} ou clicar fora salva, {{Esc}} cancela.'],
+          ['Trazer para a frente', 'Com as memórias soltas, um clique na barra do grupo traz todas elas para a frente junto com ela, inclusive as fechadas com ✕.'],
           ['Cor', 'Cada grupo novo nasce com uma cor aleatória. Para trocar, clique no ícone de pasta do grupo e escolha a cor: ela pinta a pasta e o ícone do grupo no rodapé das memórias, e marca o topo da barra e de cada memória do grupo com uma faixa e um tom suave.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
             + '<span class="demo-name">Trabalho</span><i data-icon="more"></i><i data-icon="close"></i></span>'],
@@ -552,7 +553,7 @@ window.MemoI18n = (() => {
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
           ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema e o controle por IA, sincronizar agora, procurar atualizações e sair.'],
-          ['Aba Grupos', 'Lista os grupos como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele para a frente; os botões da linha soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
+          ['Aba Grupos', 'Lista os grupos como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele (e as memórias, se estiverem soltas) para a frente; os botões da linha soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
           ['Novo grupo e trazer para a frente', 'O botão de pasta com + na barra do Gerenciador (ou "Novo grupo" no menu … de qualquer barra) cria um grupo vazio ao lado da janela. No menu … do Gerenciador, "Trazer todas as memórias para a frente" as coloca na frente das outras janelas, inclusive as minimizadas.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
             + '<i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
@@ -653,6 +654,7 @@ window.MemoI18n = (() => {
           ['Add memories', 'Drag a memory and drop it on the group, or pick the group in the memory’s footer or in the Manager. The group’s name shows in the footer.',
             '<span class="demo-foot"><i data-icon="folder"></i>Work</span><span class="demo-foot-meta">12 words</span>'],
           ['Rename', 'Double-click the group’s bar; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.'],
+          ['Bring to front', 'With its memories out, a click on the group’s bar brings all of them to the front with it, including those closed with ✕.'],
           ['Color', 'Each new group starts with a random color. To change it, click the group’s folder icon and pick a color: it tints the folder and the group icon in its memories’ footer, and marks the top of the bar and of each memory in the group with a stripe and a soft wash.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
             + '<span class="demo-name">Work</span><i data-icon="more"></i><i data-icon="close"></i></span>'],
@@ -670,7 +672,7 @@ window.MemoI18n = (() => {
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
           ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system and AI control on or off, sync now, check for updates and quit.'],
-          ['Groups tab', 'Lists the groups like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar to the front; the row’s buttons take its memories out / put them away and move the group to the trash.'],
+          ['Groups tab', 'Lists the groups like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar (and its memories, if they are out) to the front; the row’s buttons take its memories out / put them away and move the group to the trash.'],
           ['New group and bring to front', 'The folder-with-+ button in the Manager’s bar (or "New group" in the … menu of any bar) creates an empty group next to the window. In the Manager’s … menu, "Bring all memories to the front" puts them in front of other windows, minimized ones included.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
             + '<i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
