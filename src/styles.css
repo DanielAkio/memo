@@ -343,8 +343,8 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 /* Item all in one size (data-size, from app.js): the line takes that size,
    so the box (0.8em) and the strike-through stay centred on the text. Same
    px as .editor font[size]. */
-.check[data-size="2"], .bullet[data-size="2"] { font-size: 13px; }
-.check[data-size="5"], .bullet[data-size="5"] { font-size: 20px; }
+.check[data-size="2"], .bullet[data-size="2"], .number[data-size="2"] { font-size: 13px; }
+.check[data-size="5"], .bullet[data-size="5"], .number[data-size="5"] { font-size: 20px; }
 
 /* Bulleted item ("- "): a filled dot instead of the box. */
 .bullet {
@@ -362,11 +362,27 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   background: var(--color-fog);
 }
 
-/* Indent (Tab): 20px per level, for checklist and bullet items. */
-.check[data-level="1"], .bullet[data-level="1"] { margin-left: 20px; }
-.check[data-level="2"], .bullet[data-level="2"] { margin-left: 40px; }
-.check[data-level="3"], .bullet[data-level="3"] { margin-left: 60px; }
-.check[data-level="4"], .bullet[data-level="4"] { margin-left: 80px; }
+/* Numbered item ("1. "): its number (data-n, from app.js) right-aligned
+   in the marker column, so "9." and "10." line up on the dot. */
+.number {
+  position: relative;
+  padding-left: 24px;
+}
+.number::before {
+  content: attr(data-n) ".";
+  position: absolute;
+  left: -6px;
+  width: 24px;
+  text-align: right;
+  color: var(--color-fog);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Indent (Tab): 20px per level, for all list items. */
+:is(.check, .bullet, .number)[data-level="1"] { margin-left: 20px; }
+:is(.check, .bullet, .number)[data-level="2"] { margin-left: 40px; }
+:is(.check, .bullet, .number)[data-level="3"] { margin-left: 60px; }
+:is(.check, .bullet, .number)[data-level="4"] { margin-left: 80px; }
 .check::before {
   content: "";
   position: absolute;
@@ -404,6 +420,20 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 .editor::-webkit-scrollbar-thumb:hover { background: var(--color-smoke); }
 
+/* Format tray: the format bar's buttons fixed above the footer, toggled by
+   the footer's "Aa". */
+.format-tray {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 3px 6px;
+  border-top: 1px solid var(--color-graphite);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.format-tray[hidden], .embedded .format-tray { display: none; }
+
 /* ------------------------------------------------------------- statusbar */
 
 .statusbar {
@@ -424,6 +454,22 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   overflow: hidden;
 }
 #count.is-alert { color: var(--color-mist); }
+.foot-aa {
+  flex: none;
+  height: 20px;
+  margin-right: -4px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-badge);
+  background: transparent;
+  color: var(--color-ash);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: default;
+}
+.foot-aa:hover { background: var(--overlay-hover); color: var(--color-mist); }
+.foot-aa[aria-pressed="true"] { background: var(--overlay-active); color: var(--color-paper); }
 .foot-btn {
   flex: 1;
   display: flex;
@@ -530,7 +576,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   position: absolute;
   z-index: 20;
   display: flex;
-  gap: 2px;
+  gap: 0;
   padding: 3px;
   background: var(--color-obsidian);
   border-radius: 8px;
@@ -539,11 +585,13 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   -webkit-user-select: none;
 }
 .format-bar[hidden] { display: none; }
+/* Wraps onto a second row in a narrow note instead of being cut. */
+.format-bar { flex-wrap: wrap; max-width: calc(100vw - 8px); }
 
 .fmt-btn {
   display: grid;
   place-items: center;
-  width: 28px;
+  width: 23px;
   height: 26px;
   padding: 0;
   border: 0;
@@ -562,9 +610,10 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 
 .fmt-mark svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .fmt-mark[aria-pressed="true"] { color: var(--color-paper); }
-.fmt-sep { width: 1px; margin: 4px 2px; background: var(--color-graphite); }
-.fmt-sizes { display: flex; gap: 2px; }
-.fmt-size { width: 24px; font-weight: 500; }
+.fmt-mark svg .fill { fill: currentColor; stroke: none; }
+.fmt-sep { width: 1px; margin: 4px 3px; background: var(--color-graphite); }
+.fmt-sizes { display: flex; gap: 0; }
+.fmt-size { width: 20px; font-weight: 500; }
 .fmt-size.sz-s { font-size: 11px; }
 .fmt-size.sz-m { font-size: 14px; }
 .fmt-size.sz-l { font-size: 18px; }
@@ -593,5 +642,5 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 /* Folded onto the titlebar (titlebar magnet in resize_to): only the titlebar
    shows; the text and the status bar would push it out of the window. */
 @media (max-height: 40px) {
-  .body, .statusbar, .format-bar { display: none; }
+  .body, .statusbar, .format-bar, .format-tray { display: none; }
 }

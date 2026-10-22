@@ -15,7 +15,8 @@ Memo is built with [Tauri 2](https://v2.tauri.app): a Rust backend (`src-tauri/`
 
 ```bash
 npm install
-npm run dev      # run in development mode (also "Run in dev mode" in VS Code)
+npm run dev      # run in development mode (also "Run in dev mode" in VS Code, which first
+                 # ends a dev Memo still running, so Restart works)
 npm run build    # installer for the current OS in src-tauri/target/release/bundle/
 cd src-tauri && cargo check && cargo clippy && cargo test
 ```

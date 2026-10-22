@@ -18,14 +18,14 @@ Titlebar: pin far left, colour dot (`#colorBtn` → swatch popover `#colorMenu`)
 - Bold/italic/underline: `<b>`/`<i>`/`<u>` (`styleWithCSS` off). Bold must render at weight ≥ 600 or `queryCommandState('bold')` (and Ctrl+B toggling off) breaks.
 - Highlight: `<span style="background-color: rgb(255, 230, 0)">` from `execCommand('hiliteColor')` — only that exact sentinel counts (Chromium creates other background spans). WebKit (macOS/Linux) puts the style on the `<b>`/`<i>`/`<u>`/`<font>` itself when the selection is exactly that element, so `sanitize` keeps the sentinel on those too and the CSS rule matches any element; removal sets `transparent`. Mod+Shift+H or the marker button.
 - Text size: `<font size="2|3|5">` from `execCommand('fontSize')` (`SIZES` in app.js; real px in the `.editor font[size]` CSS rules — keep both in sync). Mod+Shift+> / Mod+Shift+< (matched by `e.code` Period/Comma).
-- Checklist item: `<div class="check">` (checked: `check done`, box drawn in CSS `::before`). Bullet: `<div class="bullet">`. Both can carry `data-level` 1–4.
+- Checklist item: `<div class="check">` (checked: `check done`, box drawn in CSS `::before`). Bullet: `<div class="bullet">`. Numbered: `<div class="number">`. All can carry `data-level` 1–4 (`LIST_TYPES`, `isListItem`).
 - Inline code: `<code>`. Code block: `<pre class="code" data-lang>` holding only text and `<br>`.
-- Plain text: items are `[ ] ` / `[x] ` (`[]` also accepted by `LIST_RE`/`plain`), bullets `- `, each level two leading spaces (`listPrefix`, `LIST_RE`); inline code `` `x` ``, code blocks ```` ```lang … ``` ```` fences (`fromPlain` parses both); U+200B is stripped.
-- Presentation-only attributes (dropped by `sanitize`, recomputed): `syncCheckSizes` (on load and every change) gives an item whose text is all one `<font size>` a `data-size` so the line takes that size; mixed-size items get an inline `--check-mid` with the measured first-line centre.
+- Plain text: items are `[ ] ` / `[x] ` (`[]` also accepted by `LIST_RE`/`plain`), bullets `- `, numbered `1. ` (any number is read back; written from `data-n`), each level two leading spaces (`listPrefix`, `LIST_RE`); inline code `` `x` ``, code blocks ```` ```lang … ``` ```` fences (`fromPlain` parses both); U+200B is stripped.
+- Presentation-only attributes (dropped by `sanitize`/`contentHtml`, recomputed): `syncNumbers` (on load and every change) gives each numbered item its `data-n` (counts within a run at the same level; deeper items don't break it, anything else does; CSS shows it with `attr(data-n)`). `syncCheckSizes` (on load and every change) gives an item whose text is all one `<font size>` a `data-size` so the line takes that size; mixed-size items get an inline `--check-mid` with the measured first-line centre.
 
 ## Lists
 
-Typing `[]` at line start makes a checklist item; `- ` makes a bullet (`expandBullet`); a space typed right after is dropped. Clicking the box toggles it without moving the caret. Enter continues the list (the browser clones the block; `done` is cleared). Tab / Shift+Tab change level (`setLevel`). Enter on an empty item or Backspace at its start outdents first, then leaves the list.
+Typing `[]` at line start makes a checklist item; `- ` makes a bullet and `1. ` a numbered item (`expandBullet`); a space typed right after is dropped. Clicking the box toggles it without moving the caret. Enter continues the list (the browser clones the block; `done` is cleared). Tab / Shift+Tab change level (`setLevel`). Enter on an empty item or Backspace at its start outdents first, then leaves the list.
 
 ## Code
 
@@ -37,9 +37,15 @@ Typing `[]` at line start makes a checklist item; `- ` makes a bullet (`expandBu
 
 The editor keeps its own history ("undo" section): many edits change the DOM directly, which Chromium's undo stack never sees. `onContentChanged(typing)` records a snapshot (HTML + selection as child-index paths) after every change (`recordHistory`; typing within `TYPING_MS` merges into one step, a paste never does); `selectionchange` keeps the current step's caret up to date; Mod+Z, Mod+Shift+Z / Mod+Y and `beforeinput` historyUndo/historyRedo call `restoreHistory`. Auto-conversions (`` `x` ``, `[]`, `- `) record the typed text first, so undo brings the characters back; their internal execCommand edits are ignored by the `converting` guard. **Any new DOM-changing edit must end in `onContentChanged()`.**
 
-## Format bar
+## Format bar, Format menu, format tray
 
-`#formatBar` (bold / italic / underline, highlight, code `</>` and three "A" size buttons) floats above a non-empty selection; hidden while the mouse drags a selection, repositioned on `selectionchange`/scroll/resize; buttons use `mousedown` preventDefault so the selection survives; active state from `queryCommandState`. Right-click keeps the native menu (spellcheck, cut/copy/paste) inside the editor.
+Every formatting command is in `FORMAT_COMMANDS` (bold / italic / underline, highlight, code, check / bullet / number → `toggleList`, codeBlock → `toggleCodeBlock`) with its on-state in `formatState`; `renderFormatState(bar)` sets `aria-pressed`. `toggleList` / `toggleCodeBlock` act on `touchedLines()` (the lines the selection touches, a triple click's next line left out, or the caret's line); all of one type already → back to plain lines; inside a code block, `toggleCodeBlock` turns it back into lines. The same commands reach the user three ways, all mouse-only (a "+" beside empty lines was tried and dropped: the author didn't want it):
+
+- `#formatBar` (bold / italic / underline, highlight, code `</>`, checklist, list, numbered list, code block, three "A" sizes) floats above a non-empty selection; hidden while the mouse drags a selection, repositioned on `selectionchange`/scroll/resize; buttons use `mousedown` preventDefault so the selection survives. It wraps in a narrow memory (button widths are set so it fits one row at `DEFAULT_W`). Titles show the shortcut (`data-key`) or the typed syntax (`data-hint`, `typeHint`).
+- "format menu": "Format" submenu at the top of the note's titlebar menu (`formatMenuItems`; `show_title_menu` takes nested `items`, `title_menu_entry` in main.rs, ids by path in chrome.js). The selection is saved when the menu opens (`saveMenuSelection`) and restored before the command runs.
+- "format tray": the footer's "Aa" (`#trayBtn`, or "Formatting toolbar" in the Format submenu) shows `#formatTray`, a clone of the bar's buttons, above the footer. With just the caret, its buttons add an empty element instead (`insertEmpty`: a new list item or code block on the next line, or on the caret's line if it is an empty plain line; an empty inline code holding a U+200B; bold/italic/underline/highlight/size as typing style); with a selection they format it. It behaves like a menu: any mousedown outside it and "Aa", Esc or the window losing focus folds it away (the author asked for that; it is not remembered).
+
+Right-click inside the editor keeps the native menu (spellcheck, cut/copy/paste).
 
 ## Embedded editor
 

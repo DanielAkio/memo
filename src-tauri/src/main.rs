@@ -2154,7 +2154,8 @@ async fn toggle_group(app: AppHandle, window: WebviewWindow) {
     toggle_group_by_id(&app, &group_id_of(&window));
 }
 
-/// Manager's Groups tab: shows group `id`'s bar and brings it to the front.
+/// Manager's Groups tab: shows group `id`'s bar and brings it to the front,
+/// with its notes if the group is out.
 #[tauri::command]
 async fn focus_group(app: AppHandle, id: String) -> Result<(), String> {
     let group = app
@@ -2166,9 +2167,44 @@ async fn focus_group(app: AppHandle, id: String) -> Result<(), String> {
         show_group(&app, &id);
     }
     let group = app.state::<Shared>().group(&id).unwrap_or(group);
-    let window = open_group_window(&app, &group).map_err(|e| e.to_string())?;
-    let _ = window.set_focus();
+    open_group_window(&app, &group).map_err(|e| e.to_string())?;
+    raise_group(&app, &id);
     Ok(())
+}
+
+/// A click on a group bar: brings the group's notes to the front with it.
+#[tauri::command]
+async fn show_group_notes(app: AppHandle, window: WebviewWindow) {
+    raise_group(&app, &group_id_of(&window));
+}
+
+/// Brings group `id`'s bar to the front and, if the group is out, all its
+/// notes with it (those closed with ✕ open again, as when taking them out).
+/// The bar is focused last, so it stays on top and keeps the keyboard.
+fn raise_group(app: &AppHandle, id: &str) {
+    let store = app.state::<Shared>();
+    let Some(group) = store.group(id) else {
+        return;
+    };
+    if group.open {
+        let closed = store
+            .members(id)
+            .iter()
+            .any(|n| app.get_webview_window(&label_for(&n.id)).is_none());
+        if closed {
+            take_out(app, id);
+        }
+        for note in store.members(id) {
+            if let Some(window) = app.get_webview_window(&label_for(&note.id)) {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }
+    }
+    if let Some(bar) = app.get_webview_window(&group_label(id)) {
+        let _ = bar.unminimize();
+        let _ = bar.set_focus();
+    }
 }
 
 /// Reopens a group closed with ✕: its bar, and its notes if it is out.
@@ -2893,12 +2929,35 @@ fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKi
 }
 
 /// One of a window's own commands in its titlebar menu (`null` in JS = a
-/// separator). `checked` makes it a check item (pin).
+/// separator). `checked` makes it a check item (pin); `items` a submenu
+/// (a note's "Format").
 #[derive(serde::Deserialize)]
 struct TitleMenuItem {
     id: String,
     label: String,
     checked: Option<bool>,
+    items: Option<Vec<Option<TitleMenuItem>>>,
+}
+
+/// The native entry for a `TitleMenuItem` (recursive for submenus), with
+/// its id behind `prefix`.
+fn title_menu_entry(app: &AppHandle, prefix: &str, item: Option<TitleMenuItem>) -> tauri::Result<MenuItemKind<tauri::Wry>> {
+    Ok(match item {
+        None => PredefinedMenuItem::separator(app)?.kind(),
+        Some(TitleMenuItem { id, label, items: Some(items), .. }) => {
+            let sub = Submenu::with_id(app, format!("{prefix}own:{id}"), label, true)?;
+            for item in items {
+                sub.append(&title_menu_entry(app, prefix, item)?)?;
+            }
+            sub.kind()
+        }
+        Some(TitleMenuItem { id, label, checked: Some(on), .. }) => {
+            CheckMenuItem::with_id(app, format!("{prefix}own:{id}"), label, true, on, None::<&str>)?.kind()
+        }
+        Some(TitleMenuItem { id, label, .. }) => {
+            MenuItem::with_id(app, format!("{prefix}own:{id}"), label, true, None::<&str>)?.kind()
+        }
+    })
 }
 
 /// Right click on a titlebar, or its "…" button: a native menu with the
@@ -2918,18 +2977,7 @@ async fn show_title_menu(
     let menu = Menu::new(&app).map_err(|e| e.to_string())?;
     let mut own = Vec::new();
     for item in items {
-        own.push(match item {
-            None => PredefinedMenuItem::separator(&app).map(|s| s.kind()),
-            Some(TitleMenuItem { id, label, checked: Some(on) }) => {
-                CheckMenuItem::with_id(&app, format!("{prefix}own:{id}"), label, true, on, None::<&str>)
-                    .map(|i| i.kind())
-            }
-            Some(TitleMenuItem { id, label, checked: None }) => {
-                MenuItem::with_id(&app, format!("{prefix}own:{id}"), label, true, None::<&str>)
-                    .map(|i| i.kind())
-            }
-        }
-        .map_err(|e| e.to_string())?);
+        own.push(title_menu_entry(&app, &prefix, item).map_err(|e| e.to_string())?);
     }
     if !own.is_empty() {
         own.push(PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?.kind());
@@ -3232,6 +3280,7 @@ fn main() {
             load_group,
             rename_group,
             focus_group,
+            show_group_notes,
             toggle_group_id,
             trash_group_id,
             restore_group,

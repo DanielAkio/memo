@@ -47,7 +47,7 @@
 
   const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
   // Plain text without the list markers ("[ ] " / "[x] " / "- ").
-  const plain = (text) => (text || '').replace(/^(\s*)(?:\[[ xX]?\]|-)(?= |$) ?/gm, '$1');
+  const plain = (text) => (text || '').replace(/^(\s*)(?:\[[ xX]?\]|-|\d+\.)(?= |$) ?/gm, '$1');
   // For search: lower case, without accents.
   const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -964,10 +964,8 @@
 
   // Titlebar icons for <i data-icon="…"> in the demos (same paths as the
   // windows' buttons).
-  const PIN_SVG = '<g transform="rotate(45 8 8)"><path class="pin-needle" d="M8 10.4V15"/>'
-    + '<path class="pin-body" d="M5.7 3.6h4.6l.7 5.1H5z"/>'
-    + '<rect class="pin-body" x="3.6" y="8.4" width="8.8" height="2" rx=".9"/>'
-    + '<rect class="pin-body" x="4.9" y="1.6" width="6.2" height="2" rx=".9"/></g>';
+  const PIN_SVG = '<g transform="translate(-.4 .4) rotate(45 8 8)"><path class="pin-needle" d="M8 11.1v4.4"/>'
+    + '<path class="pin-body" d="M5.45 8.35V2.4a1.5 1.5 0 0 1 1.5-1.5h2.1a1.5 1.5 0 0 1 1.5 1.5v5.95h1.55a1.35 1.35 0 0 1 0 2.7H3.9a1.35 1.35 0 0 1 0-2.7z"/></g>';
   const DEMO_ICONS = {
     pin: PIN_SVG,
     'pin-on': PIN_SVG,

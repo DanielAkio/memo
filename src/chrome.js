@@ -36,15 +36,19 @@ window.MemoZoom = {
 };
 
 // Opens the system colour picker of a hidden <input type="color"> next to
-// the swatch that asked for it. The input moves under the swatch (where
-// Chromium anchors its picker) and, on Windows, where the system dialog
-// opens on its own, Rust moves it next to the pointer (place_color_picker).
+// the swatch that asked for it. The (invisible) input takes the swatch's
+// place and size: browsers anchor their picker to it, and on macOS WebKit
+// shows a popover from it that never opens while the input has no size.
+// On Windows, where the system dialog opens on its own, Rust moves it next
+// to the pointer (place_color_picker).
 window.MemoColorPicker = {
   open(input, anchor) {
     const r = anchor.getBoundingClientRect();
     input.style.position = 'fixed';
     input.style.left = `${Math.round(r.left)}px`;
-    input.style.top = `${Math.round(r.bottom)}px`;
+    input.style.top = `${Math.round(r.top)}px`;
+    input.style.width = `${Math.round(r.width)}px`;
+    input.style.height = `${Math.round(r.height)}px`;
     const tauri = window.__TAURI__ || window.parent.__TAURI__;
     tauri.core.invoke('place_color_picker').catch((err) => console.error('place_color_picker', err));
     input.click();
@@ -191,19 +195,24 @@ window.MemoChrome = {
   // with the window's own commands on top and all the app's commands below
   // (Rust adds those, the same as the tray menu: show_title_menu). `items()`
   // is called on each opening, so labels follow the current state:
-  // [{ label, run, checked? }], null = separator. `onOpen()` closes the
-  // window's own popovers first.
+  // [{ label, run, checked? } | { label, items: [...] }], null = separator;
+  // `items` makes a submenu. `onOpen()` closes the window's own popovers first.
   titleMenu({ titlebar, more, items, onOpen }) {
     const { invoke } = window.__TAURI__.core;
-    let entries = [];
+    let entries = {};
 
     function open(at) {
       if (onOpen) onOpen();
-      entries = items();
-      const own = entries.map((item, i) => (item
-        ? { id: String(i), label: item.label, checked: item.checked ?? null }
-        : null));
-      invoke('show_title_menu', { items: own, at }).catch((err) => console.error('show_title_menu', err));
+      entries = {};
+      const native = (list, path) => list.map((item, i) => {
+        if (!item) return null;
+        const id = path + i;
+        if (item.items) return { id, label: item.label, items: native(item.items, `${id}.`) };
+        entries[id] = item;
+        return { id, label: item.label, checked: item.checked ?? null };
+      });
+      invoke('show_title_menu', { items: native(items(), ''), at })
+        .catch((err) => console.error('show_title_menu', err));
     }
 
     titlebar.addEventListener('contextmenu', (e) => {
@@ -218,7 +227,7 @@ window.MemoChrome = {
       });
     }
     window.__TAURI__.event.listen('title-menu', (e) => {
-      const item = entries[Number(e.payload)];
+      const item = entries[e.payload];
       if (item) item.run();
     });
   },

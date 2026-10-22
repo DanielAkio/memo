@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Stop the running dev Memo",
+      "detail": "Ends target/debug/memo before a (re)start, so cargo can replace the exe",
+      "type": "process",
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-Command",
+          "$exe = Join-Path '${workspaceFolder}' 'src-tauri\\target\\debug\\memo.exe'; Get-Process memo -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } | ForEach-Object { Stop-Process -Id $_.Id -Force; $_.WaitForExit(5000) | Out-Null }"
+        ]
+      },
+      "osx": {
+        "command": "sh",
+        "args": [
+          "-c",
+          "pkill -f '${workspaceFolder}/src-tauri/target/debug/[m]emo' || true"
+        ]
+      },
+      "linux": {
+        "command": "sh",
+        "args": [
+          "-c",
+          "pkill -f '${workspaceFolder}/src-tauri/target/debug/[m]emo' || true"
+        ]
+      },
+      "presentation": {
+        "reveal": "silent",
+        "close": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

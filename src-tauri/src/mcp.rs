@@ -57,8 +57,8 @@ const INSTRUCTIONS: &str = "Memo is a sticky-notes desktop app. Each note (a \"m
 small window on the user's screen; pinned ones stay above every other app. Memories can be \
 gathered in groups, shown as compact bars whose memories can be taken out on screen or put away. \
 Memory text is plain text with a few conventions: one line per paragraph, \"[ ] item\" and \
-\"[x] item\" for checklist items, \"- item\" for bullets (two leading spaces per extra level, up \
-to 4), `inline code`, and ``` fences (optionally with a language) for code blocks. Images show \
+\"[x] item\" for checklist items, \"- item\" for bullets, \"1. item\" for numbered items (Memo \
+numbers them itself; two leading spaces per extra level, up to 4), `inline code`, and ``` fences (optionally with a language) for code blocks. Images show \
 as \"[image]\"/\"[imagem]\" and cannot be created here. Colours: yellow, green, coral, teal, \
 iris (purple), mono (white in the dark theme, black in the light one), \"\" for none, \
 or a custom \"#rrggbb\". Unless Memo's settings say otherwise, new memories start with no colour \
@@ -568,7 +568,8 @@ fn anchor(app: &AppHandle) -> Option<(i32, i32)> {
 }
 
 /// A memory's HTML from its plain text: the Rust twin of `fromPlain` in
-/// app.js (lines, checklist items, bullets, inline code, code blocks).
+/// app.js (lines, checklist items, bullets, numbered items, inline code,
+/// code blocks).
 fn from_plain(text: &str) -> String {
     if text.is_empty() {
         return "<div><br></div>".into();
@@ -612,12 +613,16 @@ fn fence_open(line: &str) -> Option<&str> {
         .then_some(lang)
 }
 
-/// A checklist item or bullet (as `LIST_RE` in app.js): level, class, text.
+/// A checklist item, bullet or numbered item (as `LIST_RE` in app.js):
+/// level, class, text.
 fn list_item(line: &str) -> Option<(usize, &'static str, &str)> {
     let rest = line.trim_start_matches(' ');
     let level = ((line.len() - rest.len()) / 2).min(4);
+    let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
     let (class, after) = if let Some(after) = rest.strip_prefix('-') {
         ("bullet", after)
+    } else if digits > 0 {
+        ("number", rest[digits..].strip_prefix('.')?)
     } else {
         let inner = rest.strip_prefix('[')?;
         let (mark, after) = match inner.chars().next()? {
@@ -1084,6 +1089,10 @@ mod tests {
              <pre class=\"code\" data-lang=\"js\">x &lt; 1</pre>"
         );
         assert_eq!(from_plain("[]\n-x\na ` b"), "<div class=\"check\"><br></div><div>-x</div><div>a ` b</div>");
+        assert_eq!(
+            from_plain("1. a\n  12. b\n3.c\n2025"),
+            "<div class=\"number\">a</div><div class=\"number\" data-level=\"1\">b</div><div>3.c</div><div>2025</div>"
+        );
     }
 
     #[test]

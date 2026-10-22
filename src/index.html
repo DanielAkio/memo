@@ -13,11 +13,9 @@
     <header class="titlebar" id="titlebar">
       <button class="icon-btn pin" id="pinBtn" type="button" aria-pressed="false">
         <svg viewBox="0 0 16 16" aria-hidden="true">
-          <g transform="rotate(45 8 8)">
-            <path class="pin-needle" d="M8 10.4V15"/>
-            <path class="pin-body" d="M5.7 3.6h4.6l.7 5.1H5z"/>
-            <rect class="pin-body" x="3.6" y="8.4" width="8.8" height="2" rx=".9"/>
-            <rect class="pin-body" x="4.9" y="1.6" width="6.2" height="2" rx=".9"/>
+          <g transform="translate(-.4 .4) rotate(45 8 8)">
+            <path class="pin-needle" d="M8 11.1v4.4"/>
+            <path class="pin-body" d="M5.45 8.35V2.4a1.5 1.5 0 0 1 1.5-1.5h2.1a1.5 1.5 0 0 1 1.5 1.5v5.95h1.55a1.35 1.35 0 0 1 0 2.7H3.9a1.35 1.35 0 0 1 0-2.7z"/>
           </g>
         </svg>
       </button>
@@ -73,6 +71,19 @@
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/></svg>
       </button>
       <span class="fmt-sep" aria-hidden="true"></span>
+      <button type="button" class="fmt-btn fmt-mark" data-cmd="check" data-hint="[]" data-i18n-attr="aria-label=checklist" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.3 8.2l1.9 1.9 3.6-4"/></svg>
+      </button>
+      <button type="button" class="fmt-btn fmt-mark" data-cmd="bullet" data-hint="-" data-i18n-attr="aria-label=bulletList" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle class="fill" cx="3.5" cy="4.5" r="1"/><circle class="fill" cx="3.5" cy="11.5" r="1"/><path d="M7 4.5h6.5M7 11.5h6.5"/></svg>
+      </button>
+      <button type="button" class="fmt-btn fmt-mark" data-cmd="number" data-hint="1." data-i18n-attr="aria-label=numberedList" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 3.2l1.1-.8v4M2.4 9.6c.2-.8 2.2-.9 2.2.3 0 .9-2.2 1.8-2.2 3h2.3M7 4.5h6.5M7 11.5h6.5"/></svg>
+      </button>
+      <button type="button" class="fmt-btn fmt-mark" data-cmd="codeBlock" data-hint="```" data-i18n-attr="aria-label=codeBlock" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2.5"/><path d="M6.2 6.2 4.4 8l1.8 1.8M9.8 6.2 11.6 8l-1.8 1.8"/></svg>
+      </button>
+      <span class="fmt-sep" aria-hidden="true"></span>
       <span class="fmt-sizes" role="group" data-i18n-attr="aria-label=textSize">
         <button type="button" class="fmt-btn fmt-size sz-s" data-size="2" data-i18n-attr="aria-label=smallText" aria-pressed="false">A</button>
         <button type="button" class="fmt-btn fmt-size sz-m" data-size="3" data-i18n-attr="aria-label=normalText" aria-pressed="false">A</button>
@@ -97,6 +108,10 @@
       <span class="marker-caret" id="markerCaret" hidden></span>
     </main>
 
+    <!-- Format tray: the format bar's buttons fixed above the footer, shown
+         with the footer's "Aa" (app.js, "format tray"; filled from #formatBar). -->
+    <div class="format-tray" id="formatTray" role="toolbar" data-i18n-attr="aria-label=formatTray" hidden></div>
+
     <!-- Group picker, opened from the footer: the note's group, "no group" or
          a new one (app.js, "groups"). -->
     <div class="menu group-menu" id="groupMenu" hidden>
@@ -111,6 +126,7 @@
         <svg class="foot-folder" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/></svg><span id="edited"></span>
       </button>
       <span id="count"></span>
+      <button class="foot-aa" id="trayBtn" type="button" aria-pressed="false" data-i18n-attr="aria-label=formatTray,title=formatTray">Aa</button>
       <span class="grip" id="grip" aria-hidden="true">
         <svg viewBox="0 0 10 10"><path d="M9 3 3 9M9 6 6 9"/></svg>
       </span>
