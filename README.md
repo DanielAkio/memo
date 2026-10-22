@@ -29,10 +29,10 @@ digging through windows to find what you wrote down.
 ## Why people like it
 
 - **Always in sight.** One click on the pin and the memory stays on top while you work in anything else.
-- **Write without thinking.** Type and it's saved. `[]` starts a checklist, `-` starts a list, and a quick selection
-  lets you highlight what matters.
-- **Find things at a glance.** Give each memory a title and a colour, and gather related ones in a group you can put
-  away and bring back in one click.
+- **Write without thinking.** Type and it's saved. `[]` starts a checklist, `-` starts a list, backticks turn a
+  command into code, a screenshot pastes right in, and a quick selection lets you highlight what matters.
+- **Find things at a glance.** Give each memory a title and a colour (any colour, with the eyedropper), and gather
+  related ones in a group you can put away and bring back in one click.
 - **Yours, and only yours.** No sign-up, no ads, no tracking, and it works offline. Your memories live on your
   computer, and if you want them on several computers, they sync through your own Google Drive
   ([privacy policy](https://danielakio.github.io/memo/privacy.html)).
@@ -42,12 +42,17 @@ digging through windows to find what you wrote down.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset="site/media/write-light-en.gif">
-    <img src="site/media/write-dark-en.gif" width="860" alt="Naming a memory, typing a checklist, ticking two items, highlighting a line and changing the memory's colour">
+    <img src="site/media/write-dark-en.gif" width="860" alt="Naming a memory, typing a checklist and a command between backticks that turns into code, highlighting a line, ticking two items and picking the memory's colour">
   </picture>
 </p>
 
 Name it with a double-click on the top bar, type `[]` for a checklist, tick items as you go, highlight a line and pick
 a colour. That's all there is to learn.
+
+For the technical bits, put a command between backticks (`` `npm run dev` ``) and it shows as code, or type ```` ``` ````
+for a whole code block coloured for its language. Copy a screenshot and paste it in, then drag its corner to resize
+it. New memories start without a colour, or with a random one if you like; the colour dot offers a few to pick from,
+and its eyedropper any colour at all.
 
 ## Keep related memories together
 
@@ -59,7 +64,8 @@ a colour. That's all there is to learn.
 </p>
 
 A group is a slim bar that holds memories. The arrow tucks them all into the bar and brings them back exactly where
-they were. Drop a memory on a bar to add it.
+they were. Drop a memory on a bar to add it. Each new group gets a colour of its own, which tints its memories so you
+can tell at a glance where each one belongs.
 
 ## Everything in one place
 
@@ -101,7 +107,7 @@ Open it, and Memo greets you with a welcome memory that shows the basics. Closin
 closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.
 
 You only download it once: when a new version is out, Memo tells you in the tray menu and in Settings, and one click
-updates it and opens it again, memories and all.
+updates it and opens it again, memories and all. Settings → App shows which version you have.
 
 <details>
 <summary><b>Your computer warns you the first time?</b></summary>
