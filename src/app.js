@@ -1915,18 +1915,12 @@
 
   // ------------------------------------------------------- format tray
 
-  // The footer's "Aa" shows the format bar's buttons fixed above the footer,
-  // for the selection or the caret's line. Open or closed for every memory
-  // (remembered in this computer's webview storage; other windows follow
-  // through the "storage" event).
+  // The footer's "Aa" shows the format bar's buttons above the footer, for
+  // the selection or the caret's line. Like a menu, any click outside it (or
+  // on "Aa" again), Esc or leaving the window folds it away.
   const formatTray = $('formatTray');
   const trayBtn = $('trayBtn');
-  const TRAY_KEY = 'memo.formatTray';
   formatTray.append(...[...formatBar.children].map((n) => n.cloneNode(true)));
-
-  function trayStored() {
-    try { return localStorage.getItem(TRAY_KEY) === '1'; } catch { return false; }
-  }
 
   function showTray(on) {
     formatTray.hidden = !on;
@@ -1934,11 +1928,7 @@
     if (on) renderFormatState(formatTray);
   }
 
-  function toggleTray() {
-    const on = formatTray.hidden;
-    try { localStorage.setItem(TRAY_KEY, on ? '1' : '0'); } catch { /* still shown in this window */ }
-    showTray(on);
-  }
+  const toggleTray = () => showTray(formatTray.hidden);
 
   // ------------------------------------------------------- format menu
 
@@ -2173,11 +2163,9 @@
       if (!formatTray.hidden) renderFormatState(formatTray);
     });
   }
+  // mousedown preventDefault: the text keeps its selection for the tray.
+  trayBtn.addEventListener('mousedown', (e) => e.preventDefault());
   trayBtn.addEventListener('click', toggleTray);
-  window.addEventListener('storage', (e) => {
-    if (e.key === TRAY_KEY) showTray(e.newValue === '1');
-  });
-  if (!EMBED) showTray(trayStored());
 
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
@@ -2215,6 +2203,7 @@
   document.addEventListener('mousedown', (e) => {
     if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) closeColors();
     if (!groupMenu.hidden && !groupMenu.contains(e.target) && !footBtn.contains(e.target)) closeGroupMenu();
+    if (!formatTray.hidden && !formatTray.contains(e.target) && !trayBtn.contains(e.target)) showTray(false);
   });
 
   // -------------------------------------------------------------- groups
@@ -2316,7 +2305,7 @@
   document.addEventListener('keydown', (e) => {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const key = e.key.toLowerCase();
-    if (e.key === 'Escape') { closeColors(); closeGroupMenu(); hideFormatBar(); return; }
+    if (e.key === 'Escape') { closeColors(); closeGroupMenu(); hideFormatBar(); showTray(false); return; }
     if (EMBED) return;
     if (mod && e.shiftKey && key === 'p') { e.preventDefault(); togglePin(); }
     else if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); }
@@ -2333,6 +2322,7 @@
     frame.classList.remove('is-focused');
     finishRename(true);
     hideFormatBar();
+    showTray(false);
     closeGroupMenu();
     flushText();
   });
