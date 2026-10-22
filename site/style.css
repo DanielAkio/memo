@@ -106,6 +106,12 @@ kbd {
   text-align: left; max-width: 600px; margin: 32px auto 0; padding: 20px 24px;
   border-radius: 12px; background: var(--bg); border: 1px solid var(--line);
 }
+.mac-note { scroll-margin: 24px; }
+.mac-note.flash { animation: mac-flash 3.6s ease-out .4s both; }
+@keyframes mac-flash {
+  0%, 40% { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+  100% { border-color: var(--line); box-shadow: 0 0 0 4px transparent; }
+}
 .mac-note h3 { margin-bottom: 8px; }
 .mac-note p { color: var(--muted); margin: 0 0 12px; font-size: 15px; }
 .mac-note p.muted { margin: 12px 0 0; font-size: 14px; }

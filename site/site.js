@@ -16,9 +16,26 @@
   buttons.forEach(function (a) { a.textContent = label; });
 
   // macOS blocks the app on first launch (it isn't notarized): show the
-  // steps to allow it, which stay hidden on every other system.
+  // steps to allow it, which stay hidden on every other system. A download
+  // click also scrolls to them and flashes the box, so they aren't missed;
+  // the installer still downloads, and the release page (when the API
+  // hasn't answered) opens in a new tab to keep the steps in sight.
   if (os === 'macOS') {
     document.querySelectorAll('[data-mac]').forEach(function (el) { el.hidden = false; });
+    var note = document.getElementById('mac');
+    var still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    buttons.forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+        e.preventDefault();
+        if (/\/releases\/latest$/.test(a.href)) window.open(a.href, '_blank', 'noopener');
+        else location.href = a.href;
+        note.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' });
+        note.classList.remove('flash');
+        void note.offsetWidth;
+        note.classList.add('flash');
+      });
+    });
   }
 
   // Every Mac browser reports "Intel" in its user agent. Chromium tells the
