@@ -988,23 +988,23 @@
     return true;
   }
 
-  // Inline element drawn as a box around its text: an inline code or a
-  // highlight (the outermost, when highlights are nested).
+  // Inline element the arrows stop at the edges of: an inline code, a
+  // highlight, or bold / italic / underline (the outermost, when nested).
   function currentBox() {
     const code = currentCode();
     if (code) return code;
     const block = currentBlock();
     let box = null;
     for (let n = getSelection().anchorNode; n && n !== block; n = n.parentNode) {
-      if (n.nodeType === 1 && isHighlight(n)) box = n;
+      if (n.nodeType === 1 && (isHighlight(n) || isTextStyle(n))) box = n;
     }
     return box;
   }
 
-  // ArrowLeft inside a box (inline code, highlight). One letter from its
-  // start, stops right before that letter, still inside (the browser would
-  // jump out past it); at its start, moves just before the box, into the
-  // text there (an invisible separator when there is none).
+  // ArrowLeft inside a box (inline code, highlight, bold...). One letter
+  // from its start, stops right before that letter, still inside (the
+  // browser would jump out past it); at its start, moves just before the
+  // box, into the text there (an invisible separator when there is none).
   function boxArrowLeft() {
     const sel = getSelection();
     const box = sel.isCollapsed && currentBox();
@@ -1093,8 +1093,8 @@
     return true;
   }
 
-  // The inline code or highlight that starts right after a caret position
-  // (only invisible separators in between), if any.
+  // The box (inline code, highlight, bold...) that starts right after a
+  // caret position (only invisible separators in between), if any.
   function boxAfterCaret(node, offset, block) {
     let n;
     if (node.nodeType === 3) {
@@ -1118,7 +1118,9 @@
     return null;
   }
 
-  const isBox = (n) => n.nodeType === 1 && (n.nodeName === 'CODE' || isHighlight(n));
+  const TEXT_STYLES = ['B', 'STRONG', 'I', 'EM', 'U'];
+  const isTextStyle = (n) => TEXT_STYLES.includes(n.nodeName);
+  const isBox = (n) => n.nodeType === 1 && (n.nodeName === 'CODE' || isHighlight(n) || isTextStyle(n));
 
   // Replaces `range` with <code>text</code>, followed by an invisible
   // separator (keeps the caret outside the code). Straight in the DOM:
@@ -1189,17 +1191,18 @@
       return;
     }
 
-    // ArrowLeft walks to the first letter of an inline code or highlight,
-    // then one more press leaves it, the way it goes before a list marker:
-    // the caret stops just before the box, where typing writes plain text.
+    // ArrowLeft walks to the first letter of an inline code, highlight or
+    // bold / italic / underline text, then one more press leaves it, the way
+    // it goes before a list marker: the caret stops just before the box,
+    // where typing writes plain text.
     if (e.key === 'ArrowLeft' && !e.shiftKey && !mod && !e.altKey && boxArrowLeft()) {
       e.preventDefault();
       return;
     }
     // ArrowRight mirrors it: entering a list item or code block from the end
-    // of the line above stops before its marker first, entering an inline
-    // code or highlight stops before its first letter, and leaving one stops
-    // just after it.
+    // of the line above stops before its marker first, entering a box (inline
+    // code, highlight, bold...) stops before its first letter, and leaving
+    // one stops just after it.
     if (e.key === 'ArrowRight' && !e.shiftKey && !mod && !e.altKey && arrowRight(wasBeforeMarker)) {
       e.preventDefault();
       return;
@@ -2069,17 +2072,15 @@
       onDoubleClick: startRename,
       onClose: closeNote,
     });
-    // Right click on the titlebar: its commands in a menu.
+    // Right click on the titlebar or its "…" button: the note's commands,
+    // then all the app's (chrome.js).
     window.MemoChrome.titleMenu({
-      frame,
       titlebar,
+      more: $('moreBtn'),
       items: () => (note ? [
         { label: t('rename'), run: startRename },
-        { label: t(note.pinned ? 'unpin' : 'pin'), run: togglePin },
+        { label: t('pin'), checked: !!note.pinned, run: togglePin },
         { label: t('noteColor'), run: openColors },
-        null,
-        { label: t('newNote'), run: newNote },
-        null,
         { label: t('closeNote'), run: closeNote },
       ] : []),
       onOpen: () => { closeColors(); closeGroupMenu(); hideFormatBar(); },

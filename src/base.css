@@ -267,6 +267,8 @@ html, body {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* "…" (more commands): round dots drawn as zero-length strokes. */
+.icon-btn svg .dots { stroke-width: 2.2; }
 .icon-btn circle { fill: currentColor; stroke: none; }
 .icon-btn:hover { background: var(--overlay-hover); color: var(--color-mist); }
 .icon-btn:active { background: var(--overlay-active); }
@@ -316,43 +318,6 @@ html, body {
 }
 .grip svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; }
 .grip:hover { color: var(--color-fog); }
-
-/* Right-click menu on the titlebar (chrome.js, titleMenu), the same in a
-   note, a group bar and the manager. */
-.menu.title-menu {
-  position: absolute;
-  top: calc(var(--titlebar-h) - 2px);
-  right: auto;
-  z-index: 30;
-  width: auto;
-  min-width: 170px;
-  max-width: calc(100% - 12px);
-  padding: 6px;
-  background: var(--color-obsidian);
-  border-radius: 8px;
-  box-shadow: var(--shadow-popover);
-  user-select: none;
-  -webkit-user-select: none;
-}
-.menu.title-menu[hidden] { display: none; }
-.title-menu .menu-item {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 28px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--radius-button);
-  background: transparent;
-  color: var(--color-mist);
-  font-family: var(--font-ui);
-  font-size: 13px;
-  text-align: left;
-  cursor: default;
-}
-.title-menu .menu-item span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.title-menu .menu-item:hover { background: var(--overlay-hover); color: var(--color-paper); }
-.title-menu .menu-sep { height: 1px; margin: 4px 2px; background: var(--color-graphite); }
 
 /* ---------------------------------------------------- syntax highlighting */
 

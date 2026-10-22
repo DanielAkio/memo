@@ -32,10 +32,12 @@ sha2 = "0.10"
 base64 = "0.22"
 getrandom = "0.3"
 tokio = { version = "1", features = ["sync", "time"] }
+# In-app updates from the GitHub releases (updater.rs).
+tauri-plugin-updater = "2"
 
 # Windows: which window is shown at a point (WindowFromPoint).
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 
 # macOS: the window's occlusion state (NSWindow.occlusionState).
 [target.'cfg(target_os = "macos")'.dependencies]

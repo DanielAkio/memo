@@ -3,7 +3,8 @@
 // release, so the click downloads instead of opening the release page. The
 // installer names carry the version, so they are looked up through the
 // GitHub API; until it answers, or if it fails, the links keep their
-// fallback href (the latest release page).
+// fallback href (the latest release page). Windows and Mac visitors also
+// get the steps past their system's warning ([data-os]).
 (function () {
   var ua = navigator.userAgent;
   var os = /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
@@ -13,6 +14,31 @@
   var label = (pt ? 'Baixar para ' : 'Download for ') + os;
   var buttons = document.querySelectorAll('[data-download]');
   buttons.forEach(function (a) { a.textContent = label; });
+
+  // Unsigned installers make browsers and SmartScreen warn about the
+  // download, and macOS blocks the app on first launch (it isn't
+  // notarized): show the visitor's system the steps past that, which stay
+  // hidden elsewhere. A download click also scrolls to them and flashes the
+  // box, so they aren't missed; the installer still downloads, and the
+  // release page (when the API hasn't answered) opens in a new tab to keep
+  // the steps in sight.
+  var note = document.querySelector('.os-note[data-os="' + os + '"]');
+  if (note) {
+    document.querySelectorAll('[data-os="' + os + '"]').forEach(function (el) { el.hidden = false; });
+    var still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    buttons.forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+        e.preventDefault();
+        if (/\/releases\/latest$/.test(a.href)) window.open(a.href, '_blank', 'noopener');
+        else location.href = a.href;
+        note.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' });
+        note.classList.remove('flash');
+        void note.offsetWidth;
+        note.classList.add('flash');
+      });
+    });
+  }
 
   // Every Mac browser reports "Intel" in its user agent. Chromium tells the
   // real architecture through userAgentData; elsewhere the WebGL renderer

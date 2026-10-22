@@ -187,63 +187,39 @@ window.MemoChrome = {
     return { cancelDrag };
   },
 
-  // Right click on the titlebar: a menu with the window's commands, the same
-  // ones its buttons and gestures give. `items()` is called on each opening,
-  // so labels follow the current state: [{ label, run }], null = separator.
-  // `onOpen(menu)` / `onClose()` let a group bar grow around it.
-  titleMenu({ frame, titlebar, items, onOpen, onClose }) {
-    const menu = document.createElement('div');
-    menu.className = 'menu title-menu';
-    menu.setAttribute('role', 'menu');
-    menu.hidden = true;
-    frame.append(menu);
+  // Right click on the titlebar, or its "…" button (`more`): a native menu
+  // with the window's own commands on top and all the app's commands below
+  // (Rust adds those, the same as the tray menu: show_title_menu). `items()`
+  // is called on each opening, so labels follow the current state:
+  // [{ label, run, checked? }], null = separator. `onOpen()` closes the
+  // window's own popovers first.
+  titleMenu({ titlebar, more, items, onOpen }) {
+    const { invoke } = window.__TAURI__.core;
     let entries = [];
 
-    function close() {
-      if (menu.hidden) return;
-      menu.hidden = true;
-      if (onClose) onClose();
+    function open(at) {
+      if (onOpen) onOpen();
+      entries = items();
+      const own = entries.map((item, i) => (item
+        ? { id: String(i), label: item.label, checked: item.checked ?? null }
+        : null));
+      invoke('show_title_menu', { items: own, at }).catch((err) => console.error('show_title_menu', err));
     }
 
     titlebar.addEventListener('contextmenu', (e) => {
       if (e.target.closest('input')) return;
       e.preventDefault();
-      entries = items();
-      if (!entries.length) return;
-      menu.replaceChildren(...entries.map((item, i) => {
-        if (!item) {
-          const sep = document.createElement('div');
-          sep.className = 'menu-sep';
-          return sep;
-        }
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'menu-item';
-        btn.setAttribute('role', 'menuitem');
-        btn.dataset.index = i;
-        const text = document.createElement('span');
-        text.textContent = item.label;
-        btn.append(text);
-        return btn;
-      }));
-      menu.hidden = false;
-      // Opens under the titlebar, at the pointer, kept inside the window.
-      const max = frame.clientWidth - menu.offsetWidth - 6;
-      menu.style.left = `${Math.max(6, Math.min(e.clientX, max))}px`;
-      if (onOpen) onOpen(menu);
+      open(null);
     });
-    menu.addEventListener('mousedown', (e) => e.preventDefault()); // keeps the focus
-    menu.addEventListener('click', (e) => {
-      const btn = e.target.closest('.menu-item');
-      if (!btn) return;
-      const item = entries[btn.dataset.index];
-      close();
-      item.run();
+    if (more) {
+      more.addEventListener('click', () => {
+        const r = more.getBoundingClientRect();
+        open([r.left, r.bottom]);
+      });
+    }
+    window.__TAURI__.event.listen('title-menu', (e) => {
+      const item = entries[Number(e.payload)];
+      if (item) item.run();
     });
-    document.addEventListener('mousedown', (e) => { if (!menu.contains(e.target)) close(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-    window.addEventListener('blur', close);
-
-    return { close };
   },
 };

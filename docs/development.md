@@ -24,7 +24,9 @@ cd src-tauri && cargo check && cargo clippy && cargo test
   `docker compose -f docker/compose.yml run --build --rm windows` puts the NSIS `*-setup.exe` in `dist/`.
 - **All platforms**: the manual workflow in `.github/workflows/build.yml` (Actions → Build → Run workflow) builds
   Windows, macOS (Apple Silicon and Intel) and Linux installers; run from a version tag, it also creates a draft
-  release. With SignPath set up it also signs the Windows installers ([`code-signing.md`](code-signing.md)).
+  release. With SignPath set up it also signs the Windows installers ([`code-signing.md`](code-signing.md)); with the
+  `TAURI_SIGNING_PRIVATE_KEY` secret it also publishes the signed update packages the app updates itself from
+  ([`updates.md`](updates.md)).
 
 ## Google Drive sync
 
@@ -68,6 +70,19 @@ first launch Memo copies that data into `memo` and keeps the old folder as a bac
 (<https://danielakio.github.io/memo/>), in English and Portuguese (`site/pt/`). The GIFs in `site/media/` are used by
 both the site and the README; each one comes in dark and light versions and in both languages
 (`<scene>-<theme>-<lang>.gif`).
+
+The GIFs are recorded from the app's own pages, so re-record them whenever the windows change:
+
+```bash
+npm install --no-save playwright         # once; ffmpeg must be on the PATH
+node tools/demos/record.mjs              # every scene, theme and language (a few minutes)
+node tools/demos/record.mjs write dark en  # just one
+```
+
+`tools/demos/stage.html` is a fake desktop where each Memo window is an `<iframe>` of `src/index.html`,
+`group.html` or `manager.html`; `mock.js` stands in for the Tauri API (the state lives in `stage.js`), and
+`record.mjs` scripts each scene with a real mouse and keyboard, one screenshot per frame. A new Tauri command the
+pages call at startup may need a case in `stage.js`'s `invoke`.
 
 ## Uninstalling
 

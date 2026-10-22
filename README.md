@@ -29,10 +29,10 @@ digging through windows to find what you wrote down.
 ## Why people like it
 
 - **Always in sight.** One click on the pin and the memory stays on top while you work in anything else.
-- **Write without thinking.** Type and it's saved. `[]` starts a checklist, `-` starts a list, and a quick selection
-  lets you highlight what matters.
-- **Find things at a glance.** Give each memory a title and a colour, and gather related ones in a group you can put
-  away and bring back in one click.
+- **Write without thinking.** Type and it's saved. `[]` starts a checklist, `-` starts a list, backticks turn a
+  command into code, a screenshot pastes right in, and a quick selection lets you highlight what matters.
+- **Find things at a glance.** Give each memory a title and a colour (any colour, with the eyedropper), and gather
+  related ones in a group you can put away and bring back in one click.
 - **Yours, and only yours.** No sign-up, no ads, no tracking, and it works offline. Your memories live on your
   computer, and if you want them on several computers, they sync through your own Google Drive
   ([privacy policy](https://danielakio.github.io/memo/privacy.html)).
@@ -42,12 +42,17 @@ digging through windows to find what you wrote down.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset="site/media/write-light-en.gif">
-    <img src="site/media/write-dark-en.gif" width="860" alt="Naming a memory, typing a checklist, ticking two items, highlighting a line and changing the memory's colour">
+    <img src="site/media/write-dark-en.gif" width="860" alt="Naming a memory, typing a checklist and a command between backticks that turns into code, highlighting a line, ticking two items and picking the memory's colour">
   </picture>
 </p>
 
 Name it with a double-click on the top bar, type `[]` for a checklist, tick items as you go, highlight a line and pick
 a colour. That's all there is to learn.
+
+For the technical bits, put a command between backticks (`` `npm run dev` ``) and it shows as code, or type ```` ``` ````
+for a whole code block coloured for its language. Copy a screenshot and paste it in, then drag its corner to resize
+it. New memories start without a colour, or with a random one if you like; the colour dot offers a few to pick from,
+and its eyedropper any colour at all.
 
 ## Keep related memories together
 
@@ -59,7 +64,8 @@ a colour. That's all there is to learn.
 </p>
 
 A group is a slim bar that holds memories. The arrow tucks them all into the bar and brings them back exactly where
-they were. Drop a memory on a bar to add it.
+they were. Drop a memory on a bar to add it. Each new group gets a colour of its own, which tints its memories so you
+can tell at a glance where each one belongs.
 
 ## Everything in one place
 
@@ -72,6 +78,10 @@ they were. Drop a memory on a bar to add it.
 
 The **Memo Manager** lists every memory, open or closed. Search them, reopen one with a click, move it to a group or
 sort the list. Sent something to the trash by mistake? Restore it: the trash keeps memories for 30 days.
+
+Every bar stays clean, with just the buttons you use most. Everything else is one click away: the **…** button, or a
+right click anywhere on the bar of a memory, a group or the Manager, opens a menu with that window's commands and
+all of Memo's, from a new group to Settings, so you never have to hunt for the right window.
 
 ## Let your AI assistant take notes
 
@@ -96,6 +106,9 @@ Download the installer for your computer from the **[latest release](https://git
 Open it, and Memo greets you with a welcome memory that shows the basics. Closing a memory never deletes it, and
 closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.
 
+You only download it once: when a new version is out, Memo tells you in the tray menu and in Settings, and one click
+updates it and opens it again, memories and all. Settings → App shows which version you have.
+
 <details>
 <summary><b>Your computer warns you the first time?</b></summary>
 
@@ -103,8 +116,9 @@ Memo is new and its installers aren't signed yet, so your system may be cautious
 once:
 
 - **Windows**: if you see "Windows protected your PC", click **More info → Run anyway**.
-- **macOS**: drag Memo to Applications, then right-click it → **Open**. If macOS still refuses, go to **System
-  Settings → Privacy & Security** and click **Open Anyway**. If it says the app "is damaged", run
+- **macOS**: Apple only skips this warning for developers who pay for its Developer Program, and Memo doesn't. Drag
+  Memo to Applications and open it; when macOS blocks it, click **Done**, go to **System Settings → Privacy &
+  Security**, scroll down and click **Open Anyway**. If it says the app "is damaged", run
   `xattr -cr /Applications/Memo.app` in Terminal and open it again.
 - **Linux**: install the `.deb` or `.rpm` with your package manager, or make the `.AppImage` executable
   (`chmod +x Memo*.AppImage`) and run it.

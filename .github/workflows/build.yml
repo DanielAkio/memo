@@ -4,7 +4,10 @@ name: Build
 # publishes a draft release with the Windows, macOS (Apple Silicon and Intel)
 # and Linux installers. The Windows installers are signed through SignPath
 # once the SIGNPATH_API_TOKEN secret and the SIGNPATH_ORGANIZATION_ID variable
-# exist (docs/code-signing.md); without them they stay unsigned.
+# exist (docs/code-signing.md); without them they stay unsigned. With the
+# TAURI_SIGNING_PRIVATE_KEY secret (docs/updates.md) it also signs the update
+# packages and writes latest.json, which the app reads to update itself once
+# the release is published.
 on:
   workflow_dispatch:
 
@@ -45,6 +48,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     env:
       SIGN_WINDOWS: ${{ matrix.platform == 'windows-latest' && secrets.SIGNPATH_API_TOKEN != '' }}
+      UPDATER: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
       RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
 
     steps:
@@ -70,6 +74,15 @@ jobs:
 
       - run: npm install
 
+      # The update packages (signed .tar.gz, .AppImage, installers + .sig)
+      # need the private key, so they are only made here, not on local builds.
+      - name: Turn on the update packages
+        if: env.UPDATER == 'true'
+        shell: bash
+        run: |
+          node -e "const fs = require('fs'), f = 'src-tauri/tauri.conf.json', c = JSON.parse(fs.readFileSync(f, 'utf8'));
+            c.bundle.createUpdaterArtifacts = true; fs.writeFileSync(f, JSON.stringify(c, null, 2));"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,18 +90,24 @@ jobs:
           # these secrets the build simply has no cloud sync.
           MEMO_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           MEMO_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          # In-app updates (docs/updates.md): signs the update packages.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # Signed Windows builds reach the release after signing (below).
           tagName: ${{ env.SIGN_WINDOWS != 'true' && env.RELEASE_TAG || '' }}
           releaseName: "Memo ${{ github.ref_name }}"
           releaseDraft: true
           args: ${{ matrix.args }}
+          # latest.json: each job adds its platforms; on Windows the app
+          # updates through the NSIS installer, the one the site offers.
+          updaterJsonPreferNsis: true
 
-      # tauri-action also uploads the macOS .app as .app.tar.gz, which only an
-      # updater would use; Memo has none, so the release keeps the .dmg only.
-      # Each macOS job removes its own architecture's tarball.
+      # tauri-action also uploads the macOS .app as .app.tar.gz, which only the
+      # updater uses: without the signing key there is no update, so the
+      # release keeps the .dmg only. Each macOS job removes its own tarball.
       - name: Drop the macOS .app.tar.gz from the release
-        if: runner.os == 'macOS' && env.RELEASE_TAG != ''
+        if: runner.os == 'macOS' && env.RELEASE_TAG != '' && env.UPDATER != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -141,6 +160,34 @@ jobs:
           else
             gh release create "$RELEASE_TAG" signed/* --draft --title "Memo $RELEASE_TAG"
           fi
+
+      # Signing changed the installers, so the update signatures tauri-action
+      # made no longer match: sign the signed ones and point latest.json's
+      # Windows entries at them. This job waits for the SignPath approval, so
+      # the other jobs have written their platforms to latest.json by now.
+      - name: Add the signed Windows installers to latest.json
+        if: env.SIGN_WINDOWS == 'true' && env.UPDATER == 'true' && env.RELEASE_TAG != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          exe=$(ls signed/*-setup.exe | head -n 1)
+          msi=$(ls signed/*.msi | head -n 1)
+          npx tauri signer sign "$exe"
+          npx tauri signer sign "$msi"
+          gh release download "$RELEASE_TAG" -p latest.json -O latest.json || echo '{}' > latest.json
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+          jq --arg version "${RELEASE_TAG#v}" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+             --arg exe "$base/$(basename "$exe")" --arg exe_sig "$(cat "$exe.sig")" \
+             --arg msi "$base/$(basename "$msi")" --arg msi_sig "$(cat "$msi.sig")" \
+             '.version //= $version | .notes //= "" | .pub_date //= $date
+              | .platforms["windows-x86_64"] = { url: $exe, signature: $exe_sig }
+              | .platforms["windows-x86_64-nsis"] = { url: $exe, signature: $exe_sig }
+              | .platforms["windows-x86_64-msi"] = { url: $msi, signature: $msi_sig }' \
+             latest.json > latest.tmp && mv latest.tmp latest.json
+          gh release upload "$RELEASE_TAG" latest.json --clobber
 
       - name: Upload signed Windows installers
         if: env.SIGN_WINDOWS == 'true'
