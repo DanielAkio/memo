@@ -459,11 +459,13 @@ window.MemoI18n = (() => {
             + '<span class="demo-pair"><i data-icon="pin-on"></i><span class="demo-note">fixada por cima de tudo</span></span></span>'],
           ['Nova memória', 'Botão + na barra, {{Mod+N}} ou o ícone do Memo na bandeja.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
-            + '<span class="demo-name">Lista de compras</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
+            + '<span class="demo-name">Lista de compras</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Título', 'Clique duplo na barra de título; {{Enter}} ou clicar fora salva, {{Esc}} cancela.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-input">Lista de compras</span></span>'],
-          ['Clique direito na barra', 'Abre um menu com os comandos da barra: renomear, fixar, cor, nova memória e fechar. Nos grupos e no Gerenciador também, com os comandos de cada um.'],
+          ['Menu da barra', 'O botão … ou o clique direito em qualquer ponto da barra (memória, grupo ou Gerenciador) abre um menu com os comandos dela (renomear, fixar, cor, fechar) e, abaixo, todos os do Memo: nova memória, novo grupo, mostrar todas, Gerenciador, Lixeira, Configurações, Ajuda, tema, idioma e sair. Assim nada precisa ser procurado em outra janela.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
+            + '<span class="demo-name">Lista de compras</span><i data-icon="plus"></i><i data-icon="more" class="demo-hot"></i><i data-icon="close"></i></span>'],
           ['Cor', 'Clique na bolinha ao lado do título (vazia enquanto a memória não tem cor). O conta-gotas abre qualquer cor.',
             '<span class="demo-dots"><span class="demo-dot" data-color="yellow"></span><span class="demo-dot" data-color="green"></span>'
             + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
@@ -474,7 +476,7 @@ window.MemoI18n = (() => {
           ['Encaixar na tela', 'Arraste até encostar o cursor na borda da tela: aparece uma prévia da metade (laterais), de um quarto (cantos) ou da tela inteira (topo). Solte para encaixar; ao arrastar de novo, ela volta ao tamanho anterior.'],
           ['Fechar', 'Botão ✕ ou clique do meio na barra de título: a memória fecha, mas continua em Atuais no Gerenciador (esmaecida); clique nela para reabrir. Para a lixeira, use o botão de lixeira no Gerenciador. Uma memória fechada sem nenhuma alteração (texto, cor ou grupo) é excluída.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
-            + '<span class="demo-name">Lista de compras</span><i data-icon="plus"></i><i data-icon="close" class="demo-hot"></i></span>'],
+            + '<span class="demo-name">Lista de compras</span><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close" class="demo-hot"></i></span>'],
         ],
       },
       {
@@ -507,24 +509,24 @@ window.MemoI18n = (() => {
         items: [
           ['O que é', 'Uma barrinha que guarda várias memórias. O botão de seta solta todas elas para onde estavam; clicando de novo, elas são recolhidas para dentro do grupo.',
             '<span class="demo-bar"><i data-icon="pin"></i><i data-icon="folder"></i><span class="demo-name">Trabalho</span>'
-            + '<i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
-          ['Criar', 'Botão de pasta com + na barra do Gerenciador, ou no rodapé de uma memória (onde aparece "Sem grupo") escolha "Novo grupo": ele começa sem nome, como uma memória nova. Também pela caixa de grupo na lista do Gerenciador.'],
+            + '<i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
+          ['Criar', 'Escolha "Novo grupo" no menu … (ou clique direito) de qualquer barra, ou no rodapé de uma memória (onde aparece "Sem grupo"): ele começa sem nome, como uma memória nova. Também pela caixa de grupo na lista do Gerenciador.'],
           ['Nova memória no grupo', 'O botão + da barra (ou {{Mod+N}} com o grupo em foco) cria uma memória já dentro do grupo, ao lado dele.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint"></i>'
-            + '<span class="demo-name">Trabalho</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
+            + '<span class="demo-name">Trabalho</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Adicionar memórias', 'Arraste uma memória e solte sobre o grupo, ou escolha o grupo no rodapé da memória ou no Gerenciador. O nome do grupo aparece no rodapé.',
             '<span class="demo-foot"><i data-icon="folder"></i>Trabalho</span><span class="demo-foot-meta">12 palavras</span>'],
           ['Renomear', 'Clique duplo na barra do grupo; {{Enter}} ou clicar fora salva, {{Esc}} cancela.'],
           ['Cor', 'Cada grupo novo nasce com uma cor aleatória. Para trocar, clique no ícone de pasta do grupo e escolha a cor: ela pinta a pasta e o ícone do grupo no rodapé das memórias, e marca o topo da barra e de cada memória do grupo com uma faixa e um tom suave.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
-            + '<span class="demo-name">Trabalho</span><i data-icon="close"></i></span>'],
+            + '<span class="demo-name">Trabalho</span><i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Fixar', 'A tachinha do grupo o mantém por cima de tudo, como numa memória ({{Mod+Shift+P}}).',
             '<span class="demo-bar"><i data-icon="pin-on"></i><i data-icon="folder"></i><span class="demo-name">Trabalho</span>'
-            + '<i data-icon="close"></i></span>'],
+            + '<i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Tirar do grupo', 'No rodapé da memória ou no Gerenciador, escolha "Sem grupo".'],
           ['Fechar e lixeira', 'O ✕ do grupo fecha a barra e as memórias dele; no Gerenciador, em Grupos, clique nele para reabrir. Um grupo fechado sem nenhuma alteração (nome, cor ou memórias) é excluído. O botão de lixeira da linha manda o grupo e as memórias para a lixeira; em Grupos → Lixeira, restaure (volta com as memórias) ou exclua de vez.',
             '<span class="demo-bar" data-color="sky"><i data-icon="pin"></i><i data-icon="folder"></i>'
-            + '<span class="demo-name">Trabalho</span><i data-icon="close" class="demo-hot"></i></span>'],
+            + '<span class="demo-name">Trabalho</span><i data-icon="more"></i><i data-icon="close" class="demo-hot"></i></span>'],
         ],
       },
       {
@@ -533,12 +535,9 @@ window.MemoI18n = (() => {
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
           ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema e o controle por IA, sincronizar agora e sair.'],
           ['Aba Grupos', 'Lista os grupos como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele para a frente; os botões da linha soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
-          ['Novo grupo', 'O botão de pasta com + na barra do Gerenciador cria um grupo vazio ao lado dele.',
+          ['Novo grupo e trazer para a frente', 'No menu … (ou clique direito) da barra do Gerenciador, ou de qualquer outra barra: "Novo grupo" cria um grupo vazio ao lado da janela; "Trazer todas as memórias para a frente" as coloca na frente das outras janelas, inclusive as minimizadas.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
-            + '<i data-icon="raise"></i><i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
-          ['Trazer para a frente', 'O botão ao lado do + na barra do Gerenciador traz todas as memórias abertas para a frente das outras janelas, inclusive as minimizadas.',
-            '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
-            + '<i data-icon="raise" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
+            + '<i data-icon="plus"></i><i data-icon="more" class="demo-hot"></i><i data-icon="close"></i></span>'],
           ['Atuais e Lixeira', 'Nas abas Memórias e Grupos, o seletor acima da lista mostra as atuais ou as da lixeira.',
             '<span class="demo-seg"><span class="on">Atuais</span><span>Lixeira</span></span>'],
           ['Buscar', 'Campo de busca nas abas Memórias e Grupos, ou {{Mod+F}}.',
@@ -576,11 +575,13 @@ window.MemoI18n = (() => {
             + '<span class="demo-pair"><i data-icon="pin-on"></i><span class="demo-note">pinned on top of everything</span></span></span>'],
           ['New memory', 'The + button in the titlebar, {{Mod+N}} or the Memo tray icon.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
-            + '<span class="demo-name">Shopping list</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
+            + '<span class="demo-name">Shopping list</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Title', 'Double-click the titlebar; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-input">Shopping list</span></span>'],
-          ['Right click on the bar', 'Opens a menu with the bar’s commands: rename, pin, color, new memory and close. Groups and the Manager have one too, with their own commands.'],
+          ['Bar menu', 'The … button, or a right click anywhere on the bar (a memory’s, a group’s or the Manager’s), opens a menu with its commands (rename, pin, color, close) and, below them, all of Memo’s: new memory, new group, show all, Manager, Trash, Settings, Help, theme, language and quit. Nothing has to be looked for in another window.',
+            '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
+            + '<span class="demo-name">Shopping list</span><i data-icon="plus"></i><i data-icon="more" class="demo-hot"></i><i data-icon="close"></i></span>'],
           ['Color', 'Click the dot next to the title (hollow while the memory has no color). The eyedropper opens any color.',
             '<span class="demo-dots"><span class="demo-dot" data-color="yellow"></span><span class="demo-dot" data-color="green"></span>'
             + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
@@ -591,7 +592,7 @@ window.MemoI18n = (() => {
           ['Snap to the screen', 'Drag until the cursor touches a screen edge: a preview shows half the screen (sides), a quarter (corners) or the whole screen (top). Release to snap; drag it again to get its previous size back.'],
           ['Close', 'The ✕ button or a middle click on the titlebar: the memory closes but stays under Current in the Manager (dimmed); click it to reopen it. To send it to the trash, use the Manager’s trash button. A memory closed without any change (text, colour or group) is deleted.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
-            + '<span class="demo-name">Shopping list</span><i data-icon="plus"></i><i data-icon="close" class="demo-hot"></i></span>'],
+            + '<span class="demo-name">Shopping list</span><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close" class="demo-hot"></i></span>'],
         ],
       },
       {
@@ -624,24 +625,24 @@ window.MemoI18n = (() => {
         items: [
           ['What it is', 'A small bar that holds several memories. Its arrow button takes them all out where they were; click it again to put them back in.',
             '<span class="demo-bar"><i data-icon="pin"></i><i data-icon="folder"></i><span class="demo-name">Work</span>'
-            + '<i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
-          ['Create', 'The folder-with-+ button in the Manager’s titlebar, or "New group" in a memory’s footer (where it says "No group"): it starts unnamed, like a new memory. Also from the group box in the Manager’s list.'],
+            + '<i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
+          ['Create', '"New group" in the … menu (or right click) of any bar, or in a memory’s footer (where it says "No group"): it starts unnamed, like a new memory. Also from the group box in the Manager’s list.'],
           ['New memory in the group', 'The bar’s + button (or {{Mod+N}} with the group focused) creates a memory already in the group, next to it.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint"></i>'
-            + '<span class="demo-name">Work</span><i data-icon="plus" class="demo-hot"></i><i data-icon="close"></i></span>'],
+            + '<span class="demo-name">Work</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Add memories', 'Drag a memory and drop it on the group, or pick the group in the memory’s footer or in the Manager. The group’s name shows in the footer.',
             '<span class="demo-foot"><i data-icon="folder"></i>Work</span><span class="demo-foot-meta">12 words</span>'],
           ['Rename', 'Double-click the group’s bar; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.'],
           ['Color', 'Each new group starts with a random color. To change it, click the group’s folder icon and pick a color: it tints the folder and the group icon in its memories’ footer, and marks the top of the bar and of each memory in the group with a stripe and a soft wash.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint demo-hot"></i>'
-            + '<span class="demo-name">Work</span><i data-icon="close"></i></span>'],
+            + '<span class="demo-name">Work</span><i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Pin', 'The group’s pin keeps it on top of everything, like a memory’s ({{Mod+Shift+P}}).',
             '<span class="demo-bar"><i data-icon="pin-on"></i><i data-icon="folder"></i><span class="demo-name">Work</span>'
-            + '<i data-icon="close"></i></span>'],
+            + '<i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Remove from group', 'In the memory’s footer or in the Manager, choose "No group".'],
           ['Close and trash', 'The group’s ✕ closes its bar and its memories; in the Manager, under Groups, click it to reopen it. A group closed without any change (name, colour or memories) is deleted. The row’s trash button sends the group and its memories to the trash; under Groups → Trash, restore it (it comes back with its memories) or delete it for good.',
             '<span class="demo-bar" data-color="sky"><i data-icon="pin"></i><i data-icon="folder"></i>'
-            + '<span class="demo-name">Work</span><i data-icon="close" class="demo-hot"></i></span>'],
+            + '<span class="demo-name">Work</span><i data-icon="more"></i><i data-icon="close" class="demo-hot"></i></span>'],
         ],
       },
       {
@@ -650,12 +651,9 @@ window.MemoI18n = (() => {
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
           ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system and AI control on or off, sync now and quit.'],
           ['Groups tab', 'Lists the groups like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar to the front; the row’s buttons take its memories out / put them away and move the group to the trash.'],
-          ['New group', 'The folder-with-+ button in the Manager’s titlebar creates an empty group next to it.',
+          ['New group and bring to front', 'In the … menu (or right click) of the Manager’s bar, or of any other bar: "New group" creates an empty group next to the window; "Bring all memories to the front" puts them in front of other windows, minimized ones included.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
-            + '<i data-icon="raise"></i><i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
-          ['Bring to front', 'The button next to + in the Manager’s titlebar brings every open memory in front of other windows, minimized ones included.',
-            '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
-            + '<i data-icon="raise" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="close"></i></span>'],
+            + '<i data-icon="plus"></i><i data-icon="more" class="demo-hot"></i><i data-icon="close"></i></span>'],
           ['Current and Trash', 'In the Memories and Groups tabs, the switch above the list shows the current ones or those in the trash.',
             '<span class="demo-seg"><span class="on">Current</span><span>Trash</span></span>'],
           ['Search', 'The search box in the Memories and Groups tabs, or {{Mod+F}}.',

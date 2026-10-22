@@ -73,6 +73,10 @@ they were. Drop a memory on a bar to add it.
 The **Memo Manager** lists every memory, open or closed. Search them, reopen one with a click, move it to a group or
 sort the list. Sent something to the trash by mistake? Restore it: the trash keeps memories for 30 days.
 
+Every bar stays clean, with just the buttons you use most. Everything else is one click away: the **…** button, or a
+right click anywhere on the bar of a memory, a group or the Manager, opens a menu with that window's commands and
+all of Memo's, from a new group to Settings, so you never have to hunt for the right window.
+
 ## Let your AI assistant take notes
 
 Turn on **AI control** in Settings and click **Connect** next to your AI assistant: Claude, ChatGPT's Codex,
