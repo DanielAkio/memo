@@ -47,7 +47,7 @@
 
   const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
   // Plain text without the list markers ("[ ] " / "[x] " / "- ").
-  const plain = (text) => (text || '').replace(/^(\s*)(?:\[[ xX]?\]|-)(?= |$) ?/gm, '$1');
+  const plain = (text) => (text || '').replace(/^(\s*)(?:\[[ xX]?\]|-|\d+\.)(?= |$) ?/gm, '$1');
   // For search: lower case, without accents.
   const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 

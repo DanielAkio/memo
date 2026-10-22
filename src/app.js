@@ -49,15 +49,16 @@
   const colorName = (color) => document.querySelector(`.swatch[data-color="${color}"]`).getAttribute('aria-label');
 
   // List line in plain text: indent (2 spaces per level) followed by
-  // "[ ]"/"[]"/"[x]" (checklist) or "-" (bullet). "[]" is accepted because
-  // it can be typed in the new-note default text.
+  // "[ ]"/"[]"/"[x]" (checklist), "-" (bullet) or "1." (numbered; the
+  // number itself is recomputed). "[]" is accepted because it can be typed
+  // in the new-note default text.
   // Parameters are never named "t", which is the translation function.
-  const LIST_RE = /^( *)(?:\[([ xX]?)\]|(-))(?= |$) ?/;
+  const LIST_RE = /^( *)(?:\[([ xX]?)\]|(-)|(\d+)\.)(?= |$) ?/;
   // In the plain text (toPlain) an image is "[imagem]" / "[image]", in the
   // language it was written in, so an image-only note is not blank and the
   // manager, tray and group lists show something for it.
   const IMAGE_MARK_RE = /\[(?:imagem|image)\]/g;
-  const plain = (text) => text.replace(/^(\s*)(?:\[[ xX]?\]|-)(?= |$) ?/gm, '$1');
+  const plain = (text) => text.replace(/^(\s*)(?:\[[ xX]?\]|-|\d+\.)(?= |$) ?/gm, '$1');
   const MAX_LEVEL = 4;
 
   const firstLine = (text) => plain(text).split('\n').map((s) => s.trim()).find(Boolean) || t('emptyNote');
@@ -137,10 +138,10 @@
   //
   // The editor is a contenteditable where each line is a <div>. Formatting
   // lives in <b>, <i> and <u>; a checklist item is <div class="check">
-  // (checked: "check done") and a bulleted item is <div class="bullet">,
-  // both with data-level (1–4) when indented with Tab. Besides the HTML, the
-  // note stores the plain text, with items as "[ ] " / "[x] " / "- "
-  // preceded by 2 spaces per level.
+  // (checked: "check done"), a bulleted item is <div class="bullet"> and a
+  // numbered one <div class="number">, all with data-level (1–4) when
+  // indented with Tab. Besides the HTML, the note stores the plain text, with
+  // items as "[ ] " / "[x] " / "- " / "1. " preceded by 2 spaces per level.
 
   const isBlock = (n) => n !== editor && n.nodeType === 1 && (n.nodeName === 'DIV' || n.nodeName === 'P');
   const INLINE = { B: 'b', STRONG: 'b', I: 'i', EM: 'i', U: 'u', CODE: 'code' };
@@ -182,6 +183,7 @@
     const indent = '  '.repeat(levelOf(block));
     if (block.classList.contains('check')) return indent + (block.classList.contains('done') ? '[x] ' : '[ ] ');
     if (block.classList.contains('bullet')) return `${indent}- `;
+    if (block.classList.contains('number')) return `${indent}${block.dataset.n || 1}. `;
     return '';
   }
 
@@ -251,7 +253,7 @@
         continue;
       }
       const body = line.slice(m[0].length);
-      const cls = m[3] ? 'bullet' : `check${/x/i.test(m[2]) ? ' done' : ''}`;
+      const cls = m[3] ? 'bullet' : m[4] ? 'number' : `check${/x/i.test(m[2]) ? ' done' : ''}`;
       const level = Math.min(MAX_LEVEL, Math.floor(m[1].length / 2));
       const lvl = level ? ` data-level="${level}"` : '';
       out.push(`<div class="${cls}"${lvl}>${body ? inline(body) : '<br>'}</div>`);
@@ -296,8 +298,9 @@
           if (n.classList.contains('check')) div.classList.add('check');
           if (n.classList.contains('done')) div.classList.add('done');
           if (n.classList.contains('bullet')) div.classList.add('bullet');
+          if (n.classList.contains('number')) div.classList.add('number');
           const level = Number(n.dataset.level);
-          if ((div.classList.contains('check') || div.classList.contains('bullet')) && level >= 1) {
+          if (isListItem(div) && level >= 1) {
             div.dataset.level = String(Math.min(MAX_LEVEL, level));
           }
           copy(n, div);
@@ -346,16 +349,40 @@
 
   function loadContent() {
     editor.replaceChildren(note.html ? sanitize(note.html) : sanitize(fromPlain(note.text)));
+    syncNumbers();
     syncCheckSizes();
     renderCode();
     resetHistory();
   }
 
-  // List item (checklist or bullet) whose text is all in one size
+  // Numbered items count up within a run of items at the same level (deeper
+  // items in between don't break it; anything else does) and show their
+  // number from data-n (presentation only, recomputed on every change).
+  function syncNumbers() {
+    let counts = [];
+    for (const block of editor.children) {
+      if (!isListItem(block)) {
+        counts = [];
+        if (block.dataset.n) delete block.dataset.n;
+        continue;
+      }
+      const level = levelOf(block);
+      counts.length = level + 1;
+      if (block.classList.contains('number')) {
+        counts[level] = (counts[level] || 0) + 1;
+        if (block.dataset.n !== String(counts[level])) block.dataset.n = String(counts[level]);
+      } else {
+        counts[level] = 0;
+        if (block.dataset.n) delete block.dataset.n;
+      }
+    }
+  }
+
+  // List item (checklist, bullet or numbered) whose text is all in one size
   // (<font size>): tags the line with data-size so CSS gives the whole line
   // that size and the box/dot and strike-through stay centred on the text.
   function syncCheckSizes() {
-    for (const block of editor.querySelectorAll('.check, .bullet')) {
+    for (const block of editor.querySelectorAll('.check, .bullet, .number')) {
       const sizes = new Set();
       const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
       for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -387,11 +414,13 @@
     }
   }
 
-  // Saved HTML: the editor's, without syncCheckSizes' display tweaks
-  // (data-size and --check-mid), which are recomputed on load.
+  // Saved HTML: the editor's, without the display tweaks of syncNumbers and
+  // syncCheckSizes (data-n, data-size and --check-mid), which are recomputed
+  // on load.
   function contentHtml() {
     const copy = editor.cloneNode(true);
     for (const b of copy.querySelectorAll('[data-size]')) delete b.dataset.size;
+    for (const b of copy.querySelectorAll('[data-n]')) delete b.dataset.n;
     for (const b of copy.querySelectorAll('[style]')) {
       b.style.removeProperty('--check-mid');
       if (!b.getAttribute('style')) b.removeAttribute('style');
@@ -447,6 +476,7 @@
   }
 
   function applyContent() {
+    syncNumbers();
     syncCheckSizes();
     renderCode();
     renderImageFrame();
@@ -1320,14 +1350,15 @@
       if (levelOf(block) > 0) {
         setLevel(block, levelOf(block) - 1);
       } else {
-        block.classList.remove('check', 'done', 'bullet');
+        block.classList.remove('check', 'done', 'bullet', 'number');
         if (!block.classList.length) block.removeAttribute('class');
       }
       onContentChanged();
     }
   }
 
-  const isListItem = (block) => block.classList.contains('check') || block.classList.contains('bullet');
+  const LIST_TYPES = ['check', 'bullet', 'number'];
+  const isListItem = (block) => LIST_TYPES.some((type) => block.classList.contains(type));
 
   function setLevel(block, level) {
     const next = Math.max(0, Math.min(MAX_LEVEL, level));
@@ -1343,7 +1374,8 @@
     return [...editor.children].filter((b) => range.intersectsNode(b));
   }
 
-  // "- " typed at the start of a line turns it into a bullet.
+  // "- " typed at the start of a line turns it into a bullet, "1. " (any
+  // number) into a numbered item.
   function expandBullet() {
     const sel = getSelection();
     if (!sel.isCollapsed) return false;
@@ -1354,7 +1386,8 @@
     }
     if (!block || isListItem(block)) return false;
     const before = textBeforeCaret(block);
-    if (!/^\s*-[ \u00a0]$/.test(before.toString())) return false;
+    const m = /^\s*(-|\d+\.)[ \u00a0]$/.exec(before.toString());
+    if (!m) return false;
     sel.removeAllRanges();
     sel.addRange(before);
     document.execCommand('delete'); // goes into the undo stack
@@ -1363,7 +1396,7 @@
       block = currentBlock();
       if (!block) return false;
     }
-    block.classList.add('bullet');
+    block.classList.add(m[1] === '-' ? 'bullet' : 'number');
     return true;
   }
 

@@ -343,8 +343,8 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 /* Item all in one size (data-size, from app.js): the line takes that size,
    so the box (0.8em) and the strike-through stay centred on the text. Same
    px as .editor font[size]. */
-.check[data-size="2"], .bullet[data-size="2"] { font-size: 13px; }
-.check[data-size="5"], .bullet[data-size="5"] { font-size: 20px; }
+.check[data-size="2"], .bullet[data-size="2"], .number[data-size="2"] { font-size: 13px; }
+.check[data-size="5"], .bullet[data-size="5"], .number[data-size="5"] { font-size: 20px; }
 
 /* Bulleted item ("- "): a filled dot instead of the box. */
 .bullet {
@@ -362,11 +362,27 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   background: var(--color-fog);
 }
 
-/* Indent (Tab): 20px per level, for checklist and bullet items. */
-.check[data-level="1"], .bullet[data-level="1"] { margin-left: 20px; }
-.check[data-level="2"], .bullet[data-level="2"] { margin-left: 40px; }
-.check[data-level="3"], .bullet[data-level="3"] { margin-left: 60px; }
-.check[data-level="4"], .bullet[data-level="4"] { margin-left: 80px; }
+/* Numbered item ("1. "): its number (data-n, from app.js) right-aligned
+   in the marker column, so "9." and "10." line up on the dot. */
+.number {
+  position: relative;
+  padding-left: 24px;
+}
+.number::before {
+  content: attr(data-n) ".";
+  position: absolute;
+  left: -6px;
+  width: 24px;
+  text-align: right;
+  color: var(--color-fog);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Indent (Tab): 20px per level, for all list items. */
+:is(.check, .bullet, .number)[data-level="1"] { margin-left: 20px; }
+:is(.check, .bullet, .number)[data-level="2"] { margin-left: 40px; }
+:is(.check, .bullet, .number)[data-level="3"] { margin-left: 60px; }
+:is(.check, .bullet, .number)[data-level="4"] { margin-left: 80px; }
 .check::before {
   content: "";
   position: absolute;
