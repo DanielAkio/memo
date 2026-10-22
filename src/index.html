@@ -108,7 +108,16 @@
       </div>
       <!-- Caret before a list item's box or dot (app.js, "lists"). -->
       <span class="marker-caret" id="markerCaret" hidden></span>
+      <!-- "+" left of an empty line with the caret: opens #lineMenu (app.js, "insert"). -->
+      <button type="button" class="line-add" id="lineAdd" tabindex="-1" aria-haspopup="menu" aria-expanded="false"
+              data-i18n-attr="aria-label=insertBlock,title=insertBlock" hidden>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+      </button>
     </main>
+
+    <!-- Menu of the "+": turns the empty line into a list or a code block
+         (items built from the format bar's buttons in app.js). -->
+    <div class="menu line-menu" id="lineMenu" role="menu" hidden></div>
 
     <!-- Group picker, opened from the footer: the note's group, "no group" or
          a new one (app.js, "groups"). -->

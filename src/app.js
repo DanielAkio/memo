@@ -1880,6 +1880,7 @@
   }
 
   function updateFormatBar() {
+    updateLineAdd();
     // A selected image has its resize frame instead.
     const range = !selecting && note && document.activeElement === editor && !selectedImage() && selectionRange();
     const rects = range ? [...range.getClientRects()].filter((r) => r.width || r.height) : [];
@@ -1910,6 +1911,78 @@
 
   function hideFormatBar() {
     formatBar.hidden = true;
+  }
+
+  // ------------------------------------------------------------- insert
+
+  // An empty line with the caret shows a "+" in the margin on its left; its
+  // menu turns the line into a checklist, a list, a numbered list or a code
+  // block (the same as typing "[]", "- ", "1. " or "```").
+  const lineAdd = $('lineAdd');
+  const lineMenu = $('lineMenu');
+  let lineBlock = null; // the empty line the "+" belongs to
+
+  for (const cmd of ['check', 'bullet', 'number', 'codeBlock']) {
+    const src = formatBar.querySelector(`[data-cmd="${cmd}"]`);
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'menu-item';
+    item.setAttribute('role', 'menuitem');
+    item.dataset.cmd = cmd;
+    const label = document.createElement('span');
+    label.dataset.i18n = src.dataset.i18nAttr.split('=')[1];
+    const hint = document.createElement('span');
+    hint.className = 'menu-hint';
+    hint.textContent = src.dataset.hint;
+    item.append(src.querySelector('svg').cloneNode(true), label, hint);
+    lineMenu.append(item);
+  }
+
+  function updateLineAdd() {
+    const sel = getSelection();
+    const block = !EMBED && !selecting && note && document.activeElement === editor
+      && sel.isCollapsed && !currentPre() && currentBlock();
+    const empty = block && !isListItem(block) && !block.textContent.replace(ZWSP, '') && !block.querySelector('img');
+    if (!empty) {
+      lineBlock = null;
+      lineAdd.hidden = true;
+      closeLineMenu();
+      return;
+    }
+    if (block !== lineBlock) closeLineMenu();
+    lineBlock = block;
+    const body = lineAdd.parentElement.getBoundingClientRect();
+    const r = block.getBoundingClientRect();
+    const view = editor.getBoundingClientRect();
+    const lineHeight = parseFloat(getComputedStyle(block).lineHeight) || 24;
+    const top = r.top + (lineHeight - 16) / 2;
+    lineAdd.hidden = top < view.top || top + 16 > view.bottom;
+    lineAdd.style.left = `${Math.max(0, r.left - body.left - 17)}px`;
+    lineAdd.style.top = `${top - body.top}px`;
+  }
+
+  function openLineMenu() {
+    if (!lineBlock) return;
+    closeColors();
+    closeGroupMenu();
+    lineMenu.hidden = false;
+    lineAdd.setAttribute('aria-expanded', 'true');
+    // Under the "+" (above it when there is no room), inside the window.
+    const box = lineMenu.offsetParent.getBoundingClientRect();
+    const r = lineAdd.getBoundingClientRect();
+    const w = lineMenu.offsetWidth;
+    const h = lineMenu.offsetHeight;
+    let top = r.bottom + 4;
+    if (top + h > window.innerHeight - 4) top = Math.max(4, r.top - h - 4);
+    const left = Math.max(4, Math.min(r.left, window.innerWidth - w - 4));
+    lineMenu.style.left = `${left - box.left}px`;
+    lineMenu.style.top = `${top - box.top}px`;
+  }
+
+  function closeLineMenu() {
+    if (lineMenu.hidden) return;
+    lineMenu.hidden = true;
+    lineAdd.setAttribute('aria-expanded', 'false');
   }
 
   // ------------------------------------------------------------ actions
@@ -2078,7 +2151,7 @@
       }
     }
   });
-  editor.addEventListener('blur', () => setBeforeMarker(null));
+  editor.addEventListener('blur', () => { setBeforeMarker(null); scheduleFormatBar(); });
   editor.addEventListener('scroll', renderMarkerCaret);
   new ResizeObserver(() => {
     renderCode();
@@ -2086,6 +2159,20 @@
     renderMarkerCaret();
     scheduleFormatBar();
   }).observe(editor);
+
+  // The "+" and its menu keep the caret in the line (mousedown preventDefault).
+  lineAdd.addEventListener('mousedown', (e) => e.preventDefault());
+  lineAdd.addEventListener('click', () => (lineMenu.hidden ? openLineMenu() : closeLineMenu()));
+  lineMenu.addEventListener('mousedown', (e) => e.preventDefault());
+  lineMenu.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-cmd]');
+    if (!item || !lineBlock) return;
+    const block = lineBlock;
+    closeLineMenu();
+    editor.focus();
+    caretIn(block);
+    FORMAT_COMMANDS[item.dataset.cmd]();
+  });
 
   // mousedown with preventDefault: clicking the bar keeps the text selection.
   formatBar.addEventListener('mousedown', (e) => e.preventDefault());
@@ -2132,6 +2219,7 @@
   document.addEventListener('mousedown', (e) => {
     if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) closeColors();
     if (!groupMenu.hidden && !groupMenu.contains(e.target) && !footBtn.contains(e.target)) closeGroupMenu();
+    if (!lineMenu.hidden && !lineMenu.contains(e.target) && !lineAdd.contains(e.target)) closeLineMenu();
   });
 
   // -------------------------------------------------------------- groups
@@ -2224,14 +2312,14 @@
         { label: t('noteColor'), run: openColors },
         { label: t('closeNote'), run: closeNote },
       ] : []),
-      onOpen: () => { closeColors(); closeGroupMenu(); hideFormatBar(); },
+      onOpen: () => { closeColors(); closeGroupMenu(); closeLineMenu(); hideFormatBar(); },
     });
   }
 
   document.addEventListener('keydown', (e) => {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const key = e.key.toLowerCase();
-    if (e.key === 'Escape') { closeColors(); closeGroupMenu(); hideFormatBar(); return; }
+    if (e.key === 'Escape') { closeColors(); closeGroupMenu(); closeLineMenu(); hideFormatBar(); return; }
     if (EMBED) return;
     if (mod && e.shiftKey && key === 'p') { e.preventDefault(); togglePin(); }
     else if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); }
@@ -2243,12 +2331,14 @@
     if (!e.target.closest('input, #editor')) e.preventDefault();
   });
 
-  window.addEventListener('focus', () => frame.classList.add('is-focused'));
+  window.addEventListener('focus', () => { frame.classList.add('is-focused'); scheduleFormatBar(); });
   window.addEventListener('blur', () => {
     frame.classList.remove('is-focused');
     finishRename(true);
     hideFormatBar();
     closeGroupMenu();
+    closeLineMenu();
+    lineAdd.hidden = true;
     flushText();
   });
   window.addEventListener('beforeunload', () => {
