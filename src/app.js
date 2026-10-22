@@ -948,6 +948,19 @@
     caretIn(pre, true);
   }
 
+  // Typing before the marker of a list item or code block writes on a new
+  // line above it: the caret moves into that line and the browser types the
+  // character (or composes a dead key) there.
+  function typeAbove(e, block) {
+    const typed = e.key.length === 1 || e.key === 'Dead' || e.key === 'Process';
+    if (!typed || e.metaKey || (e.ctrlKey && !e.altKey)) return false;
+    const line = document.createElement('div');
+    line.appendChild(document.createElement('br'));
+    block.before(line);
+    caretIn(line);
+    return true;
+  }
+
   // Inside the block: Enter breaks the line, Tab indents; Enter on an empty
   // last line leaves the block; Backspace in an empty block turns it back
   // into a regular line.
@@ -973,17 +986,7 @@
       setBeforeMarker(pre);
       return;
     }
-    // Typing there writes on a new line above the block: the caret moves
-    // into it and the browser types the character (or composes a dead key)
-    // there.
-    const typed = e.key.length === 1 || e.key === 'Dead' || e.key === 'Process';
-    if (before && typed && !e.metaKey && !(e.ctrlKey && !e.altKey)) {
-      const line = document.createElement('div');
-      line.appendChild(document.createElement('br'));
-      pre.before(line);
-      caretIn(line);
-      return;
-    }
+    if (before && typeAbove(e, pre)) return;
     if (e.key === 'Tab' && !mod && !e.altKey) {
       e.preventDefault();
       if (!e.shiftKey) document.execCommand('insertText', false, '  ');
@@ -1361,6 +1364,8 @@
       setBeforeMarker(block);
       return;
     }
+    // Typing there writes on a new line above the item.
+    if (before && typeAbove(e, block)) return;
     // Enter on an empty first item adds the next item (a list just started).
     const prev = block.previousElementSibling;
     if (e.key === 'Enter' && plainKey && block.textContent.trim() === '' && !(prev && isListItem(prev))) {

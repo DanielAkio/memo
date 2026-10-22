@@ -531,7 +531,7 @@ window.MemoI18n = (() => {
             '<div class="bullet">Frutas</div><div class="bullet">Verduras</div>'],
           ['Lista numerada', 'Digite {{1.}} e espaço no começo da linha. A numeração se ajusta sozinha quando você inclui, tira ou recua itens.',
             '<div class="number" data-n="1">Abrir o Memo</div><div class="number" data-n="2">Fixar a memória</div><div class="number" data-n="1" data-level="1">clique na tachinha</div>'],
-          ['Recuo de itens', '{{Tab}} recua e {{Shift+Tab}} volta. Clique à esquerda do quadrado ou do ponto (ou {{←}} no início do item, ou {{→}} no fim da linha de cima) e {{Enter}} empurra o item para baixo, deixando uma linha de texto acima. {{Enter}} num item vazio sai da lista, exceto no primeiro, que cria o próximo; {{Backspace}} no início também sai.',
+          ['Recuo de itens', '{{Tab}} recua e {{Shift+Tab}} volta. Clique à esquerda do quadrado ou do ponto (ou {{←}} no início do item, ou {{→}} no fim da linha de cima) e {{Enter}} empurra o item para baixo, deixando uma linha de texto acima; o que você digitar ali também vai para uma linha nova acima do item. {{Enter}} num item vazio sai da lista, exceto no primeiro, que cria o próximo; {{Backspace}} no início também sai.',
             '<div class="bullet">Viagem</div><div class="check done" data-level="1">reservar hotel</div>'
             + '<div class="check" data-level="1">renovar passaporte</div>'],
           ['Código na linha', 'Texto entre crases, como {{`código`}}, ou {{Mod+E}}. {{←}} e {{→}} param na borda do código antes de entrar ou sair dele.',
@@ -655,7 +655,7 @@ window.MemoI18n = (() => {
             '<div class="bullet">Fruit</div><div class="bullet">Vegetables</div>'],
           ['Numbered list', 'Type {{1.}} and a space at the start of a line. The numbers follow along as you add, remove or indent items.',
             '<div class="number" data-n="1">Open Memo</div><div class="number" data-n="2">Pin the memory</div><div class="number" data-n="1" data-level="1">click the pushpin</div>'],
-          ['Indenting items', '{{Tab}} indents and {{Shift+Tab}} outdents. Click left of the box or dot (or {{←}} at the item’s start, or {{→}} at the end of the line above) and {{Enter}} pushes the item down, leaving a text line above. {{Enter}} on an empty item leaves the list, except on the first one, where it adds the next; {{Backspace}} at its start also leaves.',
+          ['Indenting items', '{{Tab}} indents and {{Shift+Tab}} outdents. Click left of the box or dot (or {{←}} at the item’s start, or {{→}} at the end of the line above) and {{Enter}} pushes the item down, leaving a text line above; whatever you type there also goes on a new line above the item. {{Enter}} on an empty item leaves the list, except on the first one, where it adds the next; {{Backspace}} at its start also leaves.',
             '<div class="bullet">Trip</div><div class="check done" data-level="1">book the hotel</div>'
             + '<div class="check" data-level="1">renew passport</div>'],
           ['Inline code', 'Text between backticks, like {{`code`}}, or {{Mod+E}}. {{←}} and {{→}} stop at the code’s edge before going in or out.',
