@@ -800,6 +800,9 @@
   });
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
+  $('newGroupBtn').addEventListener('click', () => {
+    invoke('new_group').catch((err) => console.error('new_group', err));
+  });
   $('closeBtn').addEventListener('click', closeWindow);
 
   window.addEventListener('focus', () => frame.classList.add('is-focused'));
@@ -964,6 +967,7 @@
     plus: '<path d="M8 3.25v9.5M3.25 8h9.5"/>',
     manager: '<rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2"/><path d="M5.25 6h5.5M5.25 8.25h5.5M5.25 10.5h3.25"/>',
     toggle: '<path d="M4.5 9.75 8 6.25l3.5 3.5"/>',
+    'folder-plus': '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/>',
     folder: '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>',
     more: '<path class="dots" d="M3.75 8h0M8 8h0M12.25 8h0"/>',
     close: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',

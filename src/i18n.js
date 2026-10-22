@@ -510,7 +510,7 @@ window.MemoI18n = (() => {
           ['O que é', 'Uma barrinha que guarda várias memórias. O botão de seta solta todas elas para onde estavam; clicando de novo, elas são recolhidas para dentro do grupo.',
             '<span class="demo-bar"><i data-icon="pin"></i><i data-icon="folder"></i><span class="demo-name">Trabalho</span>'
             + '<i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Criar', 'Escolha "Novo grupo" no menu … (ou clique direito) de qualquer barra, ou no rodapé de uma memória (onde aparece "Sem grupo"): ele começa sem nome, como uma memória nova. Também pela caixa de grupo na lista do Gerenciador.'],
+          ['Criar', 'Botão de pasta com + na barra do Gerenciador, ou "Novo grupo" no menu … (ou clique direito) de qualquer barra, ou no rodapé de uma memória (onde aparece "Sem grupo"): ele começa sem nome, como uma memória nova. Também pela caixa de grupo na lista do Gerenciador.'],
           ['Nova memória no grupo', 'O botão + da barra (ou {{Mod+N}} com o grupo em foco) cria uma memória já dentro do grupo, ao lado dele.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint"></i>'
             + '<span class="demo-name">Trabalho</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
@@ -535,9 +535,9 @@ window.MemoI18n = (() => {
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
           ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema e o controle por IA, sincronizar agora e sair.'],
           ['Aba Grupos', 'Lista os grupos como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele para a frente; os botões da linha soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
-          ['Novo grupo e trazer para a frente', 'No menu … (ou clique direito) da barra do Gerenciador, ou de qualquer outra barra: "Novo grupo" cria um grupo vazio ao lado da janela; "Trazer todas as memórias para a frente" as coloca na frente das outras janelas, inclusive as minimizadas.',
+          ['Novo grupo e trazer para a frente', 'O botão de pasta com + na barra do Gerenciador (ou "Novo grupo" no menu … de qualquer barra) cria um grupo vazio ao lado da janela. No menu … do Gerenciador, "Trazer todas as memórias para a frente" as coloca na frente das outras janelas, inclusive as minimizadas.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
-            + '<i data-icon="plus"></i><i data-icon="more" class="demo-hot"></i><i data-icon="close"></i></span>'],
+            + '<i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Atuais e Lixeira', 'Nas abas Memórias e Grupos, o seletor acima da lista mostra as atuais ou as da lixeira.',
             '<span class="demo-seg"><span class="on">Atuais</span><span>Lixeira</span></span>'],
           ['Buscar', 'Campo de busca nas abas Memórias e Grupos, ou {{Mod+F}}.',
@@ -626,7 +626,7 @@ window.MemoI18n = (() => {
           ['What it is', 'A small bar that holds several memories. Its arrow button takes them all out where they were; click it again to put them back in.',
             '<span class="demo-bar"><i data-icon="pin"></i><i data-icon="folder"></i><span class="demo-name">Work</span>'
             + '<i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Create', '"New group" in the … menu (or right click) of any bar, or in a memory’s footer (where it says "No group"): it starts unnamed, like a new memory. Also from the group box in the Manager’s list.'],
+          ['Create', 'The folder-with-+ button in the Manager’s bar, "New group" in the … menu (or right click) of any bar, or in a memory’s footer (where it says "No group"): it starts unnamed, like a new memory. Also from the group box in the Manager’s list.'],
           ['New memory in the group', 'The bar’s + button (or {{Mod+N}} with the group focused) creates a memory already in the group, next to it.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint"></i>'
             + '<span class="demo-name">Work</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
@@ -651,9 +651,9 @@ window.MemoI18n = (() => {
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
           ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system and AI control on or off, sync now and quit.'],
           ['Groups tab', 'Lists the groups like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar to the front; the row’s buttons take its memories out / put them away and move the group to the trash.'],
-          ['New group and bring to front', 'In the … menu (or right click) of the Manager’s bar, or of any other bar: "New group" creates an empty group next to the window; "Bring all memories to the front" puts them in front of other windows, minimized ones included.',
+          ['New group and bring to front', 'The folder-with-+ button in the Manager’s bar (or "New group" in the … menu of any bar) creates an empty group next to the window. In the Manager’s … menu, "Bring all memories to the front" puts them in front of other windows, minimized ones included.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
-            + '<i data-icon="plus"></i><i data-icon="more" class="demo-hot"></i><i data-icon="close"></i></span>'],
+            + '<i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
           ['Current and Trash', 'In the Memories and Groups tabs, the switch above the list shows the current ones or those in the trash.',
             '<span class="demo-seg"><span class="on">Current</span><span>Trash</span></span>'],
           ['Search', 'The search box in the Memories and Groups tabs, or {{Mod+F}}.',
