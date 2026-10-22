@@ -1953,8 +1953,9 @@
   // ------------------------------------------------------- format tray
 
   // The footer's "Aa" shows the format bar's buttons above the footer, for
-  // the selection or the caret's line. Like a menu, any click outside it (or
-  // on "Aa" again), Esc or leaving the window folds it away.
+  // the selection or the caret's line. Like a menu, picking one of its
+  // buttons, any click outside it (or on "Aa" again), Esc or leaving the
+  // window folds it away.
   const formatTray = $('formatTray');
   const trayBtn = $('trayBtn');
   formatTray.append(...[...formatBar.children].map((n) => n.cloneNode(true)));
@@ -2245,7 +2246,8 @@
       if (btn.dataset.size) setSize(btn.dataset.size);
       else if (bar === formatTray && caretOnly) insertEmpty(btn.dataset.cmd);
       else FORMAT_COMMANDS[btn.dataset.cmd]();
-      if (!formatTray.hidden) renderFormatState(formatTray);
+      // A tray button is used once, like a menu item: the tray folds away.
+      if (bar === formatTray) showTray(false);
     });
   }
   // mousedown preventDefault: the text keeps its selection for the tray.
