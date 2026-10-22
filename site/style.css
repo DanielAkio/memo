@@ -99,26 +99,27 @@ kbd {
 .platforms a { text-decoration: none; padding: 6px 12px; border-radius: 8px; background: var(--chip); }
 .platforms a:hover { color: var(--text); }
 
-/* First-launch steps for macOS, shown only to Mac visitors (site.js) */
+/* Steps past the download / first-launch warning, shown only on that system (site.js) */
 [hidden] { display: none !important; }
-.mac-hint { margin: 16px 0 0; font-size: 14px; color: var(--muted); }
-.mac-note {
+.os-hint { margin: 16px 0 0; font-size: 14px; color: var(--muted); }
+.os-note {
   text-align: left; max-width: 600px; margin: 32px auto 0; padding: 20px 24px;
   border-radius: 12px; background: var(--bg); border: 1px solid var(--line);
 }
-.mac-note { scroll-margin: 24px; }
-.mac-note.flash { animation: mac-flash 3.6s ease-out .4s both; }
-@keyframes mac-flash {
+.os-note { scroll-margin: 24px; }
+.os-note.flash { animation: os-flash 3.6s ease-out .4s both; }
+@keyframes os-flash {
   0%, 40% { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
   100% { border-color: var(--line); box-shadow: 0 0 0 4px transparent; }
 }
-.mac-note h3 { margin-bottom: 8px; }
-.mac-note p { color: var(--muted); margin: 0 0 12px; font-size: 15px; }
-.mac-note p.muted { margin: 12px 0 0; font-size: 14px; }
-.mac-note ol { margin: 0; padding-left: 22px; }
-.mac-note li { margin: 4px 0; font-size: 15px; }
-.mac-note li::marker { color: var(--muted); }
-.mac-note code {
+.os-note h3 { margin-bottom: 8px; }
+.os-note p { color: var(--muted); margin: 0 0 12px; font-size: 15px; }
+.os-note p.muted { margin: 12px 0 0; font-size: 14px; }
+.os-note ol { margin: 0; padding-left: 22px; }
+.os-note li { margin: 4px 0; font-size: 15px; }
+.os-note li::marker { color: var(--muted); }
+.os-note kbd { font-size: 12px; }
+.os-note code {
   font: 13px ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
   padding: 1px 6px; border-radius: 5px; background: var(--chip); border: 1px solid var(--line);
   overflow-wrap: anywhere;

@@ -26,8 +26,10 @@
       <a class="button" data-download href="https://github.com/DanielAkio/memo/releases/latest">Baixar o Memo</a>
       <a class="button ghost" href="#features">Veja como funciona</a>
     </div>
-    <p class="mac-hint" data-mac hidden>No Mac, o macOS pede que você libere o Memo na primeira vez que ele é aberto.
+    <p class="os-hint" data-os="macOS" hidden>No Mac, o macOS pede que você libere o Memo na primeira vez que ele é aberto.
       <a href="#mac">Veja como</a></p>
+    <p class="os-hint" data-os="Windows" hidden>O navegador ou o Windows podem avisar sobre o download na primeira vez.
+      <a href="#windows">Entenda por quê</a></p>
     <p class="facts"><span>Gratuito</span><span>Sem cadastro</span><span>Funciona offline</span><span>Windows, macOS, Linux</span></p>
   </section>
 
@@ -129,7 +131,7 @@
       <a href="https://github.com/DanielAkio/memo/releases/latest">macOS (chip Apple ou Intel)</a>
       <a href="https://github.com/DanielAkio/memo/releases/latest">Linux (.deb, .rpm, AppImage)</a>
     </div>
-    <aside class="mac-note" id="mac" data-mac hidden>
+    <aside class="os-note" id="mac" data-os="macOS" hidden>
       <h3>Abrindo o Memo no Mac pela primeira vez</h3>
       <p>Na primeira vez que você abre o Memo, o macOS bloqueia o app e diz que não pôde verificar se ele está livre
         de malware. Não há nada de errado com o app: a Apple só dispensa esse aviso para apps cujo desenvolvedor paga
@@ -147,6 +149,24 @@
       <p class="muted">Depois disso o Memo abre normalmente. Uma versão nova pode pedir isso mais uma vez. Se o macOS
         disser que o app "está danificado", rode <code>xattr -cr /Applications/Memo.app</code> no Terminal e abra de
         novo.</p>
+    </aside>
+    <aside class="os-note" id="windows" data-os="Windows" hidden>
+      <h3>O navegador ou o Windows avisam sobre o download?</h3>
+      <p>Navegadores e o Windows confiam mais em um instalador quando ele tem uma assinatura digital (um certificado de
+        assinatura de código, que custa centenas de dólares por ano) e já foi baixado por muita gente. O Memo é um
+        projeto novo e gratuito e o instalador ainda não é assinado, então pode aparecer que o arquivo "não é baixado
+        com frequência" ou "pode danificar o dispositivo". Não há nada de errado com ele: o instalador é gerado
+        direto do código no <a href="https://github.com/DanielAkio/memo">GitHub</a>, que é aberto para qualquer pessoa
+        conferir.</p>
+      <p>Para instalar:</p>
+      <ol>
+        <li>Se o navegador segurar o download, abra a lista de downloads (<kbd>Ctrl</kbd>+<kbd>J</kbd>) e escolha
+          <strong>Manter</strong>. No Edge: <strong>…</strong> → <strong>Manter</strong> → <strong>Mostrar mais</strong>
+          → <strong>Manter assim mesmo</strong>.</li>
+        <li>Abra o arquivo baixado. Se aparecer "O Windows protegeu o computador", clique em
+          <strong>Mais informações</strong> e depois em <strong>Executar assim mesmo</strong>.</li>
+        <li>Siga o instalador. Isso só precisa ser feito uma vez.</li>
+      </ol>
     </aside>
   </section>
 

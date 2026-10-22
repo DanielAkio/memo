@@ -3,8 +3,8 @@
 // release, so the click downloads instead of opening the release page. The
 // installer names carry the version, so they are looked up through the
 // GitHub API; until it answers, or if it fails, the links keep their
-// fallback href (the latest release page). Mac visitors also get the
-// first-launch steps ([data-mac]).
+// fallback href (the latest release page). Windows and Mac visitors also
+// get the steps past their system's warning ([data-os]).
 (function () {
   var ua = navigator.userAgent;
   var os = /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
@@ -15,14 +15,16 @@
   var buttons = document.querySelectorAll('[data-download]');
   buttons.forEach(function (a) { a.textContent = label; });
 
-  // macOS blocks the app on first launch (it isn't notarized): show the
-  // steps to allow it, which stay hidden on every other system. A download
-  // click also scrolls to them and flashes the box, so they aren't missed;
-  // the installer still downloads, and the release page (when the API
-  // hasn't answered) opens in a new tab to keep the steps in sight.
-  if (os === 'macOS') {
-    document.querySelectorAll('[data-mac]').forEach(function (el) { el.hidden = false; });
-    var note = document.getElementById('mac');
+  // Unsigned installers make browsers and SmartScreen warn about the
+  // download, and macOS blocks the app on first launch (it isn't
+  // notarized): show the visitor's system the steps past that, which stay
+  // hidden elsewhere. A download click also scrolls to them and flashes the
+  // box, so they aren't missed; the installer still downloads, and the
+  // release page (when the API hasn't answered) opens in a new tab to keep
+  // the steps in sight.
+  var note = document.querySelector('.os-note[data-os="' + os + '"]');
+  if (note) {
+    document.querySelectorAll('[data-os="' + os + '"]').forEach(function (el) { el.hidden = false; });
     var still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     buttons.forEach(function (a) {
       a.addEventListener('click', function (e) {

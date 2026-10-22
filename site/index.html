@@ -26,8 +26,10 @@
       <a class="button" data-download href="https://github.com/DanielAkio/memo/releases/latest">Download Memo</a>
       <a class="button ghost" href="#features">See how it works</a>
     </div>
-    <p class="mac-hint" data-mac hidden>On a Mac, macOS asks you to allow Memo the first time you open it.
+    <p class="os-hint" data-os="macOS" hidden>On a Mac, macOS asks you to allow Memo the first time you open it.
       <a href="#mac">Here's how</a></p>
+    <p class="os-hint" data-os="Windows" hidden>Your browser or Windows may warn about the download the first time.
+      <a href="#windows">Here's why</a></p>
     <p class="facts"><span>Free</span><span>No account</span><span>Works offline</span><span>Windows, macOS, Linux</span></p>
   </section>
 
@@ -129,7 +131,7 @@
       <a href="https://github.com/DanielAkio/memo/releases/latest">macOS (Apple chip or Intel)</a>
       <a href="https://github.com/DanielAkio/memo/releases/latest">Linux (.deb, .rpm, AppImage)</a>
     </div>
-    <aside class="mac-note" id="mac" data-mac hidden>
+    <aside class="os-note" id="mac" data-os="macOS" hidden>
       <h3>Opening Memo on a Mac for the first time</h3>
       <p>The first time you open Memo, macOS blocks it and says it couldn't verify that Memo is free of malware.
         Nothing is wrong with the app: Apple only skips this warning for apps whose developer pays for the Apple
@@ -146,6 +148,23 @@
       </ol>
       <p class="muted">From then on Memo opens normally. A new version may ask once more. If macOS says the app
         "is damaged", run <code>xattr -cr /Applications/Memo.app</code> in Terminal and open it again.</p>
+    </aside>
+    <aside class="os-note" id="windows" data-os="Windows" hidden>
+      <h3>Your browser or Windows warns about the download?</h3>
+      <p>Browsers and Windows trust an installer more when it carries a digital signature (a code-signing certificate,
+        which costs hundreds of dollars a year) and has already been downloaded by many people. Memo is a new, free
+        project and its installer isn't signed yet, so you may see that the file "isn't commonly downloaded" or "could
+        harm your device". Nothing is wrong with it: the installer is built straight from the code on
+        <a href="https://github.com/DanielAkio/memo">GitHub</a>, which is open for anyone to check.</p>
+      <p>To install it:</p>
+      <ol>
+        <li>If the browser holds the download, open its downloads list (<kbd>Ctrl</kbd>+<kbd>J</kbd>) and choose
+          <strong>Keep</strong>. In Edge: <strong>…</strong> → <strong>Keep</strong> → <strong>Show more</strong> →
+          <strong>Keep anyway</strong>.</li>
+        <li>Open the downloaded file. If you see "Windows protected your PC", click <strong>More info</strong>, then
+          <strong>Run anyway</strong>.</li>
+        <li>Follow the installer. You only need to do this once.</li>
+      </ol>
     </aside>
   </section>
 
