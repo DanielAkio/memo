@@ -294,6 +294,12 @@
         <div class="sec" data-sec="application">
           <h2 class="settings-title"><span data-i18n="application"></span></h2>
           <div class="setting">
+            <span class="setting-label" id="magnetLabel" data-i18n="magnet"></span>
+            <!-- On/off switch: windows stick to screen edges and to each other
+                 while dragged or resized; notes fold onto their titlebar. -->
+            <button type="button" class="switch" id="magnetSwitch" role="switch" aria-checked="true" aria-labelledby="magnetLabel"></button>
+          </div>
+          <div class="setting">
             <span class="setting-label" id="autostartLabel" data-i18n="autostart"></span>
             <!-- On/off switch: opens Memo when the user logs in (only its
                  memories; the manager stays closed). -->

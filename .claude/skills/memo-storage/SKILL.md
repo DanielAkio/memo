@@ -13,7 +13,7 @@ description: Memo's persistence layer. Use when changing store.rs, the Note/Grou
 
 ## Model
 
-`Note`, `Group`, `ManagerState`, `FileData` use `#[serde(rename_all = "camelCase", default)]`: a new field needs a `Default` and shows up camelCase in JS (`updatedAt`, `createdAt`, `trashedAt`). File format `version: 1`. `FileData` also carries app settings: `theme`, `language`, `zoom`, `default_color`, `default_title`, `default_text`, `default_html`, `default_group_color`, `default_group_title`, `manager`, `next_seq`.
+`Note`, `Group`, `ManagerState`, `FileData` use `#[serde(rename_all = "camelCase", default)]`: a new field needs a `Default` and shows up camelCase in JS (`updatedAt`, `createdAt`, `trashedAt`). File format `version: 1`. `FileData` also carries app settings: `theme`, `language`, `zoom`, `magnet_off`, `default_color`, `default_title`, `default_text`, `default_html`, `default_group_color`, `default_group_title`, `manager`, `next_seq`.
 
 Selectors: `Store::active` (not trashed), `Store::visible()` (active, not `hidden`, not in a hidden or put-away group — what startup opens), `active_groups()` (what windows, pickers and export use). `normalize` clears links to missing groups. `is_first_run()` = no notes and `next_seq <= 1`. `is_pristine` = note still equal to the new-note defaults (or blank), with the default colour and in no group (joining a group counts as a change). `is_pristine_group` = default or empty name, default colour, no notes.
 

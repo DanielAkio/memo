@@ -196,6 +196,9 @@ struct FileData {
     zoom: f64,
     /// Language chosen in Settings (see `LANGUAGES`); empty = "system".
     language: String,
+    /// The magnet turned off in Settings: windows no longer stick to screen
+    /// edges and to each other, and notes don't fold onto their titlebar.
+    magnet_off: bool,
     /// Position, size and state of the manager window.
     manager: ManagerState,
     /// Colour for new notes, chosen in the manager (`RANDOM_COLOR` = a
@@ -932,6 +935,16 @@ impl Store {
 
     pub fn set_zoom(&self, zoom: f64) {
         self.data.lock().unwrap().zoom = zoom.clamp(ZOOM_MIN, ZOOM_MAX);
+        self.mark_dirty();
+    }
+
+    /// Whether the magnet is on (the default).
+    pub fn magnet(&self) -> bool {
+        !self.data.lock().unwrap().magnet_off
+    }
+
+    pub fn set_magnet(&self, on: bool) {
+        self.data.lock().unwrap().magnet_off = !on;
         self.mark_dirty();
     }
 

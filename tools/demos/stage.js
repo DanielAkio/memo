@@ -83,6 +83,7 @@
       case 'get_data_dir': return ['C:\\Users\\ana\\AppData\\Roaming\\memo', true];
       case 'get_cloud_account': return [true, null, { syncing: false, lastSync: 0, pending: 0, error: null }];
       case 'get_autostart': return true;
+      case 'get_magnet': return true;
       case 'get_updates': return [true, { checking: false, available: null, progress: null, upToDate: false, error: null }];
       case 'get_ai_control': return [false, 'memo'];
       case 'get_ai_clients': return [];

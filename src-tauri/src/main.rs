@@ -261,6 +261,7 @@ struct TrayLabels {
     dark: &'static str,
     language: &'static str,
     autostart: &'static str,
+    magnet: &'static str,
     ai_control: &'static str,
     sync: &'static str,
     check_updates: &'static str,
@@ -284,6 +285,7 @@ fn tray_labels(lang: &str) -> TrayLabels {
             dark: "Dark",
             language: "Language",
             autostart: "Start with the system",
+            magnet: "Window magnet",
             ai_control: "AI control (MCP)",
             sync: "Sync now",
             check_updates: "Check for updates",
@@ -305,6 +307,7 @@ fn tray_labels(lang: &str) -> TrayLabels {
             dark: "Escuro",
             language: "Idioma",
             autostart: "Iniciar com o sistema",
+            magnet: "Ímã das janelas",
             ai_control: "Controle por IA (MCP)",
             sync: "Sincronizar agora",
             check_updates: "Procurar atualizações",
@@ -551,6 +554,10 @@ impl SnapTargets {
             reach,
             scale,
         };
+        // Magnet off (Settings): nothing pulls.
+        if !window.state::<Shared>().magnet() {
+            return t_;
+        }
         // Monitor edges: the same gap (`SNAP_GAP`) left between notes.
         if let Some(m) = &monitor {
             let a = m.work_area();
@@ -1198,7 +1205,11 @@ fn resize_to(
     // Titlebar magnet: a note with almost no text left closes onto its
     // titlebar, like the other magnets; pulling the edge past it opens it.
     let shut = (TITLEBAR_SNAP * zoom * targets.scale).round() as i32;
-    if is_note(&window) && (edges.contains('n') || edges.contains('s')) && b - t < min_h + shut {
+    if is_note(&window)
+        && window.state::<Shared>().magnet()
+        && (edges.contains('n') || edges.contains('s'))
+        && b - t < min_h + shut
+    {
         if edges.contains('n') {
             t = b - min_h;
         } else {
@@ -2572,6 +2583,29 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<bool, String> {
     manager.is_enabled().map_err(|e| e.to_string())
 }
 
+/// Settings → Magnet: whether windows stick to screen edges and to each
+/// other while dragged or resized (and notes fold onto their titlebar).
+#[tauri::command]
+fn get_magnet(store: State<'_, Shared>) -> bool {
+    store.magnet()
+}
+
+#[tauri::command]
+fn set_magnet(app: AppHandle, on: bool) -> bool {
+    toggle_magnet(&app, on);
+    on
+}
+
+/// Turns the magnet on or off (Settings switch or tray item); the manager's
+/// switch and the tray follow.
+fn toggle_magnet(app: &AppHandle, on: bool) {
+    let store = app.state::<Shared>();
+    store.set_magnet(on);
+    store.flush();
+    let _ = app.emit("magnet-changed", on);
+    refresh_tray(app);
+}
+
 /// Settings → AI control: whether it is on, and the executable MCP clients
 /// launch (`<path> --mcp`), for the setup snippets.
 #[tauri::command]
@@ -2898,6 +2932,7 @@ fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKi
         theme_menu.kind(),
         language_menu.kind(),
         autostart_item.kind(),
+        check("magnet", l.magnet, store.magnet())?.kind(),
         check("ai-control", l.ai_control, ai_control)?.kind(),
     ];
     // "Sync now" only with a Google account connected on this computer.
@@ -3088,6 +3123,10 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
             // The manager's switch follows.
             let _ = app.emit("autostart-changed", manager.is_enabled().unwrap_or(false));
             refresh_tray(app);
+        }
+        "magnet" => {
+            let on = !app.state::<Shared>().magnet();
+            toggle_magnet(app, on);
         }
         "ai-control" => {
             let on = default_data_dir(app).is_ok_and(|dir| !mcp::enabled(&dir));
@@ -3287,6 +3326,8 @@ fn main() {
             delete_group_forever,
             get_autostart,
             set_autostart,
+            get_magnet,
+            set_magnet,
             get_ai_control,
             set_ai_control,
             get_ai_clients,

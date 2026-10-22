@@ -1163,6 +1163,23 @@
   $('zoomReset').addEventListener('click', () => stepZoom(0));
   window.MemoZoom.attach(invoke);
 
+  // Magnet: windows stick to screen edges and to each other (on by default).
+  const magnetSwitch = $('magnetSwitch');
+  const renderMagnet = (on) => magnetSwitch.setAttribute('aria-checked', String(on));
+  magnetSwitch.addEventListener('click', async () => {
+    const on = magnetSwitch.getAttribute('aria-checked') !== 'true';
+    renderMagnet(on);
+    try {
+      renderMagnet(await invoke('set_magnet', { on }));
+    } catch (err) {
+      renderMagnet(!on);
+      console.error('set_magnet', err);
+    }
+  });
+  // The tray's "Window magnet" item.
+  listen('magnet-changed', (e) => renderMagnet(e.payload));
+  invoke('get_magnet').then(renderMagnet).catch((err) => console.error('get_magnet', err));
+
   // Start with the system (the Windows installer asks; elsewhere it starts on).
   const autostartSwitch = $('autostartSwitch');
   const renderAutostart = (on) => autostartSwitch.setAttribute('aria-checked', String(on));
