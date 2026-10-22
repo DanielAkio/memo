@@ -39,7 +39,7 @@ pub const PT: Welcome = Welcome {
         r#"<div><b>Escrever</b></div>"#,
         r#"<div class="bullet">Selecione um trecho para <b>negrito</b>, <i>itálico</i>, <u>sublinhado</u>, <span style="background-color: rgb(255, 230, 0)">marca-texto</span> ou <font size="5">tamanho</font></div>"#,
         r#"<div class="bullet">Digite <code>[]</code>, <code>-</code> ou <code>1.</code> no começo da linha para criar uma caixa, um marcador como este ou uma lista numerada</div>"#,
-        r#"<div class="bullet">Sem teclado: o + numa linha vazia, a barrinha da seleção, o botão Aa no rodapé e Formatar no menu …</div>"#,
+        r#"<div class="bullet">Sem teclado: a barrinha da seleção, o botão Aa no rodapé e Formatar no menu …</div>"#,
         r#"<div class="bullet" data-level="1">Tab recua o item e Shift+Tab volta</div>"#,
         r#"<div class="bullet">Crases em volta de um trecho viram <code>código</code>; três crases e Enter abrem um bloco:</div>"#,
         r#"<pre class="code" data-lang="sql">select * from memorias where fixada = true</pre>"#,
@@ -76,7 +76,7 @@ Organizar
 Escrever
 - Selecione um trecho para negrito, itálico, sublinhado, marca-texto ou tamanho
 - Digite `[]`, `-` ou `1.` no começo da linha para criar uma caixa, um marcador como este ou uma lista numerada
-- Sem teclado: o + numa linha vazia, a barrinha da seleção, o botão Aa no rodapé e Formatar no menu …
+- Sem teclado: a barrinha da seleção, o botão Aa no rodapé e Formatar no menu …
   - Tab recua o item e Shift+Tab volta
 - Crases em volta de um trecho viram `código`; três crases e Enter abrem um bloco:
 ```sql
@@ -119,7 +119,7 @@ pub const EN: Welcome = Welcome {
         r#"<div><b>Writing</b></div>"#,
         r#"<div class="bullet">Select some text for <b>bold</b>, <i>italic</i>, <u>underline</u>, <span style="background-color: rgb(255, 230, 0)">highlight</span> or <font size="5">size</font></div>"#,
         r#"<div class="bullet">Type <code>[]</code>, <code>-</code> or <code>1.</code> at the start of a line for a box, a bullet like this one or a numbered list</div>"#,
-        r#"<div class="bullet">No keyboard: the + on an empty line, the selection bar, the Aa button in the footer and Format in the … menu</div>"#,
+        r#"<div class="bullet">No keyboard: the selection bar, the Aa button in the footer and Format in the … menu</div>"#,
         r#"<div class="bullet" data-level="1">Tab indents the item and Shift+Tab outdents it</div>"#,
         r#"<div class="bullet">Backticks around some text make it <code>code</code>; three backticks and Enter open a block:</div>"#,
         r#"<pre class="code" data-lang="sql">select * from memories where pinned = true</pre>"#,
@@ -156,7 +156,7 @@ Organizing
 Writing
 - Select some text for bold, italic, underline, highlight or size
 - Type `[]`, `-` or `1.` at the start of a line for a box, a bullet like this one or a numbered list
-- No keyboard: the + on an empty line, the selection bar, the Aa button in the footer and Format in the … menu
+- No keyboard: the selection bar, the Aa button in the footer and Format in the … menu
   - Tab indents the item and Shift+Tab outdents it
 - Backticks around some text make it `code`; three backticks and Enter open a block:
 ```sql

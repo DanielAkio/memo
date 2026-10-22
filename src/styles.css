@@ -571,37 +571,6 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   color: var(--color-ash);
 }
 
-/* "+" in the margin left of an empty line with the caret (app.js, "insert"),
-   and its menu. Quiet until hovered or open. */
-.line-add {
-  position: absolute;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-badge);
-  background: transparent;
-  color: var(--color-ash);
-  cursor: default;
-}
-.line-add[hidden] { display: none; }
-.line-add svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
-.line-add:hover,
-.line-add[aria-expanded="true"] { background: var(--overlay-active); color: var(--color-paper); }
-.line-menu {
-  top: auto;
-  right: auto;
-  width: auto;
-  min-width: 190px;
-  padding: 4px;
-}
-.line-menu svg { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--color-fog); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
-.line-menu svg .fill { fill: var(--color-fog); stroke: none; }
-.line-menu .menu-hint { margin-left: auto; padding-left: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--color-ash); }
-
 /* Format bar: floats above the selected text. */
 .format-bar {
   position: absolute;
