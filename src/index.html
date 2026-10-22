@@ -115,6 +115,10 @@
       </button>
     </main>
 
+    <!-- Format tray: the format bar's buttons fixed above the footer, shown
+         with the footer's "Aa" (app.js, "format tray"; filled from #formatBar). -->
+    <div class="format-tray" id="formatTray" role="toolbar" data-i18n-attr="aria-label=formatTray" hidden></div>
+
     <!-- Menu of the "+": turns the empty line into a list or a code block
          (items built from the format bar's buttons in app.js). -->
     <div class="menu line-menu" id="lineMenu" role="menu" hidden></div>
@@ -133,6 +137,7 @@
         <svg class="foot-folder" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/></svg><span id="edited"></span>
       </button>
       <span id="count"></span>
+      <button class="foot-aa" id="trayBtn" type="button" aria-pressed="false" data-i18n-attr="aria-label=formatTray,title=formatTray">Aa</button>
       <span class="grip" id="grip" aria-hidden="true">
         <svg viewBox="0 0 10 10"><path d="M9 3 3 9M9 6 6 9"/></svg>
       </span>

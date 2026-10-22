@@ -1881,6 +1881,7 @@
 
   function updateFormatBar() {
     updateLineAdd();
+    if (!formatTray.hidden) renderFormatState(formatTray);
     // A selected image has its resize frame instead.
     const range = !selecting && note && document.activeElement === editor && !selectedImage() && selectionRange();
     const rects = range ? [...range.getClientRects()].filter((r) => r.width || r.height) : [];
@@ -1911,6 +1912,33 @@
 
   function hideFormatBar() {
     formatBar.hidden = true;
+  }
+
+  // ------------------------------------------------------- format tray
+
+  // The footer's "Aa" shows the format bar's buttons fixed above the footer,
+  // for the selection or the caret's line. Open or closed for every memory
+  // (remembered in this computer's webview storage; other windows follow
+  // through the "storage" event).
+  const formatTray = $('formatTray');
+  const trayBtn = $('trayBtn');
+  const TRAY_KEY = 'memo.formatTray';
+  formatTray.append(...[...formatBar.children].map((n) => n.cloneNode(true)));
+
+  function trayStored() {
+    try { return localStorage.getItem(TRAY_KEY) === '1'; } catch { return false; }
+  }
+
+  function showTray(on) {
+    formatTray.hidden = !on;
+    trayBtn.setAttribute('aria-pressed', String(on));
+    if (on) renderFormatState(formatTray);
+  }
+
+  function toggleTray() {
+    const on = formatTray.hidden;
+    try { localStorage.setItem(TRAY_KEY, on ? '1' : '0'); } catch { /* still shown in this window */ }
+    showTray(on);
   }
 
   // ------------------------------------------------------- format menu
@@ -1955,6 +1983,8 @@
       size('2', 'smallText'),
       size('3', 'normalText'),
       size('5', 'largeText'),
+      null,
+      { label: t('formatTray'), checked: !formatTray.hidden, run: toggleTray },
     ];
   }
 
@@ -2220,13 +2250,21 @@
   });
 
   // mousedown with preventDefault: clicking the bar keeps the text selection.
-  formatBar.addEventListener('mousedown', (e) => e.preventDefault());
-  formatBar.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-cmd], [data-size]');
-    if (!btn) return;
-    if (btn.dataset.size) setSize(btn.dataset.size);
-    else FORMAT_COMMANDS[btn.dataset.cmd]();
+  for (const bar of [formatBar, formatTray]) {
+    bar.addEventListener('mousedown', (e) => e.preventDefault());
+    bar.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cmd], [data-size]');
+      if (!btn) return;
+      if (btn.dataset.size) setSize(btn.dataset.size);
+      else FORMAT_COMMANDS[btn.dataset.cmd]();
+      if (!formatTray.hidden) renderFormatState(formatTray);
+    });
+  }
+  trayBtn.addEventListener('click', toggleTray);
+  window.addEventListener('storage', (e) => {
+    if (e.key === TRAY_KEY) showTray(e.newValue === '1');
   });
+  if (!EMBED) showTray(trayStored());
 
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
@@ -2422,18 +2460,19 @@
     editor.dataset.placeholder = EMBED ? t('defaultTextPlaceholder') : I18n.placeholder();
     $('newBtn').title = `${t('newNote')} (${keys('Mod', 'N')})`;
     $('closeBtn').title = t('close');
-    for (const btn of formatBar.querySelectorAll('[data-key]')) {
+    const bars = [formatBar, formatTray];
+    for (const btn of bars.flatMap((bar) => [...bar.querySelectorAll('[data-key]')])) {
       const combo = btn.dataset.shift ? keys('Mod', 'Shift', btn.dataset.key) : keys('Mod', btn.dataset.key);
       btn.title = `${btn.getAttribute('aria-label')} (${combo})`;
     }
-    for (const btn of formatBar.querySelectorAll('[data-hint]')) {
+    for (const btn of bars.flatMap((bar) => [...bar.querySelectorAll('[data-hint]')])) {
       btn.title = `${btn.getAttribute('aria-label')} (${t('typeHint', { hint: btn.dataset.hint })})`;
     }
     const sizeKeys = {
       2: ` (${t('smaller', { keys: keys('Mod', 'Shift', '<') })})`,
       5: ` (${t('larger', { keys: keys('Mod', 'Shift', '>') })})`,
     };
-    for (const btn of formatBar.querySelectorAll('[data-size]')) {
+    for (const btn of bars.flatMap((bar) => [...bar.querySelectorAll('[data-size]')])) {
       btn.title = btn.getAttribute('aria-label') + (sizeKeys[btn.dataset.size] || '');
     }
     renderMonoName();
