@@ -1,7 +1,8 @@
 // Memo — group bar: a compact window that holds notes (label group-{id};
 // Rust has the logic, main.rs "Groups"). The arrow button takes all the
 // notes out (back where they were) or puts them all back in; double-click
-// on the titlebar renames; ✕ twice deletes the group and sends its notes
+// on the titlebar renames; a click brings an open group's notes to the
+// front; ✕ twice deletes the group and sends its notes
 // to the trash; the pin keeps the bar above other apps, like a note's; the
 // folder icon picks the group's colour (folder and stripe); +
 // (or Mod+N) adds a new note straight into the group.
@@ -229,6 +230,18 @@
     onDoubleClick: startRename,
     onClose: closeGroup,
   });
+  // A click on the bar (not a drag, not a button) brings an open group's
+  // memories to the front with it. Only single clicks: the second click of
+  // a double-click renames, and raising the notes would blur the name field.
+  let downAt = null;
+  titlebar.addEventListener('pointerdown', (e) => { downAt = [e.screenX, e.screenY]; });
+  titlebar.addEventListener('click', (e) => {
+    if (!group || !group.open || renaming || e.detail > 1 || !downAt) return;
+    if (e.target.closest('button, input')) return;
+    if (Math.hypot(e.screenX - downAt[0], e.screenY - downAt[1]) >= 3) return; // a drag
+    invoke('show_group_notes').catch((err) => console.error('show_group_notes', err));
+  });
+
   // Right click on the bar or its "…" button: the group's commands, then
   // all the app's (chrome.js).
   window.MemoChrome.titleMenu({

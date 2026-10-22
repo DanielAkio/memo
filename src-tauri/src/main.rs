@@ -2154,7 +2154,8 @@ async fn toggle_group(app: AppHandle, window: WebviewWindow) {
     toggle_group_by_id(&app, &group_id_of(&window));
 }
 
-/// Manager's Groups tab: shows group `id`'s bar and brings it to the front.
+/// Manager's Groups tab: shows group `id`'s bar and brings it to the front,
+/// with its notes if the group is out.
 #[tauri::command]
 async fn focus_group(app: AppHandle, id: String) -> Result<(), String> {
     let group = app
@@ -2166,9 +2167,44 @@ async fn focus_group(app: AppHandle, id: String) -> Result<(), String> {
         show_group(&app, &id);
     }
     let group = app.state::<Shared>().group(&id).unwrap_or(group);
-    let window = open_group_window(&app, &group).map_err(|e| e.to_string())?;
-    let _ = window.set_focus();
+    open_group_window(&app, &group).map_err(|e| e.to_string())?;
+    raise_group(&app, &id);
     Ok(())
+}
+
+/// A click on a group bar: brings the group's notes to the front with it.
+#[tauri::command]
+async fn show_group_notes(app: AppHandle, window: WebviewWindow) {
+    raise_group(&app, &group_id_of(&window));
+}
+
+/// Brings group `id`'s bar to the front and, if the group is out, all its
+/// notes with it (those closed with ✕ open again, as when taking them out).
+/// The bar is focused last, so it stays on top and keeps the keyboard.
+fn raise_group(app: &AppHandle, id: &str) {
+    let store = app.state::<Shared>();
+    let Some(group) = store.group(id) else {
+        return;
+    };
+    if group.open {
+        let closed = store
+            .members(id)
+            .iter()
+            .any(|n| app.get_webview_window(&label_for(&n.id)).is_none());
+        if closed {
+            take_out(app, id);
+        }
+        for note in store.members(id) {
+            if let Some(window) = app.get_webview_window(&label_for(&note.id)) {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }
+    }
+    if let Some(bar) = app.get_webview_window(&group_label(id)) {
+        let _ = bar.unminimize();
+        let _ = bar.set_focus();
+    }
 }
 
 /// Reopens a group closed with ✕: its bar, and its notes if it is out.
@@ -3232,6 +3268,7 @@ fn main() {
             load_group,
             rename_group,
             focus_group,
+            show_group_notes,
             toggle_group_id,
             trash_group_id,
             restore_group,
