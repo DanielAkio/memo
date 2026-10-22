@@ -15,8 +15,9 @@ download, but updates install without warnings.
 
 ## The signing key
 
-The key pair was made with `npx tauri signer generate` (no password). The public key is in `tauri.conf.json`; the
-private key is **never committed** (`*.key` is git-ignored). It lives in two places:
+The key pair was made on the maintainer's computer, in the repository folder, with
+`npx tauri signer generate -w memo-updater.key`. The public key (`memo-updater.key.pub`) is in `tauri.conf.json`;
+the private key is **never committed** (`*.key` and `*.key.pub` are git-ignored). It lives in two places:
 
 1. The repository secret **`TAURI_SIGNING_PRIVATE_KEY`** (GitHub → Settings → Secrets and variables → Actions →
    New repository secret), holding the whole content of the key file. If the key has a password, also add
