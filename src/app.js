@@ -355,6 +355,33 @@
     resetHistory();
   }
 
+  // Every line is a <div> (or a code block). Backspace on the last empty
+  // line can leave the editor with no line at all, and Chromium then types
+  // straight into the editor: text that isn't in a line is wrapped in one,
+  // so the list and code buttons see it. The text nodes are moved, not
+  // copied, so the caret stays where it was.
+  function wrapLooseLines() {
+    let run = null;
+    for (const n of [...editor.childNodes]) {
+      if (n.nodeName === 'DIV' || n.nodeName === 'PRE') {
+        run = null;
+      } else if (n.nodeType === 3 && !n.data && !run) {
+        n.remove();
+      } else {
+        if (!run) {
+          run = document.createElement('div');
+          n.before(run);
+        }
+        run.appendChild(n);
+      }
+    }
+    if (!editor.firstChild) {
+      const line = editor.appendChild(document.createElement('div'));
+      line.appendChild(document.createElement('br'));
+      if (document.activeElement === editor) caretIn(line);
+    }
+  }
+
   // Numbered items count up within a run of items at the same level (deeper
   // items in between don't break it; anything else does) and show their
   // number from data-n (presentation only, recomputed on every change).
@@ -476,6 +503,7 @@
   }
 
   function applyContent() {
+    wrapLooseLines();
     syncNumbers();
     syncCheckSizes();
     renderCode();
@@ -1767,6 +1795,7 @@
   function touchedLines() {
     const sel = getSelection();
     if (!sel.rangeCount) return [];
+    wrapLooseLines();
     const range = sel.getRangeAt(0);
     const lines = selectedBlocks().filter((b) => b.nodeName === 'DIV');
     if (range.collapsed) return lines;
