@@ -6,6 +6,7 @@
       "type": "node-terminal",
       "request": "launch",
       "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Stop the running dev Memo",
       "command": "npm install --no-audit --no-fund; npm run dev"
     },
     {
