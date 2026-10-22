@@ -289,11 +289,25 @@
                memories; the manager stays closed). -->
           <button type="button" class="switch" id="autostartSwitch" role="switch" aria-checked="false" aria-labelledby="autostartLabel"></button>
         </div>
-        <div class="setting">
+        <div class="setting setting-top">
           <span class="setting-label" data-i18n="version"></span>
-          <!-- The running build's version (tauri.conf.json), to tell an old
-               install from a new one. -->
-          <span class="app-version" id="appVersion"></span>
+          <div class="field-wrap">
+            <!-- The running build's version (tauri.conf.json), to tell an old
+                 install from a new one, then "Check for updates" or, once a
+                 newer one is found, "Update and restart" (updater.rs). -->
+            <div class="version-row">
+              <span class="app-version" id="appVersion"></span>
+              <button type="button" class="btn" id="updateCheckBtn" data-i18n="checkUpdates"></button>
+              <button type="button" class="btn" id="updateInstallBtn" data-i18n="updateInstall" hidden></button>
+            </div>
+            <p class="storage-status" id="updateStatus" role="status" hidden></p>
+          </div>
+        </div>
+        <div class="setting">
+          <span class="setting-label" id="autoUpdateLabel" data-i18n="autoUpdate"></span>
+          <!-- On/off switch: checks for a new version on launch and every few
+               hours. On by default. -->
+          <button type="button" class="switch" id="autoUpdateSwitch" role="switch" aria-checked="true" aria-labelledby="autoUpdateLabel"></button>
         </div>
         <div class="setting">
           <span class="setting-label" data-i18n="exit"></span>

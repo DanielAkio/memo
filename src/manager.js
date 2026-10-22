@@ -35,6 +35,8 @@
   let view = 'notes';
   // Memories and Groups each list either the current ones or the trash.
   const scopes = { notes: 'current', groups: 'current' };
+  // The tray's update items open Settings scrolled to the version row.
+  let scrollToUpdate = false;
   const inTrash = () => scopes[view] === 'trash';
   let defaultColor = '';
   let reloadTimer = null;
@@ -161,6 +163,11 @@
     $('searchBox').hidden = panel;
     renderDefaultColor();
     if (view === 'settings') fitSettings();
+    // The tray's update items show the answer in Settings: bring it in view.
+    if (view === 'settings' && scrollToUpdate) {
+      scrollToUpdate = false;
+      $('updateStatus').closest('.setting').scrollIntoView({ block: 'center' });
+    }
     if (panel) return;
 
     const q = fold(search.value.trim());
@@ -1030,6 +1037,7 @@
     renderMonoName();
     renderHelp();
     renderCloud();
+    renderUpdate();
     renderAi(aiSwitch.getAttribute('aria-checked') === 'true');
     render();
   }
@@ -1086,6 +1094,48 @@
   window.__TAURI__.app.getVersion()
     .then((v) => { $('appVersion').textContent = v; })
     .catch((err) => console.error('getVersion', err));
+  // Updates (updater.rs): "Check for updates", the version found with its
+  // "Update and restart", the download, and the automatic checks switch.
+  // The tray's items answer here too ("update-changed").
+  let update = {};
+  function renderUpdate() {
+    const installing = update.progress != null;
+    $('updateCheckBtn').hidden = !!update.available;
+    $('updateCheckBtn').disabled = !!update.checking;
+    $('updateInstallBtn').hidden = !update.available;
+    $('updateInstallBtn').disabled = installing;
+    let text = '';
+    if (installing) text = t('updateDownloading', { percent: update.progress });
+    else if (update.error) text = t(update.error === 'install' ? 'updateErrInstall' : 'updateErrCheck');
+    else if (update.checking) text = t('updateChecking');
+    else if (update.available) text = t('updateAvailable', { version: update.available });
+    else if (update.upToDate) text = t('updateUpToDate');
+    $('updateStatus').textContent = text;
+    $('updateStatus').hidden = !text;
+  }
+  $('updateCheckBtn').addEventListener('click', () => {
+    invoke('check_update').catch((err) => console.error('check_update', err));
+  });
+  $('updateInstallBtn').addEventListener('click', () => {
+    invoke('install_update').catch((err) => console.error('install_update', err));
+  });
+  const autoUpdateSwitch = $('autoUpdateSwitch');
+  const renderAutoUpdate = (on) => autoUpdateSwitch.setAttribute('aria-checked', String(on));
+  autoUpdateSwitch.addEventListener('click', async () => {
+    const on = autoUpdateSwitch.getAttribute('aria-checked') !== 'true';
+    renderAutoUpdate(on);
+    try {
+      renderAutoUpdate(await invoke('set_auto_update', { on }));
+    } catch (err) {
+      renderAutoUpdate(!on);
+      console.error('set_auto_update', err);
+    }
+  });
+  listen('update-changed', (e) => { update = e.payload; renderUpdate(); });
+  invoke('get_updates')
+    .then(([on, status]) => { renderAutoUpdate(on); update = status; renderUpdate(); })
+    .catch((err) => console.error('get_updates', err));
+
   // AI control (MCP, mcp.rs): the switch; the MCP clients installed here,
   // which Connect sets up by editing their config (clients.rs); and, for any
   // other client, which launches "<Memo's executable> --mcp" (stdio): pick
@@ -1218,6 +1268,7 @@
   function setView(target) {
     if (!target) return;
     view = target.view;
+    if (target.scope === 'update') scrollToUpdate = true;
     if (target.scope && view in scopes) scopes[view] = target.scope;
   }
 

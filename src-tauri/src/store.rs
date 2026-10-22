@@ -457,6 +457,9 @@ pub struct Config {
     /// AI assistants may control Memo through MCP on this computer (see
     /// mcp.rs). Off by default.
     pub ai_control: bool,
+    /// Automatic update checks turned off in Settings (updater.rs). On by
+    /// default.
+    pub updates_off: bool,
 }
 
 impl Config {

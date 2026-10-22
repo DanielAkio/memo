@@ -7,6 +7,7 @@ mod images;
 mod mcp;
 mod store;
 mod sync;
+mod updater;
 mod welcome;
 
 use std::{
@@ -2575,6 +2576,31 @@ fn toggle_ai_control(app: &AppHandle, on: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Settings → Updates: whether automatic checks are on, and the update
+/// status (`updater::Status`).
+#[tauri::command]
+fn get_updates(app: AppHandle) -> (bool, updater::Status) {
+    (updater::auto_enabled(&app), updater::status())
+}
+
+#[tauri::command]
+fn set_auto_update(app: AppHandle, on: bool) -> Result<bool, String> {
+    updater::set_auto(&app, on)?;
+    Ok(on)
+}
+
+/// "Check for updates": the answer comes as `update-changed`.
+#[tauri::command]
+async fn check_update(app: AppHandle) {
+    updater::check(&app, true).await;
+}
+
+/// Downloads and installs the update found, then restarts Memo.
+#[tauri::command]
+async fn install_update(app: AppHandle) {
+    updater::install(&app).await;
+}
+
 /// Configurações → Sincronização: whether this build can connect a Google
 /// account, the one connected on this computer and how syncing goes.
 #[tauri::command]
@@ -3114,6 +3140,8 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        // In-app updates from the GitHub releases (updater.rs).
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // Start with the system: same name and argument as the Windows
         // installer's Run value (windows/hooks.nsh).
         .plugin(
@@ -3194,6 +3222,10 @@ fn main() {
             cancel_cloud_connect,
             disconnect_cloud,
             sync_cloud,
+            get_updates,
+            set_auto_update,
+            check_update,
+            install_update,
             empty_group_trash,
             set_group_color,
             set_manager_color,
@@ -3257,6 +3289,7 @@ fn main() {
                 }
             }
             sync::start(&handle);
+            updater::start(&handle);
             if mcp::enabled(&default_dir) {
                 if let Err(err) = mcp::start(&handle, &default_dir) {
                     eprintln!("memo: mcp: {err}");
