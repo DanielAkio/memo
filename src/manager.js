@@ -964,10 +964,9 @@
 
   // Titlebar icons for <i data-icon="…"> in the demos (same paths as the
   // windows' buttons).
-  const PIN_SVG = '<g transform="rotate(45 8 8)"><path class="pin-needle" d="M8 10.4V15"/>'
-    + '<path class="pin-body" d="M5.7 3.6h4.6l.7 5.1H5z"/>'
-    + '<rect class="pin-body" x="3.6" y="8.4" width="8.8" height="2" rx=".9"/>'
-    + '<rect class="pin-body" x="4.9" y="1.6" width="6.2" height="2" rx=".9"/></g>';
+  const PIN_SVG = '<g transform="translate(-.4 .4) rotate(45 8 8)"><path class="pin-needle" d="M8 11.1v4.4"/>'
+    + '<rect class="pin-body" x="5.45" y=".9" width="5.1" height="7.45" rx="1.5"/>'
+    + '<rect class="pin-body" x="2.55" y="8.35" width="10.9" height="2.7" rx="1.35"/></g>';
   const DEMO_ICONS = {
     pin: PIN_SVG,
     'pin-on': PIN_SVG,
