@@ -99,6 +99,25 @@ kbd {
 .platforms a { text-decoration: none; padding: 6px 12px; border-radius: 8px; background: var(--chip); }
 .platforms a:hover { color: var(--text); }
 
+/* First-launch steps for macOS, shown only to Mac visitors (site.js) */
+[hidden] { display: none !important; }
+.mac-hint { margin: 16px 0 0; font-size: 14px; color: var(--muted); }
+.mac-note {
+  text-align: left; max-width: 600px; margin: 32px auto 0; padding: 20px 24px;
+  border-radius: 12px; background: var(--bg); border: 1px solid var(--line);
+}
+.mac-note h3 { margin-bottom: 8px; }
+.mac-note p { color: var(--muted); margin: 0 0 12px; font-size: 15px; }
+.mac-note p.muted { margin: 12px 0 0; font-size: 14px; }
+.mac-note ol { margin: 0; padding-left: 22px; }
+.mac-note li { margin: 4px 0; font-size: 15px; }
+.mac-note li::marker { color: var(--muted); }
+.mac-note code {
+  font: 13px ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  padding: 1px 6px; border-radius: 5px; background: var(--chip); border: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 860px) {
   .benefits { grid-template-columns: 1fr 1fr; }
   .feature, .feature.flip { grid-template-columns: 1fr; gap: 20px; margin: 48px 0; }

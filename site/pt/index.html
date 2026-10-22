@@ -26,6 +26,8 @@
       <a class="button" data-download href="https://github.com/DanielAkio/memo/releases/latest">Baixar o Memo</a>
       <a class="button ghost" href="#features">Veja como funciona</a>
     </div>
+    <p class="mac-hint" data-mac hidden>No Mac, o macOS pede que você libere o Memo na primeira vez que ele é aberto.
+      <a href="#mac">Veja como</a></p>
     <p class="facts"><span>Gratuito</span><span>Sem cadastro</span><span>Funciona offline</span><span>Windows, macOS, Linux</span></p>
   </section>
 
@@ -127,6 +129,25 @@
       <a href="https://github.com/DanielAkio/memo/releases/latest">macOS (chip Apple ou Intel)</a>
       <a href="https://github.com/DanielAkio/memo/releases/latest">Linux (.deb, .rpm, AppImage)</a>
     </div>
+    <aside class="mac-note" id="mac" data-mac hidden>
+      <h3>Abrindo o Memo no Mac pela primeira vez</h3>
+      <p>Na primeira vez que você abre o Memo, o macOS bloqueia o app e diz que não pôde verificar se ele está livre
+        de malware. Não há nada de errado com o app: a Apple só dispensa esse aviso para apps cujo desenvolvedor paga
+        o Apple Developer Program (US$ 99 por ano), e o Memo é um projeto gratuito que não paga. O código é aberto no
+        <a href="https://github.com/DanielAkio/memo">GitHub</a> para qualquer pessoa conferir.</p>
+      <p>Você só precisa liberar uma vez:</p>
+      <ol>
+        <li>Abra o arquivo baixado e arraste o <strong>Memo</strong> para <strong>Aplicativos</strong>.</li>
+        <li>Abra o Memo. Quando o aviso aparecer, clique em <strong>Concluído</strong> (ou <strong>OK</strong>), e não
+          em <em>Mover para o Lixo</em>.</li>
+        <li>Abra <strong>Ajustes do Sistema → Privacidade e Segurança</strong> e role até <em>Segurança</em>.</li>
+        <li>Ao lado da mensagem sobre o Memo, clique em <strong>Abrir Mesmo Assim</strong> e confirme com sua senha
+          ou Touch ID.</li>
+      </ol>
+      <p class="muted">Depois disso o Memo abre normalmente. Uma versão nova pode pedir isso mais uma vez. Se o macOS
+        disser que o app "está danificado", rode <code>xattr -cr /Applications/Memo.app</code> no Terminal e abra de
+        novo.</p>
+    </aside>
   </section>
 
   <footer>

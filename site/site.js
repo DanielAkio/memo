@@ -3,7 +3,8 @@
 // release, so the click downloads instead of opening the release page. The
 // installer names carry the version, so they are looked up through the
 // GitHub API; until it answers, or if it fails, the links keep their
-// fallback href (the latest release page).
+// fallback href (the latest release page). Mac visitors also get the
+// first-launch steps ([data-mac]).
 (function () {
   var ua = navigator.userAgent;
   var os = /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
@@ -13,6 +14,12 @@
   var label = (pt ? 'Baixar para ' : 'Download for ') + os;
   var buttons = document.querySelectorAll('[data-download]');
   buttons.forEach(function (a) { a.textContent = label; });
+
+  // macOS blocks the app on first launch (it isn't notarized): show the
+  // steps to allow it, which stay hidden on every other system.
+  if (os === 'macOS') {
+    document.querySelectorAll('[data-mac]').forEach(function (el) { el.hidden = false; });
+  }
 
   // Every Mac browser reports "Intel" in its user agent. Chromium tells the
   // real architecture through userAgentData; elsewhere the WebGL renderer
