@@ -509,8 +509,8 @@ window.MemoI18n = (() => {
             + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
             + '<span class="demo-dot" data-color="iris"></span>'
             + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot" data-color=""></span><span class="demo-dot demo-eyedropper"></span></span>'],
-          ['Mover e redimensionar', 'Arraste pela barra de título ou pelas bordas. Perto da borda da tela ou de outra memória, ela gruda.'],
-          ['Recolher na barra', 'Diminua a altura pela borda de baixo (ou de cima): perto do fim, a memória gruda na barra de título e esconde o texto. Puxe a borda de novo para abrir.'],
+          ['Mover e redimensionar', 'Arraste pela barra de título ou pelas bordas. Perto da borda da tela ou de outra memória, ela gruda (o ímã; desligue em Configurações → Aplicativo → Ímã das janelas).'],
+          ['Recolher na barra', 'Diminua a altura pela borda de baixo (ou de cima): perto do fim, a memória gruda na barra de título e esconde o texto. Puxe a borda de novo para abrir. Só com o ímã ligado.'],
           ['Encaixar na tela', 'Arraste até encostar o cursor na borda da tela: aparece uma prévia da metade (laterais), de um quarto (cantos) ou da tela inteira (topo). Solte para encaixar; ao arrastar de novo, ela volta ao tamanho anterior.'],
           ['Fechar', 'Botão ✕ ou clique do meio na barra de título: a memória fecha, mas continua em Atuais no Gerenciador (esmaecida); clique nela para reabrir. Para a lixeira, use o botão de lixeira no Gerenciador. Uma memória fechada sem nenhuma alteração (texto, cor ou grupo) é excluída.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
@@ -575,7 +575,7 @@ window.MemoI18n = (() => {
         title: 'Gerenciador do Memo',
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
-          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o início com o sistema e o controle por IA, sincronizar agora, procurar atualizações e sair.'],
+          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o ímã das janelas, o início com o sistema e o controle por IA, sincronizar agora, procurar atualizações e sair.'],
           ['Aba Grupos', 'Lista os grupos como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele (e as memórias, se estiverem soltas) para a frente; os botões da linha soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
           ['Novo grupo e trazer para a frente', 'O botão de pasta com + na barra do Gerenciador (ou "Novo grupo" no menu … de qualquer barra) cria um grupo vazio ao lado da janela. No menu … do Gerenciador, "Trazer todas as memórias para a frente" as coloca na frente das outras janelas, inclusive as minimizadas.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
@@ -602,6 +602,8 @@ window.MemoI18n = (() => {
           ['Padrão', 'Cor, título e texto com que as memórias novas começam (sem cor, a menos que você escolha uma cor ou "Aleatória"); cor e título dos grupos novos (uma cor aleatória para cada, a menos que você escolha uma).'],
           ['Sincronização', 'Conecte sua conta Google para usar as mesmas memórias em vários computadores. Só o conteúdo vai para uma pasta oculta do seu Google Drive; a posição das janelas fica em cada computador. Uma memória criada em outro computador aparece fechada aqui no Gerenciador. Se a mesma memória for editada em dois lugares antes de sincronizar, fica a versão mais nova e a outra vai para a lixeira com "(conflito)" no título.'],
           ['Armazenamento', 'Pasta onde as memórias ficam salvas (uma pasta do Dropbox ou OneDrive leva para outros computadores) e backup: exportar e importar.'],
+          ['Ímã das janelas', 'Ligado (o padrão), as janelas grudam na borda da tela e umas nas outras quando você move ou redimensiona, e a memória recolhe na barra de título. Desligue para posicionar à vontade; o encaixe na tela continua. Também no menu da bandeja.',
+            '<span class="demo-switch on"></span>'],
           ['Iniciar com o sistema', 'O Memo abre sozinho quando você entra no computador, só com as memórias (o Gerenciador fica fechado). Vem ligado: no Windows, o instalador pergunta; mude em Configurações → Aplicativo.',
             '<span class="demo-switch on"></span>'],
           ['Controle por IA (MCP)', 'Ligue em Configurações → Controle por IA (ou no menu da bandeja) e clique em Conectar ao lado do seu app de IA (Claude, Cursor, VS Code com Copilot, Gemini CLI, Cline, Codex…); para outro app compatível com MCP, copie a configuração. Depois é só pedir, como "crie uma memória com a lista de compras" ou "fixe a memória do projeto": a IA lista, lê, cria, edita, fixa, colore, agrupa e manda para a lixeira. Vem desligado; excluir de vez continua só no Gerenciador.',
@@ -633,8 +635,8 @@ window.MemoI18n = (() => {
             + '<span class="demo-dot" data-color="coral"></span><span class="demo-dot" data-color="teal"></span>'
             + '<span class="demo-dot" data-color="iris"></span>'
             + '<span class="demo-dot" data-color="mono"></span><span class="demo-dot" data-color=""></span><span class="demo-dot demo-eyedropper"></span></span>'],
-          ['Move and resize', 'Drag by the titlebar or the edges. Near a screen edge or another memory, it snaps.'],
-          ['Fold into the titlebar', 'Shrink the height from the bottom (or top) edge: near the end, the memory snaps onto its titlebar and hides the text. Pull the edge again to open it.'],
+          ['Move and resize', 'Drag by the titlebar or the edges. Near a screen edge or another memory, it snaps (the magnet; turn it off in Settings → App → Window magnet).'],
+          ['Fold into the titlebar', 'Shrink the height from the bottom (or top) edge: near the end, the memory snaps onto its titlebar and hides the text. Pull the edge again to open it. Only with the magnet on.'],
           ['Snap to the screen', 'Drag until the cursor touches a screen edge: a preview shows half the screen (sides), a quarter (corners) or the whole screen (top). Release to snap; drag it again to get its previous size back.'],
           ['Close', 'The ✕ button or a middle click on the titlebar: the memory closes but stays under Current in the Manager (dimmed); click it to reopen it. To send it to the trash, use the Manager’s trash button. A memory closed without any change (text, colour or group) is deleted.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
@@ -699,7 +701,7 @@ window.MemoI18n = (() => {
         title: 'Memo Manager',
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
-          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn starting with the system and AI control on or off, sync now, check for updates and quit.'],
+          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn the window magnet, starting with the system and AI control on or off, sync now, check for updates and quit.'],
           ['Groups tab', 'Lists the groups like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar (and its memories, if they are out) to the front; the row’s buttons take its memories out / put them away and move the group to the trash.'],
           ['New group and bring to front', 'The folder-with-+ button in the Manager’s bar (or "New group" in the … menu of any bar) creates an empty group next to the window. In the Manager’s … menu, "Bring all memories to the front" puts them in front of other windows, minimized ones included.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
@@ -726,6 +728,8 @@ window.MemoI18n = (() => {
           ['Defaults', 'Color, title and text that new memories start with (no color unless you pick a color or "Random"); color and title of new groups (a random color for each unless you pick one).'],
           ['Sync', 'Connect your Google account to use the same memories on several computers. Only the content goes to a hidden folder in your Google Drive; window positions stay on each computer. A memory created on another computer shows up closed here in the Manager. If the same memory is edited in two places before syncing, the newer version stays and the other goes to the trash with "(conflict)" in its title.'],
           ['Storage', 'Folder where memories are saved (a Dropbox or OneDrive folder takes them to other computers) and backup: export and import.'],
+          ['Window magnet', 'On (the default), windows stick to the screen edges and to each other when you move or resize them, and a memory folds into its titlebar. Turn it off to place them freely; snapping to the screen still works. Also in the tray menu.',
+            '<span class="demo-switch on"></span>'],
           ['Start with the system', 'Memo opens by itself when you log in, with just your memories (the Manager stays closed). It starts on: on Windows the installer asks; change it in Settings → App.',
             '<span class="demo-switch on"></span>'],
           ['AI control (MCP)', 'Turn it on in Settings → AI control (or in the tray menu) and click Connect next to your AI app (Claude, Cursor, VS Code with Copilot, Gemini CLI, Cline, Codex…); for any other MCP-compatible app, copy the setup. Then just ask, like "create a memory with the shopping list" or "pin the project memory": the AI lists, reads, creates, edits, pins, colors, groups and trashes. It starts off; deleting for good stays in the Manager only.',
