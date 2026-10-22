@@ -482,7 +482,7 @@ window.MemoI18n = (() => {
       {
         title: 'Escrever',
         items: [
-          ['Formatação', 'Selecione um trecho e use a barrinha que aparece, ou {{Mod+B}}, {{Mod+I}} e {{Mod+U}}.',
+          ['Formatação', 'Selecione um trecho e use a barrinha que aparece, ou {{Mod+B}}, {{Mod+I}} e {{Mod+U}}. {{←}} e {{→}} param na borda do trecho formatado: ali você continua escrevendo com a formatação, e mais um toque para fora escreve sem ela.',
             '<b>negrito</b>, <i>itálico</i> e <u>sublinhado</u>'],
           ['Marca-texto', '{{Mod+Shift+H}} ou o marcador na barrinha. {{←}} e {{→}} param na borda do trecho marcado antes de entrar ou sair dele.',
             'Um <span class="hl">trecho importante</span> no meio do texto.'],
@@ -598,7 +598,7 @@ window.MemoI18n = (() => {
       {
         title: 'Writing',
         items: [
-          ['Formatting', 'Select some text and use the bar that appears, or {{Mod+B}}, {{Mod+I}} and {{Mod+U}}.',
+          ['Formatting', 'Select some text and use the bar that appears, or {{Mod+B}}, {{Mod+I}} and {{Mod+U}}. {{←}} and {{→}} stop at the formatted text’s edge: typing there keeps the formatting, and one more press outwards types without it.',
             '<b>bold</b>, <i>italic</i> and <u>underline</u>'],
           ['Highlight', '{{Mod+Shift+H}} or the marker in the bar. {{←}} and {{→}} stop at the highlight’s edge before going in or out.',
             'An <span class="hl">important bit</span> in the middle of the text.'],
