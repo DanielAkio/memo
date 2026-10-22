@@ -64,6 +64,13 @@ Memories, groups and settings live in `notes.json` and `config.json` in the data
 macOS `~/Library/Application Support/memo/`, Linux `~/.local/share/memo/`, or the folder picked in Settings → Storage. Older versions saved to a folder named `br.memo.notas` (or `br.taxinha.notas`); on
 first launch Memo copies that data into `memo` and keeps the old folder as a backup.
 
+## App icon
+
+The icon is a minimal iris pushpin. Its sources are `assets/icon.svg` (app icon, also copied to `site/media/icon.svg`)
+and `assets/tray.svg` (tray glyph). Every file in `src-tauri/icons/` is rendered from them: the PNGs at their
+sizes, `icon.ico` (16–256 px), `icon.icns` (PNG entries 16@2x–1024), `tray.png` and `tray-template.png` (the tray
+glyph in black, used as a macOS template image). Change the SVGs first, then regenerate all of them together.
+
 ## Website
 
 `site/` is the home page and privacy policy published to GitHub Pages by `.github/workflows/pages.yml`
