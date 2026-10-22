@@ -52,6 +52,7 @@ src-tauri/
   capabilities/default.json  permissions for note-*, group-* and manager windows
 site/                    GitHub Pages home page + privacy policy (en, pt/) for Google's consent screen
   media/                 demo GIFs (<scene>-<dark|light>-<en|pt>.gif), also used by README.md
+tools/demos/             records the site/README GIFs from the real pages (Playwright + fake Tauri API; docs/development.md)
 docs/google-cloud.md     Google Cloud project / OAuth client setup for cloud sync
 docs/development.md      building, running, installers, sync builds (moved out of the README)
 docs/code-signing.md     Windows installer signing through SignPath Foundation (CI setup)
