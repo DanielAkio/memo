@@ -785,30 +785,21 @@
     grip: $('grip'),
     onClose: closeWindow,
   });
-  // Right click on the titlebar: its commands in a menu, as in a note.
+  // Right click on the titlebar or its "…" button: the manager's commands,
+  // then all the app's (chrome.js), as in a note.
   window.MemoChrome.titleMenu({
-    frame,
     titlebar: $('titlebar'),
+    more: $('moreBtn'),
     items: () => [
-      { label: t(win.pinned ? 'unpin' : 'pin'), run: togglePin },
+      { label: t('pin'), checked: !!win.pinned, run: togglePin },
       { label: t('managerColor'), run: openMgrColors },
-      null,
-      { label: t('newNote'), run: newNote },
-      { label: t('newGroup'), run: () => invoke('new_group').catch((err) => console.error('new_group', err)) },
       { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err)) },
-      null,
       { label: t('close'), run: closeWindow },
     ],
     onOpen: closeMgrColors,
   });
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
-  $('raiseBtn').addEventListener('click', () => {
-    invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err));
-  });
-  $('newGroupBtn').addEventListener('click', () => {
-    invoke('new_group').catch((err) => console.error('new_group', err));
-  });
   $('closeBtn').addEventListener('click', closeWindow);
 
   window.addEventListener('focus', () => frame.classList.add('is-focused'));

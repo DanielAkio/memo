@@ -2069,17 +2069,15 @@
       onDoubleClick: startRename,
       onClose: closeNote,
     });
-    // Right click on the titlebar: its commands in a menu.
+    // Right click on the titlebar or its "…" button: the note's commands,
+    // then all the app's (chrome.js).
     window.MemoChrome.titleMenu({
-      frame,
       titlebar,
+      more: $('moreBtn'),
       items: () => (note ? [
         { label: t('rename'), run: startRename },
-        { label: t(note.pinned ? 'unpin' : 'pin'), run: togglePin },
+        { label: t('pin'), checked: !!note.pinned, run: togglePin },
         { label: t('noteColor'), run: openColors },
-        null,
-        { label: t('newNote'), run: newNote },
-        null,
         { label: t('closeNote'), run: closeNote },
       ] : []),
       onOpen: () => { closeColors(); closeGroupMenu(); hideFormatBar(); },

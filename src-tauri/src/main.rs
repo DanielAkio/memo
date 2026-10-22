@@ -22,10 +22,10 @@ use store::{
     DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, RANDOM_COLOR, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
 };
 use tauri::{
-    menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
+    menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
     Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::{
@@ -161,7 +161,7 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
         }
     }
 
-    apply_background(&window, &app.state::<Shared>().theme());
+    apply_theme(&window, &app.state::<Shared>().theme());
     track_geometry(app, &window);
     let _ = window.set_zoom(app.state::<Shared>().zoom());
     Ok(window)
@@ -228,7 +228,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
             let _ = window.center();
         }
     }
-    apply_background(&window, &store.theme());
+    apply_theme(&window, &store.theme());
     track_geometry(app, &window);
     let _ = window.set_zoom(store.zoom());
     window.show()?;
@@ -331,6 +331,17 @@ fn refresh_tray(app: &AppHandle) {
     });
 }
 
+/// The window's native theme and background for the app's theme: the
+/// native theme makes its titlebar menu (`show_title_menu`) match the app.
+fn apply_theme(window: &WebviewWindow, theme: &str) {
+    let _ = window.set_theme(match theme {
+        "light" => Some(Theme::Light),
+        "dark" => Some(Theme::Dark),
+        _ => None,
+    });
+    apply_background(window, theme);
+}
+
 /// Native window background for the effective theme ("system" follows the OS).
 fn apply_background(window: &WebviewWindow, theme: &str) {
     let light = match theme {
@@ -347,7 +358,7 @@ fn set_theme(app: &AppHandle, theme: &str) {
     store.set_theme(theme);
     store.flush();
     for window in app.webview_windows().values().filter(|w| is_app_window(w)) {
-        apply_background(window, theme);
+        apply_theme(window, theme);
     }
     let _ = app.emit("theme-changed", theme);
     refresh_tray(app);
@@ -1879,7 +1890,7 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
             let _ = window.center();
         }
     }
-    apply_background(&window, &app.state::<Shared>().theme());
+    apply_theme(&window, &app.state::<Shared>().theme());
     track_geometry(app, &window);
     let _ = window.set_zoom(app.state::<Shared>().zoom());
     window.show()?;
@@ -2470,7 +2481,7 @@ fn reload_windows(app: &AppHandle) {
     }
     let theme = store.theme();
     for window in app.webview_windows().values().filter(|w| is_app_window(w)) {
-        apply_background(window, &theme);
+        apply_theme(window, &theme);
     }
     if let Some(manager) = app.get_webview_window(MANAGER) {
         let _ = manager.set_title(manager_title(store.effective_language()));
@@ -2754,10 +2765,19 @@ async fn import_notes(app: AppHandle, window: WebviewWindow) -> Result<Option<us
 /// showing, the manager's tabs, appearance, sync) and "Quit". Rebuilt by
 /// `refresh_tray` whenever a checked item or a label changes.
 fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let items = app_menu_items(app, "")?;
+    let refs: Vec<&dyn IsMenuItem<tauri::Wry>> = items.iter().map(|i| i as &dyn IsMenuItem<tauri::Wry>).collect();
+    Menu::with_items(app, &refs)
+}
+
+/// The app's commands, as in the tray menu: also the bottom part of every
+/// titlebar menu (`show_title_menu`), with the item ids behind `prefix`.
+fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKind<tauri::Wry>>> {
     let store = app.state::<Shared>();
     let l = tray_labels(store.effective_language());
-    let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
-    let check = |id: &str, text: &str, on: bool| CheckMenuItem::with_id(app, id, text, true, on, None::<&str>);
+    let id = |id: &str| format!("{prefix}{id}");
+    let item = |key: &str, text: &str| MenuItem::with_id(app, id(key), text, true, None::<&str>);
+    let check = |key: &str, text: &str, on: bool| CheckMenuItem::with_id(app, id(key), text, true, on, None::<&str>);
 
     let theme = store.theme();
     let theme_menu = Submenu::with_items(
@@ -2788,7 +2808,7 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     };
     let autostart_item = CheckMenuItem::with_id(
         app,
-        "autostart",
+        id("autostart"),
         l.autostart,
         autostart.is_ok(),
         autostart.unwrap_or(false),
@@ -2796,53 +2816,154 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     )?;
 
     let ai_control = default_data_dir(app).is_ok_and(|dir| mcp::enabled(&dir));
-    let ai_control_item = check("ai-control", l.ai_control, ai_control)?;
-
-    let new_note = item("new", l.new_note)?;
-    let new_group = item("new-group", l.new_group)?;
-    let show = item("show", l.show)?;
-    let manager = item("manager", l.manager)?;
-    let trash = item("trash", l.trash)?;
-    let settings = item("settings", l.settings)?;
-    let help = item("help", l.help)?;
-    let sync = item("sync", l.sync)?;
-    let quit = item("quit", l.quit)?;
-    // The running version, greyed out: shows at a glance which build is open.
-    let version = MenuItem::with_id(
-        app,
-        "version",
-        format!("Memo {}", app.package_info().version),
-        false,
-        None::<&str>,
-    )?;
-    let separators = [
-        PredefinedMenuItem::separator(app)?,
-        PredefinedMenuItem::separator(app)?,
-        PredefinedMenuItem::separator(app)?,
-    ];
-    let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![
-        &new_note,
-        &new_group,
-        &show,
-        &separators[0],
-        &manager,
-        &trash,
-        &settings,
-        &help,
-        &separators[1],
-        &theme_menu,
-        &language_menu,
-        &autostart_item,
-        &ai_control_item,
+    let separator = || PredefinedMenuItem::separator(app).map(|s| s.kind());
+    let mut items = vec![
+        item("new", l.new_note)?.kind(),
+        item("new-group", l.new_group)?.kind(),
+        item("show", l.show)?.kind(),
+        separator()?,
+        item("manager", l.manager)?.kind(),
+        item("trash", l.trash)?.kind(),
+        item("settings", l.settings)?.kind(),
+        item("help", l.help)?.kind(),
+        separator()?,
+        theme_menu.kind(),
+        language_menu.kind(),
+        autostart_item.kind(),
+        check("ai-control", l.ai_control, ai_control)?.kind(),
     ];
     // "Sync now" only with a Google account connected on this computer.
     if cloud_account(app).is_some() {
-        items.push(&sync);
+        items.push(item("sync", l.sync)?.kind());
     }
-    items.push(&separators[2]);
-    items.push(&version);
-    items.push(&quit);
-    Menu::with_items(app, &items)
+    items.push(separator()?);
+    // The running version, greyed out: shows at a glance which build is open.
+    items.push(
+        MenuItem::with_id(
+            app,
+            id("version"),
+            format!("Memo {}", app.package_info().version),
+            false,
+            None::<&str>,
+        )?
+        .kind(),
+    );
+    items.push(item("quit", l.quit)?.kind());
+    Ok(items)
+}
+
+/// One of a window's own commands in its titlebar menu (`null` in JS = a
+/// separator). `checked` makes it a check item (pin).
+#[derive(serde::Deserialize)]
+struct TitleMenuItem {
+    id: String,
+    label: String,
+    checked: Option<bool>,
+}
+
+/// Right click on a titlebar, or its "…" button: a native menu with the
+/// window's own commands on top and all the app's commands (the tray menu's)
+/// below, so any window reaches every command. Native, so it is never cut
+/// by a small window. `at` is the button's bottom-left corner (CSS pixels);
+/// without it the menu opens at the pointer. Clicks come back in
+/// `on_tray_menu` as `win:<label>:<id>`.
+#[tauri::command]
+async fn show_title_menu(
+    app: AppHandle,
+    window: WebviewWindow,
+    items: Vec<Option<TitleMenuItem>>,
+    at: Option<(f64, f64)>,
+) -> Result<(), String> {
+    let prefix = format!("win:{}:", window.label());
+    let menu = Menu::new(&app).map_err(|e| e.to_string())?;
+    let mut own = Vec::new();
+    for item in items {
+        own.push(match item {
+            None => PredefinedMenuItem::separator(&app).map(|s| s.kind()),
+            Some(TitleMenuItem { id, label, checked: Some(on) }) => {
+                CheckMenuItem::with_id(&app, format!("{prefix}own:{id}"), label, true, on, None::<&str>)
+                    .map(|i| i.kind())
+            }
+            Some(TitleMenuItem { id, label, checked: None }) => {
+                MenuItem::with_id(&app, format!("{prefix}own:{id}"), label, true, None::<&str>)
+                    .map(|i| i.kind())
+            }
+        }
+        .map_err(|e| e.to_string())?);
+    }
+    if !own.is_empty() {
+        own.push(PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?.kind());
+    }
+    own.extend(app_menu_items(&app, &prefix).map_err(|e| e.to_string())?);
+    for item in &own {
+        menu.append(item).map_err(|e| e.to_string())?;
+    }
+    #[cfg(windows)]
+    set_menu_theme(&app.state::<Shared>().theme());
+    match at {
+        Some((x, y)) => {
+            let zoom = app.state::<Shared>().zoom();
+            window.popup_menu_at(&menu, LogicalPosition::new(x * zoom, y * zoom))
+        }
+        None => window.popup_menu(&menu),
+    }
+    .map_err(|e| e.to_string())
+}
+
+/// Windows draws popup menus light or dark from the process-wide "preferred
+/// app mode", not from the window's theme: set it to Memo's theme before a
+/// titlebar menu opens. uxtheme's SetPreferredAppMode (ordinal 135) and
+/// FlushMenuThemes (136) are undocumented but stable since Windows 10 1903.
+#[cfg(windows)]
+fn set_menu_theme(theme: &str) {
+    use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+    // 1 = follow the system, 2 = force dark, 3 = force light.
+    let mode: i32 = match theme {
+        "dark" => 2,
+        "light" => 3,
+        _ => 1,
+    };
+    let name: Vec<u16> = "uxtheme.dll\0".encode_utf16().collect();
+    unsafe {
+        let lib = LoadLibraryW(name.as_ptr());
+        if lib.is_null() {
+            return;
+        }
+        if let Some(set) = GetProcAddress(lib, 135 as *const u8) {
+            let set: unsafe extern "system" fn(i32) -> i32 = std::mem::transmute(set);
+            set(mode);
+        }
+        if let Some(flush) = GetProcAddress(lib, 136 as *const u8) {
+            let flush: unsafe extern "system" fn() = std::mem::transmute(flush);
+            flush();
+        }
+    }
+}
+
+/// A click in a titlebar menu (`show_title_menu`), from window `label`: its
+/// own commands go back to the window ("title-menu" event); new memories and
+/// groups open beside it, as with its buttons; the rest is the tray's.
+fn on_title_menu(app: &AppHandle, label: &str, id: &str) {
+    let Some(window) = app.get_webview_window(label) else {
+        return on_tray_menu(app, id);
+    };
+    if let Some(own) = id.strip_prefix("own:") {
+        let _ = window.emit_to(label, "title-menu", own);
+        return;
+    }
+    match id {
+        "new" => {
+            let _ = create_and_open(app, beside(&window));
+        }
+        "new-group" => {
+            let group = app.state::<Shared>().create_group(beside(&window));
+            if let Ok(window) = open_group_window(app, &group) {
+                let _ = window.set_focus();
+            }
+            groups_changed(app);
+        }
+        _ => on_tray_menu(app, id),
+    }
 }
 
 /// A tray menu click.
@@ -2893,7 +3014,9 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
             app.exit(0);
         }
         _ => {
-            if let Some(theme) = id.strip_prefix("theme:") {
+            if let Some((label, id)) = id.strip_prefix("win:").and_then(|rest| rest.split_once(':')) {
+                on_title_menu(app, label, id);
+            } else if let Some(theme) = id.strip_prefix("theme:") {
                 set_theme(app, theme);
             } else if let Some(language) = id.strip_prefix("language:") {
                 set_language(app, language);
@@ -3022,6 +3145,7 @@ fn main() {
             take_manager_view,
             close_manager,
             bring_notes_to_front,
+            show_title_menu,
             list_notes,
             open_note,
             move_to_trash,
