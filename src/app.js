@@ -1176,6 +1176,7 @@
     caret.collapse(true);
     getSelection().removeAllRanges();
     getSelection().addRange(caret);
+    return code;
   }
 
   // Raw text of a fragment, with <br> as a line break (keeps the last one).
@@ -1930,6 +1931,51 @@
 
   const toggleTray = () => showTray(formatTray.hidden);
 
+  // With just the caret (nothing selected), the tray's buttons add a new,
+  // empty element instead of formatting what is there: a list item or code
+  // block on a new line below (or on the caret's line, if it is an empty
+  // plain line), an empty inline code at the caret, and bold, italic,
+  // underline, highlight or size for what is typed next.
+  function insertEmpty(cmd) {
+    editor.focus();
+    if (LIST_TYPES.includes(cmd) || cmd === 'codeBlock') {
+      const line = currentPre() || currentBlock() || editor.lastElementChild;
+      let target = line;
+      const emptyLine = line && line.nodeName === 'DIV' && !isListItem(line)
+        && !line.textContent.replace(ZWSP, '') && !line.querySelector('img');
+      if (!emptyLine) {
+        target = document.createElement('div');
+        target.appendChild(document.createElement('br'));
+        if (line) line.after(target);
+        else editor.append(target);
+      }
+      if (cmd === 'codeBlock') {
+        openCodeBlock(target, '');
+      } else {
+        target.className = cmd;
+        // Under a list item, the new item takes its level.
+        if (line && isListItem(line) && levelOf(line)) target.dataset.level = line.dataset.level;
+        caretIn(target);
+        onContentChanged();
+      }
+    } else if (cmd === 'code') {
+      const sel = getSelection();
+      if (!sel.rangeCount || currentPre() || currentCode()) return;
+      // Caret inside, after the invisible character that keeps it open.
+      const code = insertCode(sel.getRangeAt(0), '\u200b');
+      const r = document.createRange();
+      r.setStart(code.firstChild, 1);
+      r.collapse(true);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      onContentChanged();
+    } else {
+      FORMAT_COMMANDS[cmd]();
+      return;
+    }
+    scheduleFormatBar();
+  }
+
   // ------------------------------------------------------- format menu
 
   // "Format" in the titlebar menu (… / right click): every formatting
@@ -2158,7 +2204,10 @@
     bar.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-cmd], [data-size]');
       if (!btn) return;
+      const sel = getSelection();
+      const caretOnly = !sel.rangeCount || sel.isCollapsed || !editor.contains(sel.anchorNode);
       if (btn.dataset.size) setSize(btn.dataset.size);
+      else if (bar === formatTray && caretOnly) insertEmpty(btn.dataset.cmd);
       else FORMAT_COMMANDS[btn.dataset.cmd]();
       if (!formatTray.hidden) renderFormatState(formatTray);
     });
