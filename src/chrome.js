@@ -36,15 +36,19 @@ window.MemoZoom = {
 };
 
 // Opens the system colour picker of a hidden <input type="color"> next to
-// the swatch that asked for it. The input moves under the swatch (where
-// Chromium anchors its picker) and, on Windows, where the system dialog
-// opens on its own, Rust moves it next to the pointer (place_color_picker).
+// the swatch that asked for it. The (invisible) input takes the swatch's
+// place and size: browsers anchor their picker to it, and on macOS WebKit
+// shows a popover from it that never opens while the input has no size.
+// On Windows, where the system dialog opens on its own, Rust moves it next
+// to the pointer (place_color_picker).
 window.MemoColorPicker = {
   open(input, anchor) {
     const r = anchor.getBoundingClientRect();
     input.style.position = 'fixed';
     input.style.left = `${Math.round(r.left)}px`;
-    input.style.top = `${Math.round(r.bottom)}px`;
+    input.style.top = `${Math.round(r.top)}px`;
+    input.style.width = `${Math.round(r.width)}px`;
+    input.style.height = `${Math.round(r.height)}px`;
     const tauri = window.__TAURI__ || window.parent.__TAURI__;
     tauri.core.invoke('place_color_picker').catch((err) => console.error('place_color_picker', err));
     input.click();
