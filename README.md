@@ -29,8 +29,9 @@ digging through windows to find what you wrote down.
 ## Why people like it
 
 - **Always in sight.** One click on the pin and the memory stays on top while you work in anything else.
-- **Write without thinking.** Type and it's saved. `[]` starts a checklist, `-` starts a list, backticks turn a
-  command into code, a screenshot pastes right in, and a quick selection lets you highlight what matters.
+- **Write without thinking.** Type and it's saved. `[]` starts a checklist, `-` a list, `1.` a numbered list,
+  backticks turn a command into code, a screenshot pastes right in, and a quick selection lets you highlight what
+  matters. Prefer the mouse? The + beside an empty line, the selection bar and the Aa toolbar do it all in a click.
 - **Find things at a glance.** Give each memory a title and a colour (any colour, with the eyedropper), and gather
   related ones in a group you can put away and bring back in one click.
 - **Yours, and only yours.** No sign-up, no ads, no tracking, and it works offline. Your memories live on your

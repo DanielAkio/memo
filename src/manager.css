@@ -705,9 +705,42 @@ textarea.field { resize: vertical; min-height: 84px; }
   text-transform: uppercase;
   color: var(--color-ash);
 }
-/* Checklist and bullets, as in the editor (styles.css .check / .bullet). */
+/* Lists, as in the editor (styles.css .check / .bullet / .number). */
 .help-demo .check,
-.help-demo .bullet { position: relative; padding-left: 22px; }
+.help-demo .bullet,
+.help-demo .number { position: relative; padding-left: 22px; }
+.help-demo .number::before {
+  content: attr(data-n) ".";
+  position: absolute;
+  left: -6px;
+  width: 22px;
+  text-align: right;
+  color: var(--color-fog);
+  font-variant-numeric: tabular-nums;
+}
+/* "Mouse only": the "+" of an empty line and its menu (styles.css .line-add). */
+.help-demo .demo-plus {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-badge);
+  background: var(--overlay-active);
+  color: var(--color-paper);
+  line-height: 1;
+  align-self: flex-start;
+}
+.help-demo .demo-menu {
+  display: inline-grid;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--color-obsidian);
+  box-shadow: var(--shadow-popover);
+  font-size: 12px;
+  color: var(--color-mist);
+}
+.help-demo .demo-menu > span { padding: 3px 8px; border-radius: var(--radius-badge); }
+.help-demo .demo-menu > span:first-child { background: var(--overlay-hover); }
 .help-demo [data-level="1"] { margin-left: 20px; }
 .help-demo .check::before {
   content: "";
