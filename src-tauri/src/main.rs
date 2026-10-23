@@ -33,6 +33,7 @@ use tauri::{
 use tauri_plugin_dialog::{
     DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult,
 };
+use tauri_plugin_opener::OpenerExt;
 
 type Shared = Arc<Store>;
 
@@ -1407,6 +1408,19 @@ fn save_text(
     if changed {
         notify(&app);
     }
+}
+
+/// Opens a link from a note in the system's default browser (or mail app).
+/// Only web and mail links: anything else could launch a local program.
+#[tauri::command]
+fn open_link(app: AppHandle, url: String) -> Result<(), String> {
+    let lower = url.to_ascii_lowercase();
+    if !["http://", "https://", "mailto:"].iter().any(|s| lower.starts_with(s)) {
+        return Err(format!("not a web or mail link: {url}"));
+    }
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 /// The headline feature: keeps (or stops keeping) the note above every other app.
@@ -3380,6 +3394,7 @@ fn main() {
             resize_to,
             load_note,
             save_text,
+            open_link,
             set_pinned,
             set_color,
             set_title,

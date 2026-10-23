@@ -181,6 +181,70 @@
   // In the plain text an image is "[imagem]" / "[image]" (see toPlain).
   const imageMark = () => `[${t('imageMark')}]`;
 
+  // Links: <a href> with a web or mail address, opened in the system's
+  // browser on click (see "links"). A bare address in the text ("https://…",
+  // "www.…") is a link to itself; in the plain text a link whose text isn't
+  // its address is "[text](address)".
+  const BARE_URL_RE = /(?<![\w@.\/])(?:https?:\/\/[^\s<>"]+|www\.[^\s<>"./]+\.[^\s<>"]+)/gi;
+  const PLAIN_LINK_RE = /\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/gi;
+  const SAFE_HREF_RE = /^(?:https?:\/\/|mailto:)\S+$/i;
+
+  // A bare address without the punctuation that usually follows it in a
+  // sentence ("see https://x.com." or "(https://x.com)").
+  function trimUrl(url) {
+    while (url) {
+      const last = url[url.length - 1];
+      const unbalanced = (open, close) => last === close && url.split(open).length < url.split(close).length;
+      if (!/[.,;:!?'"*]/.test(last) && !unbalanced('(', ')') && !unbalanced('[', ']')) break;
+      url = url.slice(0, -1);
+    }
+    return url;
+  }
+
+  // The address a link opens: "www.x.com" → "https://www.x.com".
+  const hrefOf = (url) => (/^www\./i.test(url) ? `https://${url}` : url);
+  const safeHref = (href) => (href && SAFE_HREF_RE.test(href) ? href : '');
+
+  // `text` is a whole bare address (after trimming): the address, else ''.
+  function bareUrl(text) {
+    const t = text.replace(ZWSP, '').trim();
+    BARE_URL_RE.lastIndex = 0;
+    const m = BARE_URL_RE.exec(t);
+    return m && m.index === 0 && trimUrl(m[0]) === t ? t : '';
+  }
+
+  // A link in plain text: its address when that is its text, else
+  // "[text](address)".
+  function linkPlain(a) {
+    const text = a.textContent.replace(ZWSP, '');
+    const href = a.getAttribute('href') || '';
+    if (!text.trim()) return '';
+    return text === href || hrefOf(bareUrl(text)) === href ? text : `[${text}](${href})`;
+  }
+
+  // Escaped text with its "[text](address)" and bare addresses as links.
+  function linkHtml(s) {
+    let out = '';
+    let last = 0;
+    const re = new RegExp(`${PLAIN_LINK_RE.source}|${BARE_URL_RE.source}`, 'gi');
+    for (let m; (m = re.exec(s));) {
+      let text = m[0];
+      let href;
+      if (m[1]) {
+        text = m[1];
+        href = m[2];
+      } else {
+        text = trimUrl(text);
+        if (!text) continue;
+        href = hrefOf(text);
+        re.lastIndex = m.index + text.length;
+      }
+      out += `${esc(s.slice(last, m.index))}<a href="${esc(href)}">${esc(text)}</a>`;
+      last = m.index + (m[1] ? m[0].length : text.length);
+    }
+    return out + esc(s.slice(last));
+  }
+
   const levelOf = (block) => Number(block.dataset.level) || 0;
 
   // Start of the line in plain text: indent + list item marker.
@@ -215,6 +279,8 @@
           lines.push(...tableLines(n));
         } else if (n.nodeName === 'CODE') {
           cur = `${cur ?? ''}\`${n.textContent.replace(ZWSP, '')}\``;
+        } else if (n.nodeName === 'A' && !n.querySelector('img, br')) {
+          cur = (cur ?? '') + linkPlain(n);
         } else if (n.nodeName === 'IMG') {
           cur = (cur ?? '') + imageMark();
         } else if (n.nodeName === 'BR') {
@@ -252,6 +318,7 @@
       for (const n of node.childNodes) {
         if (n.nodeType === 3) out += n.data;
         else if (n.nodeName === 'CODE') out += `\`${n.textContent}\``;
+        else if (n.nodeName === 'A' && !n.querySelector('img, br')) out += linkPlain(n);
         else if (n.nodeName === 'IMG') out += imageMark();
         else if (n.nodeName === 'BR') out += ' ';
         else if (n.nodeType === 1) walk(n);
@@ -271,7 +338,7 @@
   // HTML for notes that only have plain text (created before formatting).
   function fromPlain(text) {
     if (!text) return '<div><br></div>';
-    const inline = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+    const inline = (s) => s.split(/(`[^`]+`)/).map((part, i) => (i % 2 ? `<code>${esc(part.slice(1, -1))}</code>` : linkHtml(part))).join('');
     const lines = text.split('\n');
     const out = [];
     for (let i = 0; i < lines.length; i++) {
@@ -317,8 +384,8 @@
   }
 
   // Rebuilds saved HTML with only what the editor uses: lines, <br>, <b>,
-  // <i>, <u>, <code>, <pre>, <img> (data URLs), sizes, highlight, the list
-  // classes and tables.
+  // <i>, <u>, <code>, <pre>, <img> (data URLs), links (<a href>, web and
+  // mail only), sizes, highlight, the list classes and tables.
   // Anything else becomes text.
   function sanitize(html) {
     const src = new DOMParser().parseFromString(html, 'text/html').body;
@@ -393,6 +460,10 @@
           font.setAttribute('size', n.getAttribute('size'));
           if (isHighlight(n)) font.style.backgroundColor = HIGHLIGHT;
           copy(n, font, inCell);
+        } else if (n.nodeName === 'A' && safeHref(n.getAttribute('href')) && !(to.nodeType === 1 && to.closest('a'))) {
+          const a = to.appendChild(document.createElement('a'));
+          a.setAttribute('href', n.getAttribute('href'));
+          copy(n, a, inCell);
         } else if (n.nodeName === 'SPAN' && isHighlight(n)) {
           const span = to.appendChild(document.createElement('span'));
           span.style.backgroundColor = HIGHLIGHT;
@@ -521,11 +592,12 @@
 
   // Saved HTML: the editor's, without the display tweaks of syncNumbers and
   // syncCheckSizes (data-n, data-size and --check-mid), which are recomputed
-  // on load.
+  // on load, and the address shown over a link (title).
   function contentHtml() {
     const copy = editor.cloneNode(true);
     for (const b of copy.querySelectorAll('[data-size]')) delete b.dataset.size;
     for (const b of copy.querySelectorAll('[data-n]')) delete b.dataset.n;
+    for (const a of copy.querySelectorAll('a[title]')) a.removeAttribute('title');
     for (const b of copy.querySelectorAll('[style]')) {
       b.style.removeProperty('--check-mid');
       if (!b.getAttribute('style')) b.removeAttribute('style');
@@ -582,6 +654,7 @@
 
   function applyContent() {
     syncTables();
+    syncLinks();
     wrapLooseLines();
     syncNumbers();
     syncCheckSizes();
@@ -1388,6 +1461,11 @@
       toggleCode();
       return;
     }
+    if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyK') {
+      e.preventDefault();
+      openLinkBox();
+      return;
+    }
 
     const pre = currentPre();
     if (pre) {
@@ -1543,6 +1621,10 @@
 
   const TYPING_RE = /^(insertText|insertCompositionText|insertParagraph|insertLineBreak|deleteContent)/;
   let pasting = false;
+  // The line (or table cell) a paste starts in, and a link to itself being
+  // edited (see "links").
+  let pasteFrom = null;
+  let selfLink = null;
   let converting = false;
 
   function onEditorInput(e) {
@@ -1583,9 +1665,27 @@
       try {
         if (e.data === '`') converted = expandInlineCode();
         else if (e.data === ']') converted = expandCheckbox();
-        else if (!(converted = expandBullet())) swallowLeadingSpace();
+        else if (!(converted = expandBullet())) {
+          swallowLeadingSpace();
+          converted = linkTypedWord();
+        }
       } finally {
         converting = false;
+      }
+    }
+    // Editing the text of a link to itself keeps its address in step.
+    if (selfLink?.isConnected) {
+      const url = bareUrl(selfLink.textContent);
+      if (url) selfLink.setAttribute('href', hrefOf(url));
+    }
+    selfLink = null;
+    // Enter after an address makes it a link; pasted addresses too.
+    if (e.inputType === 'insertParagraph') linkLineEnd(currentBlock()?.previousElementSibling);
+    if (pasting && pasteFrom?.isConnected) {
+      const end = currentBlock() || pasteFrom;
+      for (let n = pasteFrom; n; n = n.nextElementSibling) {
+        linkAddresses(n);
+        if (n === end || pasteFrom.nodeName === 'TD') break;
       }
     }
     // Enter on an item creates the next item (the browser clones the line), unchecked.
@@ -1623,11 +1723,13 @@
     }
     if (!text) return;
     pasting = true;
+    pasteFrom = currentCell() || currentBlock();
     try {
       // A cell holds one line: line breaks become spaces.
       document.execCommand('insertText', false, currentCell() ? text.replace(/\s*\n\s*/g, ' ') : text);
     } finally {
       pasting = false;
+      pasteFrom = null;
     }
   }
 
@@ -2264,6 +2366,297 @@
   imageHandle.addEventListener('pointerup', endResize);
   imageHandle.addEventListener('pointercancel', endResize);
 
+  // -------------------------------------------------------------- links
+  //
+  // A link is <a href> around text (web or mail addresses only). Clicking
+  // it opens the address in the system's browser (open_link in Rust); a
+  // drag that starts on it still selects text. An address typed (followed
+  // by a space or Enter) or pasted becomes a link to itself, and editing
+  // such a link's text keeps its address in step. The link button, Mod+K
+  // and the Format menu open #linkBox to add, change, open or remove the
+  // link of the selection (or insert one at the caret).
+
+  const linkBox = $('linkBox');
+  const linkInput = $('linkInput');
+  let linkRange = null;
+  let editingLink = null;
+
+  // A link whose text is its own address ("https://x.com", "www.x.com").
+  const isSelfLink = (a) => {
+    const url = bareUrl(a.textContent);
+    return Boolean(url) && hrefOf(url) === a.getAttribute('href');
+  };
+
+  // The link holding the caret, or the first one the selection touches.
+  function currentLink() {
+    const sel = getSelection();
+    if (!sel.rangeCount) return null;
+    const range = sel.getRangeAt(0);
+    const n = range.startContainer;
+    const el = n.nodeType === 1 ? n : n.parentElement;
+    const a = el && el.closest('a');
+    if (a && editor.contains(a)) return a;
+    if (range.collapsed) return null;
+    return [...editor.querySelectorAll('a')].find((link) => range.intersectsNode(link)) || null;
+  }
+
+  function openLink(a) {
+    const url = safeHref(a.getAttribute('href'));
+    if (url) invoke('open_link', { url }).catch((err) => console.error('open_link', err));
+  }
+
+  // What was typed in #linkBox as an address: "x.com" → "https://x.com",
+  // "a@b.com" → "mailto:a@b.com"; '' when it can't be one.
+  function linkAddress(text) {
+    const url = text.trim();
+    if (!url) return '';
+    if (/^[a-z][\w+.-]*:/i.test(url)) return safeHref(url);
+    if (/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(url)) return `mailto:${url}`;
+    return /^[^\s/]+\.[^\s/]+/.test(url) ? `https://${url}` : '';
+  }
+
+  // Wraps text[start, end) of a text node in a link to `href`.
+  function wrapLink(node, start, end, href) {
+    const r = document.createRange();
+    r.setStart(node, start);
+    r.setEnd(node, end);
+    const a = document.createElement('a');
+    a.setAttribute('href', href);
+    r.surroundContents(a);
+    return a;
+  }
+
+  // An address that ends right before `offset` in a text node (just typed,
+  // followed by a space or Enter) becomes a link; the caret, if given (an
+  // offset in the same node), stays where it was. Returns whether it did.
+  function linkWordBefore(node, offset, caret = null) {
+    if (!node || node.nodeType !== 3 || node.parentElement.closest('a, code, pre')) return false;
+    const before = node.data.slice(0, offset);
+    const m = /(?:https?:\/\/|www\.)\S*$/i.exec(before);
+    if (!m || /[\w@./]/.test(before[m.index - 1] || '')) return false;
+    const url = trimUrl(m[0]);
+    if (!url || bareUrl(url) !== url) return false;
+    const a = wrapLink(node, m.index, m.index + url.length, hrefOf(url));
+    const tail = caret === null ? 0 : caret - m.index - url.length;
+    if (tail > 0 && a.nextSibling) {
+      const r = document.createRange();
+      r.setStart(a.nextSibling, tail);
+      r.collapse(true);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+    }
+    return true;
+  }
+
+  // A space typed after an address: the address before it becomes a link.
+  // Typed right after a link to itself ("www.x.com" + "/page"), it extends
+  // that link.
+  function linkTypedWord() {
+    const sel = getSelection();
+    const node = sel.anchorNode;
+    if (!sel.isCollapsed || !node || node.nodeType !== 3) return false;
+    const end = sel.anchorOffset - 1;
+    const prev = node.previousSibling;
+    const word = node.data.slice(0, Math.max(0, end));
+    if (prev?.nodeName === 'A' && isSelfLink(prev) && word && !/\s/.test(word)) {
+      const url = trimUrl(prev.textContent + word);
+      if (url.length <= prev.textContent.length || bareUrl(url) !== url) return false;
+      const moved = url.length - prev.textContent.length;
+      const rest = node.splitText(moved);
+      prev.appendChild(node);
+      prev.normalize();
+      prev.setAttribute('href', hrefOf(url));
+      const r = document.createRange();
+      r.setStart(rest, end - moved + 1);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      return true;
+    }
+    return linkWordBefore(node, Math.max(0, end), sel.anchorOffset);
+  }
+
+  // Enter after an address: the end of the line it left becomes a link.
+  function linkLineEnd(line) {
+    if (!line || line.nodeName !== 'DIV') return;
+    const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+    let last = null;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) last = n;
+    if (last) linkWordBefore(last, last.data.replace(/\s+$/, '').length);
+  }
+
+  // Every address in the text under `root` (outside links and code)
+  // becomes a link: used on pasted lines.
+  function linkAddresses(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.parentElement.closest('a, code, pre')) nodes.push(n);
+    }
+    // The caret as a number of characters into `root`, put back afterwards
+    // (wrapping moves the text it was in).
+    const sel = getSelection();
+    let caret = -1;
+    if (sel.isCollapsed && sel.anchorNode && root.contains(sel.anchorNode)) {
+      const r = document.createRange();
+      r.setStart(root, 0);
+      r.setEnd(sel.anchorNode, sel.anchorOffset);
+      caret = r.toString().length;
+    }
+    let changed = false;
+    for (const node of nodes) {
+      // From the end, so earlier matches keep their offsets.
+      BARE_URL_RE.lastIndex = 0;
+      const found = [...node.data.matchAll(BARE_URL_RE)].map((m) => [m.index, trimUrl(m[0])]).filter(([, url]) => url);
+      for (const [start, url] of found.reverse()) {
+        wrapLink(node, start, start + url.length, hrefOf(url));
+        changed = true;
+      }
+    }
+    if (changed && caret >= 0) {
+      const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const r = document.createRange();
+      r.selectNodeContents(root);
+      r.collapse(false);
+      for (let n = walk.nextNode(), left = caret; n; n = walk.nextNode()) {
+        if (left > n.length) { left -= n.length; continue; }
+        // At the end of a link: after it, so typing goes on outside.
+        const a = left === n.length && n.parentElement.closest('a');
+        if (a && root.contains(a)) r.setStartAfter(a);
+        else r.setStart(n, left);
+        r.collapse(true);
+        break;
+      }
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+    return changed;
+  }
+
+  // Links left without text are removed (keeping what they hold).
+  function syncLinks() {
+    for (const a of editor.querySelectorAll('a')) {
+      if (!a.textContent.replace(ZWSP, '') && !a.querySelector('img')) a.replaceWith(...a.childNodes);
+    }
+  }
+
+  // #linkBox: floats below the selection (or above, if it doesn't fit),
+  // like the format bar.
+  function placeLinkBox(range) {
+    let rects = [...range.getClientRects()].filter((r) => r.width || r.height);
+    if (!rects.length) {
+      const n = range.startContainer;
+      const el = n.nodeType === 1 ? n : n.parentElement;
+      rects = [el.getBoundingClientRect()];
+    }
+    const first = rects[0];
+    const last = rects[rects.length - 1];
+    const w = linkBox.offsetWidth;
+    const h = linkBox.offsetHeight;
+    let top = last.bottom + 6;
+    if (top + h > window.innerHeight - 4) top = first.top - h - 6;
+    top = Math.max(4, Math.min(top, window.innerHeight - h - 4));
+    const left = Math.max(4, Math.min(first.left, window.innerWidth - w - 4));
+    linkBox.style.left = `${left}px`;
+    linkBox.style.top = `${top}px`;
+  }
+
+  // Link button / Mod+K / Format menu: asks for the address of the
+  // selection's link (a new one, or the one at the caret).
+  function openLinkBox() {
+    const sel = getSelection();
+    if (!sel.rangeCount || !editor.contains(sel.anchorNode) || currentPre()) return;
+    linkRange = sel.getRangeAt(0).cloneRange();
+    editingLink = currentLink();
+    const selected = bareUrl(sel.toString());
+    linkInput.value = editingLink ? editingLink.getAttribute('href').replace(/^mailto:/i, '') : selected;
+    linkBox.classList.toggle('editing', Boolean(editingLink));
+    hideFormatBar();
+    linkBox.hidden = false;
+    placeLinkBox(linkRange);
+    linkInput.focus();
+    linkInput.select();
+  }
+
+  function closeLinkBox(restore) {
+    if (linkBox.hidden) return;
+    linkBox.hidden = true;
+    if (restore && linkRange) {
+      editor.focus();
+      getSelection().removeAllRanges();
+      getSelection().addRange(linkRange);
+    }
+    linkRange = null;
+    editingLink = null;
+  }
+
+  // Enter in #linkBox: the address applies to the link being edited, to the
+  // selected text, or goes in at the caret as a link to itself. Empty, it
+  // removes the link.
+  function applyLinkBox() {
+    const href = linkAddress(linkInput.value);
+    if (linkInput.value.trim() && !href) {
+      linkInput.select();
+      return;
+    }
+    const link = editingLink;
+    const range = linkRange;
+    closeLinkBox(true);
+    if (!href) {
+      if (link) unlink(link);
+      return;
+    }
+    if (link) {
+      link.setAttribute('href', href);
+    } else if (range.collapsed) {
+      const a = document.createElement('a');
+      a.setAttribute('href', href);
+      a.textContent = linkInput.value.trim();
+      // After the link, plain text again.
+      const gap = document.createTextNode('​');
+      range.insertNode(gap);
+      range.insertNode(a);
+      const r = document.createRange();
+      r.setStartAfter(gap);
+      r.collapse(true);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+    } else {
+      document.execCommand('createLink', false, href);
+    }
+    onContentChanged();
+    scheduleFormatBar();
+  }
+
+  // Turns a link back into its text (and formatting).
+  function unlink(a) {
+    const parent = a.parentNode;
+    const kids = [...a.childNodes];
+    a.replaceWith(...kids);
+    parent.normalize();
+    onContentChanged();
+    scheduleFormatBar();
+  }
+
+  linkBox.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); applyLinkBox(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeLinkBox(true); }
+  });
+  linkInput.addEventListener('blur', () => {
+    // A click on the box's own buttons keeps it (they don't take focus).
+    setTimeout(() => { if (document.activeElement !== linkInput) closeLinkBox(false); });
+  });
+  linkBox.addEventListener('mousedown', (e) => { if (e.target !== linkInput) e.preventDefault(); });
+  $('linkOpen').addEventListener('click', () => {
+    if (editingLink) openLink(editingLink);
+    closeLinkBox(true);
+  });
+  $('linkRemove').addEventListener('click', () => {
+    const link = editingLink;
+    closeLinkBox(true);
+    if (link) unlink(link);
+  });
+
   // ---------------------------------------------------------- formatting
 
   const FORMAT_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
@@ -2408,6 +2801,7 @@
     number: () => toggleList('number'),
     codeBlock: toggleCodeBlock,
     table: toggleTable,
+    link: openLinkBox,
   };
 
   // Whether a command is on for the selection or the caret's line.
@@ -2416,6 +2810,7 @@
     if (cmd === 'code') return Boolean(currentCode());
     if (cmd === 'codeBlock') return Boolean(currentPre());
     if (cmd === 'table') return Boolean(currentCell());
+    if (cmd === 'link') return Boolean(currentLink());
     if (LIST_TYPES.includes(cmd)) {
       const lines = touchedLines();
       return lines.length > 0 && lines.every((b) => b.classList.contains(cmd));
@@ -2587,6 +2982,7 @@
       cmd('underline', 'underline'),
       cmd('highlight', 'highlight'),
       cmd('code', 'code'),
+      cmd('link', 'link'),
       null,
       cmd('check', 'checklist'),
       cmd('bullet', 'bulletList'),
@@ -2708,8 +3104,28 @@
     e.preventDefault();
     restoreHistory(e.inputType === 'historyUndo' ? -1 : 1);
   });
+  editor.addEventListener('beforeinput', () => {
+    const a = currentLink();
+    selfLink = a && isSelfLink(a) ? a : null;
+  });
   editor.addEventListener('keydown', onEditorKeydown);
   editor.addEventListener('paste', onPaste);
+  // A click on a link opens it in the browser (a drag from it selects text);
+  // hovering shows its address.
+  editor.addEventListener('click', (e) => {
+    const a = e.target.closest?.('a');
+    if (!a || !editor.contains(a) || e.button !== 0) return;
+    e.preventDefault();
+    if (getSelection().isCollapsed) openLink(a);
+  });
+  editor.addEventListener('mouseover', (e) => {
+    const a = e.target.closest?.('a');
+    if (a && editor.contains(a)) a.title = a.getAttribute('href').replace(/^mailto:/i, '');
+  });
+  editor.addEventListener('mouseout', (e) => {
+    const a = e.target.closest?.('a');
+    if (a && !a.contains(e.relatedTarget)) a.removeAttribute('title');
+  });
   editor.addEventListener('blur', () => {
     flushText();
     renderImageFrame();
