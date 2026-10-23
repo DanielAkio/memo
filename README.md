@@ -10,9 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/DanielAkio/memo/releases/latest"><b>Download</b></a> ·
-  <a href="https://danielakio.github.io/memo/">Website</a> ·
-  <a href="https://danielakio.github.io/memo/?lang=pt">Em português</a>
+  <a href="https://danielakio.github.io/memo/"><b>Website</b></a>
 </p>
 
 <p align="center">
@@ -95,14 +93,8 @@ in your hands.
 
 ## Get Memo
 
-Download the installer for your computer from the **[latest release](https://github.com/DanielAkio/memo/releases/latest)**:
-
-| Your computer | File to download |
-| --- | --- |
-| Windows 10 or 11 | the one ending in `-setup.exe` |
-| Mac with Apple chip (M1, M2…) | the `.dmg` with `aarch64` in its name |
-| Mac with Intel chip | the `.dmg` with `x64` in its name |
-| Linux | `.deb` (Ubuntu, Debian, Mint), `.rpm` (Fedora, openSUSE) or `.AppImage` (any) |
+Download Memo for Windows, macOS or Linux from **[its website](https://danielakio.github.io/memo/)**, which picks
+the right installer for your computer.
 
 Open it, and Memo greets you with a welcome memory that shows the basics. Closing a memory never deletes it, and
 closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.
