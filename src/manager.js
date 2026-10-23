@@ -732,6 +732,19 @@
     if (view === 'groups') showGroup(item.dataset.gid);
     else act('open', item.dataset.id);
   });
+  // Middle click (wheel button) on a memory or group moves it to the trash,
+  // like its trash button; in the trash it does nothing (deleting stays a
+  // deliberate click). Same in the list and in cards.
+  list.addEventListener('mousedown', (e) => {
+    if (e.button === 1 && e.target.closest('.card')) e.preventDefault(); // no autoscroll
+  });
+  list.addEventListener('auxclick', (e) => {
+    const item = e.target.closest('.card');
+    if (e.button !== 1 || !item || inTrash() || e.target.closest('select')) return;
+    e.preventDefault();
+    if (item.dataset.gid) invoke('trash_group_id', { id: item.dataset.gid }).catch((err) => console.error('trash', err));
+    else act('trash', item.dataset.id);
+  });
 
   emptyTrashBtn.addEventListener('click', async () => {
     if (!confirmFirst(emptyTrashBtn, t('emptyTrashConfirm'))) return;
