@@ -1071,6 +1071,7 @@
     close: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',
     search: '<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>',
     sort: '<path d="M5 3v10M2.75 10.75 5 13l2.25-2.25M11 13V3M8.75 5.25 11 3l2.25 2.25"/>',
+    trash: TRASH_ICON,
   };
 
   function helpText(text) {

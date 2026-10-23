@@ -801,7 +801,7 @@ textarea.field { resize: vertical; min-height: 84px; }
   background: var(--color-fog);
 }
 
-/* Window chrome mock-ups: a titlebar, colour dots, fields, a list row. */
+/* Window chrome mock-ups: a titlebar, colour dots, fields, a card. */
 .help-demo .icon-btn { display: inline-grid; width: 26px; height: 26px; vertical-align: middle; }
 .help-demo .icon-btn svg { width: 15px; height: 15px; }
 .help-demo .pin { opacity: 1; }
@@ -810,8 +810,7 @@ textarea.field { resize: vertical; min-height: 84px; }
 .demo-dots { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .demo-pair { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; }
 .demo-note { color: var(--color-fog); font-size: 12px; }
-.demo-bar,
-.demo-list-row {
+.demo-bar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -831,7 +830,24 @@ textarea.field { resize: vertical; min-height: 84px; }
     color-mix(in srgb, var(--note-color) 6%, transparent)
   );
 }
-.demo-list-row { padding: 0 6px; }
+/* A memory's card in the Manager (Memories tab, trash). */
+.demo-card {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 200px;
+  max-width: 100%;
+  padding: 8px 8px 6px 10px;
+  border-radius: 10px;
+  background: var(--color-obsidian);
+  box-shadow: var(--hairline);
+  vertical-align: middle;
+}
+.demo-card-head,
+.demo-card-foot { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.demo-card-text { font-size: 12px; line-height: 1.45; color: var(--color-fog); }
+.demo-card-foot { gap: 4px; }
+.demo-card-foot .demo-meta { margin: 0 auto 0 0; }
 .demo-name {
   min-width: 0;
   overflow: hidden;

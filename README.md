@@ -75,8 +75,8 @@ can tell at a glance where each one belongs.
   </picture>
 </p>
 
-The **Memo Manager** lists every memory, open or closed. Search them, reopen one with a click, move it to a group or
-sort the list. Sent something to the trash by mistake? Restore it: the trash keeps memories for 30 days.
+The **Memo Manager** shows every memory as a card, open or closed. Search them, reopen one with a click, move it to a
+group or sort them. Sent something to the trash by mistake? Restore it: the trash keeps memories for 30 days.
 
 Every bar stays clean, with just the buttons you use most. Everything else is one click away: the **…** button, or a
 right click anywhere on the bar of a memory, a group or the Manager, opens a menu with that window's commands and
