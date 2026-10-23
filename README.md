@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/DanielAkio/memo/releases/latest"><b>Download</b></a> ·
   <a href="https://danielakio.github.io/memo/">Website</a> ·
-  <a href="https://danielakio.github.io/memo/pt/">Em português</a>
+  <a href="https://danielakio.github.io/memo/?lang=pt">Em português</a>
 </p>
 
 <p align="center">
