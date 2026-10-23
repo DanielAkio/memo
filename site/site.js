@@ -10,10 +10,12 @@
   var os = /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
     : /Android|iPhone|iPad/.test(ua) ? '' : /Linux/.test(ua) ? 'Linux' : '';
   if (!os) return;
-  var pt = document.documentElement.lang.indexOf('pt') === 0;
-  var label = (pt ? 'Baixar para ' : 'Download for ') + os;
+  // A bilingual page has a button per language: each takes its own lang.
   var buttons = document.querySelectorAll('[data-download]');
-  buttons.forEach(function (a) { a.textContent = label; });
+  buttons.forEach(function (a) {
+    var pt = (a.closest('[lang]') || document.documentElement).lang.indexOf('pt') === 0;
+    a.textContent = (pt ? 'Baixar para ' : 'Download for ') + os;
+  });
 
   // Unsigned installers make browsers and SmartScreen warn about the
   // download, and macOS blocks the app on first launch (it isn't
