@@ -130,6 +130,7 @@
   }
 
   function render() {
+    swapQuery();
     renderSort();
     const active = sortNotes(notes.filter((n) => !n.trashedAt), 'updatedAt');
     const trashed = sortNotes(notes.filter((n) => n.trashedAt), 'trashedAt');
@@ -155,16 +156,23 @@
     emptyTrashBtn.disabled = (view === 'groups' ? trashedGroups : trashed).length === 0;
     document.body.classList.toggle('notes-view', listView && !inTrash());
 
-    // Settings and Help tabs: no list and no search.
+    // Settings and Help tabs: no list, no scope and no sort, but sections.
     const panel = view === 'settings' || view === 'help';
     $('settingsView').hidden = view !== 'settings';
     $('helpView').hidden = view !== 'help';
     $('listWrap').hidden = panel;
-    $('searchBox').hidden = panel;
+    $('scopeSwitch').hidden = panel;
+    $('sortSelect').closest('.sort').hidden = panel;
+    const placeholder = { settings: 'searchSettings', help: 'searchHelp' }[view] || 'search';
+    search.placeholder = t(placeholder);
+    search.setAttribute('aria-label', t(panel ? placeholder : 'searchNotes'));
+    // The tray's update items show the answer in Settings: open its section.
+    const toUpdate = view === 'settings' && scrollToUpdate;
+    if (toUpdate) showSection('application');
+    renderSections();
     renderDefaultColor();
     if (view === 'settings') fitSettings();
-    // The tray's update items show the answer in Settings: bring it in view.
-    if (view === 'settings' && scrollToUpdate) {
+    if (toUpdate) {
       scrollToUpdate = false;
       $('updateStatus').closest('.setting').scrollIntoView({ block: 'center' });
     }
@@ -576,6 +584,84 @@
   }
   new ResizeObserver(fitSettings).observe(settingsView);
 
+  // ------------------------------------------- sections (Settings, Help)
+  // Both tabs are split in sections (.sec, each starting with its
+  // .settings-title), opened and closed by a click on the title; the first
+  // one starts open. A search shows every setting or Help topic that
+  // matches, from all of them, with their sections open.
+
+  const panels = { settings: settingsView, help: $('helpView') };
+  // The open sections of each tab, by data-sec (kept when Sync comes and goes).
+  const openSecs = { settings: new Set(['appearance']), help: new Set(['0']) };
+  // Memories and Groups share one search; Settings and Help keep their own.
+  const queries = { list: '', settings: '', help: '' };
+  let queryKey = 'list';
+
+  function swapQuery() {
+    const key = panels[view] ? view : 'list';
+    if (key === queryKey) return;
+    queries[queryKey] = search.value;
+    queryKey = key;
+    search.value = queries[key];
+  }
+
+  // The sections a tab offers now (Sync only in builds that have it).
+  const sectionsOf = (panel) => [...panel.querySelectorAll('.sec')].filter((sec) => !sec.hidden);
+  const secTitle = (sec) => sec.querySelector('.sec-toggle').textContent.trim();
+
+  // The title's text (its first span) goes in a button that opens and closes
+  // the section; a click anywhere on the title row but its "i" does too.
+  function makeToggle(sec, tab) {
+    const title = sec.querySelector('.settings-title');
+    const button = el('button', 'sec-toggle');
+    button.type = 'button';
+    button.append(title.firstElementChild);
+    title.prepend(button);
+    title.addEventListener('click', (e) => {
+      if (e.target.closest('.info') || search.value.trim()) return;
+      const open = openSecs[tab];
+      if (!open.delete(sec.dataset.sec)) open.add(sec.dataset.sec);
+      renderSections();
+      if (tab === 'settings') fitSettings();
+    });
+  }
+  for (const sec of settingsView.querySelectorAll('.sec')) makeToggle(sec, 'settings');
+
+  function showSection(name) {
+    search.value = '';
+    openSecs.settings.add(name);
+  }
+
+  function renderSections() {
+    const panel = panels[view];
+    if (!panel) return;
+    const q = fold(search.value.trim());
+    // The Help intro and welcome button only above the sections, not results.
+    $('helpView').querySelector('.help-top').hidden = Boolean(q);
+    let found = 0;
+    for (const sec of sectionsOf(panel)) {
+      // A section whose title matches shows whole; otherwise only the
+      // settings (or Help topics, with their text) that match.
+      const whole = !q || fold(secTitle(sec)).includes(q);
+      let hits = 0;
+      for (const unit of sec.querySelectorAll('.setting, dt')) {
+        const hit = whole || fold(unit.dataset.find || unit.textContent).includes(q);
+        unit.classList.toggle('is-off', !hit);
+        if (unit.tagName === 'DT') unit.nextElementSibling.classList.toggle('is-off', !hit);
+        if (hit && !unit.hidden) hits++;
+      }
+      const shown = !q || hits > 0;
+      const open = q ? shown : openSecs[view].has(sec.dataset.sec);
+      sec.classList.toggle('is-off', !shown);
+      sec.classList.toggle('is-open', open);
+      sec.querySelector('.sec-toggle').setAttribute('aria-expanded', String(open));
+      if (shown) found++;
+    }
+    const empty = panel.querySelector('.sec-empty');
+    empty.hidden = found > 0;
+    if (!found) empty.textContent = t('nothingFound', { q: search.value.trim() });
+  }
+
   // Tabs or select: show the tabs, and fall back to the select only if a tab
   // can't fit its label. Re-measured on resize (window, zoom), language and
   // count changes.
@@ -682,7 +768,6 @@
     if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); return; }
     if (mod && key === 'f') {
       e.preventDefault();
-      if (view === 'settings' || view === 'help') { view = 'notes'; render(); }
       search.focus();
       search.select();
     } else if (e.key === 'Escape' && document.activeElement === search && search.value) {
@@ -907,6 +992,7 @@
 
   function renderCloud() {
     document.querySelectorAll('[data-cloud]').forEach((el) => { el.hidden = !cloud.available; });
+    if (panels[view]) renderSections(); // the Sync section comes and goes with it
     const reauth = (cloud.status || {}).error === 'reauth';
     $('cloudConnectBtn').hidden = (!!cloud.email && !reauth) || cloud.waiting;
     $('cloudCancelBtn').hidden = !cloud.waiting;
@@ -1011,17 +1097,26 @@
   }
 
   function renderHelp() {
-    const groups = I18n.help().map(({ title, items }) => {
+    const groups = I18n.help().map(({ title, items }, i) => {
       const list = el('dl', 'help-list');
       for (const [topic, how, demo] of items) {
+        const dt = el('dt', '', topic);
+        // What the search looks at: the topic and its text, not the demo.
+        dt.dataset.find = fold(`${topic} ${how.replace(/[{}]/g, '')}`);
         const dd = el('dd');
         dd.append(helpText(how));
         if (demo) dd.append(demoBox(demo));
-        list.append(el('dt', '', topic), dd);
+        list.append(dt, dd);
       }
-      return [el('h2', 'settings-title', title), list];
+      const sec = el('div', 'sec');
+      sec.dataset.sec = String(i);
+      const heading = el('h2', 'settings-title');
+      heading.append(el('span', '', title));
+      sec.append(heading, list);
+      makeToggle(sec, 'help');
+      return sec;
     });
-    $('helpGroups').replaceChildren(...groups.flat());
+    $('helpGroups').replaceChildren(...groups);
   }
 
   // ------------------------------------------------------------ language

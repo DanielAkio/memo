@@ -131,6 +131,8 @@ body {
 /* The search keeps a usable width; the sort button stays on its right. */
 .list-tools .search { flex: 1 1 140px; }
 .scope { flex: none; }
+.list-tools .scope[hidden],
+.list-tools .sort[hidden] { display: none; }
 
 /* Memories and groups closed with ✕ (still current): dimmed until reopened. */
 .row.is-closed .row-main,
@@ -410,13 +412,44 @@ body {
   text-transform: uppercase;
   color: var(--color-ash);
 }
-/* Dividers only between groups: a hairline above every section title but
-   the first, none between the settings of a group. */
-.settings > .settings-title:not(:first-child) {
-  margin-top: 16px;
-  padding-top: 20px;
+/* Sections that open and close (manager.js sets .is-open, and .is-off on
+   sections and on settings or Help topics a search leaves out). Each title
+   is a row with a chevron; a hairline between rows. */
+.sec.is-off,
+.setting.is-off,
+.help-list .is-off { display: none; }
+.sec > .settings-title { margin: 0; padding: 14px 0; }
+.sec:not(.is-off):not([hidden]) ~ .sec:not(.is-off):not([hidden]) > .settings-title {
   border-top: 1px solid var(--color-graphite);
 }
+.sec:not(.is-open) > :not(.settings-title) { display: none; }
+.sec.is-open { padding-bottom: 12px; }
+.sec-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: default;
+}
+.sec-toggle::before { /* chevron: right when closed, down when open */
+  content: "";
+  width: 5px;
+  height: 5px;
+  margin: 0 1px 2px 1px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.12s;
+}
+.sec-toggle[aria-expanded="true"]::before { transform: rotate(45deg); margin-bottom: 4px; }
+.sec-toggle:focus-visible { outline: 1px solid var(--color-smoke); outline-offset: 2px; border-radius: 4px; }
+.sec > .settings-title:hover { color: var(--color-fog); }
 
 .setting {
   position: relative; /* anchors the tooltip of an "i" in its label */
@@ -614,6 +647,7 @@ textarea.field { resize: vertical; min-height: 84px; }
 /* ------------------------------------------------------------ Help tab */
 
 .help { user-select: text; -webkit-user-select: text; }
+.help-top[hidden] { display: none; }
 .help-top { /* the intro line, with the welcome-memory button below it */
   display: flex;
   flex-direction: column;
@@ -625,12 +659,6 @@ textarea.field { resize: vertical; min-height: 84px; }
   margin: 0;
   color: var(--color-fog);
   line-height: 1.5;
-}
-/* Same dividers between groups as the Settings tab. */
-#helpGroups > .settings-title {
-  margin-top: 16px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-graphite);
 }
 .help-list {
   display: grid;
