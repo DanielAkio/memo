@@ -4,17 +4,31 @@
 // installer names carry the version, so they are looked up through the
 // GitHub API; until it answers, or if it fails, the links keep their
 // fallback href (the latest release page). Windows and Mac visitors also
-// get the steps past their system's warning ([data-os]).
+// get the steps past their system's warning ([data-os]). Phones and
+// tablets have no Memo yet: their buttons read "Coming soon" and lead
+// nowhere, while the platform links below still reach the desktop builds.
 (function () {
   var ua = navigator.userAgent;
-  var os = /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
-    : /Android|iPhone|iPad/.test(ua) ? '' : /Linux/.test(ua) ? 'Linux' : '';
-  if (!os) return;
+  // iPadOS reports itself as a Mac; only its touch screen tells it apart.
+  var ipad = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  var mobile = /Android/.test(ua) ? 'Android' : /iPhone|iPad|iPod/.test(ua) || ipad ? 'iOS' : '';
+  var os = mobile ? '' : /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
+    : /Linux/.test(ua) ? 'Linux' : '';
   // A bilingual page has a button per language: each takes its own lang.
   var buttons = document.querySelectorAll('[data-download]');
+  function isPt(a) { return (a.closest('[lang]') || document.documentElement).lang.indexOf('pt') === 0; }
+  if (mobile) {
+    buttons.forEach(function (a) {
+      a.textContent = (isPt(a) ? 'Em breve para ' : 'Coming soon to ') + mobile;
+      a.removeAttribute('href');
+      a.setAttribute('aria-disabled', 'true');
+      a.classList.add('soon');
+    });
+    return;
+  }
+  if (!os) return;
   buttons.forEach(function (a) {
-    var pt = (a.closest('[lang]') || document.documentElement).lang.indexOf('pt') === 0;
-    a.textContent = (pt ? 'Baixar para ' : 'Download for ') + os;
+    a.textContent = (isPt(a) ? 'Baixar para ' : 'Download for ') + os;
   });
 
   // Unsigned installers make browsers and SmartScreen warn about the
