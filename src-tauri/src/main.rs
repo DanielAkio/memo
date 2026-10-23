@@ -26,7 +26,7 @@ use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
+    AppHandle, Emitter, LogicalPosition, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
     Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::{
@@ -156,6 +156,9 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
     match (note.x, note.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
             let _ = window.set_position(PhysicalPosition::new(x, y));
+            // Built on the main monitor: on another one with a different
+            // scale the window would keep the main monitor's pixel size.
+            set_logical_size(&window, note.width, note.height);
         }
         _ => {
             let _ = window.center();
@@ -224,6 +227,8 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     match (state.x, state.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
             let _ = window.set_position(PhysicalPosition::new(x, y));
+            // On another monitor's scale (see `build_note_window`).
+            set_logical_size(&window, state.width, state.height);
         }
         _ => {
             let _ = window.center();
@@ -383,6 +388,30 @@ fn set_theme(app: &AppHandle, theme: &str) {
     refresh_tray(app);
 }
 
+/// Scale factor of the monitor a window is on (the one holding most of it,
+/// as the system decides). `scale_factor()` is what the window was last told,
+/// which can lag behind on Windows with monitors of different scales: a window
+/// placed on another monitor while hidden keeps the scale it was built with.
+fn scale_of(window: &WebviewWindow) -> f64 {
+    window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .map(|m| m.scale_factor())
+        .or_else(|| window.scale_factor().ok())
+        .unwrap_or(1.0)
+}
+
+/// Sets a window's size in logical pixels of the monitor it is on (see
+/// `scale_of`), so it looks the same size on every monitor.
+fn set_logical_size(window: &WebviewWindow, width: f64, height: f64) {
+    let scale = scale_of(window);
+    let _ = window.set_size(PhysicalSize::new(
+        (width * scale).round() as u32,
+        (height * scale).round() as u32,
+    ));
+}
+
 /// A saved position is only used if the titlebar is still visible on some
 /// monitor (avoids "lost" notes after a display is disconnected).
 fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
@@ -451,8 +480,7 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 if size.width == 0 || size.height == 0 {
                     return;
                 }
-                let scale = win.scale_factor().unwrap_or(1.0);
-                let logical = size.to_logical::<f64>(scale);
+                let logical = size.to_logical::<f64>(scale_of(&win));
                 match &kind {
                     Kind::Note(id) => {
                         store.update(id, |n| {
@@ -1043,7 +1071,7 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
     // the cursor at the same relative spot of the titlebar.
     let restore = drags.restore.lock().unwrap().remove(window.label());
     if let (Some((w, h)), Ok(before)) = (restore, window.outer_size()) {
-        let _ = window.set_size(LogicalSize::new(w, h));
+        set_logical_size(window, w, h);
         if let Ok(after) = window.outer_size() {
             drag.grab.0 *= after.width as f64 / before.width.max(1) as f64;
         }
@@ -1141,14 +1169,10 @@ fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
     let Some(zone) = drag.zone else {
         return;
     };
-    let (Some((dx, dy)), Ok(size), Ok(scale)) = (
-        frame_offset(&window),
-        window.inner_size(),
-        window.scale_factor(),
-    ) else {
+    let (Some((dx, dy)), Ok(size)) = (frame_offset(&window), window.inner_size()) else {
         return;
     };
-    let logical = size.to_logical::<f64>(scale);
+    let logical = size.to_logical::<f64>(scale_of(&window));
     drags
         .restore
         .lock()
@@ -1749,7 +1773,7 @@ fn change_zoom(app: AppHandle, step: i32) -> f64 {
         let _ = window.set_zoom(zoom);
         if is_group(window) {
             if let Some(group) = store.group(&group_id_of(window)) {
-                let _ = window.set_size(LogicalSize::new(group.width, TITLEBAR_H * zoom));
+                set_logical_size(window, group.width, TITLEBAR_H * zoom);
             }
         }
     }
@@ -1912,6 +1936,9 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
     match (group.x, group.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
             let _ = window.set_position(PhysicalPosition::new(x, y));
+            // On another monitor's scale (see `build_note_window`).
+            let zoom = app.state::<Shared>().zoom();
+            set_logical_size(&window, group.width, TITLEBAR_H * zoom);
         }
         _ => {
             let _ = window.center();
@@ -2177,14 +2204,11 @@ fn set_group_color(app: AppHandle, window: WebviewWindow, color: String) -> Resu
 #[tauri::command]
 fn set_group_height(window: WebviewWindow, height: f64) -> Result<(), String> {
     let zoom = window.state::<Shared>().zoom();
-    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let scale = scale_of(&window);
     let size = window.inner_size().map_err(|e| e.to_string())?;
-    let width = size.to_logical::<f64>(scale).width;
+    let height = ((height * zoom).max(TITLEBAR_H * zoom) * scale).round() as u32;
     window
-        .set_size(LogicalSize::new(
-            width,
-            (height * zoom).max(TITLEBAR_H * zoom),
-        ))
+        .set_size(PhysicalSize::new(size.width, height))
         .map_err(|e| e.to_string())
 }
 
