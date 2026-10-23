@@ -71,11 +71,12 @@
     return plain(note.text).split('\n').map((s) => s.trim()).filter(Boolean);
   }
 
-  // Title: the note's name, else its first line; the preview is the rest of the text.
+  // Title: the note's name, else its first line; the preview is the rest of
+  // the text, one line per line (the card shows the first few).
   function titleAndPreview(note) {
     const ls = lines(note);
-    if (note.title) return { title: note.title, preview: ls.join(' · '), named: true };
-    return { title: ls[0] || t('emptyNote'), preview: ls.slice(1).join(' · '), named: Boolean(ls[0]) };
+    if (note.title) return { title: note.title, preview: ls.join('\n'), named: true };
+    return { title: ls[0] || t('emptyNote'), preview: ls.slice(1).join('\n'), named: Boolean(ls[0]) };
   }
 
   function el(tag, cls, text) {
@@ -182,7 +183,7 @@
     if (view === 'groups') {
       const source = inTrash() ? trashedGroups : groups;
       const shownGroups = sortGroups(source.filter((g) => !q || fold(g.name || t('untitled')).includes(q)));
-      list.replaceChildren(...shownGroups.map((g) => (inTrash() ? groupTrashRow(g, trashed) : groupRow(g, active))));
+      list.replaceChildren(...shownGroups.map((g) => (inTrash() ? groupTrashCard(g, trashed) : groupCard(g, active))));
       empty.hidden = shownGroups.length > 0;
       if (q) empty.textContent = t('nothingFound', { q: search.value.trim() });
       else empty.textContent = t(inTrash() ? 'trashIsEmpty' : 'noGroups');
@@ -194,24 +195,34 @@
       ? source.filter((n) => fold(`${n.title}\n${plain(n.text)}\n${groupName(n)}`).includes(q))
       : source;
 
-    list.replaceChildren(...shown.map(inTrash() ? trashRow : noteRow));
+    list.replaceChildren(...shown.map(inTrash() ? noteTrashCard : noteCard));
     empty.hidden = shown.length > 0;
     if (q) empty.textContent = t('nothingFound', { q: search.value.trim() });
     else empty.textContent = t(inTrash() ? 'trashIsEmpty' : 'noNotes');
   }
 
-  function baseRow(note) {
-    const row = el('li', 'row');
-    row.dataset.id = note.id;
-    const dot = el('span', 'row-dot');
+  // A card: a head (colour dot or folder, title), the preview, and a foot with
+  // the date (or days left in the trash) and the actions, always visible.
+  function card(mark, title, named, preview, meta, actions) {
+    const item = el('li', 'card');
+    const head = el('div', 'card-head');
+    head.append(mark, el('div', `card-title${named ? '' : ' is-empty'}`, title));
+    item.append(head);
+    if (preview) item.append(el('div', 'card-preview', preview));
+    const foot = el('div', 'card-foot');
+    foot.append(el('span', 'card-meta', meta), actions);
+    item.append(foot);
+    return item;
+  }
+
+  function noteBase(note, meta, actions) {
+    const dot = el('span', 'card-dot');
     dot.dataset.color = isCustomColor(note.color) ? 'custom' : note.color || '';
     if (isCustomColor(note.color)) dot.style.setProperty('--note-color', note.color);
     const { title, preview, named } = titleAndPreview(note);
-    const main = el('div', 'row-main');
-    main.append(el('div', `row-title${named ? '' : ' is-empty'}`, title));
-    if (preview) main.append(el('div', 'row-preview', preview));
-    row.append(dot, main);
-    return row;
+    const item = card(dot, title, named, preview, meta, actions);
+    item.dataset.id = note.id;
+    return item;
   }
 
   const groupName = (note) => ([...groups, ...trashedGroups].find((g) => g.id === note.groupId) || {}).name || '';
@@ -219,7 +230,7 @@
   // Group of a memory, changed right in the list: no group, a group or a new
   // one. Rust moves it (move_note_to_group) and emits "groups-changed".
   function groupSelect(note) {
-    const select = el('select', 'row-group');
+    const select = el('select', 'card-group');
     select.title = t('moveToGroup');
     select.setAttribute('aria-label', t('moveToGroup'));
     const sorted = groups.slice()
@@ -238,7 +249,7 @@
   }
 
   // -------------------------------------------------------- groups tab
-  // Groups listed like memories: same search, same sort box, a row per group
+  // Groups shown like memories: same search, same sort box, a card per group
   // (folder in its colour, name, how many memories, out or put away), click
   // to bring its bar to the front, and its actions always visible.
 
@@ -253,16 +264,16 @@
     return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }
 
-  function groupRow(group, active) {
+  function groupBase(group, preview, meta, actions) {
+    const item = card(groupFolder(group), group.name || t('untitled'), Boolean(group.name), preview, meta, actions);
+    item.classList.add('group-card');
+    item.dataset.gid = group.id;
+    return item;
+  }
+
+  function groupCard(group, active) {
     const count = active.filter((n) => n.groupId === group.id).length;
-    const row = el('li', `row group-row${group.hidden ? ' is-closed' : ''}`);
-    row.dataset.gid = group.id;
-    row.title = t('showGroup');
-    row.tabIndex = 0;
-    const main = el('div', 'row-main');
-    main.append(el('div', `row-title${group.name ? '' : ' is-empty'}`, group.name || t('untitled')));
     const state = t(group.hidden ? 'stateClosed' : group.open ? 'groupStateOut' : 'groupStateIn');
-    main.append(el('div', 'row-preview', `${t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count })} · ${state}`));
     const toggle = el('button', `icon-btn out-in${group.open ? ' is-open' : ''}`);
     toggle.type = 'button';
     toggle.dataset.gact = 'toggle';
@@ -276,29 +287,28 @@
     del.title = t('groupToTrash');
     del.setAttribute('aria-label', t('groupToTrash'));
     del.append(icon(TRASH_ICON));
-    const actions = el('div', 'row-actions');
+    const actions = el('div', 'card-actions');
     actions.append(toggle, del);
-    row.append(groupFolder(group), main, actions);
-    return row;
+    const item = groupBase(group, state,
+      t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count }), actions);
+    item.classList.toggle('is-closed', Boolean(group.hidden));
+    item.title = t('showGroup');
+    item.tabIndex = 0;
+    return item;
   }
 
   function groupFolder(group) {
     const folder = icon(FOLDER_ICON);
-    folder.classList.add('row-folder', 'group-row-folder');
+    folder.classList.add('card-folder', 'group-card-folder');
     folder.dataset.color = isCustomColor(group.color) ? 'custom' : group.color || '';
     if (isCustomColor(group.color)) folder.style.setProperty('--note-color', group.color);
     return folder;
   }
 
-  // A group in the trash, as a trashed memory's row: the memories that went
+  // A group in the trash, as a trashed memory's card: the memories that went
   // with it (they come back when it is restored), days left, restore / delete.
-  function groupTrashRow(group, trashed) {
+  function groupTrashCard(group, trashed) {
     const count = trashed.filter((n) => n.groupId === group.id && n.trashedAt >= group.trashedAt).length;
-    const row = el('li', 'row group-row');
-    row.dataset.gid = group.id;
-    const main = el('div', 'row-main');
-    main.append(el('div', `row-title${group.name ? '' : ' is-empty'}`, group.name || t('untitled')));
-    main.append(el('div', 'row-preview', t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count })));
     const restore = el('button', 'btn', t('restore'));
     restore.type = 'button';
     restore.dataset.gact = 'restore';
@@ -306,10 +316,10 @@
     del.type = 'button';
     del.dataset.gact = 'forever';
     del.title = t('deleteGroupForever');
-    const actions = el('div', 'row-actions');
+    const actions = el('div', 'card-actions');
     actions.append(restore, del);
-    row.append(groupFolder(group), main, el('span', 'row-meta', purgeLabel(group.trashedAt)), actions);
-    return row;
+    return groupBase(group, t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count }),
+      purgeLabel(group.trashedAt), actions);
   }
 
   const OUT_IN_ICON = '<path d="M4.5 9.75 8 6.25l3.5 3.5"/>';
@@ -328,45 +338,42 @@
 
   const showGroup = (id) => invoke('focus_group', { id }).catch((err) => console.error('focus_group', err));
 
-  function noteRow(note) {
-    const row = baseRow(note);
-    // Closed with ✕: dimmed, a click reopens it.
-    row.classList.toggle('is-closed', Boolean(note.hidden));
-    row.title = t('openNote');
-    row.tabIndex = 0;
+  function noteCard(note) {
     const trashBtn = el('button', 'icon-btn');
     trashBtn.type = 'button';
     trashBtn.dataset.act = 'trash';
     trashBtn.title = t('moveToTrash');
     trashBtn.setAttribute('aria-label', t('moveToTrash'));
     trashBtn.append(icon(TRASH_ICON));
-    const actions = el('div', 'row-actions');
+    const actions = el('div', 'card-actions');
     // Always visible: the group select (which shows the group's name),
     // preceded by the group's folder icon in its colour (grey without a
     // group, as in the note's footer), and the trash button.
     const group = groups.find((g) => g.id === note.groupId);
     const folder = icon(FOLDER_ICON);
-    folder.classList.add('row-folder');
+    folder.classList.add('card-folder');
     const color = group ? group.color || '' : '';
     folder.dataset.color = isCustomColor(color) ? 'custom' : color;
     if (isCustomColor(color)) folder.style.setProperty('--note-color', color);
     actions.append(folder, groupSelect(note), trashBtn);
-    row.append(el('span', 'row-meta', editedLabel(note.updatedAt)), actions);
-    return row;
+    const item = noteBase(note, editedLabel(note.updatedAt), actions);
+    // Closed with ✕: dimmed, a click reopens it.
+    item.classList.toggle('is-closed', Boolean(note.hidden));
+    item.title = t('openNote');
+    item.tabIndex = 0;
+    return item;
   }
 
-  function trashRow(note) {
-    const row = baseRow(note);
+  function noteTrashCard(note) {
     const restore = el('button', 'btn', t('restore'));
     restore.type = 'button';
     restore.dataset.act = 'restore';
     const del = el('button', 'btn danger', t('delete'));
     del.type = 'button';
     del.dataset.act = 'delete';
-    const actions = el('div', 'row-actions');
+    const actions = el('div', 'card-actions');
     actions.append(restore, del);
-    row.append(el('span', 'row-meta', purgeLabel(note.trashedAt)), actions);
-    return row;
+    return noteBase(note, purgeLabel(note.trashedAt), actions);
   }
 
   // ---------------------------------------------------- default colour
@@ -703,23 +710,23 @@
   renderSort();
 
   list.addEventListener('click', (e) => {
-    const row = e.target.closest('.row');
-    if (row && row.dataset.gid) {
+    const item = e.target.closest('.card');
+    if (item && item.dataset.gid) {
       const btn = e.target.closest('[data-gact]');
-      if (btn) groupAct(btn, row.dataset.gid);
-      else if (!inTrash()) showGroup(row.dataset.gid);
+      if (btn) groupAct(btn, item.dataset.gid);
+      else if (!inTrash()) showGroup(item.dataset.gid);
       return;
     }
-    if (!row || e.target.closest('select')) return;
+    if (!item || e.target.closest('select')) return;
     const btn = e.target.closest('[data-act]');
-    if (btn) act(btn.dataset.act, row.dataset.id);
-    else if (!inTrash()) act('open', row.dataset.id);
+    if (btn) act(btn.dataset.act, item.dataset.id);
+    else if (!inTrash()) act('open', item.dataset.id);
   });
   list.addEventListener('keydown', (e) => {
-    const row = e.target.closest('.row');
-    if (!row || e.target !== row || e.key !== 'Enter' || inTrash()) return;
-    if (view === 'groups') showGroup(row.dataset.gid);
-    else act('open', row.dataset.id);
+    const item = e.target.closest('.card');
+    if (!item || e.target !== item || e.key !== 'Enter' || inTrash()) return;
+    if (view === 'groups') showGroup(item.dataset.gid);
+    else act('open', item.dataset.id);
   });
 
   emptyTrashBtn.addEventListener('click', async () => {

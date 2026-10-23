@@ -24,7 +24,7 @@ grep -n '^  // -\{5,\}' src/app.js src/manager.js src/group.js
 ```
 
 - **app.js** sections: helpers, render, editor content (`toPlain`, `fromPlain`, `sanitize`, `syncCheckSizes`), save, undo, checklist, code, code highlighting (`renderCode`, `codeLang`, `copyCode`), formatting, format bar, actions, title, colour picker, events (keydown/shortcuts), groups (footer picker), init.
-- **manager.js** sections: helpers, render (notes list, tabs, `fitTabs`), groups tab, default colour, data, default title and text, group defaults (+ `fitSettings`), theme, events, window (like a note), window colour picker, data folder, backup, help (`renderHelp`, `keys`, `demoBox`), language, init, zoom.
+- **manager.js** sections: helpers, render (note cards, tabs, `fitTabs`), groups tab, default colour, data, default title and text, group defaults (+ `fitSettings`), theme, events, window (like a note), window colour picker, data folder, backup, help (`renderHelp`, `keys`, `demoBox`), language, init, zoom.
 - **group.js**: rename, colour, close, window. **chrome.js** (small, read whole if needed): `MemoChrome.attach` (drag, resize handles), `MemoZoom`.
 - **store.rs**: constants at the top (`TITLEBAR_H`, `COLORS`, `DEFAULT_COLOR`, `TRASH_TTL_MS`, `ZOOM_*`, `GROUP_NAME_MAX`, …), then `Note`, `FileData`, `Group`, `ManagerState`, `Store`, `Config`, then `impl Store`.
 - **i18n.js**: `STRINGS` (`pt`, then `en`), `PLACEHOLDERS`, `HELP` (Help guide data), then the `MemoI18n` helpers.

@@ -135,9 +135,8 @@ body {
 .list-tools .sort[hidden] { display: none; }
 
 /* Memories and groups closed with ✕ (still current): dimmed until reopened. */
-.row.is-closed .row-main,
-.row.is-closed .row-dot,
-.row.is-closed .group-row-folder { opacity: 0.5; }
+.card.is-closed .card-head,
+.card.is-closed .card-preview { opacity: 0.5; }
 /* Sort: an icon-only button on the right of the search box, same height;
    the select is stretched over it, invisible, and opens the native list. */
 .sort {
@@ -245,78 +244,96 @@ body {
   border-radius: 9999px;
 }
 
+/* Memories and groups as a grid of cards, as many columns as fit. */
 .list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  align-content: start;
+  gap: 8px;
   margin: 0;
-  padding: 6px 8px;
+  padding: 8px 16px 16px;
   list-style: none;
 }
 
-.row {
+.card {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 8px 8px 10px;
-  border-radius: 8px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 10px 10px 8px 12px;
+  border-radius: 10px;
+  background: var(--color-obsidian);
+  box-shadow: var(--hairline);
   cursor: default;
 }
-.row + .row { margin-top: 2px; }
-.row:hover { background: var(--overlay-hover); }
-.notes-view .row:active { background: var(--overlay-active); }
+.card:hover { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.notes-view .card:active { background: var(--overlay-active); }
 
-.row-dot {
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.card-dot {
   flex: none;
   width: 8px;
   height: 8px;
   border-radius: 9999px;
   background: var(--note-color);
 }
-.row-dot[data-color=""] { box-shadow: inset 0 0 0 1px var(--color-smoke); }
-
-.row-main { flex: 1; min-width: 72px; }
-/* Narrow window (or zoomed in): the title keeps its room — no date, and a
-   smaller group box. */
-@media (max-width: 420px) {
-  .row { flex-wrap: wrap; gap: 6px 8px; }
-  .row-meta { display: none; }
-  .row-group { max-width: 110px; }
-  /* If they still don't fit, the actions go to a second line, on the right. */
-  .row-actions { margin-left: auto; }
-}
-.row-title,
-.row-preview {
+.card-dot[data-color=""] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.card-title {
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-.row-title {
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.010em;
   color: var(--color-mist);
 }
-.row-title.is-empty { color: var(--color-ash); font-weight: 400; }
-.row-preview {
-  margin-top: 2px;
+.card-title.is-empty { color: var(--color-ash); font-weight: 400; }
+/* The text under the title, line by line, as much as fits in four lines. */
+.card-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
   font-size: 12px;
-  color: var(--color-ash);
+  line-height: 1.45;
+  color: var(--color-fog);
 }
-
-.row-meta {
+/* The foot stays at the bottom: date (or days left), then the actions on the
+   right; when they don't fit, the actions go below, still on the right. */
+.card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+.card-meta {
   flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-ash);
   white-space: nowrap;
 }
-
-.row-actions {
-  flex: none;
+.card-actions {
   display: flex;
+  align-items: center;
   gap: 4px;
+  min-width: 0;
+  margin-left: auto;
 }
 /* The group's folder before the group select: in the group's colour, grey
    without a group or colour (like the folder in a note's footer). */
-.row-folder {
+.card-folder {
   flex: none;
   width: 14px;
   height: 14px;
@@ -326,9 +343,10 @@ body {
   stroke-width: 1.3;
   stroke-linejoin: round;
 }
-.row-folder[data-color]:not([data-color=""]) { stroke: var(--note-color); }
-/* Group picker in the row's actions (always shown, like the trash button). */
-.row-group {
+.card-folder[data-color]:not([data-color=""]) { stroke: var(--note-color); }
+/* Group picker in the card's actions (always shown, like the trash button). */
+.card-group {
+  min-width: 0;
   max-width: 120px;
   height: 26px;
   padding: 0 20px 0 8px;
@@ -347,15 +365,14 @@ body {
   color: var(--color-mist);
   font: inherit;
   font-size: 12px;
+  text-overflow: ellipsis;
   cursor: default;
 }
-.row-group:hover, .row-group:focus-visible { box-shadow: inset 0 0 0 1px var(--color-smoke); }
-.row-group option { background: var(--color-obsidian); color: var(--color-mist); }
-
-.row-actions { align-items: center; }
+.card-group:hover, .card-group:focus-visible { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.card-group option { background: var(--color-obsidian); color: var(--color-mist); }
 
 /* Groups tab: the folder takes the place of a memory's colour dot. */
-.group-row-folder { width: 16px; height: 16px; margin: 0 -4px; }
+.group-card-folder { width: 16px; height: 16px; margin: 0 -4px; }
 .out-in svg { transition: transform 160ms ease; }
 .out-in:not(.is-open) svg { transform: rotate(180deg); }
 

@@ -286,7 +286,7 @@ async function manager() {
       ['trip', L('Trip budget', 'Orçamento da viagem'), L('Hotel 1,300\nFlights 900', 'Hotel 1.300\nPassagens 900'), ''],
     ],
   });
-  const row = (id, sel = '') => at('manager', `.row[data-id="${id}"] ${sel}`.trim());
+  const row = (id, sel = '') => at('manager', `.card[data-id="${id}"] ${sel}`.trim());
   rec.x = 760; rec.y = 470;
   await rec.cursor('arrow');
   await rec.hold(1000);
@@ -317,7 +317,7 @@ async function manager() {
   await rec.move(cur.cx, cur.cy, 700);
   await rec.click({ after: 900 });
   // Reopen a closed memory.
-  const r = await row('ideas', '.row-title');
+  const r = await row('ideas', '.card-title');
   await rec.move(r.cx, r.cy, 800);
   await rec.hold(300);
   await rec.click({ after: 400 });
