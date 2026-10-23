@@ -885,7 +885,9 @@ struct Rect {
 }
 
 struct Drag {
-    /// Cursor offset from the window's outer corner, physical pixels.
+    /// Cursor offset from the window's outer corner, in logical pixels: on
+    /// a monitor with another scale the window changes size, and the cursor
+    /// stays on the same spot of the titlebar.
     grab: (f64, f64),
     /// Outer position where the drag started.
     start: (i32, i32),
@@ -1038,7 +1040,11 @@ fn drag_start(window: WebviewWindow, drags: State<'_, Drags>) {
     let (Ok(cursor), Ok(outer)) = (window.cursor_position(), window.outer_position()) else {
         return;
     };
-    let grab = (cursor.x - outer.x as f64, cursor.y - outer.y as f64);
+    let scale = scale_of(&window);
+    let grab = (
+        (cursor.x - outer.x as f64) / scale,
+        (cursor.y - outer.y as f64) / scale,
+    );
     let _ = window.set_always_on_top(true);
     drags.active.lock().unwrap().insert(
         window.label().into(),
@@ -1076,17 +1082,19 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
             drag.grab.0 *= after.width as f64 / before.width.max(1) as f64;
         }
     }
-    // Moving to a monitor with another scale resizes the window: keep the
-    // grab point inside it.
+    // The grab point in this monitor's pixels, kept inside the window.
+    let scale = scale_of(window);
+    let (mut gx, mut gy) = (drag.grab.0 * scale, drag.grab.1 * scale);
     if let Ok(outer) = window.outer_size() {
-        drag.grab.0 = drag.grab.0.min(outer.width as f64 - 1.0);
+        gx = gx.min(outer.width as f64 - 1.0);
+        gy = gy.min(outer.height as f64 - 1.0);
     }
 
     let (Some((dx, dy)), Ok(size)) = (frame_offset(window), window.inner_size()) else {
         return;
     };
-    let x = (cursor.x - drag.grab.0).round() as i32;
-    let y = (cursor.y - drag.grab.1).round() as i32;
+    let x = (cursor.x - gx).round() as i32;
+    let y = (cursor.y - gy).round() as i32;
     // `x`,`y` are the window corner; the magnet works on the visible area.
     let (vx, vy) = snapped(
         window,
