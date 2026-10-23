@@ -20,7 +20,7 @@ use std::{
 
 use store::{
     is_valid_color, now_ms, Config, Group, ManagerState, Note, Store, DEFAULT_H, DEFAULT_TEXT_MAX,
-    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, RANDOM_COLOR, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
+    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, LAYOUTS, RANDOM_COLOR, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
 };
 use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
@@ -260,6 +260,9 @@ struct TrayLabels {
     light: &'static str,
     dark: &'static str,
     language: &'static str,
+    layout: &'static str,
+    cards: &'static str,
+    list: &'static str,
     autostart: &'static str,
     magnet: &'static str,
     ai_control: &'static str,
@@ -284,6 +287,9 @@ fn tray_labels(lang: &str) -> TrayLabels {
             light: "Light",
             dark: "Dark",
             language: "Language",
+            layout: "Manager layout",
+            cards: "Cards",
+            list: "List",
             autostart: "Start with the system",
             magnet: "Window magnet",
             ai_control: "AI control (MCP)",
@@ -306,6 +312,9 @@ fn tray_labels(lang: &str) -> TrayLabels {
             light: "Claro",
             dark: "Escuro",
             language: "Idioma",
+            layout: "Visualização do Gerenciador",
+            cards: "Cards",
+            list: "Lista",
             autostart: "Iniciar com o sistema",
             magnet: "Ímã das janelas",
             ai_control: "Controle por IA (MCP)",
@@ -2130,6 +2139,26 @@ fn set_manager_color(color: String, store: State<'_, Shared>) -> Result<(), Stri
     Ok(())
 }
 
+/// Settings → Appearance → Layout: the Memories and Groups tabs as cards or
+/// as a list (also in the tray menu).
+#[tauri::command]
+fn set_manager_layout(app: AppHandle, layout: String) -> Result<(), String> {
+    if !LAYOUTS.contains(&layout.as_str()) {
+        return Err(format!("unknown layout: {layout}"));
+    }
+    set_layout(&app, &layout);
+    Ok(())
+}
+
+/// Saves the manager's layout; the manager and the tray follow.
+fn set_layout(app: &AppHandle, layout: &str) {
+    let store = app.state::<Shared>();
+    store.update_manager(|m| m.layout = layout.to_string());
+    store.flush();
+    let _ = app.emit("layout-changed", layout);
+    refresh_tray(app);
+}
+
 /// Colour of the calling group (same labels as notes).
 #[tauri::command]
 fn set_group_color(app: AppHandle, window: WebviewWindow, color: String) -> Result<(), String> {
@@ -2904,6 +2933,16 @@ fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKi
             &check("language:en", "English", language == "en")?,
         ],
     )?;
+    let layout = store.manager_layout();
+    let layout_menu = Submenu::with_items(
+        app,
+        l.layout,
+        true,
+        &[
+            &check("layout:cards", l.cards, layout == "cards")?,
+            &check("layout:list", l.list, layout == "list")?,
+        ],
+    )?;
     let autostart = {
         use tauri_plugin_autostart::ManagerExt;
         app.autolaunch().is_enabled()
@@ -2931,6 +2970,7 @@ fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKi
         separator()?,
         theme_menu.kind(),
         language_menu.kind(),
+        layout_menu.kind(),
         autostart_item.kind(),
         check("magnet", l.magnet, store.magnet())?.kind(),
         check("ai-control", l.ai_control, ai_control)?.kind(),
@@ -3158,6 +3198,8 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
                 set_theme(app, theme);
             } else if let Some(language) = id.strip_prefix("language:") {
                 set_language(app, language);
+            } else if let Some(layout) = id.strip_prefix("layout:") {
+                set_layout(app, layout);
             }
         }
     }
@@ -3344,6 +3386,7 @@ fn main() {
             empty_group_trash,
             set_group_color,
             set_manager_color,
+            set_manager_layout,
             set_group_height,
             toggle_group,
             new_note_in_group,

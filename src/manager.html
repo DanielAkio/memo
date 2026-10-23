@@ -127,6 +127,13 @@
             </div>
           </div>
           <div class="setting">
+            <span class="setting-label" id="layoutLabel" data-i18n="layout"></span>
+            <div class="segmented" id="layoutSwitch" role="radiogroup" aria-labelledby="layoutLabel">
+              <button type="button" class="seg" role="radio" data-layout="cards" aria-checked="true" data-i18n="layoutCards"></button>
+              <button type="button" class="seg" role="radio" data-layout="list" aria-checked="false" data-i18n="layoutList"></button>
+            </div>
+          </div>
+          <div class="setting">
             <label class="setting-label" for="languageSelect" data-i18n="language"></label>
             <!-- Language names are always shown in their own language. -->
             <select class="field select" id="languageSelect">

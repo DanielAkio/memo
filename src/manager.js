@@ -42,6 +42,8 @@
   let reloadTimer = null;
   // State of this window itself (pinned), saved by Rust.
   let win = { pinned: false };
+  // Memories and Groups as "cards" or as a "list" (Settings → Appearance).
+  let layout = 'cards';
 
   // ------------------------------------------------------------ helpers
 
@@ -72,11 +74,13 @@
   }
 
   // Title: the note's name, else its first line; the preview is the rest of
-  // the text, one line per line (the card shows the first few).
+  // the text, one line per line (the card shows the first few), or on one
+  // line with " · " between them in the list layout.
   function titleAndPreview(note) {
     const ls = lines(note);
-    if (note.title) return { title: note.title, preview: ls.join('\n'), named: true };
-    return { title: ls[0] || t('emptyNote'), preview: ls.slice(1).join('\n'), named: Boolean(ls[0]) };
+    const sep = layout === 'list' ? ' · ' : '\n';
+    if (note.title) return { title: note.title, preview: ls.join(sep), named: true };
+    return { title: ls[0] || t('emptyNote'), preview: ls.slice(1).join(sep), named: Boolean(ls[0]) };
   }
 
   function el(tag, cls, text) {
@@ -760,6 +764,23 @@
     invoke('quit_app').catch((err) => console.error('quit_app', err));
   });
 
+  // Layout of the Memories and Groups tabs: cards (the default) or a list,
+  // one row per item. Same items either way; `.as-list` restyles the cards.
+  function applyLayout(value, redraw = true) {
+    layout = value === 'list' ? 'list' : 'cards';
+    list.classList.toggle('as-list', layout === 'list');
+    for (const seg of document.querySelectorAll('#layoutSwitch .seg')) {
+      seg.setAttribute('aria-checked', String(seg.dataset.layout === layout));
+    }
+    if (redraw) render();
+  }
+  $('layoutSwitch').addEventListener('click', (e) => {
+    const seg = e.target.closest('.seg');
+    if (!seg || seg.dataset.layout === layout) return;
+    applyLayout(seg.dataset.layout);
+    invoke('set_manager_layout', { layout }).catch((err) => console.error('set_manager_layout', err));
+  });
+
   // Theme: applies to every window; Rust notifies them all with "theme-changed".
   $('themeSwitch').addEventListener('click', (e) => {
     const seg = e.target.closest('.seg');
@@ -1392,6 +1413,9 @@
 
   async function init() {
     win = await invoke('load_manager');
+    applyLayout(win.layout, false);
+    // The tray's layout items.
+    listen('layout-changed', (e) => applyLayout(e.payload));
     setView(await invoke('take_manager_view'));
     listen('manager-view', (e) => {
       setView(e.payload);
