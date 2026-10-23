@@ -542,7 +542,7 @@ window.MemoI18n = (() => {
       {
         title: 'Escrever',
         items: [
-          ['Só com o mouse', 'Tudo o que se digita também tem botão. Com um trecho selecionado, a barrinha traz formatação, checklist, lista, lista numerada e bloco de código para as linhas selecionadas. O botão Aa no rodapé abre a barrinha embaixo do texto: com o cursor parado, cada botão insere um elemento novo e vazio para você escrever dentro (uma caixa, um item, um bloco de código ou um código na linha); com um trecho selecionado, formata o trecho. Ela se recolhe depois de cada botão e com qualquer clique fora dela. E o menu … (ou o clique direito na barra) tem Formatar, com todos os comandos.'],
+          ['Só com o mouse', 'Tudo o que se digita também tem botão. Com um trecho selecionado, a barrinha traz formatação, checklist, lista, lista numerada, bloco de código e tabela para as linhas selecionadas. O botão Aa no rodapé abre a barrinha embaixo do texto: com o cursor parado, cada botão insere um elemento novo e vazio para você escrever dentro (uma caixa, um item, um bloco de código, uma tabela ou um código na linha); com um trecho selecionado, formata o trecho. Ela se recolhe depois de cada botão e com qualquer clique fora dela. E o menu … (ou o clique direito na barra) tem Formatar, com todos os comandos.'],
           ['Formatação', 'Selecione um trecho e use a barrinha que aparece, ou {{Mod+B}}, {{Mod+I}} e {{Mod+U}}. {{←}} e {{→}} param na borda do trecho formatado: ali você continua escrevendo com a formatação, e mais um toque para fora escreve sem ela.',
             '<b>negrito</b>, <i>itálico</i> e <u>sublinhado</u>'],
           ['Marca-texto', '{{Mod+Shift+H}} ou o marcador na barrinha. {{←}} e {{→}} param na borda do trecho marcado antes de entrar ou sair dele.',
@@ -562,6 +562,8 @@ window.MemoI18n = (() => {
             'Rode <code>npm run dev</code> no terminal.'],
           ['Bloco de código', 'Digite {{```}} (ou {{```sql}}) e {{Enter}}; com linhas selecionadas, o botão do bloco na barrinha (ou no Aa) as transforma num bloco. Passe o mouse sobre o bloco: à esquerda escolhe a linguagem, à direita copia o código. {{Enter}} numa linha vazia no fim sai do bloco; {{←}} no início (ou {{→}} no fim da linha de cima) põe o cursor antes dele, e ali {{Enter}} ou o que você digitar vai para uma linha nova acima do bloco.',
             '<pre class="code" data-lang="sql">select titulo\nfrom memorias\nwhere fixada = true; -- só as fixadas</pre>'],
+          ['Tabela', 'Digite {{| a | b |}} e {{Enter}} numa linha, ou use o botão de tabela na barrinha (ou no Aa): com linhas selecionadas, cada uma vira uma linha da tabela. {{Tab}} vai para a próxima célula (na última, cria uma linha nova) e {{Enter}} desce. Passe o mouse sobre a tabela: os botões + nas bordas incluem colunas e linhas, e os do canto de baixo destacam o cabeçalho ou excluem a linha ou a coluna. Tudo isso também está no menu …, em Formatar.',
+            '<table class="head"><tbody><tr><td>Dia</td><td>Tarefa</td></tr><tr><td>Seg</td><td>Revisar o texto</td></tr><tr><td>Ter</td><td>Publicar</td></tr></tbody></table>'],
           ['Colar', 'O texto colado entra sempre sem formatação.'],
           ['Imagens', 'Copie uma imagem ou um print e cole com {{Mod+V}}. Clique na imagem e arraste o canto de baixo para mudar o tamanho; a proporção se mantém.',
             DEMO_IMAGE],
@@ -597,11 +599,14 @@ window.MemoI18n = (() => {
         title: 'Gerenciador do Memo',
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
-          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema e idioma, ligar ou desligar o ímã das janelas, o início com o sistema e o controle por IA, sincronizar agora, procurar atualizações e sair.'],
+          ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema, idioma e a visualização do Gerenciador, ligar ou desligar o ímã das janelas, o início com o sistema e o controle por IA, sincronizar agora, procurar atualizações e sair.'],
           ['Aba Memórias', 'Cada memória é um cartão com a cor, o título e o começo do texto. Clique num cartão para abrir a memória (as fechadas aparecem esmaecidas); no rodapé ficam a data da última edição, a caixa de grupo e o botão de lixeira.',
             '<span class="demo-card"><span class="demo-card-head"><span class="demo-dot" data-color="yellow"></span><span class="demo-name">Compras</span></span>'
             + '<span class="demo-card-text">Café<br>Pão</span><span class="demo-card-foot"><span class="demo-meta">14:32</span><i data-icon="folder"></i><i data-icon="trash"></i></span></span>'],
           ['Aba Grupos', 'Mostra os grupos em cartões, como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele (e as memórias, se estiverem soltas) para a frente; os botões do cartão soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
+          ['Cards ou lista', 'As abas Memórias e Grupos mostram cartões ou uma lista compacta, uma linha por item. Escolha em Configurações → Aparência → Visualização, ou no menu da bandeja.',
+            '<span class="demo-seg"><span>Cards</span><span class="on">Lista</span></span>'],
+          ['Clique do meio', 'Nas abas Memórias e Grupos, o clique do meio (na rodinha do mouse) num item o manda para a lixeira, como o botão de lixeira. Na Lixeira ele não faz nada: excluir de vez continua pedindo o clique no botão.'],
           ['Novo grupo e trazer para a frente', 'O botão de pasta com + na barra do Gerenciador (ou "Novo grupo" no menu … de qualquer barra) cria um grupo vazio ao lado da janela. No menu … do Gerenciador, "Trazer todas as memórias para a frente" as coloca na frente das outras janelas, inclusive as minimizadas.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Gerenciador do Memo</span>'
             + '<i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
@@ -621,7 +626,7 @@ window.MemoI18n = (() => {
       {
         title: 'Configurações',
         items: [
-          ['Aparência', 'Tema (sistema, claro ou escuro) e idioma.',
+          ['Aparência', 'Tema (sistema, claro ou escuro), visualização do Gerenciador (cards ou lista) e idioma.',
             '<span class="demo-seg"><span>Sistema</span><span class="on">Claro</span><span>Escuro</span></span>'],
           ['Tamanho do texto', 'Aumenta ou diminui o texto de todas as janelas do Memo: em Aparência, ou {{Mod++}} / {{Mod+-}}, {{Mod+0}} para voltar a 100%, e {{Mod}} + rolagem do mouse.'],
           ['Padrão', 'Cor, título e texto com que as memórias novas começam (sem cor, a menos que você escolha uma cor ou "Aleatória"); cor e título dos grupos novos (uma cor aleatória para cada, a menos que você escolha uma).'],
@@ -671,7 +676,7 @@ window.MemoI18n = (() => {
       {
         title: 'Writing',
         items: [
-          ['Mouse only', 'Everything you can type also has a button. With text selected, the bar has formatting, checklist, bulleted and numbered lists and code block for the selected lines. The Aa button in the footer opens that bar under the text: with just the caret, each button adds a new, empty element to type in (a box, an item, a code block or inline code); with text selected, it formats it. It folds away after each button and on any click outside it. And the … menu (or a right click on the titlebar) has Format, with every command.'],
+          ['Mouse only', 'Everything you can type also has a button. With text selected, the bar has formatting, checklist, bulleted and numbered lists, code block and table for the selected lines. The Aa button in the footer opens that bar under the text: with just the caret, each button adds a new, empty element to type in (a box, an item, a code block, a table or inline code); with text selected, it formats it. It folds away after each button and on any click outside it. And the … menu (or a right click on the titlebar) has Format, with every command.'],
           ['Formatting', 'Select some text and use the bar that appears, or {{Mod+B}}, {{Mod+I}} and {{Mod+U}}. {{←}} and {{→}} stop at the formatted text’s edge: typing there keeps the formatting, and one more press outwards types without it.',
             '<b>bold</b>, <i>italic</i> and <u>underline</u>'],
           ['Highlight', '{{Mod+Shift+H}} or the marker in the bar. {{←}} and {{→}} stop at the highlight’s edge before going in or out.',
@@ -691,6 +696,8 @@ window.MemoI18n = (() => {
             'Run <code>npm run dev</code> in the terminal.'],
           ['Code block', 'Type {{```}} (or {{```sql}}) and {{Enter}}; with lines selected, the code block button on the bar (or the Aa toolbar) turns them into a block. Hover over the block: pick its language on the left, copy the code on the right. {{Enter}} on an empty last line leaves the block; {{←}} at its start (or {{→}} at the end of the line above) puts the caret before it, where {{Enter}} or whatever you type goes on a new line above the block.',
             '<pre class="code" data-lang="sql">select title\nfrom memories\nwhere pinned = true; -- pinned only</pre>'],
+          ['Table', 'Type {{| a | b |}} and {{Enter}} on a line, or use the table button on the bar (or the Aa toolbar): with lines selected, each one becomes a row. {{Tab}} moves to the next cell (in the last one, it adds a row) and {{Enter}} goes down. Hover over the table: the + buttons on its edges add columns and rows, and the ones on its bottom corner turn the header row on or off or delete the row or column. All of it is also in the … menu, under Format.',
+            '<table class="head"><tbody><tr><td>Day</td><td>Task</td></tr><tr><td>Mon</td><td>Review the text</td></tr><tr><td>Tue</td><td>Publish</td></tr></tbody></table>'],
           ['Paste', 'Pasted text always comes in without formatting.'],
           ['Images', 'Copy an image or a screenshot and paste it with {{Mod+V}}. Click the image and drag its bottom corner to resize it; it keeps its proportions.',
             DEMO_IMAGE],
@@ -726,11 +733,14 @@ window.MemoI18n = (() => {
         title: 'Memo Manager',
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
-          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme and language, turn the window magnet, starting with the system and AI control on or off, sync now, check for updates and quit.'],
+          ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme, language and the Manager’s layout, turn the window magnet, starting with the system and AI control on or off, sync now, check for updates and quit.'],
           ['Memories tab', 'Each memory is a card with its colour, title and the start of its text. Click a card to open the memory (closed ones look dimmed); its footer has the last edit date, the group box and the trash button.',
             '<span class="demo-card"><span class="demo-card-head"><span class="demo-dot" data-color="yellow"></span><span class="demo-name">Groceries</span></span>'
             + '<span class="demo-card-text">Coffee<br>Bread</span><span class="demo-card-foot"><span class="demo-meta">14:32</span><i data-icon="folder"></i><i data-icon="trash"></i></span></span>'],
           ['Groups tab', 'Shows the groups as cards, like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar (and its memories, if they are out) to the front; the card’s buttons take its memories out / put them away and move the group to the trash.'],
+          ['Cards or list', 'The Memories and Groups tabs show cards or a compact list, one row per item. Choose in Settings → Appearance → Layout, or in the tray menu.',
+            '<span class="demo-seg"><span>Cards</span><span class="on">List</span></span>'],
+          ['Middle click', 'In the Memories and Groups tabs, a middle click (the mouse wheel) on an item sends it to the trash, like its trash button. In the Trash it does nothing: deleting for good still takes a click on the button.'],
           ['New group and bring to front', 'The folder-with-+ button in the Manager’s bar (or "New group" in the … menu of any bar) creates an empty group next to the window. In the Manager’s … menu, "Bring all memories to the front" puts them in front of other windows, minimized ones included.',
             '<span class="demo-bar" data-color="yellow"><i data-icon="pin"></i><i data-icon="manager" class="demo-tint"></i><span class="demo-name">Memo Manager</span>'
             + '<i data-icon="folder-plus" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
@@ -750,7 +760,7 @@ window.MemoI18n = (() => {
       {
         title: 'Settings',
         items: [
-          ['Appearance', 'Theme (system, light or dark) and language.',
+          ['Appearance', 'Theme (system, light or dark), the Manager’s layout (cards or list) and language.',
             '<span class="demo-seg"><span>System</span><span class="on">Light</span><span>Dark</span></span>'],
           ['Text size', 'Makes the text of every Memo window larger or smaller: in Appearance, or {{Mod++}} / {{Mod+-}}, {{Mod+0}} back to 100%, and {{Mod}} + mouse wheel.'],
           ['Defaults', 'Color, title and text that new memories start with (no color unless you pick a color or "Random"); color and title of new groups (a random color for each unless you pick one).'],
