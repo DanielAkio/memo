@@ -76,6 +76,7 @@
       case 'rename_group': g.name = a.name.trim(); M.emit('groups-changed'); return g.name;
       case 'set_group_color': g.color = a.color; M.emit('groups-changed'); return null;
       case 'load_manager': return copy(M.manager);
+      case 'set_manager_layout': M.manager.layout = a.layout; M.emit('layout-changed', a.layout); return null;
       case 'take_manager_view': { const v = M.view; M.view = null; return v; }
       case 'get_default_color': return 'iris';
       case 'get_new_note_defaults': return ['', '', ''];

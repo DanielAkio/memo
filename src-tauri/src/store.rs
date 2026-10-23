@@ -416,6 +416,9 @@ pub struct ManagerState {
     pub pinned: bool,
     /// Colour label, as for notes and groups (stripe and icon).
     pub color: String,
+    /// How the Memories and Groups tabs show their items (`LAYOUTS`):
+    /// "cards" (the default; empty reads as cards) or "list".
+    pub layout: String,
 }
 
 impl Default for ManagerState {
@@ -427,9 +430,14 @@ impl Default for ManagerState {
             height: 640.0,
             pinned: false,
             color: DEFAULT_COLOR.to_string(),
+            layout: String::new(),
         }
     }
 }
+
+/// Layouts of the manager's Memories and Groups tabs: a grid of cards or a
+/// list, one row per item.
+pub const LAYOUTS: &[&str] = &["cards", "list"];
 
 /// Accepted languages: follow the OS, Portuguese or English.
 pub const LANGUAGES: [&str; 3] = ["system", "pt-BR", "en"];
@@ -1112,6 +1120,16 @@ impl Store {
 
     pub fn manager(&self) -> ManagerState {
         self.data.lock().unwrap().manager.clone()
+    }
+
+    /// Layout of the manager's Memories and Groups tabs (see `LAYOUTS`).
+    pub fn manager_layout(&self) -> String {
+        let layout = self.data.lock().unwrap().manager.layout.clone();
+        if LAYOUTS.contains(&layout.as_str()) {
+            layout
+        } else {
+            "cards".into()
+        }
     }
 
     /// Applies `f` to the manager window state and returns a copy.

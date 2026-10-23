@@ -371,6 +371,51 @@ body {
 .card-group:hover, .card-group:focus-visible { box-shadow: inset 0 0 0 1px var(--color-smoke); }
 .card-group option { background: var(--color-obsidian); color: var(--color-mist); }
 
+/* List layout (Settings → Appearance): the same cards as rows, one per
+   item: colour dot or folder and title, the text on one line below, and the
+   date and actions on the right. */
+.list.as-list {
+  display: block;
+  padding: 6px 8px;
+}
+.as-list .card {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) auto;
+  grid-template-areas: "head foot" "preview foot";
+  align-items: center;
+  gap: 2px 12px;
+  min-height: 0;
+  padding: 8px 8px 8px 10px;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+}
+.as-list .card + .card { margin-top: 2px; }
+.as-list .card:hover { background: var(--overlay-hover); box-shadow: none; }
+.notes-view .as-list .card:active { background: var(--overlay-active); }
+.as-list .card-head { grid-area: head; gap: 12px; }
+.as-list .card-preview {
+  grid-area: preview;
+  display: block;
+  padding-left: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-ash);
+}
+.as-list .card-foot {
+  grid-area: foot;
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+}
+/* Narrow window (or zoomed in): the title keeps its room — no date, and a
+   smaller group box. */
+@media (max-width: 420px) {
+  .as-list .card-meta { display: none; }
+  .as-list .card-group { max-width: 110px; }
+}
+
 /* Groups tab: the folder takes the place of a memory's colour dot. */
 .group-card-folder { width: 16px; height: 16px; margin: 0 -4px; }
 .out-in svg { transition: transform 160ms ease; }
