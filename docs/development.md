@@ -79,6 +79,11 @@ glyph in black, used as a macOS template image). Change the SVGs first, then reg
 both the site and the README; each one comes in dark and light versions and in both languages
 (`<scene>-<theme>-<lang>.gif`).
 
+`site/prefs.js`, loaded in every page's `<head>`, picks the language and theme: a browser that prefers Portuguese is sent
+to the `pt/` pages (everyone else to the English ones), and the theme follows the system's light/dark setting. The nav's
+language link and theme button override both; the choice is kept in `localStorage` (`memo-lang`, `memo-theme`). A new
+page with a translation goes in its `PAGES` list.
+
 The GIFs are recorded from the app's own pages, so re-record them whenever the windows change:
 
 ```bash
