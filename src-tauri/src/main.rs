@@ -26,7 +26,7 @@ use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
+    AppHandle, Emitter, LogicalPosition, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
     Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::{
@@ -156,6 +156,9 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
     match (note.x, note.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
             let _ = window.set_position(PhysicalPosition::new(x, y));
+            // Built on the main monitor: on another one with a different
+            // scale the window would keep the main monitor's pixel size.
+            set_logical_size(&window, note.width, note.height);
         }
         _ => {
             let _ = window.center();
@@ -224,6 +227,8 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     match (state.x, state.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
             let _ = window.set_position(PhysicalPosition::new(x, y));
+            // On another monitor's scale (see `build_note_window`).
+            set_logical_size(&window, state.width, state.height);
         }
         _ => {
             let _ = window.center();
@@ -383,6 +388,30 @@ fn set_theme(app: &AppHandle, theme: &str) {
     refresh_tray(app);
 }
 
+/// Scale factor of the monitor a window is on (the one holding most of it,
+/// as the system decides). `scale_factor()` is what the window was last told,
+/// which can lag behind on Windows with monitors of different scales: a window
+/// placed on another monitor while hidden keeps the scale it was built with.
+fn scale_of(window: &WebviewWindow) -> f64 {
+    window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .map(|m| m.scale_factor())
+        .or_else(|| window.scale_factor().ok())
+        .unwrap_or(1.0)
+}
+
+/// Sets a window's size in logical pixels of the monitor it is on (see
+/// `scale_of`), so it looks the same size on every monitor.
+fn set_logical_size(window: &WebviewWindow, width: f64, height: f64) {
+    let scale = scale_of(window);
+    let _ = window.set_size(PhysicalSize::new(
+        (width * scale).round() as u32,
+        (height * scale).round() as u32,
+    ));
+}
+
 /// A saved position is only used if the titlebar is still visible on some
 /// monitor (avoids "lost" notes after a display is disconnected).
 fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
@@ -451,8 +480,7 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 if size.width == 0 || size.height == 0 {
                     return;
                 }
-                let scale = win.scale_factor().unwrap_or(1.0);
-                let logical = size.to_logical::<f64>(scale);
+                let logical = size.to_logical::<f64>(scale_of(&win));
                 match &kind {
                     Kind::Note(id) => {
                         store.update(id, |n| {
@@ -857,7 +885,9 @@ struct Rect {
 }
 
 struct Drag {
-    /// Cursor offset from the window's outer corner, physical pixels.
+    /// Cursor offset from the window's outer corner, in logical pixels: on
+    /// a monitor with another scale the window changes size, and the cursor
+    /// stays on the same spot of the titlebar.
     grab: (f64, f64),
     /// Outer position where the drag started.
     start: (i32, i32),
@@ -874,6 +904,15 @@ struct Drags {
     /// Logical size of each snapped window before it was snapped, restored
     /// when it is dragged again (not persisted).
     restore: Mutex<HashMap<String, (f64, f64)>>,
+    /// Resizes in progress, by window label.
+    resizes: Mutex<HashMap<String, Resize>>,
+}
+
+/// Cursor and visible rect when a resize handle was grabbed.
+#[derive(Clone, Copy)]
+struct Resize {
+    cursor: (f64, f64),
+    rect: Rect,
 }
 
 /// Whether the note (or the manager) is pinned, to put back after a drag.
@@ -1010,7 +1049,11 @@ fn drag_start(window: WebviewWindow, drags: State<'_, Drags>) {
     let (Ok(cursor), Ok(outer)) = (window.cursor_position(), window.outer_position()) else {
         return;
     };
-    let grab = (cursor.x - outer.x as f64, cursor.y - outer.y as f64);
+    let scale = scale_of(&window);
+    let grab = (
+        (cursor.x - outer.x as f64) / scale,
+        (cursor.y - outer.y as f64) / scale,
+    );
     let _ = window.set_always_on_top(true);
     drags.active.lock().unwrap().insert(
         window.label().into(),
@@ -1043,22 +1086,24 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
     // the cursor at the same relative spot of the titlebar.
     let restore = drags.restore.lock().unwrap().remove(window.label());
     if let (Some((w, h)), Ok(before)) = (restore, window.outer_size()) {
-        let _ = window.set_size(LogicalSize::new(w, h));
+        set_logical_size(window, w, h);
         if let Ok(after) = window.outer_size() {
             drag.grab.0 *= after.width as f64 / before.width.max(1) as f64;
         }
     }
-    // Moving to a monitor with another scale resizes the window: keep the
-    // grab point inside it.
+    // The grab point in this monitor's pixels, kept inside the window.
+    let scale = scale_of(window);
+    let (mut gx, mut gy) = (drag.grab.0 * scale, drag.grab.1 * scale);
     if let Ok(outer) = window.outer_size() {
-        drag.grab.0 = drag.grab.0.min(outer.width as f64 - 1.0);
+        gx = gx.min(outer.width as f64 - 1.0);
+        gy = gy.min(outer.height as f64 - 1.0);
     }
 
     let (Some((dx, dy)), Ok(size)) = (frame_offset(window), window.inner_size()) else {
         return;
     };
-    let x = (cursor.x - drag.grab.0).round() as i32;
-    let y = (cursor.y - drag.grab.1).round() as i32;
+    let x = (cursor.x - gx).round() as i32;
+    let y = (cursor.y - gy).round() as i32;
     // `x`,`y` are the window corner; the magnet works on the visible area.
     let (vx, vy) = snapped(
         window,
@@ -1141,14 +1186,10 @@ fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
     let Some(zone) = drag.zone else {
         return;
     };
-    let (Some((dx, dy)), Ok(size), Ok(scale)) = (
-        frame_offset(&window),
-        window.inner_size(),
-        window.scale_factor(),
-    ) else {
+    let (Some((dx, dy)), Ok(size)) = (frame_offset(&window), window.inner_size()) else {
         return;
     };
-    let logical = size.to_logical::<f64>(scale);
+    let logical = size.to_logical::<f64>(scale_of(&window));
     drags
         .restore
         .lock()
@@ -1158,27 +1199,71 @@ fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
     let _ = window.set_size(PhysicalSize::new(zone.w as u32, zone.h as u32));
 }
 
-/// Resize driven by the page (handles on the edges and corners): the moving
-/// edges (`edges`: "n", "s", "e", "w" or combinations) of the requested
-/// visible area (physical `x`,`y`,`w`,`h`) are pulled by the same snapping as
-/// dragging. Native resizing is off (`resizable(false)`): the OS wouldn't let
-/// us adjust the size mid-gesture.
+/// Start of a resize by one of the page's handles: records the cursor and the
+/// visible rect. Like dragging, the resize then follows the cursor as Rust
+/// reads it (physical pixels), which stays right across monitors with
+/// different scales, where the page's screen coordinates don't.
 #[tauri::command]
-fn resize_to(
-    window: WebviewWindow,
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
-    edges: String,
-    drags: State<'_, Drags>,
-) {
+fn resize_start(window: WebviewWindow, drags: State<'_, Drags>) {
+    let (Ok(cursor), Ok(p), Ok(s)) = (
+        window.cursor_position(),
+        window.inner_position(),
+        window.inner_size(),
+    ) else {
+        return;
+    };
+    let rect = Rect {
+        x: p.x,
+        y: p.y,
+        w: s.width as i32,
+        h: s.height as i32,
+    };
+    drags.resizes.lock().unwrap().insert(
+        window.label().into(),
+        Resize {
+            cursor: (cursor.x, cursor.y),
+            rect,
+        },
+    );
+}
+
+/// Resize driven by the page (handles on the edges and corners): the moving
+/// edges (`edges`: "n", "s", "e", "w" or combinations) follow the cursor from
+/// `resize_start` and are pulled by the same snapping as dragging. Native
+/// resizing is off (`resizable(false)`): the OS wouldn't let us adjust the
+/// size mid-gesture.
+#[tauri::command]
+fn resize_to(window: WebviewWindow, edges: String, drags: State<'_, Drags>) {
+    let Some(Resize {
+        cursor: start,
+        rect,
+    }) = drags.resizes.lock().unwrap().get(window.label()).copied()
+    else {
+        return;
+    };
+    let Ok(cursor) = window.cursor_position() else {
+        return;
+    };
     // Resized by hand: no longer "snapped", so a later drag keeps this size.
     drags.restore.lock().unwrap().remove(window.label());
     let Some((dx, dy)) = frame_offset(&window) else {
         return;
     };
-    let (mut l, mut t, mut r, mut b) = (x, y, x + w, y + h);
+    let mx = (cursor.x - start.0).round() as i32;
+    let my = (cursor.y - start.1).round() as i32;
+    let (mut l, mut t, mut r, mut b) = (rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+    if edges.contains('w') {
+        l += mx;
+    }
+    if edges.contains('e') {
+        r += mx;
+    }
+    if edges.contains('n') {
+        t += my;
+    }
+    if edges.contains('s') {
+        b += my;
+    }
     let targets = SnapTargets::new(&window, l, t, r, b);
     if edges.contains('w') {
         l = targets.pick(l, &targets.left);
@@ -1749,7 +1834,7 @@ fn change_zoom(app: AppHandle, step: i32) -> f64 {
         let _ = window.set_zoom(zoom);
         if is_group(window) {
             if let Some(group) = store.group(&group_id_of(window)) {
-                let _ = window.set_size(LogicalSize::new(group.width, TITLEBAR_H * zoom));
+                set_logical_size(window, group.width, TITLEBAR_H * zoom);
             }
         }
     }
@@ -1912,6 +1997,9 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
     match (group.x, group.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
             let _ = window.set_position(PhysicalPosition::new(x, y));
+            // On another monitor's scale (see `build_note_window`).
+            let zoom = app.state::<Shared>().zoom();
+            set_logical_size(&window, group.width, TITLEBAR_H * zoom);
         }
         _ => {
             let _ = window.center();
@@ -2177,14 +2265,11 @@ fn set_group_color(app: AppHandle, window: WebviewWindow, color: String) -> Resu
 #[tauri::command]
 fn set_group_height(window: WebviewWindow, height: f64) -> Result<(), String> {
     let zoom = window.state::<Shared>().zoom();
-    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let scale = scale_of(&window);
     let size = window.inner_size().map_err(|e| e.to_string())?;
-    let width = size.to_logical::<f64>(scale).width;
+    let height = ((height * zoom).max(TITLEBAR_H * zoom) * scale).round() as u32;
     window
-        .set_size(LogicalSize::new(
-            width,
-            (height * zoom).max(TITLEBAR_H * zoom),
-        ))
+        .set_size(PhysicalSize::new(size.width, height))
         .map_err(|e| e.to_string())
 }
 
@@ -3314,6 +3399,7 @@ fn main() {
             drag_start,
             drag_to,
             drag_end,
+            resize_start,
             resize_to,
             load_note,
             save_text,
