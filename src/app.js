@@ -1051,7 +1051,9 @@
     const plainKey = !e.shiftKey && !mod && !e.altKey;
     const sel = getSelection();
     const atStart = sel.isCollapsed && textBeforeCaret(pre).toString().replace(ZWSP, '') === '';
-    if (e.key === 'ArrowLeft' && plainKey && atStart && !before) {
+    // Before a block that starts the note there is nowhere further left:
+    // stay there (the browser would put the caret back inside the block).
+    if (e.key === 'ArrowLeft' && plainKey && atStart && (!before || !pre.previousSibling)) {
       e.preventDefault();
       setBeforeMarker(pre);
       return;
@@ -1439,8 +1441,9 @@
     const plainKey = !e.shiftKey && !mod && !e.altKey;
     const before = wasBeforeMarker === block && atStart;
 
-    // ArrowLeft at the start of an item puts the caret before its marker.
-    if (e.key === 'ArrowLeft' && plainKey && atStart && !before) {
+    // ArrowLeft at the start of an item puts the caret before its marker;
+    // there, in an item that starts the note, it stays put.
+    if (e.key === 'ArrowLeft' && plainKey && atStart && (!before || !block.previousSibling)) {
       e.preventDefault();
       setBeforeMarker(block);
       return;
