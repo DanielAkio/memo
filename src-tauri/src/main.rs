@@ -3,6 +3,7 @@
 
 mod clients;
 mod cloud;
+mod desk;
 mod images;
 mod mcp;
 mod store;
@@ -26,7 +27,7 @@ use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, LogicalPosition, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
+    AppHandle, Emitter, LogicalPosition, Manager, PhysicalSize, RunEvent, State,
     Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::{
@@ -155,7 +156,7 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
 
     match (note.x, note.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+            desk::set_position(&window, x, y);
             // Built on the main monitor: on another one with a different
             // scale the window would keep the main monitor's pixel size.
             set_logical_size(&window, note.width, note.height);
@@ -226,7 +227,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
         .build()?;
     match (state.x, state.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+            desk::set_position(&window, x, y);
             // On another monitor's scale (see `build_note_window`).
             set_logical_size(&window, state.width, state.height);
         }
@@ -415,15 +416,11 @@ fn set_logical_size(window: &WebviewWindow, width: f64, height: f64) {
 /// A saved position is only used if the titlebar is still visible on some
 /// monitor (avoids "lost" notes after a display is disconnected).
 fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
-    match window.available_monitors() {
-        Ok(monitors) if !monitors.is_empty() => monitors.iter().any(|m| {
-            let p = m.position();
-            let s = m.size();
-            let (px, py) = (x + 48, y + 12);
-            px >= p.x && px < p.x + s.width as i32 && py >= p.y && py < p.y + s.height as i32
-        }),
-        _ => true,
-    }
+    let screens = desk::screens(window);
+    screens.is_empty()
+        || screens
+            .iter()
+            .any(|m| m.contains(((x + 48) as f64, (y + 12) as f64)))
 }
 
 /// Which saved object a window's geometry belongs to.
@@ -463,7 +460,10 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 {
                     return;
                 }
-                let (x, y) = (Some(pos.x), Some(pos.y));
+                // Saved in desktop units (`desk`), like everything they're
+                // compared with.
+                let (x, y) = desk::point(&win, *pos);
+                let (x, y) = (Some(x), Some(y));
                 match &kind {
                     Kind::Note(id) => {
                         store.update(id, |n| (n.x, n.y) = (x, y));
@@ -560,26 +560,22 @@ struct SnapTargets {
     right: Vec<i32>,
     top: Vec<i32>,
     bottom: Vec<i32>,
-    /// Snap reach, in physical pixels.
+    /// Snap reach, in desktop units (`desk`).
     reach: i32,
+    /// Desktop units per logical pixel.
     scale: f64,
 }
 
 impl SnapTargets {
+    /// Targets for the visible rect `l`,`t`,`r`,`b`, in desktop units.
     fn new(window: &WebviewWindow, l: i32, t: i32, r: i32, b: i32) -> Self {
         let (cx, cy) = ((l + r) / 2, (t + b) / 2);
-        let monitor = window.available_monitors().ok().and_then(|monitors| {
-            monitors.into_iter().find(|m| {
-                let a = m.work_area();
-                cx >= a.position.x
-                    && cx < a.position.x + a.size.width as i32
-                    && cy >= a.position.y
-                    && cy < a.position.y + a.size.height as i32
-            })
-        });
+        let monitor = desk::screens(window)
+            .into_iter()
+            .find(|m| m.work_contains((cx, cy)));
         let scale = match &monitor {
-            Some(m) => m.scale_factor(),
-            None => window.scale_factor().unwrap_or(1.0),
+            Some(m) => m.scale,
+            None => desk::scale(window),
         };
         let reach = (SNAP_DISTANCE * scale).round() as i32;
         let gap = (SNAP_GAP * scale).round() as i32;
@@ -597,11 +593,11 @@ impl SnapTargets {
         }
         // Monitor edges: the same gap (`SNAP_GAP`) left between notes.
         if let Some(m) = &monitor {
-            let a = m.work_area();
-            t_.left.push(a.position.x + gap);
-            t_.right.push(a.position.x + a.size.width as i32 - gap);
-            t_.top.push(a.position.y + gap);
-            t_.bottom.push(a.position.y + a.size.height as i32 - gap);
+            let (ax, ay, aw, ah) = m.work;
+            t_.left.push(ax + gap);
+            t_.right.push(ax + aw - gap);
+            t_.top.push(ay + gap);
+            t_.bottom.push(ay + ah - gap);
         }
         // Other windows pull only when they are really on the user's screen:
         // shown, not minimised, and on the monitor where this window is.
@@ -613,21 +609,19 @@ impl SnapTargets {
             {
                 continue;
             }
-            let (Ok(p), Ok(s)) = (other.inner_position(), other.inner_size()) else {
+            let (Some((ol, ot)), Some((ow, oh))) =
+                (desk::inner_position(&other), desk::inner_size(&other))
+            else {
                 continue;
             };
-            let (ol, ot) = (p.x, p.y);
-            let (or, ob) = (ol + s.width as i32, ot + s.height as i32);
+            let (or, ob) = (ol + ow, ot + oh);
             // Covered by other apps' windows: not on screen either.
             if !shows_on_screen(&other, (ol, ot, or, ob)) {
                 continue;
             }
             if let Some(m) = &monitor {
-                let (mp, ms) = (m.position(), m.size());
-                let on_monitor = ol < mp.x + ms.width as i32
-                    && or > mp.x
-                    && ot < mp.y + ms.height as i32
-                    && ob > mp.y;
+                let (mx, my, mw, mh) = m.area;
+                let on_monitor = ol < mx + mw && or > mx && ot < my + mh && ob > my;
                 if !on_monitor {
                     continue;
                 }
@@ -854,9 +848,9 @@ fn snapped(window: &WebviewWindow, x: i32, y: i32, w: i32, h: i32) -> (i32, i32)
 
 /// Offset between the visible corner and the window corner (invisible border).
 fn frame_offset(window: &WebviewWindow) -> Option<(i32, i32)> {
-    let outer = window.outer_position().ok()?;
-    let inner = window.inner_position().ok()?;
-    Some((inner.x - outer.x, inner.y - outer.y))
+    let outer = desk::outer_position(window)?;
+    let inner = desk::inner_position(window)?;
+    Some((inner.0 - outer.0, inner.1 - outer.1))
 }
 
 // ---------------------------------------------------------------------------
@@ -932,35 +926,31 @@ fn pinned(window: &WebviewWindow) -> bool {
 /// work area, or a quarter in the top/bottom fifth (near a corner); of the
 /// top edge → the whole work area, or a quarter near a corner. Rects keep the
 /// magnet's `SNAP_GAP` from the edges and between halves.
-fn snap_zone(window: &WebviewWindow, cursor: PhysicalPosition<f64>) -> Option<Rect> {
-    let monitors = window.available_monitors().ok()?;
-    let m = monitors.iter().find(|m| {
-        let (p, s) = (m.position(), m.size());
-        cursor.x >= p.x as f64
-            && cursor.x < (p.x + s.width as i32) as f64
-            && cursor.y >= p.y as f64
-            && cursor.y < (p.y + s.height as i32) as f64
-    })?;
-    let scale = m.scale_factor();
+fn snap_zone(window: &WebviewWindow, cursor: (f64, f64)) -> Option<Rect> {
+    let m = desk::screens(window)
+        .into_iter()
+        .find(|m| m.contains(cursor))?;
+    let (cx, cy) = cursor;
+    let scale = m.scale;
     let edge = SNAP_EDGE * scale;
-    let (p, s) = (m.position(), m.size());
-    let (l, t) = (p.x as f64, p.y as f64);
-    let (r, b) = (l + s.width as f64, t + s.height as f64);
-    let at_left = cursor.x <= l + edge;
-    let at_right = cursor.x >= r - 1.0 - edge;
-    let at_top = cursor.y <= t + edge;
+    let (ml, mt, mw, mh) = m.area;
+    let (l, t) = (ml as f64, mt as f64);
+    let (r, b) = (l + mw as f64, t + mh as f64);
+    let at_left = cx <= l + edge;
+    let at_right = cx >= r - 1.0 - edge;
+    let at_top = cy <= t + edge;
     // Corner bands: a fifth of the height on the sides, a tenth of the width
     // along the top.
-    let near_top = cursor.y < t + (b - t) / 5.0;
-    let near_bottom = cursor.y > b - (b - t) / 5.0;
-    let near_left = cursor.x < l + (r - l) / 10.0;
-    let near_right = cursor.x > r - (r - l) / 10.0;
+    let near_top = cy < t + (b - t) / 5.0;
+    let near_bottom = cy > b - (b - t) / 5.0;
+    let near_left = cx < l + (r - l) / 10.0;
+    let near_right = cx > r - (r - l) / 10.0;
 
-    let area = m.work_area();
+    let (ax, ay, aw, ah) = m.work;
     let gap = (SNAP_GAP * scale).round() as i32;
-    let (x0, y0) = (area.position.x + gap, area.position.y + gap);
-    let x1 = area.position.x + area.size.width as i32 - gap;
-    let y1 = area.position.y + area.size.height as i32 - gap;
+    let (x0, y0) = (ax + gap, ay + gap);
+    let x1 = ax + aw - gap;
+    let y1 = ay + ah - gap;
     let (mx, my) = ((x0 + x1) / 2, (y0 + y1) / 2);
     let half = gap / 2;
     let left = (x0, mx - half);
@@ -1024,8 +1014,8 @@ fn show_snap_preview(app: &AppHandle, rect: Option<Rect>) {
     match rect {
         Some(r) => {
             let (dx, dy) = frame_offset(&preview).unwrap_or((0, 0));
-            let _ = preview.set_position(PhysicalPosition::new(r.x - dx, r.y - dy));
-            let _ = preview.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
+            desk::set_position(&preview, r.x - dx, r.y - dy);
+            desk::set_size(&preview, r.w, r.h);
             if !preview.is_visible().unwrap_or(false) {
                 let _ = preview.show();
                 #[cfg(target_os = "linux")]
@@ -1046,20 +1036,20 @@ fn show_snap_preview(app: &AppHandle, rect: Option<Rect>) {
 /// `drag_end`.
 #[tauri::command]
 fn drag_start(window: WebviewWindow, drags: State<'_, Drags>) {
-    let (Ok(cursor), Ok(outer)) = (window.cursor_position(), window.outer_position()) else {
+    let (Some(cursor), Some(outer)) = (desk::cursor(&window), desk::outer_position(&window)) else {
         return;
     };
-    let scale = scale_of(&window);
+    let scale = desk::scale(&window);
     let grab = (
-        (cursor.x - outer.x as f64) / scale,
-        (cursor.y - outer.y as f64) / scale,
+        (cursor.0 - outer.0 as f64) / scale,
+        (cursor.1 - outer.1 as f64) / scale,
     );
     let _ = window.set_always_on_top(true);
     drags.active.lock().unwrap().insert(
         window.label().into(),
         Drag {
             grab,
-            start: (outer.x, outer.y),
+            start: outer,
             zone: None,
             drop: None,
         },
@@ -1074,7 +1064,7 @@ fn drag_to(window: WebviewWindow, drags: State<'_, Drags>) {
 }
 
 fn drag_move(window: &WebviewWindow, drags: &Drags) {
-    let Ok(cursor) = window.cursor_position() else {
+    let Some(cursor) = desk::cursor(window) else {
         return;
     };
     let mut active = drags.active.lock().unwrap();
@@ -1085,34 +1075,28 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
     // A window snapped by an earlier drag gets its previous size back, with
     // the cursor at the same relative spot of the titlebar.
     let restore = drags.restore.lock().unwrap().remove(window.label());
-    if let (Some((w, h)), Ok(before)) = (restore, window.outer_size()) {
+    if let (Some((w, h)), Some(before)) = (restore, desk::outer_size(window)) {
         set_logical_size(window, w, h);
-        if let Ok(after) = window.outer_size() {
-            drag.grab.0 *= after.width as f64 / before.width.max(1) as f64;
+        if let Some(after) = desk::outer_size(window) {
+            drag.grab.0 *= after.0 as f64 / before.0.max(1) as f64;
         }
     }
-    // The grab point in this monitor's pixels, kept inside the window.
-    let scale = scale_of(window);
+    // The grab point in desktop units, kept inside the window.
+    let scale = desk::scale(window);
     let (mut gx, mut gy) = (drag.grab.0 * scale, drag.grab.1 * scale);
-    if let Ok(outer) = window.outer_size() {
-        gx = gx.min(outer.width as f64 - 1.0);
-        gy = gy.min(outer.height as f64 - 1.0);
+    if let Some((ow, oh)) = desk::outer_size(window) {
+        gx = gx.min(ow as f64 - 1.0);
+        gy = gy.min(oh as f64 - 1.0);
     }
 
-    let (Some((dx, dy)), Ok(size)) = (frame_offset(window), window.inner_size()) else {
+    let (Some((dx, dy)), Some((w, h))) = (frame_offset(window), desk::inner_size(window)) else {
         return;
     };
-    let x = (cursor.x - gx).round() as i32;
-    let y = (cursor.y - gy).round() as i32;
+    let x = (cursor.0 - gx).round() as i32;
+    let y = (cursor.1 - gy).round() as i32;
     // `x`,`y` are the window corner; the magnet works on the visible area.
-    let (vx, vy) = snapped(
-        window,
-        x + dx,
-        y + dy,
-        size.width as i32,
-        size.height as i32,
-    );
-    let _ = window.set_position(PhysicalPosition::new(vx - dx, vy - dy));
+    let (vx, vy) = snapped(window, x + dx, y + dy, w, h);
+    desk::set_position(window, vx - dx, vy - dy);
 
     // A note over a group bar can be dropped into it (the bar lights up);
     // group bars themselves don't Snap.
@@ -1139,7 +1123,7 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
 }
 
 /// The group bar under `cursor` (not the note's own group), by id.
-fn group_under(note: &WebviewWindow, cursor: PhysicalPosition<f64>) -> Option<String> {
+fn group_under(note: &WebviewWindow, cursor: (f64, f64)) -> Option<String> {
     let own = note
         .state::<Shared>()
         .get(&id_of(note))
@@ -1152,13 +1136,14 @@ fn group_under(note: &WebviewWindow, cursor: PhysicalPosition<f64>) -> Option<St
             is_group(w) && w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false)
         })
         .find(|w| {
-            let (Ok(p), Ok(s)) = (w.inner_position(), w.inner_size()) else {
+            let (Some((x, y)), Some((bw, bh))) = (desk::inner_position(w), desk::inner_size(w))
+            else {
                 return false;
             };
-            cursor.x >= p.x as f64
-                && cursor.x < (p.x + s.width as i32) as f64
-                && cursor.y >= p.y as f64
-                && cursor.y < (p.y + s.height as i32) as f64
+            cursor.0 >= x as f64
+                && cursor.0 < (x + bw) as f64
+                && cursor.1 >= y as f64
+                && cursor.1 < (y + bh) as f64
         })
         .map(|w| group_id_of(&w))
         .filter(|id| *id != own)
@@ -1195,36 +1180,29 @@ fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
         .lock()
         .unwrap()
         .insert(window.label().into(), (logical.width, logical.height));
-    let _ = window.set_position(PhysicalPosition::new(zone.x - dx, zone.y - dy));
-    let _ = window.set_size(PhysicalSize::new(zone.w as u32, zone.h as u32));
+    desk::set_position(&window, zone.x - dx, zone.y - dy);
+    desk::set_size(&window, zone.w, zone.h);
 }
 
 /// Start of a resize by one of the page's handles: records the cursor and the
 /// visible rect. Like dragging, the resize then follows the cursor as Rust
-/// reads it (physical pixels), which stays right across monitors with
+/// reads it (desktop units, `desk`), which stays right across monitors with
 /// different scales, where the page's screen coordinates don't.
 #[tauri::command]
 fn resize_start(window: WebviewWindow, drags: State<'_, Drags>) {
-    let (Ok(cursor), Ok(p), Ok(s)) = (
-        window.cursor_position(),
-        window.inner_position(),
-        window.inner_size(),
+    let (Some(cursor), Some((x, y)), Some((w, h))) = (
+        desk::cursor(&window),
+        desk::inner_position(&window),
+        desk::inner_size(&window),
     ) else {
         return;
     };
-    let rect = Rect {
-        x: p.x,
-        y: p.y,
-        w: s.width as i32,
-        h: s.height as i32,
-    };
-    drags.resizes.lock().unwrap().insert(
-        window.label().into(),
-        Resize {
-            cursor: (cursor.x, cursor.y),
-            rect,
-        },
-    );
+    let rect = Rect { x, y, w, h };
+    drags
+        .resizes
+        .lock()
+        .unwrap()
+        .insert(window.label().into(), Resize { cursor, rect });
 }
 
 /// Resize driven by the page (handles on the edges and corners): the moving
@@ -1241,7 +1219,7 @@ fn resize_to(window: WebviewWindow, edges: String, drags: State<'_, Drags>) {
     else {
         return;
     };
-    let Ok(cursor) = window.cursor_position() else {
+    let Some(cursor) = desk::cursor(&window) else {
         return;
     };
     // Resized by hand: no longer "snapped", so a later drag keeps this size.
@@ -1249,8 +1227,8 @@ fn resize_to(window: WebviewWindow, edges: String, drags: State<'_, Drags>) {
     let Some((dx, dy)) = frame_offset(&window) else {
         return;
     };
-    let mx = (cursor.x - start.0).round() as i32;
-    let my = (cursor.y - start.1).round() as i32;
+    let mx = (cursor.0 - start.0).round() as i32;
+    let my = (cursor.1 - start.1).round() as i32;
     let (mut l, mut t, mut r, mut b) = (rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
     if edges.contains('w') {
         l += mx;
@@ -1319,9 +1297,9 @@ fn resize_to(window: WebviewWindow, edges: String, drags: State<'_, Drags>) {
     }
 
     if edges.contains('w') || edges.contains('n') {
-        let _ = window.set_position(PhysicalPosition::new(l - dx, t - dy));
+        desk::set_position(&window, l - dx, t - dy);
     }
-    let _ = window.set_size(PhysicalSize::new((r - l) as u32, (b - t) as u32));
+    desk::set_size(&window, r - l, b - t);
 }
 
 fn create_and_open(app: &AppHandle, pos: Option<(i32, i32)>) -> tauri::Result<()> {
@@ -1483,35 +1461,34 @@ async fn new_note(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
 /// gap between notes is a real `SNAP_GAP`, without Windows' invisible border.
 /// The new note has the same borders as its parent.
 fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
-    let outer = parent.outer_position().ok()?;
-    let pos = parent.inner_position().ok()?;
-    let size = parent.inner_size().ok()?;
-    let (dx, dy) = (pos.x - outer.x, pos.y - outer.y);
-    let monitor = parent.current_monitor().ok()??;
-    let scale = monitor.scale_factor();
-    let area = monitor.work_area();
+    let (dx, dy) = frame_offset(parent)?;
+    let (px, py) = desk::inner_position(parent)?;
+    let (pw, _) = desk::inner_size(parent)?;
+    let monitor = desk::current_screen(parent)?;
+    let scale = monitor.scale;
+    let (ax, ay, aw, ah) = monitor.work;
     let gap = (SNAP_GAP * scale).round() as i32;
     // Work area inset by the snap gap: the new note doesn't touch the edge.
-    let (left_edge, top_edge) = (area.position.x + gap, area.position.y + gap);
-    let right_edge = area.position.x + area.size.width as i32 - gap;
-    let bottom_edge = area.position.y + area.size.height as i32 - gap;
+    let (left_edge, top_edge) = (ax + gap, ay + gap);
+    let right_edge = ax + aw - gap;
+    let bottom_edge = ay + ah - gap;
 
     let w = (DEFAULT_W * scale).round() as i32;
     let h = (DEFAULT_H * scale).round() as i32;
-    let parent_right = pos.x + size.width as i32;
+    let parent_right = px + pw;
 
     // Visible corner of the new note.
     let vx = if parent_right + gap + w <= right_edge {
         parent_right + gap
-    } else if pos.x - gap - w >= left_edge {
-        pos.x - gap - w
-    } else if right_edge - parent_right >= pos.x - left_edge {
+    } else if px - gap - w >= left_edge {
+        px - gap - w
+    } else if right_edge - parent_right >= px - left_edge {
         right_edge - w
     } else {
         left_edge
     };
     let vx = vx.max(left_edge);
-    let vy = pos.y.clamp(top_edge, (bottom_edge - h).max(top_edge));
+    let vy = py.clamp(top_edge, (bottom_edge - h).max(top_edge));
 
     // Window corner (with the invisible borders), which is what gets positioned.
     let x = vx - dx;
@@ -1522,17 +1499,17 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     // if a note is already there, step down (titlebar + slack) until a free
     // spot is found, so they all stay visible.
     let step = ((TITLEBAR_H + 8.0) * scale).round() as i32;
-    let taken: Vec<PhysicalPosition<i32>> = parent
+    let taken: Vec<(i32, i32)> = parent
         .app_handle()
         .webview_windows()
         .values()
         .filter(|w| is_app_window(w) && w.is_visible().unwrap_or(false))
-        .filter_map(|w| w.outer_position().ok())
+        .filter_map(desk::outer_position)
         .collect();
     let occupied = |y: i32| {
         taken
             .iter()
-            .any(|p| (p.x - x).abs() < step / 2 && (p.y - y).abs() < step / 2)
+            .any(|&(tx, ty)| (tx - x).abs() < step / 2 && (ty - y).abs() < step / 2)
     };
     while occupied(y) && y + step <= max_y {
         y += step;
@@ -1955,7 +1932,7 @@ fn slide(
             let e = 1.0 - (1.0 - t).powi(3);
             let x = from.0 + ((to.0 - from.0) as f64 * e).round() as i32;
             let y = from.1 + ((to.1 - from.1) as f64 * e).round() as i32;
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+            desk::set_position(&window, x, y);
             thread::sleep(SLIDE_STEP);
         }
         done(&window);
@@ -1996,7 +1973,7 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
         .build()?;
     match (group.x, group.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+            desk::set_position(&window, x, y);
             // On another monitor's scale (see `build_note_window`).
             let zoom = app.state::<Shared>().zoom();
             set_logical_size(&window, group.width, TITLEBAR_H * zoom);
@@ -2016,9 +1993,9 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
 fn group_anchor(app: &AppHandle, id: &str) -> Option<(i32, i32)> {
     if let Some(p) = app
         .get_webview_window(&group_label(id))
-        .and_then(|w| w.outer_position().ok())
+        .and_then(|w| desk::outer_position(&w))
     {
-        return Some((p.x, p.y));
+        return Some(p);
     }
     let group = app.state::<Shared>().group(id)?;
     Some((group.x?, group.y?))
@@ -2050,11 +2027,11 @@ fn take_out(app: &AppHandle, id: &str) {
         // reports (0, 0) as its position on Linux until it is mapped.
         let target = match (note.x, note.y) {
             (Some(x), Some(y)) if is_on_screen(&window, x, y) => Ok((x, y)),
-            _ => window.outer_position().map(|p| (p.x, p.y)),
+            _ => desk::outer_position(&window).ok_or(()),
         };
         match (anchor, target) {
             (Some(from), Ok(to)) => {
-                let _ = window.set_position(PhysicalPosition::new(from.0, from.1));
+                desk::set_position(&window, from.0, from.1);
                 let _ = window.show();
                 let app = app.clone();
                 slide(window, from, to, move |w| {
@@ -2097,8 +2074,8 @@ fn slide_in(app: &AppHandle, window: WebviewWindow, anchor: Option<(i32, i32)>) 
         .lock()
         .unwrap()
         .insert(window.label().into());
-    match (anchor, window.outer_position()) {
-        (Some(to), Ok(from)) => slide(window, (from.x, from.y), to, |w| {
+    match (anchor, desk::outer_position(&window)) {
+        (Some(to), Some(from)) => slide(window, from, to, |w| {
             let _ = w.destroy();
         }),
         _ => {
@@ -2122,8 +2099,8 @@ fn join_group(app: &AppHandle, note_id: &str, group_id: &str, back_to: Option<(i
             let _ = window.destroy();
         } else if !group.open {
             slide_in(app, window, group_anchor(app, group_id));
-        } else if let (Some(to), Ok(from)) = (back_to, window.outer_position()) {
-            slide(window, (from.x, from.y), to, |_| {});
+        } else if let (Some(to), Some(from)) = (back_to, desk::outer_position(&window)) {
+            slide(window, from, to, |_| {});
         }
     }
     groups_changed(app);
