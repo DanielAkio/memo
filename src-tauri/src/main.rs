@@ -27,7 +27,7 @@ use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, LogicalPosition, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
+    AppHandle, Emitter, LogicalPosition, Manager, PhysicalSize, RunEvent, State,
     Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::{
@@ -156,7 +156,7 @@ fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindo
 
     match (note.x, note.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+            desk::set_position(&window, x, y);
             // Built on the main monitor: on another one with a different
             // scale the window would keep the main monitor's pixel size.
             set_logical_size(&window, note.width, note.height);
@@ -227,7 +227,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
         .build()?;
     match (state.x, state.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+            desk::set_position(&window, x, y);
             // On another monitor's scale (see `build_note_window`).
             set_logical_size(&window, state.width, state.height);
         }
@@ -416,15 +416,11 @@ fn set_logical_size(window: &WebviewWindow, width: f64, height: f64) {
 /// A saved position is only used if the titlebar is still visible on some
 /// monitor (avoids "lost" notes after a display is disconnected).
 fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
-    match window.available_monitors() {
-        Ok(monitors) if !monitors.is_empty() => monitors.iter().any(|m| {
-            let p = m.position();
-            let s = m.size();
-            let (px, py) = (x + 48, y + 12);
-            px >= p.x && px < p.x + s.width as i32 && py >= p.y && py < p.y + s.height as i32
-        }),
-        _ => true,
-    }
+    let screens = desk::screens(window);
+    screens.is_empty()
+        || screens
+            .iter()
+            .any(|m| m.contains(((x + 48) as f64, (y + 12) as f64)))
 }
 
 /// Which saved object a window's geometry belongs to.
@@ -464,7 +460,10 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 {
                     return;
                 }
-                let (x, y) = (Some(pos.x), Some(pos.y));
+                // Saved in desktop units (`desk`), like everything they're
+                // compared with.
+                let (x, y) = desk::point(&win, *pos);
+                let (x, y) = (Some(x), Some(y));
                 match &kind {
                     Kind::Note(id) => {
                         store.update(id, |n| (n.x, n.y) = (x, y));
@@ -562,13 +561,13 @@ struct SnapTargets {
     top: Vec<i32>,
     bottom: Vec<i32>,
     /// Snap reach, in desktop units (`desk`).
-    /// Desktop units per logical pixel.
     reach: i32,
+    /// Desktop units per logical pixel.
     scale: f64,
 }
 
-    /// Targets for the visible rect `l`,`t`,`r`,`b`, in desktop units.
 impl SnapTargets {
+    /// Targets for the visible rect `l`,`t`,`r`,`b`, in desktop units.
     fn new(window: &WebviewWindow, l: i32, t: i32, r: i32, b: i32) -> Self {
         let (cx, cy) = ((l + r) / 2, (t + b) / 2);
         let monitor = desk::screens(window)
@@ -1933,7 +1932,7 @@ fn slide(
             let e = 1.0 - (1.0 - t).powi(3);
             let x = from.0 + ((to.0 - from.0) as f64 * e).round() as i32;
             let y = from.1 + ((to.1 - from.1) as f64 * e).round() as i32;
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+            desk::set_position(&window, x, y);
             thread::sleep(SLIDE_STEP);
         }
         done(&window);
@@ -1974,7 +1973,7 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
         .build()?;
     match (group.x, group.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+            desk::set_position(&window, x, y);
             // On another monitor's scale (see `build_note_window`).
             let zoom = app.state::<Shared>().zoom();
             set_logical_size(&window, group.width, TITLEBAR_H * zoom);
@@ -1994,9 +1993,9 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
 fn group_anchor(app: &AppHandle, id: &str) -> Option<(i32, i32)> {
     if let Some(p) = app
         .get_webview_window(&group_label(id))
-        .and_then(|w| w.outer_position().ok())
+        .and_then(|w| desk::outer_position(&w))
     {
-        return Some((p.x, p.y));
+        return Some(p);
     }
     let group = app.state::<Shared>().group(id)?;
     Some((group.x?, group.y?))
@@ -2028,11 +2027,11 @@ fn take_out(app: &AppHandle, id: &str) {
         // reports (0, 0) as its position on Linux until it is mapped.
         let target = match (note.x, note.y) {
             (Some(x), Some(y)) if is_on_screen(&window, x, y) => Ok((x, y)),
-            _ => window.outer_position().map(|p| (p.x, p.y)),
+            _ => desk::outer_position(&window).ok_or(()),
         };
         match (anchor, target) {
             (Some(from), Ok(to)) => {
-                let _ = window.set_position(PhysicalPosition::new(from.0, from.1));
+                desk::set_position(&window, from.0, from.1);
                 let _ = window.show();
                 let app = app.clone();
                 slide(window, from, to, move |w| {
@@ -2075,8 +2074,8 @@ fn slide_in(app: &AppHandle, window: WebviewWindow, anchor: Option<(i32, i32)>) 
         .lock()
         .unwrap()
         .insert(window.label().into());
-    match (anchor, window.outer_position()) {
-        (Some(to), Ok(from)) => slide(window, (from.x, from.y), to, |w| {
+    match (anchor, desk::outer_position(&window)) {
+        (Some(to), Some(from)) => slide(window, from, to, |w| {
             let _ = w.destroy();
         }),
         _ => {
@@ -2100,8 +2099,8 @@ fn join_group(app: &AppHandle, note_id: &str, group_id: &str, back_to: Option<(i
             let _ = window.destroy();
         } else if !group.open {
             slide_in(app, window, group_anchor(app, group_id));
-        } else if let (Some(to), Ok(from)) = (back_to, window.outer_position()) {
-            slide(window, (from.x, from.y), to, |_| {});
+        } else if let (Some(to), Some(from)) = (back_to, desk::outer_position(&window)) {
+            slide(window, from, to, |_| {});
         }
     }
     groups_changed(app);
