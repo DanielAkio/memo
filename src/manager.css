@@ -831,6 +831,30 @@ textarea.field { resize: vertical; min-height: 84px; }
   border: solid var(--color-void);
   border-width: 0 1.5px 1.5px 0;
 }
+/* Tables, as in the editor (styles.css .editor table). */
+.help-demo table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  border-radius: var(--radius-button);
+  box-shadow: var(--hairline);
+}
+.help-demo td {
+  padding: 3px 8px;
+  border-right: 1px solid var(--color-graphite);
+  border-bottom: 1px solid var(--color-graphite);
+  vertical-align: top;
+}
+.help-demo td:last-child { border-right: 0; }
+.help-demo tr:last-child td { border-bottom: 0; }
+.help-demo table.head tr:first-child td {
+  background: var(--overlay-active);
+  color: var(--color-paper);
+  font-weight: 500;
+}
+.help-demo table.head tr:first-child td:first-child { border-top-left-radius: var(--radius-button); }
+.help-demo table.head tr:first-child td:last-child { border-top-right-radius: var(--radius-button); }
 .help-demo .check.done {
   color: var(--color-ash);
   text-decoration: line-through;

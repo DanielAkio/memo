@@ -542,7 +542,7 @@ window.MemoI18n = (() => {
       {
         title: 'Escrever',
         items: [
-          ['Só com o mouse', 'Tudo o que se digita também tem botão. Com um trecho selecionado, a barrinha traz formatação, checklist, lista, lista numerada e bloco de código para as linhas selecionadas. O botão Aa no rodapé abre a barrinha embaixo do texto: com o cursor parado, cada botão insere um elemento novo e vazio para você escrever dentro (uma caixa, um item, um bloco de código ou um código na linha); com um trecho selecionado, formata o trecho. Ela se recolhe depois de cada botão e com qualquer clique fora dela. E o menu … (ou o clique direito na barra) tem Formatar, com todos os comandos.'],
+          ['Só com o mouse', 'Tudo o que se digita também tem botão. Com um trecho selecionado, a barrinha traz formatação, checklist, lista, lista numerada, bloco de código e tabela para as linhas selecionadas. O botão Aa no rodapé abre a barrinha embaixo do texto: com o cursor parado, cada botão insere um elemento novo e vazio para você escrever dentro (uma caixa, um item, um bloco de código, uma tabela ou um código na linha); com um trecho selecionado, formata o trecho. Ela se recolhe depois de cada botão e com qualquer clique fora dela. E o menu … (ou o clique direito na barra) tem Formatar, com todos os comandos.'],
           ['Formatação', 'Selecione um trecho e use a barrinha que aparece, ou {{Mod+B}}, {{Mod+I}} e {{Mod+U}}. {{←}} e {{→}} param na borda do trecho formatado: ali você continua escrevendo com a formatação, e mais um toque para fora escreve sem ela.',
             '<b>negrito</b>, <i>itálico</i> e <u>sublinhado</u>'],
           ['Marca-texto', '{{Mod+Shift+H}} ou o marcador na barrinha. {{←}} e {{→}} param na borda do trecho marcado antes de entrar ou sair dele.',
@@ -562,6 +562,8 @@ window.MemoI18n = (() => {
             'Rode <code>npm run dev</code> no terminal.'],
           ['Bloco de código', 'Digite {{```}} (ou {{```sql}}) e {{Enter}}; com linhas selecionadas, o botão do bloco na barrinha (ou no Aa) as transforma num bloco. Passe o mouse sobre o bloco: à esquerda escolhe a linguagem, à direita copia o código. {{Enter}} numa linha vazia no fim sai do bloco; {{←}} no início (ou {{→}} no fim da linha de cima) põe o cursor antes dele, e ali {{Enter}} ou o que você digitar vai para uma linha nova acima do bloco.',
             '<pre class="code" data-lang="sql">select titulo\nfrom memorias\nwhere fixada = true; -- só as fixadas</pre>'],
+          ['Tabela', 'Digite {{| a | b |}} e {{Enter}} numa linha, ou use o botão de tabela na barrinha (ou no Aa): com linhas selecionadas, cada uma vira uma linha da tabela. {{Tab}} vai para a próxima célula (na última, cria uma linha nova) e {{Enter}} desce. Passe o mouse sobre a tabela: os botões + nas bordas incluem colunas e linhas, e os do canto de baixo destacam o cabeçalho ou excluem a linha ou a coluna. Tudo isso também está no menu …, em Formatar.',
+            '<table class="head"><tbody><tr><td>Dia</td><td>Tarefa</td></tr><tr><td>Seg</td><td>Revisar o texto</td></tr><tr><td>Ter</td><td>Publicar</td></tr></tbody></table>'],
           ['Colar', 'O texto colado entra sempre sem formatação.'],
           ['Imagens', 'Copie uma imagem ou um print e cole com {{Mod+V}}. Clique na imagem e arraste o canto de baixo para mudar o tamanho; a proporção se mantém.',
             DEMO_IMAGE],
@@ -671,7 +673,7 @@ window.MemoI18n = (() => {
       {
         title: 'Writing',
         items: [
-          ['Mouse only', 'Everything you can type also has a button. With text selected, the bar has formatting, checklist, bulleted and numbered lists and code block for the selected lines. The Aa button in the footer opens that bar under the text: with just the caret, each button adds a new, empty element to type in (a box, an item, a code block or inline code); with text selected, it formats it. It folds away after each button and on any click outside it. And the … menu (or a right click on the titlebar) has Format, with every command.'],
+          ['Mouse only', 'Everything you can type also has a button. With text selected, the bar has formatting, checklist, bulleted and numbered lists, code block and table for the selected lines. The Aa button in the footer opens that bar under the text: with just the caret, each button adds a new, empty element to type in (a box, an item, a code block, a table or inline code); with text selected, it formats it. It folds away after each button and on any click outside it. And the … menu (or a right click on the titlebar) has Format, with every command.'],
           ['Formatting', 'Select some text and use the bar that appears, or {{Mod+B}}, {{Mod+I}} and {{Mod+U}}. {{←}} and {{→}} stop at the formatted text’s edge: typing there keeps the formatting, and one more press outwards types without it.',
             '<b>bold</b>, <i>italic</i> and <u>underline</u>'],
           ['Highlight', '{{Mod+Shift+H}} or the marker in the bar. {{←}} and {{→}} stop at the highlight’s edge before going in or out.',
@@ -691,6 +693,8 @@ window.MemoI18n = (() => {
             'Run <code>npm run dev</code> in the terminal.'],
           ['Code block', 'Type {{```}} (or {{```sql}}) and {{Enter}}; with lines selected, the code block button on the bar (or the Aa toolbar) turns them into a block. Hover over the block: pick its language on the left, copy the code on the right. {{Enter}} on an empty last line leaves the block; {{←}} at its start (or {{→}} at the end of the line above) puts the caret before it, where {{Enter}} or whatever you type goes on a new line above the block.',
             '<pre class="code" data-lang="sql">select title\nfrom memories\nwhere pinned = true; -- pinned only</pre>'],
+          ['Table', 'Type {{| a | b |}} and {{Enter}} on a line, or use the table button on the bar (or the Aa toolbar): with lines selected, each one becomes a row. {{Tab}} moves to the next cell (in the last one, it adds a row) and {{Enter}} goes down. Hover over the table: the + buttons on its edges add columns and rows, and the ones on its bottom corner turn the header row on or off or delete the row or column. All of it is also in the … menu, under Format.',
+            '<table class="head"><tbody><tr><td>Day</td><td>Task</td></tr><tr><td>Mon</td><td>Review the text</td></tr><tr><td>Tue</td><td>Publish</td></tr></tbody></table>'],
           ['Paste', 'Pasted text always comes in without formatting.'],
           ['Images', 'Copy an image or a screenshot and paste it with {{Mod+V}}. Click the image and drag its bottom corner to resize it; it keeps its proportions.',
             DEMO_IMAGE],
