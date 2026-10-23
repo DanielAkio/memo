@@ -83,6 +83,9 @@
       <button type="button" class="fmt-btn fmt-mark" data-cmd="codeBlock" data-hint="```" data-i18n-attr="aria-label=codeBlock" aria-pressed="false">
         <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2.5"/><path d="M6.2 6.2 4.4 8l1.8 1.8M9.8 6.2 11.6 8l-1.8 1.8"/></svg>
       </button>
+      <button type="button" class="fmt-btn fmt-mark" data-cmd="table" data-hint="| a | b |" data-i18n-attr="aria-label=table" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2.5"/><path d="M1.5 6.5h13M1.5 10h13M8 6.5v7"/></svg>
+      </button>
       <span class="fmt-sep" aria-hidden="true"></span>
       <span class="fmt-sizes" role="group" data-i18n-attr="aria-label=textSize">
         <button type="button" class="fmt-btn fmt-size sz-s" data-size="2" data-i18n-attr="aria-label=smallText" aria-pressed="false">A</button>
@@ -98,6 +101,32 @@
       <!-- Highlighted copies of the code blocks, drawn over them, plus their
            language pickers (app.js, "code highlighting"). -->
       <div class="code-layer" id="codeLayer"></div>
+      <!-- Controls of the table under the mouse: "+" on its left and right
+           edges (a column) and bottom edge (a row), header and delete tools
+           (app.js, "tables"). -->
+      <div class="table-layer" id="tableLayer" hidden>
+        <div class="table-mark" hidden></div>
+        <button type="button" class="table-add" data-add="left" data-i18n-attr="aria-label=addColumnLeft,title=addColumnLeft">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4.5v7M4.5 8h7"/></svg>
+        </button>
+        <button type="button" class="table-add" data-add="right" data-i18n-attr="aria-label=addColumnRight,title=addColumnRight">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4.5v7M4.5 8h7"/></svg>
+        </button>
+        <button type="button" class="table-add" data-add="bottom" data-i18n-attr="aria-label=addRow,title=addRow">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4.5v7M4.5 8h7"/></svg>
+        </button>
+        <div class="table-tools" role="toolbar" data-i18n-attr="aria-label=table">
+          <button type="button" data-tool="header" aria-pressed="false" data-i18n-attr="aria-label=tableHeader,title=tableHeader">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M4 2.5h8a2 2 0 0 1 2 2v2h-12v-2a2 2 0 0 1 2-2z"/><rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M2 6.5h12M8 6.5v7"/></svg>
+          </button>
+          <button type="button" data-tool="deleteRow" data-i18n-attr="aria-label=deleteRow,title=deleteRow">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="5" width="12" height="6" rx="1.5"/><path d="M6 8h4"/></svg>
+          </button>
+          <button type="button" data-tool="deleteColumn" data-i18n-attr="aria-label=deleteColumn,title=deleteColumn">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="2" width="6" height="12" rx="1.5"/><path d="M6.6 8h2.8"/></svg>
+          </button>
+        </div>
+      </div>
       <!-- Frame of the selected image, with its resize handle (app.js, "images"). -->
       <div class="image-layer" id="imageLayer">
         <div class="image-frame" id="imageFrame" hidden>

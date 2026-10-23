@@ -58,7 +58,9 @@ small window on the user's screen; pinned ones stay above every other app. Memor
 gathered in groups, shown as compact bars whose memories can be taken out on screen or put away. \
 Memory text is plain text with a few conventions: one line per paragraph, \"[ ] item\" and \
 \"[x] item\" for checklist items, \"- item\" for bullets, \"1. item\" for numbered items (Memo \
-numbers them itself; two leading spaces per extra level, up to 4), `inline code`, and ``` fences (optionally with a language) for code blocks. Images show \
+numbers them itself; two leading spaces per extra level, up to 4), `inline code`, ``` fences (optionally with a language) for code blocks, \
+and tables as consecutive \"| a | b |\" lines (a \"| --- | --- |\" line after the first row makes it a header; \
+\"\\|\" is a \"|\" inside a cell). Images show \
 as \"[image]\"/\"[imagem]\" and cannot be created here. Colours: yellow, green, coral, teal, \
 iris (purple), mono (white in the dark theme, black in the light one), \"\" for none, \
 or a custom \"#rrggbb\". Unless Memo's settings say otherwise, new memories start with no colour \
@@ -569,7 +571,7 @@ fn anchor(app: &AppHandle) -> Option<(i32, i32)> {
 
 /// A memory's HTML from its plain text: the Rust twin of `fromPlain` in
 /// app.js (lines, checklist items, bullets, numbered items, inline code,
-/// code blocks).
+/// code blocks, tables).
 fn from_plain(text: &str) -> String {
     if text.is_empty() {
         return "<div><br></div>".into();
@@ -589,6 +591,28 @@ fn from_plain(text: &str) -> String {
                 continue;
             }
         }
+        if is_table_row(line) {
+            let end = (i..lines.len()).take_while(|&j| is_table_row(lines[j])).last().unwrap_or(i);
+            let mut rows: Vec<Vec<String>> = lines[i..=end].iter().map(|l| row_cells(l)).collect();
+            let head = rows.len() > 1 && is_table_sep(lines[i + 1]);
+            if head {
+                rows.remove(1);
+            }
+            let cols = rows.iter().map(Vec::len).max().unwrap_or(1);
+            out.push_str(if head { "<table class=\"head\"><tbody>" } else { "<table><tbody>" });
+            for row in &rows {
+                out.push_str("<tr>");
+                for c in 0..cols {
+                    let cell = row.get(c).map(String::as_str).unwrap_or("");
+                    let body = if cell.is_empty() { "<br>".into() } else { inline(cell) };
+                    out.push_str(&format!("<td>{body}</td>"));
+                }
+                out.push_str("</tr>");
+            }
+            out.push_str("</tbody></table>");
+            i = end + 1;
+            continue;
+        }
         match list_item(line) {
             Some((level, class, body)) => {
                 let level = if level > 0 { format!(" data-level=\"{level}\"") } else { String::new() };
@@ -603,6 +627,41 @@ fn from_plain(text: &str) -> String {
         i += 1;
     }
     out
+}
+
+/// A table row, "| a | b |" (as `TABLE_ROW_RE` in app.js).
+fn is_table_row(line: &str) -> bool {
+    let t = line.trim();
+    t.len() >= 2 && t.starts_with('|') && t.ends_with('|')
+}
+
+/// The "| --- | --- |" line after a header row (as `TABLE_SEP_RE`).
+fn is_table_sep(line: &str) -> bool {
+    let t = line.trim();
+    is_table_row(t)
+        && t[1..t.len() - 1].split('|').all(|c| {
+            let c = c.trim().trim_start_matches(':').trim_end_matches(':');
+            !c.is_empty() && c.chars().all(|ch| ch == '-')
+        })
+}
+
+/// The cells of a "| a | b |" line; "\|" is a "|" inside a cell.
+fn row_cells(line: &str) -> Vec<String> {
+    let t = line.trim();
+    let inner = &t[1..t.len() - 1];
+    let mut cells = vec![String::new()];
+    let mut chars = inner.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' if chars.peek() == Some(&'|') => {
+                cells.last_mut().unwrap().push('|');
+                chars.next();
+            }
+            '|' => cells.push(String::new()),
+            _ => cells.last_mut().unwrap().push(c),
+        }
+    }
+    cells.into_iter().map(|c| c.trim().to_string()).collect()
 }
 
 /// "```lang" opening a code block (as `/^```([\w+#.-]*)\s*$/`): the language.
@@ -1093,6 +1152,12 @@ mod tests {
             from_plain("1. a\n  12. b\n3.c\n2025"),
             "<div class=\"number\">a</div><div class=\"number\" data-level=\"1\">b</div><div>3.c</div><div>2025</div>"
         );
+        assert_eq!(
+            from_plain("| A | B |\n| --- | :-: |\n| `x` | a \\| b |\n|  |\nend"),
+            "<table class=\"head\"><tbody><tr><td>A</td><td>B</td></tr>\
+             <tr><td><code>x</code></td><td>a | b</td></tr><tr><td><br></td><td><br></td></tr></tbody></table><div>end</div>"
+        );
+        assert_eq!(from_plain("| a |\n| b |"), "<table><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody></table>");
     }
 
     #[test]
