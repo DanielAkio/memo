@@ -26,7 +26,7 @@ Titlebar: pin far left, colour dot (`#colorBtn` → swatch popover `#colorMenu`)
 
 ## Lists
 
-Typing `[]` at line start makes a checklist item; `- ` makes a bullet and `1. ` a numbered item (`expandBullet`); a space typed right after is dropped. Clicking the box toggles it without moving the caret. Enter continues the list (the browser clones the block; `done` is cleared). Tab / Shift+Tab change level (`setLevel`). Clicking left of the box/dot, or ArrowLeft at the item's start, puts the caret "before the marker" (`setBeforeMarker`, a drawn `#markerCaret`): Enter there pushes the item down, and a typed character or dead key goes on a new plain line above (`typeAbove`, shared with code blocks). Enter on an empty item or Backspace at its start outdents first, then leaves the list.
+Typing `[]` at line start makes a checklist item; `- ` makes a bullet and `1. ` a numbered item (`expandBullet`); a space typed right after is dropped. Clicking the box toggles it without moving the caret. Enter continues the list (the browser clones the block; `done` is cleared). Tab / Shift+Tab change level (`setLevel`). Clicking left of the box/dot, or ArrowLeft at the item's start, puts the caret "before the marker" (`setBeforeMarker`, a drawn `#markerCaret`; in an item or code block that starts the note, another ArrowLeft keeps it there): Enter there pushes the item down, and a typed character or dead key goes on a new plain line above (`typeAbove`, shared with code blocks). Enter on an empty item or Backspace at its start outdents first, then leaves the list.
 
 ## Code
 
