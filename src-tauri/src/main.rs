@@ -904,6 +904,15 @@ struct Drags {
     /// Logical size of each snapped window before it was snapped, restored
     /// when it is dragged again (not persisted).
     restore: Mutex<HashMap<String, (f64, f64)>>,
+    /// Resizes in progress, by window label.
+    resizes: Mutex<HashMap<String, Resize>>,
+}
+
+/// Cursor and visible rect when a resize handle was grabbed.
+#[derive(Clone, Copy)]
+struct Resize {
+    cursor: (f64, f64),
+    rect: Rect,
 }
 
 /// Whether the note (or the manager) is pinned, to put back after a drag.
@@ -1190,27 +1199,71 @@ fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
     let _ = window.set_size(PhysicalSize::new(zone.w as u32, zone.h as u32));
 }
 
-/// Resize driven by the page (handles on the edges and corners): the moving
-/// edges (`edges`: "n", "s", "e", "w" or combinations) of the requested
-/// visible area (physical `x`,`y`,`w`,`h`) are pulled by the same snapping as
-/// dragging. Native resizing is off (`resizable(false)`): the OS wouldn't let
-/// us adjust the size mid-gesture.
+/// Start of a resize by one of the page's handles: records the cursor and the
+/// visible rect. Like dragging, the resize then follows the cursor as Rust
+/// reads it (physical pixels), which stays right across monitors with
+/// different scales, where the page's screen coordinates don't.
 #[tauri::command]
-fn resize_to(
-    window: WebviewWindow,
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
-    edges: String,
-    drags: State<'_, Drags>,
-) {
+fn resize_start(window: WebviewWindow, drags: State<'_, Drags>) {
+    let (Ok(cursor), Ok(p), Ok(s)) = (
+        window.cursor_position(),
+        window.inner_position(),
+        window.inner_size(),
+    ) else {
+        return;
+    };
+    let rect = Rect {
+        x: p.x,
+        y: p.y,
+        w: s.width as i32,
+        h: s.height as i32,
+    };
+    drags.resizes.lock().unwrap().insert(
+        window.label().into(),
+        Resize {
+            cursor: (cursor.x, cursor.y),
+            rect,
+        },
+    );
+}
+
+/// Resize driven by the page (handles on the edges and corners): the moving
+/// edges (`edges`: "n", "s", "e", "w" or combinations) follow the cursor from
+/// `resize_start` and are pulled by the same snapping as dragging. Native
+/// resizing is off (`resizable(false)`): the OS wouldn't let us adjust the
+/// size mid-gesture.
+#[tauri::command]
+fn resize_to(window: WebviewWindow, edges: String, drags: State<'_, Drags>) {
+    let Some(Resize {
+        cursor: start,
+        rect,
+    }) = drags.resizes.lock().unwrap().get(window.label()).copied()
+    else {
+        return;
+    };
+    let Ok(cursor) = window.cursor_position() else {
+        return;
+    };
     // Resized by hand: no longer "snapped", so a later drag keeps this size.
     drags.restore.lock().unwrap().remove(window.label());
     let Some((dx, dy)) = frame_offset(&window) else {
         return;
     };
-    let (mut l, mut t, mut r, mut b) = (x, y, x + w, y + h);
+    let mx = (cursor.x - start.0).round() as i32;
+    let my = (cursor.y - start.1).round() as i32;
+    let (mut l, mut t, mut r, mut b) = (rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+    if edges.contains('w') {
+        l += mx;
+    }
+    if edges.contains('e') {
+        r += mx;
+    }
+    if edges.contains('n') {
+        t += my;
+    }
+    if edges.contains('s') {
+        b += my;
+    }
     let targets = SnapTargets::new(&window, l, t, r, b);
     if edges.contains('w') {
         l = targets.pick(l, &targets.left);
@@ -3346,6 +3399,7 @@ fn main() {
             drag_start,
             drag_to,
             drag_end,
+            resize_start,
             resize_to,
             load_note,
             save_text,

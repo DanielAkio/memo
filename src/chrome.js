@@ -60,7 +60,6 @@ window.MemoChrome = {
   // changes width). `onDoubleClick` receives the mousedown event.
   attach({ frame, titlebar, grip, onDoubleClick, onClose, resizeEdges = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] }) {
     const { invoke } = window.__TAURI__.core;
-    const appWindow = window.__TAURI__.window.getCurrentWindow();
 
     // Dragging is done here (not by the OS, with startDragging) so the window
     // snaps to monitor edges and other windows during the move. Rust follows
@@ -130,27 +129,20 @@ window.MemoChrome = {
 
     // Resizing: thin handles on the edges and corners (plus the visible grip
     // in the bottom-right corner). Native resizing is off, and each size goes
-    // through Rust's resize_to, which snaps the edges being moved.
+    // through Rust's resize_to, which follows the cursor (like dragging, so it
+    // stays right across monitors with different scales) and snaps the edges
+    // being moved. Calls are chained like drag_to.
     let resize = null;
 
-    function pumpResize(r) {
-      if (r.busy || !r.origin || !r.target) return;
-      const [dx, dy] = r.target;
-      r.target = null;
-      r.busy = true;
-      let { x, y, w, h } = r.origin;
-      const mx = Math.round(dx * r.scale);
-      const my = Math.round(dy * r.scale);
-      if (r.edges.includes('e')) w += mx;
-      if (r.edges.includes('w')) { x += mx; w -= mx; }
-      if (r.edges.includes('s')) h += my;
-      if (r.edges.includes('n')) { y += my; h -= my; }
-      invoke('resize_to', { x, y, w, h, edges: r.edges })
-        .catch((err) => console.error('resize_to', err))
-        .finally(() => {
-          r.busy = false;
-          pumpResize(r);
-        });
+    function moveResize(r) {
+      if (r.queued) return;
+      r.queued = true;
+      r.chain = r.chain
+        .then(() => {
+          r.queued = false;
+          return invoke('resize_to', { edges: r.edges });
+        })
+        .catch((err) => console.error('resize_to', err));
     }
 
     function startResize(handle, edges) {
@@ -159,19 +151,12 @@ window.MemoChrome = {
         e.preventDefault();
         e.stopPropagation();
         handle.setPointerCapture(e.pointerId);
-        const r = { edges, sx: e.screenX, sy: e.screenY, origin: null, scale: 1, target: null, busy: false };
+        const r = { edges, queued: false, chain: invoke('resize_start').catch((err) => console.error('resize_start', err)) };
         resize = r;
-        Promise.all([appWindow.innerPosition(), appWindow.innerSize(), appWindow.scaleFactor()])
-          .then(([p, s, scale]) => {
-            r.origin = { x: p.x, y: p.y, w: s.width, h: s.height };
-            r.scale = scale;
-            pumpResize(r);
-          });
       });
-      handle.addEventListener('pointermove', (e) => {
+      handle.addEventListener('pointermove', () => {
         if (!resize || resize.edges !== edges) return;
-        resize.target = [e.screenX - resize.sx, e.screenY - resize.sy];
-        pumpResize(resize);
+        moveResize(resize);
       });
       const end = () => { resize = null; };
       handle.addEventListener('pointerup', end);
