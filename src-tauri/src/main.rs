@@ -450,6 +450,7 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
         let store = app.state::<Shared>();
         match event {
             WindowEvent::Moved(pos) => {
+                eprintln!("[moved] {} ({},{})", win.label(), pos.x, pos.y);
                 // Windows reports -32000 when minimising; ignore it.
                 if pos.x <= -30_000 || pos.y <= -30_000 {
                     return;
@@ -476,7 +477,11 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                     }
                 }
             }
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                eprintln!("[scale] {} -> {}", win.label(), scale_factor);
+            }
             WindowEvent::Resized(size) => {
+                eprintln!("[resized] {} {}x{}", win.label(), size.width, size.height);
                 if size.width == 0 || size.height == 0 {
                     return;
                 }
@@ -1113,6 +1118,23 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
         size.height as i32,
     );
     let _ = window.set_position(PhysicalPosition::new(vx - dx, vy - dy));
+    // DEBUG (multi-monitor drag): one line per move.
+    eprintln!(
+        "[drag] {} cursor=({:.0},{:.0}) target=({},{}) outer_before={:?} scale_of={} window_scale={:?} monitor={:?}",
+        window.label(),
+        cursor.x,
+        cursor.y,
+        vx - dx,
+        vy - dy,
+        window.outer_position().ok().map(|p| (p.x, p.y)),
+        scale,
+        window.scale_factor().ok(),
+        window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .map(|m| (m.position().x, m.position().y, m.size().width, m.size().height, m.scale_factor())),
+    );
 
     // A note over a group bar can be dropped into it (the bar lights up);
     // group bars themselves don't Snap.
