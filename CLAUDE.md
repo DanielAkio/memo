@@ -50,7 +50,7 @@ src-tauri/
   src/welcome.rs         first-run welcome note (HTML + matching plain text)
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
   capabilities/default.json  permissions for note-*, group-* and manager windows
-site/                    GitHub Pages home page + privacy policy (en, pt/) for Google's consent screen
+site/                    GitHub Pages home page + privacy policy (en + pt in each page) for Google's consent screen
   media/                 demo GIFs (<scene>-<dark|light>-<en|pt>.gif), also used by README.md
 tools/demos/             records the site/README GIFs from the real pages (Playwright + fake Tauri API; docs/development.md)
 docs/google-cloud.md     Google Cloud project / OAuth client setup for cloud sync

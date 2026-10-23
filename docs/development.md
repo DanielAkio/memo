@@ -75,9 +75,18 @@ glyph in black, used as a macOS template image). Change the SVGs first, then reg
 ## Website
 
 `site/` is the home page and privacy policy published to GitHub Pages by `.github/workflows/pages.yml`
-(<https://danielakio.github.io/memo/>), in English and Portuguese (`site/pt/`). The GIFs in `site/media/` are used by
+(<https://danielakio.github.io/memo/>), in English and Portuguese. The GIFs in `site/media/` are used by
 both the site and the README; each one comes in dark and light versions and in both languages
 (`<scene>-<theme>-<lang>.gif`).
+
+Each page holds both languages: every translated element appears twice, marked `lang="en"` and `lang="pt-BR"`, and
+`style.css` shows the ones matching `<html lang>`. The page's title and description, which can't be doubled, keep the
+Portuguese text in `data-pt`. A bilingual page has `data-bilingual` on `<html>`; `code-signing.html` is English only.
+The old `site/pt/` addresses redirect to `?lang=pt`.
+
+`site/prefs.js`, loaded in every page's `<head>`, picks the language and theme: Portuguese when the browser prefers it,
+English otherwise, and the system's light/dark setting. The nav's language link (`?lang=pt|en`, switched in place) and
+theme button override both; the choice is kept in `localStorage` (`memo-lang`, `memo-theme`).
 
 The GIFs are recorded from the app's own pages, so re-record them whenever the windows change:
 

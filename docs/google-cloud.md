@@ -65,7 +65,7 @@ say what Memo accesses (its own hidden Drive folder and the account's e-mail), t
 the memories go only to the user's own Drive, and that nobody else, the developer
 included, receives them.
 
-Both pages live in `site/` (English, with Portuguese under `site/pt/`) and are
+Both pages live in `site/` (each in English and Portuguese) and are
 published by `.github/workflows/pages.yml` once Settings → Pages → Source is
 **GitHub Actions**:
 
