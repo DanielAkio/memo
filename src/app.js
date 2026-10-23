@@ -62,7 +62,9 @@
   const MAX_LEVEL = 4;
 
   const firstLine = (text) => plain(text).split('\n').map((s) => s.trim()).find(Boolean) || t('emptyNote');
-  const wordCount = (text) => (plain(text).replace(IMAGE_MARK_RE, ' ').trim().match(/\S+/g) || []).length;
+  // Table rows' "|" and "| --- |" header lines are not words.
+  const TABLE_MARKS_RE = /^\s*\|(?:\s*:?-+:?\s*\|)+\s*$|(?<=^|\s)\|(?=\s|$)/gm;
+  const wordCount = (text) => (plain(text).replace(IMAGE_MARK_RE, ' ').replace(TABLE_MARKS_RE, ' ').trim().match(/\S+/g) || []).length;
   const displayName = () => note.title || firstLine(note.text);
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -140,8 +142,11 @@
   // lives in <b>, <i> and <u>; a checklist item is <div class="check">
   // (checked: "check done"), a bulleted item is <div class="bullet"> and a
   // numbered one <div class="number">, all with data-level (1–4) when
-  // indented with Tab. Besides the HTML, the note stores the plain text, with
-  // items as "[ ] " / "[x] " / "- " / "1. " preceded by 2 spaces per level.
+  // indented with Tab. A table is <table> (class "head" when its first row is
+  // a header) with <tbody>, <tr> and <td>; cells hold only inline content.
+  // Besides the HTML, the note stores the plain text, with items as
+  // "[ ] " / "[x] " / "- " / "1. " preceded by 2 spaces per level and table
+  // rows as "| a | b |" (a header row is followed by "| --- | --- |").
 
   const isBlock = (n) => n !== editor && n.nodeType === 1 && (n.nodeName === 'DIV' || n.nodeName === 'P');
   const INLINE = { B: 'b', STRONG: 'b', I: 'i', EM: 'i', U: 'u', CODE: 'code' };
@@ -205,6 +210,9 @@
           const body = preText(n);
           if (body) lines.push(...body.split('\n'));
           lines.push('```');
+        } else if (n.nodeName === 'TABLE') {
+          flush();
+          lines.push(...tableLines(n));
         } else if (n.nodeName === 'CODE') {
           cur = `${cur ?? ''}\`${n.textContent.replace(ZWSP, '')}\``;
         } else if (n.nodeName === 'IMG') {
@@ -227,6 +235,39 @@
     return lines.join('\n');
   }
 
+  // A table's rows in plain text: "| a | b |", the header row followed by
+  // "| --- | --- |". A "|" inside a cell is written "\\|".
+  function tableLines(table) {
+    const rows = [...table.rows].map((row) => `| ${[...row.cells].map(cellText).join(' | ')} |`);
+    if (table.classList.contains('head') && rows.length) {
+      rows.splice(1, 0, `| ${[...table.rows[0].cells].map(() => '---').join(' | ')} |`);
+    }
+    return rows;
+  }
+
+  // A cell's text on one line: inline code as `x`, images as [image].
+  function cellText(cell) {
+    let out = '';
+    const walk = (node) => {
+      for (const n of node.childNodes) {
+        if (n.nodeType === 3) out += n.data;
+        else if (n.nodeName === 'CODE') out += `\`${n.textContent}\``;
+        else if (n.nodeName === 'IMG') out += imageMark();
+        else if (n.nodeName === 'BR') out += ' ';
+        else if (n.nodeType === 1) walk(n);
+      }
+    };
+    walk(cell);
+    return out.replace(ZWSP, '').replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
+  }
+
+  // Table rows in plain text: "| a | b |" lines; a "| --- |" line right
+  // after the first one makes it a header.
+  const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
+  const TABLE_SEP_RE = /^\s*\|(?:\s*:?-+:?\s*\|)+\s*$/;
+  // The cells of a "| a | b |" line ("\\|" is a "|" inside a cell).
+  const rowCells = (line) => line.trim().slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
+
   // HTML for notes that only have plain text (created before formatting).
   function fromPlain(text) {
     if (!text) return '<div><br></div>';
@@ -247,6 +288,20 @@
           continue;
         }
       }
+      // Table: a run of "| a | b |" lines.
+      if (TABLE_ROW_RE.test(line)) {
+        let end = i;
+        while (end + 1 < lines.length && TABLE_ROW_RE.test(lines[end + 1])) end++;
+        const rows = lines.slice(i, end + 1);
+        const head = rows.length > 1 && TABLE_SEP_RE.test(rows[1]);
+        if (head) rows.splice(1, 1);
+        const cells = rows.map(rowCells);
+        const cols = Math.max(...cells.map((r) => r.length));
+        const tr = cells.map((r) => `<tr>${Array.from({ length: cols }, (_, c) => `<td>${r[c] ? inline(r[c]) : '<br>'}</td>`).join('')}</tr>`);
+        out.push(`<table${head ? ' class="head"' : ''}><tbody>${tr.join('')}</tbody></table>`);
+        i = end;
+        continue;
+      }
       const m = LIST_RE.exec(line);
       if (!m) {
         out.push(`<div>${line ? inline(line) : '<br>'}</div>`);
@@ -262,18 +317,41 @@
   }
 
   // Rebuilds saved HTML with only what the editor uses: lines, <br>, <b>,
-  // <i>, <u>, <code>, <pre>, <img> (data URLs), sizes, highlight and the list
-  // classes.
+  // <i>, <u>, <code>, <pre>, <img> (data URLs), sizes, highlight, the list
+  // classes and tables.
   // Anything else becomes text.
   function sanitize(html) {
     const src = new DOMParser().parseFromString(html, 'text/html').body;
     const out = document.createDocumentFragment();
-    const copy = (from, to) => {
+    // `inCell`: inside a table cell, which only holds inline content (lines,
+    // code blocks and tables there become their text).
+    const copy = (from, to, inCell = false) => {
       for (const n of from.childNodes) {
         if (n.nodeType === 3) {
           to.appendChild(document.createTextNode(n.data));
         } else if (DROP.has(n.nodeName)) {
           continue;
+        } else if (inCell && n.nodeName === 'PRE') {
+          to.appendChild(document.createTextNode(` ${preText(n)} `));
+        } else if (inCell && (isBlock(n) || n.nodeName === 'TABLE' || n.nodeName === 'TR' || n.nodeName === 'TD' || n.nodeName === 'TH')) {
+          if (to.lastChild) to.appendChild(document.createTextNode(' '));
+          copy(n, to, true);
+        } else if (n.nodeName === 'TABLE') {
+          const rows = [...n.rows].filter((row) => row.closest('table') === n && row.cells.length);
+          if (!rows.length) continue;
+          const cols = Math.max(...rows.map((row) => row.cells.length));
+          const table = document.createElement('table');
+          if (n.classList.contains('head') || [...rows[0].cells].every((c) => c.nodeName === 'TH')) table.className = 'head';
+          const body = table.appendChild(document.createElement('tbody'));
+          for (const row of rows) {
+            const tr = body.appendChild(document.createElement('tr'));
+            for (let c = 0; c < cols; c++) {
+              const td = tr.appendChild(document.createElement('td'));
+              if (row.cells[c]) copy(row.cells[c], td, true);
+              if (!td.textContent && !td.querySelector('img')) td.replaceChildren(document.createElement('br'));
+            }
+          }
+          to.appendChild(table);
         } else if (n.nodeName === 'BR') {
           to.appendChild(document.createElement('br'));
         } else if (n.nodeName === 'IMG') {
@@ -309,18 +387,18 @@
           const el = to.appendChild(document.createElement(INLINE[n.nodeName]));
           if (el.nodeName === 'CODE') el.spellcheck = false;
           if (isHighlight(n)) el.style.backgroundColor = HIGHLIGHT;
-          copy(n, el);
+          copy(n, el, inCell);
         } else if (n.nodeName === 'FONT' && SIZES.includes(n.getAttribute('size'))) {
           const font = to.appendChild(document.createElement('font'));
           font.setAttribute('size', n.getAttribute('size'));
           if (isHighlight(n)) font.style.backgroundColor = HIGHLIGHT;
-          copy(n, font);
+          copy(n, font, inCell);
         } else if (n.nodeName === 'SPAN' && isHighlight(n)) {
           const span = to.appendChild(document.createElement('span'));
           span.style.backgroundColor = HIGHLIGHT;
-          copy(n, span);
+          copy(n, span, inCell);
         } else if (n.nodeType === 1) {
-          copy(n, to);
+          copy(n, to, inCell);
         }
       }
     };
@@ -330,7 +408,7 @@
     const wrapped = document.createDocumentFragment();
     let run = null;
     for (const n of [...out.childNodes]) {
-      if (n.nodeName === 'DIV' || n.nodeName === 'PRE') {
+      if (n.nodeName === 'DIV' || n.nodeName === 'PRE' || n.nodeName === 'TABLE') {
         run = null;
         if (!n.firstChild) n.appendChild(document.createElement('br'));
         wrapped.appendChild(n);
@@ -339,9 +417,9 @@
         run.appendChild(n);
       }
     }
-    // There is always a regular line after a trailing code block, so the
-    // caret has somewhere to go.
-    if (!wrapped.lastChild || wrapped.lastChild.nodeName === 'PRE') {
+    // There is always a regular line after a trailing code block or table,
+    // so the caret has somewhere to go.
+    if (!wrapped.lastChild || wrapped.lastChild.nodeName === 'PRE' || wrapped.lastChild.nodeName === 'TABLE') {
       wrapped.appendChild(document.createElement('div')).appendChild(document.createElement('br'));
     }
     return wrapped;
@@ -363,7 +441,7 @@
   function wrapLooseLines() {
     let run = null;
     for (const n of [...editor.childNodes]) {
-      if (n.nodeName === 'DIV' || n.nodeName === 'PRE') {
+      if (n.nodeName === 'DIV' || n.nodeName === 'PRE' || n.nodeName === 'TABLE') {
         run = null;
       } else if (n.nodeType === 3 && !n.data && !run) {
         n.remove();
@@ -503,10 +581,12 @@
   }
 
   function applyContent() {
+    syncTables();
     wrapLooseLines();
     syncNumbers();
     syncCheckSizes();
     renderCode();
+    renderTableTools();
     renderImageFrame();
     note.text = toPlain();
     note.html = contentHtml();
@@ -642,7 +722,7 @@
   // "[]" typed at the start of a line turns it into an item.
   function expandCheckbox() {
     const sel = getSelection();
-    if (!sel.isCollapsed) return false;
+    if (!sel.isCollapsed || currentCell()) return false;
     let block = currentBlock();
     if (!block) {
       document.execCommand('formatBlock', false, 'div');
@@ -1312,14 +1392,27 @@
       onCodeBlockKeydown(e, pre, mod, wasBeforeMarker === pre);
       return;
     }
+    const cell = currentCell();
+    if (cell) {
+      onTableKeydown(e, cell, mod);
+      return;
+    }
+    if ((e.key === 'Backspace' || e.key === 'Delete') && !mod && !e.altKey && !e.shiftKey && tableEdgeKey(e)) return;
 
-    // "```lang" + Enter on a regular line opens a code block.
+    // "```lang" + Enter on a regular line opens a code block; "| a | b |" +
+    // Enter, a table.
     if (e.key === 'Enter' && !e.shiftKey && !mod && !e.altKey) {
       const line = currentBlock();
       const fence = fenceOf(line);
       if (fence) {
         e.preventDefault();
         openCodeBlock(line, fence[1]);
+        return;
+      }
+      const cells = tableRowOf(line);
+      if (cells) {
+        e.preventDefault();
+        openTable(line, [cells, Array(cells.length).fill('')], [1, 0]);
         return;
       }
     }
@@ -1415,7 +1508,7 @@
   // number) into a numbered item.
   function expandBullet() {
     const sel = getSelection();
-    if (!sel.isCollapsed) return false;
+    if (!sel.isCollapsed || currentCell()) return false;
     let block = currentBlock();
     if (!block) {
       document.execCommand('formatBlock', false, 'div');
@@ -1528,10 +1621,446 @@
     if (!text) return;
     pasting = true;
     try {
-      document.execCommand('insertText', false, text);
+      // A cell holds one line: line breaks become spaces.
+      document.execCommand('insertText', false, currentCell() ? text.replace(/\s*\n\s*/g, ' ') : text);
     } finally {
       pasting = false;
     }
+  }
+
+  // ------------------------------------------------------------- tables
+  //
+  // A table is a <table> straight in the editor, beside the lines; its cells
+  // hold inline content only (no line breaks: Enter goes to the cell below).
+  // While the mouse is over a table, #tableLayer shows a "+" on its left and
+  // right edges (a new column on that side) and on its bottom edge (a new
+  // row), and a few tools: header row on/off, delete the caret's row or
+  // column. The header row is optional (class "head" on the table).
+
+  const TABLE_COLS = 3;
+  const TABLE_ROWS = 2;
+  const tableLayer = $('tableLayer');
+  const tableMark = tableLayer.querySelector('.table-mark');
+  let hoveredTable = null;
+  let hoveredCell = null;
+
+  function currentCell() {
+    const sel = getSelection();
+    if (!sel.rangeCount) return null;
+    const n = sel.anchorNode;
+    const el = n && (n.nodeType === 1 ? n : n.parentElement);
+    const cell = el && el.closest('td');
+    return cell && editor.contains(cell) ? cell : null;
+  }
+
+  // Puts the caret at the end of a cell, outside a box (inline code,
+  // highlight, bold...) that ends it: after an invisible separator, as
+  // ArrowRight does, so typing doesn't go into the box.
+  function caretInCell(cell) {
+    let last = cell.lastChild;
+    while (last && last.nodeName === 'BR' && last.previousSibling) last = last.previousSibling;
+    if (last && last.nodeType === 1 && last.nodeName !== 'BR' && last.nodeName !== 'IMG') {
+      const gap = document.createTextNode('\u200b');
+      last.after(gap);
+      const r = document.createRange();
+      r.setStart(gap, 1);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      return;
+    }
+    caretIn(cell, true);
+  }
+
+  // A new cell holding `content`: text, nodes or nothing (an empty cell).
+  function newCell(row, content, at = -1) {
+    const cell = row.insertCell(at);
+    if (typeof content === 'string' && content) cell.textContent = content;
+    else if (Array.isArray(content) && content.length) cell.append(...content);
+    else cell.appendChild(document.createElement('br'));
+    return cell;
+  }
+
+  // A table from rows of cell contents (see newCell), as wide as the widest.
+  function makeTable(rows, head = false) {
+    const cols = Math.max(1, ...rows.map((r) => r.length));
+    const table = document.createElement('table');
+    if (head) table.className = 'head';
+    const body = table.appendChild(document.createElement('tbody'));
+    for (const cells of rows) {
+      const row = body.insertRow();
+      for (let c = 0; c < cols; c++) newCell(row, cells[c]);
+    }
+    return table;
+  }
+
+  const emptyRows = () => Array.from({ length: TABLE_ROWS }, () => Array(TABLE_COLS).fill(''));
+
+  // Replaces `line` with a table and puts the caret in its cell `focus`
+  // ([row, column]); a regular line always follows it.
+  function openTable(line, rows, focus = [0, 0], head = false) {
+    const table = makeTable(rows, head);
+    line.replaceWith(table);
+    lineAfter(table);
+    caretInCell(table.rows[focus[0]].cells[focus[1]]);
+    onContentChanged();
+    return table;
+  }
+
+  // The regular line right after a table (added when there is none).
+  function lineAfter(table) {
+    let next = table.nextElementSibling;
+    if (!next || next.nodeName !== 'DIV') {
+      next = document.createElement('div');
+      next.appendChild(document.createElement('br'));
+      table.after(next);
+    }
+    return next;
+  }
+
+  // "| a | b |" + Enter on a regular line: a table whose first row has those
+  // cells, and an empty row below for the caret.
+  function tableRowOf(line) {
+    if (!line || isListItem(line) || line.querySelector('img')) return null;
+    const text = line.textContent.replace(ZWSP, '').trim();
+    return TABLE_ROW_RE.test(text) && !TABLE_SEP_RE.test(text) ? rowCells(text) : null;
+  }
+
+  // Keeps every table whole after any edit: rows as wide as the widest, a
+  // <br> in empty cells, no empty rows or tables, a line after the last one.
+  function syncTables() {
+    for (const table of editor.querySelectorAll(':scope > table')) {
+      for (const row of [...table.rows]) if (!row.cells.length) row.remove();
+      const rows = [...table.rows];
+      if (!rows.length) {
+        table.remove();
+        continue;
+      }
+      const cols = Math.max(...rows.map((row) => row.cells.length));
+      for (const row of rows) {
+        while (row.cells.length < cols) newCell(row);
+        for (const cell of row.cells) {
+          if (!cell.textContent && !cell.querySelector('br, img')) cell.appendChild(document.createElement('br'));
+        }
+      }
+      if (!table.nextElementSibling) lineAfter(table);
+    }
+  }
+
+  // Table commands, from the "+" buttons, the tools and the Format menu. Each
+  // one leaves the caret in the table (or where it was) and records a step.
+  function addColumn(table, side) {
+    const cell = currentCell();
+    const row = cell && table.contains(cell) ? cell.parentNode : table.rows[0];
+    for (const r of table.rows) newCell(r, '', side === 'left' ? 0 : -1);
+    editor.focus();
+    caretIn(side === 'left' ? row.cells[0] : row.cells[row.cells.length - 1]);
+    onContentChanged();
+  }
+
+  function addRow(table, at = -1) {
+    const row = table.tBodies[0].insertRow(at);
+    for (let c = 0; c < table.rows[0].cells.length; c++) newCell(row);
+    editor.focus();
+    caretIn(row.cells[0]);
+    onContentChanged();
+  }
+
+  function deleteRow(table, row) {
+    if (table.rows.length === 1) {
+      deleteTable(table);
+      return;
+    }
+    const column = Math.min(currentCell()?.cellIndex ?? 0, row.cells.length - 1);
+    const next = row.nextElementSibling || row.previousElementSibling;
+    row.remove();
+    editor.focus();
+    caretInCell(next.cells[column]);
+    onContentChanged();
+  }
+
+  function deleteColumn(table, column) {
+    if (table.rows[0].cells.length === 1) {
+      deleteTable(table);
+      return;
+    }
+    const row = currentCell()?.parentNode || table.rows[0];
+    for (const r of table.rows) r.cells[column]?.remove();
+    editor.focus();
+    caretInCell(row.cells[Math.min(column, row.cells.length - 1)]);
+    onContentChanged();
+  }
+
+  function deleteTable(table) {
+    const line = document.createElement('div');
+    line.appendChild(document.createElement('br'));
+    table.replaceWith(line);
+    editor.focus();
+    caretIn(line);
+    setHoveredTable(null);
+    onContentChanged();
+  }
+
+  function toggleHeader(table) {
+    table.classList.toggle('head');
+    if (!table.classList.length) table.removeAttribute('class');
+    if (!currentCell()) {
+      editor.focus();
+      caretIn(table.rows[0].cells[0], true);
+    }
+    onContentChanged();
+    renderTableTools();
+  }
+
+  // The cell the row and column tools act on: the caret's, in this table,
+  // or the one last under the mouse.
+  function targetCell(table) {
+    const cell = currentCell();
+    if (cell && table.contains(cell)) return cell;
+    return hoveredCell && table.contains(hoveredCell) ? hoveredCell : null;
+  }
+
+  // Table from the buttons and menus. Inside a table: back to lines, one per
+  // row ("| a | b |", the cells' formatting kept). With a selection: its
+  // lines become rows ("| a | b |" lines and tab-separated text are split
+  // into cells). With just the caret: a new empty table on the caret's line
+  // if it is empty, or on a new line below.
+  function toggleTable() {
+    editor.focus();
+    const cell = currentCell();
+    if (cell) {
+      const table = cell.closest('table');
+      const lines = [...table.rows].map((row) => {
+        const div = document.createElement('div');
+        div.append('| ');
+        [...row.cells].forEach((c, i) => {
+          if (i) div.append(' | ');
+          div.append(...[...c.childNodes].filter((n) => n.nodeName !== 'BR'));
+        });
+        div.append(' |');
+        return div;
+      });
+      table.replaceWith(...lines);
+      caretIn(lines[lines.length - 1], true);
+      onContentChanged();
+      scheduleFormatBar();
+      return;
+    }
+    if (getSelection().isCollapsed) {
+      insertEmpty('table');
+      return;
+    }
+    const lines = touchedLines();
+    if (!lines.length) return;
+    const rows = lines.map((b) => {
+      const text = b.textContent.replace(ZWSP, '').trim();
+      if (TABLE_ROW_RE.test(text)) return rowCells(text);
+      if (text.includes('\t')) return text.split('\t').map((c) => c.trim());
+      return [[...b.childNodes].filter((n) => n.nodeName !== 'BR')];
+    });
+    const sep = rows.length > 1 && rows[1].length && rows[1].every((c) => typeof c === 'string' && /^:?-+:?$/.test(c));
+    if (sep) rows.splice(1, 1);
+    for (const b of lines.slice(1)) b.remove();
+    openTable(lines[0], rows, [rows.length - 1, 0], sep);
+    scheduleFormatBar();
+  }
+
+  // Keys inside a cell. Tab / Shift+Tab: next / previous cell (Tab in the
+  // last one adds a row). Enter: the cell below, or the line after the table.
+  // Backspace at a cell's start goes to the end of the previous cell (in an
+  // empty row's first cell, deletes the row); Delete at a cell's end does
+  // nothing, so cells never merge. ArrowUp in the first row of a table that
+  // starts the note makes a line above it.
+  function onTableKeydown(e, cell, mod) {
+    const table = cell.closest('table');
+    const cells = [...table.querySelectorAll('td')];
+    const i = cells.indexOf(cell);
+    const row = cell.parentNode;
+    if (e.key === 'Tab' && !mod && !e.altKey) {
+      e.preventDefault();
+      if (e.shiftKey) {
+        if (i > 0) caretInCell(cells[i - 1]);
+      } else if (i < cells.length - 1) {
+        caretInCell(cells[i + 1]);
+      } else {
+        addRow(table);
+      }
+      return;
+    }
+    if (e.key === 'Enter' && !mod && !e.altKey) {
+      e.preventDefault();
+      const next = row.nextElementSibling;
+      if (next) {
+        caretInCell(next.cells[cell.cellIndex]);
+      } else {
+        const line = lineAfter(table);
+        caretIn(line);
+        onContentChanged();
+      }
+      return;
+    }
+    const sel = getSelection();
+    if (!sel.isCollapsed) return;
+    const before = document.createRange();
+    before.setStart(cell, 0);
+    before.setEnd(sel.anchorNode, sel.anchorOffset);
+    const atStart = !before.toString().replace(ZWSP, '') && !before.cloneContents().querySelector('img');
+    if (e.key === 'Backspace' && !mod && !e.altKey && atStart) {
+      e.preventDefault();
+      if (cell.cellIndex === 0 && ![...row.cells].some((c) => c.textContent.replace(ZWSP, '').trim() || c.querySelector('img'))) {
+        deleteRow(table, row);
+      } else if (i > 0) {
+        caretInCell(cells[i - 1]);
+      }
+      return;
+    }
+    if (e.key === 'Delete' && !mod && !e.altKey) {
+      const after = document.createRange();
+      after.setStart(sel.anchorNode, sel.anchorOffset);
+      after.setEnd(cell, cell.childNodes.length);
+      if (!after.toString().replace(ZWSP, '') && !after.cloneContents().querySelector('img')) e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowUp' && !mod && !e.altKey && !e.shiftKey && row.rowIndex === 0 && !table.previousElementSibling) {
+      e.preventDefault();
+      const line = document.createElement('div');
+      line.appendChild(document.createElement('br'));
+      table.before(line);
+      caretIn(line);
+      onContentChanged();
+    }
+  }
+
+  // Backspace at the start of the line after a table, or Delete at the end
+  // of the line before one: into the table's last (first) cell instead of
+  // merging the line into it, taking an empty line away.
+  function tableEdgeKey(e) {
+    const sel = getSelection();
+    const line = currentBlock();
+    if (!sel.isCollapsed || !line || isListItem(line)) return false;
+    const empty = !line.textContent.replace(ZWSP, '') && !line.querySelector('img');
+    if (e.key === 'Backspace') {
+      const table = line.previousElementSibling;
+      if (table?.nodeName !== 'TABLE' || textBeforeCaret(line).toString().replace(ZWSP, '')) return false;
+      e.preventDefault();
+      if (empty && line.nextElementSibling) line.remove();
+      const last = table.rows[table.rows.length - 1];
+      caretInCell(last.cells[last.cells.length - 1]);
+      if (!line.isConnected) onContentChanged();
+      return true;
+    }
+    const table = line.nextElementSibling;
+    if (table?.nodeName !== 'TABLE') return false;
+    const rest = document.createRange();
+    rest.setStart(sel.anchorNode, sel.anchorOffset);
+    rest.setEnd(line, line.childNodes.length);
+    if (rest.toString().replace(ZWSP, '')) return false;
+    e.preventDefault();
+    if (empty) line.remove();
+    caretIn(table.rows[0].cells[0]);
+    if (!line.isConnected) onContentChanged();
+    return true;
+  }
+
+  // The "+" buttons and tools of the table under the mouse. Each "+" shows
+  // only while the mouse is near its edge.
+  function setHoveredTable(table, x = 0, y = 0) {
+    hoveredTable = table && table.isConnected ? table : null;
+    tableLayer.hidden = !hoveredTable;
+    if (!hoveredTable) {
+      hoveredCell = null;
+      tableMark.hidden = true;
+      return;
+    }
+    const r = hoveredTable.getBoundingClientRect();
+    const near = { left: x < r.left + 16, right: x > r.right - 16, bottom: y > r.bottom - 12 };
+    for (const btn of tableLayer.querySelectorAll('[data-add]')) btn.classList.toggle('is-shown', near[btn.dataset.add]);
+    renderTableTools();
+  }
+
+  // Where the table's controls go (on every change, scroll and resize).
+  function renderTableTools() {
+    if (!hoveredTable) return;
+    if (!hoveredTable.isConnected) {
+      setHoveredTable(null);
+      return;
+    }
+    const box = tableLayer.getBoundingClientRect();
+    const r = hoveredTable.getBoundingClientRect();
+    const place = (el, x, y) => {
+      el.style.left = `${x - box.left - el.offsetWidth / 2}px`;
+      el.style.top = `${y - box.top - el.offsetHeight / 2}px`;
+    };
+    const midY = (r.top + r.bottom) / 2;
+    for (const btn of tableLayer.querySelectorAll('[data-add]')) {
+      if (btn.dataset.add === 'left') place(btn, r.left, midY);
+      else if (btn.dataset.add === 'right') place(btn, r.right, midY);
+      else place(btn, (r.left + r.right) / 2, r.bottom);
+    }
+    const tools = tableLayer.querySelector('.table-tools');
+    tools.style.left = `${r.right - box.left - tools.offsetWidth}px`;
+    tools.style.top = `${r.bottom - box.top - tools.offsetHeight / 2}px`;
+    const header = tools.querySelector('[data-tool="header"]');
+    header.setAttribute('aria-pressed', String(hoveredTable.classList.contains('head')));
+    const target = targetCell(hoveredTable);
+    for (const btn of tools.querySelectorAll('[data-tool^="delete"]')) btn.disabled = !target;
+  }
+
+  // While a delete tool is hovered, the row or column it would delete is
+  // tinted.
+  function markTarget(tool) {
+    const cell = tool && hoveredTable && targetCell(hoveredTable);
+    tableMark.hidden = !cell;
+    if (!cell) return;
+    const box = tableLayer.getBoundingClientRect();
+    const t0 = hoveredTable.getBoundingClientRect();
+    const c = cell.getBoundingClientRect();
+    const rect = tool === 'deleteRow'
+      ? { left: t0.left, right: t0.right, top: c.top, bottom: c.bottom }
+      : { left: c.left, right: c.right, top: t0.top, bottom: t0.bottom };
+    tableMark.style.left = `${rect.left - box.left}px`;
+    tableMark.style.top = `${rect.top - box.top}px`;
+    tableMark.style.width = `${rect.right - rect.left}px`;
+    tableMark.style.height = `${rect.bottom - rect.top}px`;
+  }
+
+  // The table near the pointer (within the reach of its "+" buttons).
+  function tableNear(x, y) {
+    for (const table of editor.querySelectorAll(':scope > table')) {
+      const r = table.getBoundingClientRect();
+      if (x >= r.left - 16 && x <= r.right + 16 && y >= r.top - 4 && y <= r.bottom + 16) return table;
+    }
+    return null;
+  }
+
+  function runTableTool(tool) {
+    const table = hoveredTable;
+    if (!table) return;
+    const cell = targetCell(table);
+    if (tool === 'header') toggleHeader(table);
+    else if (tool === 'deleteRow' && cell) deleteRow(table, cell.parentNode);
+    else if (tool === 'deleteColumn' && cell) deleteColumn(table, cell.cellIndex);
+    markTarget(null);
+    renderTableTools();
+  }
+
+  // Table commands for the Format menu, while the caret is in a table.
+  function tableMenuItems() {
+    const cell = currentCell();
+    if (!cell) return [];
+    const table = cell.closest('table');
+    const run = (fn) => withMenuSelection(() => {
+      if (table.isConnected && cell.isConnected) fn();
+    });
+    return [
+      null,
+      { label: t('tableHeader'), checked: table.classList.contains('head'), run: run(() => toggleHeader(table)) },
+      { label: t('addRow'), run: run(() => addRow(table)) },
+      { label: t('addColumnLeft'), run: run(() => addColumn(table, 'left')) },
+      { label: t('addColumnRight'), run: run(() => addColumn(table, 'right')) },
+      { label: t('deleteRow'), run: run(() => deleteRow(table, cell.parentNode)) },
+      { label: t('deleteColumn'), run: run(() => deleteColumn(table, cell.cellIndex)) },
+      { label: t('deleteTable'), run: run(() => deleteTable(table)) },
+    ];
   }
 
   // ------------------------------------------------------------- images
@@ -1875,6 +2404,7 @@
     bullet: () => toggleList('bullet'),
     number: () => toggleList('number'),
     codeBlock: toggleCodeBlock,
+    table: toggleTable,
   };
 
   // Whether a command is on for the selection or the caret's line.
@@ -1882,6 +2412,7 @@
     if (cmd === 'highlight') return currentHighlight();
     if (cmd === 'code') return Boolean(currentCode());
     if (cmd === 'codeBlock') return Boolean(currentPre());
+    if (cmd === 'table') return Boolean(currentCell());
     if (LIST_TYPES.includes(cmd)) {
       const lines = touchedLines();
       return lines.length > 0 && lines.every((b) => b.classList.contains(cmd));
@@ -1980,8 +2511,8 @@
   // underline, highlight or size for what is typed next.
   function insertEmpty(cmd) {
     editor.focus();
-    if (LIST_TYPES.includes(cmd) || cmd === 'codeBlock') {
-      const line = currentPre() || currentBlock() || editor.lastElementChild;
+    if (LIST_TYPES.includes(cmd) || cmd === 'codeBlock' || cmd === 'table') {
+      const line = currentPre() || currentCell()?.closest('table') || currentBlock() || editor.lastElementChild;
       let target = line;
       const emptyLine = line && line.nodeName === 'DIV' && !isListItem(line)
         && !line.textContent.replace(ZWSP, '') && !line.querySelector('img');
@@ -1993,6 +2524,8 @@
       }
       if (cmd === 'codeBlock') {
         openCodeBlock(target, '');
+      } else if (cmd === 'table') {
+        openTable(target, emptyRows());
       } else {
         target.className = cmd;
         // Under a list item, the new item takes its level.
@@ -2056,6 +2589,8 @@
       cmd('bullet', 'bulletList'),
       cmd('number', 'numberedList'),
       cmd('codeBlock', 'codeBlock'),
+      cmd('table', 'table'),
+      ...tableMenuItems(),
       null,
       size('2', 'smallText'),
       size('3', 'normalText'),
@@ -2178,6 +2713,7 @@
   });
   editor.addEventListener('scroll', () => {
     renderCode();
+    renderTableTools();
     renderImageFrame();
     scheduleFormatBar();
   });
@@ -2205,6 +2741,28 @@
     }
   });
   editor.addEventListener('mousemove', (e) => setHoveredPre(e.target.closest('pre.code')));
+  // Tables: the "+" buttons and tools of the one under the mouse. The layer
+  // sits on top of the editor, so the whole body is watched.
+  const body = editor.parentElement;
+  body.addEventListener('mousemove', (e) => {
+    const cell = e.target.closest && e.target.closest('td');
+    if (cell && editor.contains(cell)) hoveredCell = cell;
+    setHoveredTable(tableNear(e.clientX, e.clientY), e.clientX, e.clientY);
+  });
+  body.addEventListener('mouseleave', () => setHoveredTable(null));
+  tableLayer.addEventListener('mousedown', (e) => e.preventDefault());
+  tableLayer.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn || !hoveredTable) return;
+    if (btn.dataset.add === 'bottom') addRow(hoveredTable);
+    else if (btn.dataset.add) addColumn(hoveredTable, btn.dataset.add);
+    else runTableTool(btn.dataset.tool);
+    renderTableTools();
+  });
+  tableLayer.addEventListener('mouseover', (e) => markTarget(e.target.closest('[data-tool^="delete"]:not(:disabled)')?.dataset.tool));
+  tableLayer.addEventListener('mouseout', (e) => {
+    if (!e.relatedTarget?.closest?.('[data-tool^="delete"]')) markTarget(null);
+  });
   editor.addEventListener('mouseleave', leaveCode);
   codeLayer.addEventListener('mouseout', leaveCode);
   editor.addEventListener('mousemove', (e) => {
@@ -2223,6 +2781,7 @@
   document.addEventListener('selectionchange', () => {
     scheduleFormatBar();
     renderImageFrame();
+    renderTableTools();
     // The caret left the start of the item: no longer before its marker.
     if (beforeMarker) {
       const block = currentPre() || currentBlock();
@@ -2235,6 +2794,7 @@
   editor.addEventListener('scroll', renderMarkerCaret);
   new ResizeObserver(() => {
     renderCode();
+    renderTableTools();
     renderImageFrame();
     renderMarkerCaret();
     scheduleFormatBar();
