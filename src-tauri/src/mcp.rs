@@ -58,7 +58,9 @@ small window on the user's screen; pinned ones stay above every other app. Memor
 gathered in groups, shown as compact bars whose memories can be taken out on screen or put away. \
 Memory text is plain text with a few conventions: one line per paragraph, \"[ ] item\" and \
 \"[x] item\" for checklist items, \"- item\" for bullets, \"1. item\" for numbered items (Memo \
-numbers them itself; two leading spaces per extra level, up to 4), `inline code`, ``` fences (optionally with a language) for code blocks, \
+numbers them itself; two leading spaces per extra level, up to 4), `inline code`, \
+links as \"[text](https://address)\" (web or mailto: addresses; a bare https:// or www. address is a link \
+to itself, and the user opens links in the browser with a click), ``` fences (optionally with a language) for code blocks, \
 and tables as consecutive \"| a | b |\" lines (a \"| --- | --- |\" line after the first row makes it a header; \
 \"\\|\" is a \"|\" inside a cell). Images show \
 as \"[image]\"/\"[imagem]\" and cannot be created here. Colours: yellow, green, coral, teal, \
@@ -571,7 +573,7 @@ fn anchor(app: &AppHandle) -> Option<(i32, i32)> {
 
 /// A memory's HTML from its plain text: the Rust twin of `fromPlain` in
 /// app.js (lines, checklist items, bullets, numbered items, inline code,
-/// code blocks, tables).
+/// links, code blocks, tables).
 fn from_plain(text: &str) -> String {
     if text.is_empty() {
         return "<div><br></div>".into();
@@ -704,7 +706,7 @@ fn inline(s: &str) -> String {
     let mut out = String::new();
     let mut rest = s;
     while let Some(open) = rest.find('`') {
-        out.push_str(&esc(&rest[..open]));
+        out.push_str(&links(&rest[..open]));
         let after = &rest[open + 1..];
         match after.find('`') {
             Some(close) if close > 0 => {
@@ -717,8 +719,90 @@ fn inline(s: &str) -> String {
             }
         }
     }
-    out.push_str(&esc(rest));
+    out.push_str(&links(rest));
     out
+}
+
+/// Escapes text and turns its links into `<a href>`: "[text](address)" with
+/// a web or mail address, and bare "https://…" / "www.…" addresses (as
+/// `linkHtml` in app.js).
+fn links(s: &str) -> String {
+    let mut out = String::new();
+    let (mut last, mut i) = (0, 0);
+    while i < s.len() {
+        let rest = &s[i..];
+        let link = plain_link(rest).or_else(|| {
+            // A bare address starts a word (as the regex's lookbehind).
+            let prev = s[..i].chars().next_back();
+            let starts = !prev.is_some_and(|c| c.is_ascii_alphanumeric() || "_@./".contains(c));
+            starts
+                .then(|| bare_url(rest))
+                .flatten()
+                .map(|url| {
+                    let href = if starts_ci(url, "www.") { format!("https://{url}") } else { url.to_string() };
+                    (url, href, url.len())
+                })
+        });
+        match link {
+            Some((text, href, len)) => {
+                out.push_str(&esc(&s[last..i]));
+                out.push_str(&format!("<a href=\"{}\">{}</a>", esc(&href), esc(text)));
+                i += len;
+                last = i;
+            }
+            None => i += rest.chars().next().map_or(1, char::len_utf8),
+        }
+    }
+    out.push_str(&esc(&s[last..]));
+    out
+}
+
+fn starts_ci(s: &str, prefix: &str) -> bool {
+    s.len() >= prefix.len() && s.as_bytes()[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes())
+}
+
+/// "[text](address)" at the start of `s`: (text, address, length).
+fn plain_link(s: &str) -> Option<(&str, String, usize)> {
+    let body = s.strip_prefix('[')?;
+    let close = body.find(']')?;
+    let text = &body[..close];
+    if text.is_empty() || text.contains('\n') {
+        return None;
+    }
+    let target = body[close + 1..].strip_prefix('(')?;
+    let end = target.find(|c: char| c == ')' || c.is_whitespace())?;
+    let href = &target[..end];
+    let scheme = ["http://", "https://", "mailto:"].into_iter().find(|p| starts_ci(href, p))?;
+    if href.len() == scheme.len() || !target[end..].starts_with(')') {
+        return None;
+    }
+    Some((text, href.to_string(), 1 + close + 2 + end + 1))
+}
+
+/// A bare web address at the start of `s`, without the punctuation that
+/// usually follows one in a sentence.
+fn bare_url(s: &str) -> Option<&str> {
+    let end = s.find(|c: char| c.is_whitespace() || "<>\"".contains(c)).unwrap_or(s.len());
+    let word = &s[..end];
+    if starts_ci(word, "www.") {
+        // "www." + a name + "." + something.
+        let name = &word[4..];
+        let dot = name.find(['.', '/'])?;
+        if dot == 0 || !name[dot..].starts_with('.') || name.len() == dot + 1 {
+            return None;
+        }
+    } else if !["http://", "https://"].into_iter().any(|p| starts_ci(word, p) && word.len() > p.len()) {
+        return None;
+    }
+    let mut url = word;
+    while let Some(last) = url.chars().next_back() {
+        let unbalanced = |open: char, close: char| last == close && url.matches(open).count() < url.matches(close).count();
+        if !".,;:!?'\"*".contains(last) && !unbalanced('(', ')') && !unbalanced('[', ']') {
+            break;
+        }
+        url = &url[..url.len() - last.len_utf8()];
+    }
+    (!url.is_empty()).then_some(url)
 }
 
 fn esc(s: &str) -> String {
@@ -1158,6 +1242,20 @@ mod tests {
              <tr><td><code>x</code></td><td>a | b</td></tr><tr><td><br></td><td><br></td></tr></tbody></table><div>end</div>"
         );
         assert_eq!(from_plain("| a |\n| b |"), "<table><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody></table>");
+    }
+
+    #[test]
+    fn plain_links() {
+        assert_eq!(
+            from_plain("See [Memo](https://memo.app) and www.x.com.br.\n- (https://a.io/b?c=1) `https://no.pe`"),
+            "<div>See <a href=\"https://memo.app\">Memo</a> and <a href=\"https://www.x.com.br\">www.x.com.br</a>.</div>\
+             <div class=\"bullet\">(<a href=\"https://a.io/b?c=1\">https://a.io/b?c=1</a>) <code>https://no.pe</code></div>"
+        );
+        assert_eq!(
+            from_plain("[mail](mailto:a@b.c) [x](file:///etc) xhttps://a.io www. https:// a@www.b.c"),
+            "<div><a href=\"mailto:a@b.c\">mail</a> [x](file:///etc) xhttps://a.io www. https:// a@www.b.c</div>"
+        );
+        assert_eq!(from_plain("| <https://a.io> |"), "<table><tbody><tr><td>&lt;<a href=\"https://a.io\">https://a.io</a>&gt;</td></tr></tbody></table>");
     }
 
     #[test]

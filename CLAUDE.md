@@ -11,7 +11,7 @@ This file holds only what every task needs. Subsystem detail lives in skills und
 | `memo-storage` | `Store`, `notes.json`/`config.json`, data folder, migration, backup/import, trash purge, note model |
 | `memo-windows` | geometry, drag/magnet/Snap, resize, `beside`, close vs trash, startup, tray, lifecycle |
 | `memo-groups` | group bars, joining/leaving, take out / put away, group trash |
-| `memo-editor` | the note editor: HTML format, lists (checklist, bullets, numbered), code blocks + Prism, tables, undo, format bar / Format menu / "Aa" tray, embedded editor |
+| `memo-editor` | the note editor: HTML format, lists (checklist, bullets, numbered), code blocks + Prism, tables, links, undo, format bar / Format menu / "Aa" tray, embedded editor |
 | `memo-manager` | the manager window: tabs, trash scopes, settings (theme, language, zoom, defaults, autostart), Help guide |
 
 ## Commands
