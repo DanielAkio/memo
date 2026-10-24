@@ -1,0 +1,15 @@
+{
+  "large-read-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "read_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ../.ai/hooks/large-read-guard.js"
+          }
+        ]
+      }
+    ]
+  }
+}
