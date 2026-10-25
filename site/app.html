@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memo</title>
+  <meta name="description" content="Memo no navegador: memórias rápidas que você fixa, organiza em grupos e sincroniza com o Google Drive.">
+  <meta name="memo-google-client-id" content="">
+  <link rel="icon" href="media/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="web.css">
+</head>
+<body>
+  <div id="desk" aria-label="Memo">
+    <div id="snapPreview" class="snap-preview" hidden aria-hidden="true">
+      <div class="snap-box"></div>
+    </div>
+  </div>
+
+  <!-- Floating tray control (bottom-right), counterpart of the OS system tray icon -->
+  <div id="trayBar" class="tray-bar" role="toolbar" aria-label="Memo">
+    <button type="button" id="trayManagerBtn" class="tray-main" title="Gerenciador do Memo">
+      <img src="media/icon.svg" width="16" height="16" alt="" aria-hidden="true">
+      <span id="trayLabel">Memo</span>
+    </button>
+    <button type="button" id="trayNewBtn" class="tray-icon-btn" aria-label="Nova memória" title="Nova memória">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
+    </button>
+    <button type="button" id="trayMenuBtn" class="tray-icon-btn" aria-label="Mais comandos" title="Mais comandos" aria-haspopup="menu">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path class="dots" d="M3.75 8h0M8 8h0M12.25 8h0"/></svg>
+    </button>
+  </div>
+
+  <!-- Shared popup menu for window titlebars (… / right click) and the tray -->
+  <div id="contextMenu" class="ctx-menu" role="menu" hidden></div>
+  <div id="contextSubmenu" class="ctx-menu ctx-sub" role="menu" hidden></div>
+
+  <script src="web.js"></script>
+</body>
+</html>

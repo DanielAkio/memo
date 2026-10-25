@@ -1,0 +1,294 @@
+/* Memo Web — browser workspace styling, following src/base.css tokens. */
+
+:root {
+  --desk-bg: radial-gradient(120% 140% at 15% 0%, #191d2b 0%, #11131c 58%, #0b0c11 100%);
+  --color-carbon: #0f1011;
+  --color-obsidian: #161718;
+  --color-graphite: #23252a;
+  --color-smoke: #383b3f;
+  --color-ash: #62666d;
+  --color-fog: #8a8f98;
+  --color-bone: #e5e5e6;
+  --overlay-hover: rgba(255, 255, 255, 0.06);
+  --overlay-active: rgba(255, 255, 255, 0.1);
+  --shadow-win: 0 12px 34px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-menu: rgba(255, 255, 255, 0.04) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.65) 0px 0px 0px 1px, rgba(8, 9, 10, 0.65) 0px 8px 28px 0px;
+  --font-ui: system-ui, "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Ubuntu, Cantarell, "Noto Sans", sans-serif;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --desk-bg: radial-gradient(120% 140% at 15% 0%, #eef2f9 0%, #e1e7f2 58%, #d4dceb 100%);
+    --color-carbon: #fbfbfa;
+    --color-obsidian: #ffffff;
+    --color-graphite: #e4e5e7;
+    --color-smoke: #c4c7cc;
+    --color-ash: #8a8f98;
+    --color-fog: #62666d;
+    --color-bone: #16171a;
+    --overlay-hover: rgba(0, 0, 0, 0.05);
+    --overlay-active: rgba(0, 0, 0, 0.09);
+    --shadow-win: 0 10px 28px rgba(24, 34, 60, 0.14), 0 2px 6px rgba(24, 34, 60, 0.08);
+    --shadow-menu: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.14) 0px 6px 20px 0px;
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --desk-bg: radial-gradient(120% 140% at 15% 0%, #eef2f9 0%, #e1e7f2 58%, #d4dceb 100%);
+  --color-carbon: #fbfbfa;
+  --color-obsidian: #ffffff;
+  --color-graphite: #e4e5e7;
+  --color-smoke: #c4c7cc;
+  --color-ash: #8a8f98;
+  --color-fog: #62666d;
+  --color-bone: #16171a;
+  --overlay-hover: rgba(0, 0, 0, 0.05);
+  --overlay-active: rgba(0, 0, 0, 0.09);
+  --shadow-win: 0 10px 28px rgba(24, 34, 60, 0.14), 0 2px 6px rgba(24, 34, 60, 0.08);
+  --shadow-menu: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.14) 0px 6px 20px 0px;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--desk-bg);
+  font-family: var(--font-ui);
+  color: var(--color-bone);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#desk {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Floating Memo window container */
+.win {
+  position: absolute;
+  box-shadow: var(--shadow-win);
+  border-radius: 0;
+  background: var(--color-carbon);
+  transition: opacity 0.14s ease;
+}
+
+.win.in-pip {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.win.sliding {
+  transition: left 0.15s ease-out, top 0.15s ease-out, opacity 0.14s ease;
+}
+
+.win iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: transparent;
+}
+
+/* While dragging or resizing any window, shield iframes so pointer events stay smooth */
+body.interacting .win:not(.active-gesture) iframe {
+  pointer-events: none;
+}
+
+/* Aero Snap preview zone (matches src/snap.html) */
+.snap-preview {
+  position: absolute;
+  z-index: 90;
+  pointer-events: none;
+  transition: left 0.08s ease, top 0.08s ease, width 0.08s ease, height 0.08s ease;
+}
+
+.snap-box {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  background: rgba(140, 145, 155, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+}
+
+/* Floating tray bar (bottom-right) */
+.tray-bar {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 90000;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-obsidian);
+  box-shadow: var(--shadow-menu);
+}
+
+.tray-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 9px 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-bone);
+  font: 500 12.5px/1 var(--font-ui);
+  cursor: pointer;
+}
+
+.tray-main:hover,
+.tray-icon-btn:hover {
+  background: var(--overlay-hover);
+  color: var(--color-bone);
+}
+
+.tray-main:active,
+.tray-icon-btn:active {
+  background: var(--overlay-active);
+}
+
+.tray-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-fog);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.tray-icon-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tray-icon-btn svg .dots {
+  stroke-width: 2.2;
+}
+
+/* Context / Titlebar / Tray menu */
+.ctx-menu {
+  position: fixed;
+  z-index: 100000;
+  min-width: 196px;
+  max-width: 280px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--color-obsidian);
+  box-shadow: var(--shadow-menu);
+  color: var(--color-bone);
+  font: 400 12.5px/1.35 var(--font-ui);
+}
+
+.ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--color-graphite);
+}
+
+.ctx-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-bone);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ctx-item:hover,
+.ctx-item.is-open {
+  background: var(--overlay-hover);
+}
+
+.ctx-item:disabled {
+  color: var(--color-ash);
+  cursor: default;
+  background: transparent;
+}
+
+.ctx-check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-bone);
+}
+
+.ctx-check svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ctx-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ctx-arrow {
+  width: 12px;
+  height: 12px;
+  color: var(--color-fog);
+  flex-shrink: 0;
+}
+
+.ctx-arrow svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Mobile / small screen (< 680px): full-screen single-view navigation */
+@media (max-width: 679px) {
+  .win {
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-shadow: none;
+  }
+  .win.is-group {
+    display: none !important;
+  }
+  .tray-bar {
+    display: none;
+  }
+}

@@ -1,11 +1,11 @@
 name: Pages
 
-# Publishes site/ (home page and privacy policy, needed by Google's OAuth
-# consent screen) to GitHub Pages. Needs Settings → Pages → Source: GitHub Actions.
+# Publishes site/ (home page, privacy policy and browser web app) to GitHub Pages.
+# Needs Settings → Pages → Source: GitHub Actions.
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "src/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -25,6 +25,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Bundle web app
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID || vars.GOOGLE_WEB_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
+        run: |
+          cp -r src site/src
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
+            sed -i "s|content=\"\"|content=\"$GOOGLE_WEB_CLIENT_ID\"|" site/app.html
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

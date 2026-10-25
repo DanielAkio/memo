@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://danielakio.github.io/memo/"><b>Website</b></a>
+  <a href="https://danielakio.github.io/memo/"><b>Website</b></a> · <a href="https://danielakio.github.io/memo/app.html"><b>Use in browser</b></a>
 </p>
 
 <p align="center">
@@ -94,7 +94,7 @@ in your hands.
 ## Get Memo
 
 Download Memo for Windows, macOS or Linux from **[its website](https://danielakio.github.io/memo/)**, which picks
-the right installer for your computer.
+the right installer for your computer, or **[use Memo right in your browser](https://danielakio.github.io/memo/app.html)** (memories stay in your browser and can sync with the desktop app through Google Drive; pinning a memory uses Picture-in-Picture to float over other apps).
 
 Open it, and Memo greets you with a welcome memory that shows the basics. Closing a memory never deletes it, and
 closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.

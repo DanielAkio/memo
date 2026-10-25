@@ -1425,6 +1425,14 @@
   }
 
   async function init() {
+    if ((window.top && window.top.MemoWeb) || (window.opener && window.opener.MemoWeb)) {
+      const aiSec = settingsView.querySelector('[data-sec="aiControl"]');
+      if (aiSec) aiSec.hidden = true;
+      for (const id of ['chooseDirBtn', 'autostartSwitch', 'updateCheckBtn', 'autoUpdateSwitch', 'quitBtn']) {
+        const row = $(id)?.closest('.setting');
+        if (row) row.hidden = true;
+      }
+    }
     win = await invoke('load_manager');
     applyLayout(win.layout, false);
     // The tray's layout items.

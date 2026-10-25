@@ -4,6 +4,16 @@
 // or full screen); double click, middle click (close) and the right-click
 // menu on the titlebar.
 
+// Web version: inside the browser workspace (site/app.html) or a Document
+// Picture-in-Picture window, MemoWeb supplies the Tauri API for each frame.
+(() => {
+  if (window.__TAURI__) return;
+  const host = (window.top && window.top.MemoWeb)
+    || (window.parent && window.parent.MemoWeb)
+    || (window.opener && window.opener.MemoWeb);
+  if (host) window.__TAURI__ = host.createTauri(window);
+})();
+
 // Global zoom shortcuts, in every window (and the manager's embedded
 // editor): Mod + / Mod − step the zoom of all windows by 10%, Mod 0 resets
 // it, Mod + wheel steps it too. Rust applies it everywhere (change_zoom).
@@ -70,8 +80,8 @@ window.MemoChrome = {
 
     // Calls run one after another. Moves made while a drag_to is waiting
     // share it: Rust reads the latest cursor position anyway.
-    function send(d, cmd) {
-      d.chain = d.chain.then(() => invoke(cmd)).catch((err) => console.error(cmd, err));
+    function send(d, cmd, args) {
+      d.chain = d.chain.then(() => invoke(cmd, args)).catch((err) => console.error(cmd, err));
     }
     function moveDrag(d) {
       if (d.queued) return;
@@ -79,14 +89,14 @@ window.MemoChrome = {
       d.chain = d.chain
         .then(() => {
           d.queued = false;
-          return invoke('drag_to');
+          return invoke('drag_to', { cx: d.cx, cy: d.cy });
         })
         .catch((err) => console.error('drag_to', err));
     }
     const cancelDrag = () => {
       const d = drag;
       drag = null;
-      if (d && d.started) send(d, 'drag_end');
+      if (d && d.started) send(d, 'drag_end', { cx: d.cx, cy: d.cy });
     };
 
     titlebar.addEventListener('mousedown', (e) => {
@@ -103,7 +113,7 @@ window.MemoChrome = {
     titlebar.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || e.target.closest('button, input')) return;
       titlebar.setPointerCapture(e.pointerId); // follow the mouse even outside the window
-      drag = { sx: e.screenX, sy: e.screenY, started: false, queued: false, chain: Promise.resolve() };
+      drag = { sx: e.screenX, sy: e.screenY, cx: e.clientX, cy: e.clientY, started: false, queued: false, chain: Promise.resolve() };
     });
 
     titlebar.addEventListener('pointermove', (e) => {
@@ -111,8 +121,10 @@ window.MemoChrome = {
       if (!drag.started) {
         if (Math.hypot(e.screenX - drag.sx, e.screenY - drag.sy) < 3) return; // a click, not a drag
         drag.started = true;
-        send(drag, 'drag_start');
+        send(drag, 'drag_start', { cx: drag.cx, cy: drag.cy });
       }
+      drag.cx = e.clientX;
+      drag.cy = e.clientY;
       moveDrag(drag);
     });
 
@@ -140,7 +152,7 @@ window.MemoChrome = {
       r.chain = r.chain
         .then(() => {
           r.queued = false;
-          return invoke('resize_to', { edges: r.edges });
+          return invoke('resize_to', { edges: r.edges, cx: r.cx, cy: r.cy });
         })
         .catch((err) => console.error('resize_to', err));
     }
@@ -151,11 +163,19 @@ window.MemoChrome = {
         e.preventDefault();
         e.stopPropagation();
         handle.setPointerCapture(e.pointerId);
-        const r = { edges, queued: false, chain: invoke('resize_start').catch((err) => console.error('resize_start', err)) };
+        const r = {
+          edges,
+          cx: e.clientX,
+          cy: e.clientY,
+          queued: false,
+          chain: invoke('resize_start', { cx: e.clientX, cy: e.clientY }).catch((err) => console.error('resize_start', err)),
+        };
         resize = r;
       });
-      handle.addEventListener('pointermove', () => {
+      handle.addEventListener('pointermove', (e) => {
         if (!resize || resize.edges !== edges) return;
+        resize.cx = e.clientX;
+        resize.cy = e.clientY;
         moveResize(resize);
       });
       const end = () => { resize = null; };
