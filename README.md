@@ -113,7 +113,7 @@ once:
   Memo to Applications and open it; when macOS blocks it, click **Done**, go to **System Settings → Privacy &
   Security**, scroll down and click **Open Anyway**. If it says the app "is damaged", run
   `xattr -cr /Applications/Memo.app` in Terminal and open it again.
-- **Linux**: install the `.deb` or `.rpm` with your package manager, or make the `.AppImage` executable
+- **Linux**: make the `.AppImage` executable
   (`chmod +x Memo*.AppImage`) and run it.
 
 </details>

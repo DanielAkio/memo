@@ -2,9 +2,9 @@ name: Build
 
 # Manual runs only (Actions → Build → Run workflow). Run from a v* tag, it
 # publishes a draft release with the Windows, macOS (Apple Silicon and Intel)
-# and Linux installers. The Windows installers are signed through SignPath
+# and Linux installers. The Windows installer is signed through SignPath
 # once the SIGNPATH_API_TOKEN secret and the SIGNPATH_ORGANIZATION_ID variable
-# exist (docs/code-signing.md); without them they stay unsigned. With the
+# exist (docs/code-signing.md); without them it stays unsigned. With the
 # TAURI_SIGNING_PRIVATE_KEY secret (docs/updates.md) it also signs the update
 # packages and writes latest.json, which the app reads to update itself once
 # the release is published.
@@ -74,14 +74,15 @@ jobs:
 
       - run: npm install
 
-      # The update packages (signed .tar.gz, .AppImage, installers + .sig)
+      # The update packages (signed .app.tar.gz, .AppImage, *-setup.exe + .sig)
       # need the private key, so they are only made here, not on local builds.
+      # On macOS the updater uses the .app bundle (.app.tar.gz), not the .dmg.
       - name: Turn on the update packages
         if: env.UPDATER == 'true'
         shell: bash
         run: |
           node -e "const fs = require('fs'), f = 'src-tauri/tauri.conf.json', c = JSON.parse(fs.readFileSync(f, 'utf8'));
-            c.bundle.createUpdaterArtifacts = true; fs.writeFileSync(f, JSON.stringify(c, null, 2));"
+            c.bundle.createUpdaterArtifacts = true; c.bundle.targets.push('app'); fs.writeFileSync(f, JSON.stringify(c, null, 2));"
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -99,34 +100,15 @@ jobs:
           releaseName: "Memo ${{ github.ref_name }}"
           releaseDraft: true
           args: ${{ matrix.args }}
-          # latest.json: each job adds its platforms; on Windows the app
-          # updates through the NSIS installer, the one the site offers.
-          updaterJsonPreferNsis: true
 
-      # tauri-action also uploads the macOS .app as .app.tar.gz, which only the
-      # updater uses: without the signing key there is no update, so the
-      # release keeps the .dmg only. Each macOS job removes its own tarball.
-      - name: Drop the macOS .app.tar.gz from the release
-        if: runner.os == 'macOS' && env.RELEASE_TAG != '' && env.UPDATER != 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ARCH: ${{ contains(matrix.args, 'aarch64') && 'aarch64' || 'x64' }}
-        run: |
-          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' |
-            { grep -E "_${ARCH}\.app\.tar\.gz$" || true; } |
-            while read -r asset; do
-              gh release delete-asset "$RELEASE_TAG" "$asset" -y
-            done
-
-      - name: Collect Windows installers for signing
+      - name: Collect Windows installer for signing
         if: env.SIGN_WINDOWS == 'true'
         shell: bash
         run: |
           mkdir unsigned
-          cp src-tauri/target/release/bundle/msi/*.msi src-tauri/target/release/bundle/nsis/*-setup.exe unsigned/
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe unsigned/
 
-      - name: Upload unsigned Windows installers
+      - name: Upload unsigned Windows installer
         id: upload-unsigned
         if: env.SIGN_WINDOWS == 'true'
         uses: actions/upload-artifact@v4
@@ -135,7 +117,7 @@ jobs:
           path: unsigned/
 
       # Each request waits for a manual approval in SignPath (Foundation rule).
-      - name: Sign Windows installers
+      - name: Sign Windows installer
         if: env.SIGN_WINDOWS == 'true'
         uses: signpath/github-action-submit-signing-request@v1
         with:
@@ -149,7 +131,7 @@ jobs:
           wait-for-completion-timeout-in-seconds: 3600
           output-artifact-directory: signed
 
-      - name: Add signed installers to the draft release
+      - name: Add signed installer to the draft release
         if: env.SIGN_WINDOWS == 'true' && env.RELEASE_TAG != ''
         shell: bash
         env:
@@ -161,11 +143,11 @@ jobs:
             gh release create "$RELEASE_TAG" signed/* --draft --title "Memo $RELEASE_TAG"
           fi
 
-      # Signing changed the installers, so the update signatures tauri-action
-      # made no longer match: sign the signed ones and point latest.json's
-      # Windows entries at them. This job waits for the SignPath approval, so
+      # Signing changed the installer, so the update signature tauri-action
+      # made no longer matches: sign the signed one and point latest.json's
+      # Windows entries at it. This job waits for the SignPath approval, so
       # the other jobs have written their platforms to latest.json by now.
-      - name: Add the signed Windows installers to latest.json
+      - name: Add the signed Windows installer to latest.json
         if: env.SIGN_WINDOWS == 'true' && env.UPDATER == 'true' && env.RELEASE_TAG != ''
         shell: bash
         env:
@@ -174,22 +156,18 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           exe=$(ls signed/*-setup.exe | head -n 1)
-          msi=$(ls signed/*.msi | head -n 1)
           npx tauri signer sign "$exe"
-          npx tauri signer sign "$msi"
           gh release download "$RELEASE_TAG" -p latest.json -O latest.json || echo '{}' > latest.json
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
           jq --arg version "${RELEASE_TAG#v}" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
              --arg exe "$base/$(basename "$exe")" --arg exe_sig "$(cat "$exe.sig")" \
-             --arg msi "$base/$(basename "$msi")" --arg msi_sig "$(cat "$msi.sig")" \
              '.version //= $version | .notes //= "" | .pub_date //= $date
               | .platforms["windows-x86_64"] = { url: $exe, signature: $exe_sig }
-              | .platforms["windows-x86_64-nsis"] = { url: $exe, signature: $exe_sig }
-              | .platforms["windows-x86_64-msi"] = { url: $msi, signature: $msi_sig }' \
+              | .platforms["windows-x86_64-nsis"] = { url: $exe, signature: $exe_sig }' \
              latest.json > latest.tmp && mv latest.tmp latest.json
           gh release upload "$RELEASE_TAG" latest.json --clobber
 
-      - name: Upload signed Windows installers
+      - name: Upload signed Windows installer
         if: env.SIGN_WINDOWS == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -202,10 +180,7 @@ jobs:
         with:
           name: memo-${{ matrix.platform }}${{ matrix.args != '' && '-' || '' }}${{ contains(matrix.args, 'aarch64') && 'arm64' || contains(matrix.args, 'x86_64') && 'x64' || '' }}
           path: |
-            src-tauri/target/**/release/bundle/**/*.msi
             src-tauri/target/**/release/bundle/**/*-setup.exe
             src-tauri/target/**/release/bundle/**/*.dmg
-            src-tauri/target/**/release/bundle/**/*.deb
-            src-tauri/target/**/release/bundle/**/*.rpm
             src-tauri/target/**/release/bundle/**/*.AppImage
           if-no-files-found: ignore

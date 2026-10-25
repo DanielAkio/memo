@@ -105,7 +105,7 @@ pages call at startup may need a case in `stage.js`'s `invoke`.
 
 - **Windows**: Settings → Apps → Installed apps → Memo → Uninstall.
 - **macOS**: quit Memo from the menu bar and drag `Memo.app` from Applications to the Trash.
-- **Linux**: `sudo apt remove memo` (`.deb`) or `sudo dnf remove memo` (`.rpm`); for the AppImage, delete the file.
+- **Linux**: delete the `.AppImage` file.
 
 Uninstalling keeps the data folder; delete it to remove the memories too.
 

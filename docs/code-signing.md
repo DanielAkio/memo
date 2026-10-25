@@ -1,7 +1,7 @@
 # Code signing
 
 Unsigned installers make browsers and Windows SmartScreen warn that the file "may be dangerous". Memo applies to
-[SignPath Foundation](https://signpath.org), which signs open source projects for free, for the Windows installers.
+[SignPath Foundation](https://signpath.org), which signs open source projects for free, for the Windows installer.
 macOS notarization needs the paid Apple Developer Program and is not set up; Linux packages need no signature.
 
 Even signed, SmartScreen can still warn on the first downloads of a new certificate until it builds reputation.
@@ -9,10 +9,10 @@ Even signed, SmartScreen can still warn on the first downloads of a new certific
 ## What the workflow does
 
 `.github/workflows/build.yml` signs only when the repository has the `SIGNPATH_API_TOKEN` secret. Then the Windows
-job builds as usual, uploads the `.msi` and `*-setup.exe` as the `memo-windows-unsigned` artifact, submits it to
-SignPath and waits (up to an hour) for the request to be approved and signed. The signed files become the
-`memo-windows-latest` artifact and, on a `v*` tag, are added to the draft release. Without the secret nothing changes:
-the installers stay unsigned.
+job builds as usual, uploads the `*-setup.exe` as the `memo-windows-unsigned` artifact, submits it to
+SignPath and waits (up to an hour) for the request to be approved and signed. The signed file becomes the
+`memo-windows-latest` artifact and, on a `v*` tag, is added to the draft release. Without the secret nothing changes:
+the installer stays unsigned.
 
 ## Setting it up
 
@@ -27,9 +27,6 @@ the installers stay unsigned.
      <?xml version="1.0" encoding="utf-8"?>
      <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
        <zip-file>
-         <msi-file path="*.msi">
-           <authenticode-sign/>
-         </msi-file>
          <pe-file path="*-setup.exe">
            <authenticode-sign/>
          </pe-file>
@@ -42,5 +39,5 @@ the installers stay unsigned.
    variable `SIGNPATH_ORGANIZATION_ID` (the SignPath organization id).
 4. Run the workflow and approve the signing request in SignPath while the Windows job waits.
 
-Only the installers themselves are signed; `Memo.exe` inside them is not. That is enough for the download warning,
+Only the installer itself is signed; `Memo.exe` inside it is not. That is enough for the download warning,
 which checks the file that was downloaded.

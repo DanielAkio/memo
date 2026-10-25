@@ -1,7 +1,6 @@
 # Environment to build the Windows installer (NSIS) from Linux, without
 # installing Rust, Node or Visual Studio on the machine. Follows Tauri's
-# "Build Windows apps on Linux" guide: cargo-xwin + LLVM + NSIS. The .msi
-# can't be built here (WiX only runs on Windows); use CI for that.
+# "Build Windows apps on Linux" guide: cargo-xwin + LLVM + NSIS.
 FROM node:22-trixie-slim AS node
 
 FROM rust:1-trixie

@@ -31,7 +31,7 @@ Unchanged: bump the version (`package.json`, `src-tauri/Cargo.toml`, `src-tauri/
 and run the Build workflow from it. With the secret present, the workflow also:
 
 - turns on `bundle.createUpdaterArtifacts`, so each job also builds signed update packages (macOS `.app.tar.gz`,
-  Linux `.AppImage` / `.deb` / `.rpm`, the Windows installers) with a `.sig` beside them;
+  Linux `.AppImage`, the Windows `*-setup.exe`) with a `.sig` beside them;
 - has `tauri-action` upload them and add each platform to `latest.json` in the draft release;
 - with SignPath on, signs the SignPath-signed Windows installers again for the updater and rewrites latest.json's
   Windows entries to point at them.
@@ -47,5 +47,5 @@ builds (`npm run build`, Docker) make no update packages and need no key.
   Settings → App shows it with "Update and restart". Installing downloads the package, checks the signature, saves
   pending changes, installs and restarts. On Windows the NSIS installer runs in passive mode (a progress bar, no
   questions) and closes the app itself.
-- Linux: an AppImage replaces itself; a `.deb` / `.rpm` install asks for the administrator password (`pkexec`).
+- Linux: the AppImage replaces itself.
 - Testing the whole flow needs two releases: install the older one, publish the newer one, then "Check for updates".
