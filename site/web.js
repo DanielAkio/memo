@@ -3146,18 +3146,31 @@
     const pt = lang === 'pt';
     const day = 86_400_000;
     const now = nowMs();
+    const groupWork = {
+      id: 'demo-work',
+      name: pt ? 'Trabalho' : 'Work',
+      color: 'teal',
+      x: 56,
+      y: 36,
+      width: 296,
+      open: true,
+      pinned: false,
+      hidden: false,
+    };
+    const groupProjects = {
+      id: 'demo-projects',
+      name: pt ? 'Projetos' : 'Projects',
+      color: 'coral',
+      x: 56,
+      y: 36,
+      width: 312,
+      open: true,
+      pinned: false,
+      hidden: false,
+    };
     return {
-      group: {
-        id: 'demo-work',
-        name: pt ? 'Trabalho' : 'Work',
-        color: 'teal',
-        x: 56,
-        y: 36,
-        width: 312,
-        open: true,
-        pinned: false,
-        hidden: false,
-      },
+      group: groupWork,
+      groups: [groupWork, groupProjects],
       notes: [
         {
           id: 'demo-today',
@@ -3234,8 +3247,8 @@
             ? '- Lançar a 0.4 na sexta\n- Ana cuida das notas da versão\n- Próxima reunião: terça'
             : '- Ship 0.4 on Friday\n- Ana owns the release notes\n- Next sync: Tuesday',
           html: '',
-          color: 'yellow',
-          groupId: 'demo-work',
+          color: 'coral',
+          groupId: 'demo-projects',
           x: 366,
           y: 88,
           width: 296,
@@ -3312,19 +3325,22 @@
 
   function seedDemoData(lang, force = false) {
     const cat = demoCatalog(lang);
-    let grp = findGroup(cat.group.id);
-    if (!grp) {
-      data.groups.push(Object.assign({
-        seq: data.nextSeq++,
-        createdAt: nowMs(),
-        updatedAt: nowMs(),
-        trashedAt: null,
-        demoSeed: true,
-      }, cat.group));
-    } else if (force || grp.demoSeed) {
-      grp.name = cat.group.name;
-      if (force) {
-        Object.assign(grp, cat.group, { trashedAt: null, demoSeed: true });
+    const groups = cat.groups || (cat.group ? [cat.group] : []);
+    for (const gDef of groups) {
+      let grp = findGroup(gDef.id);
+      if (!grp) {
+        data.groups.push(Object.assign({
+          seq: data.nextSeq++,
+          createdAt: nowMs(),
+          updatedAt: nowMs(),
+          trashedAt: null,
+          demoSeed: true,
+        }, gDef));
+      } else if (force || grp.demoSeed) {
+        grp.name = gDef.name;
+        if (force) {
+          Object.assign(grp, gDef, { trashedAt: null, demoSeed: true });
+        }
       }
     }
 
@@ -3493,6 +3509,7 @@
       for (const id of ['demo-q4', 'demo-meet', 'demo-ideas']) {
         const n = findNote(id);
         if (n) {
+          if (id === 'demo-meet') n.groupId = 'demo-work';
           n.hidden = false;
           await openNoteWindow(n);
         }
@@ -3530,13 +3547,40 @@
     const pos = {};
     const hero = anchorRect('anchorHero');
     if (hero) {
-      if (hero.w >= 640) {
-        pos['note-demo-today'] = { x: hero.x + Math.round(hero.w / 2) - 318, y: hero.y + 8, w: 304, h: 252 };
-        pos['note-demo-wifi'] = { x: hero.x + Math.round(hero.w / 2) + 14, y: hero.y + 24, w: 296, h: 224 };
+      const groupY = hero.y + 8;
+      const noteQ4Y = groupY + TITLEBAR_H + SNAP_GAP;
+      if (hero.w >= 880) {
+        const gap = hero.w >= 960 ? 24 : 16;
+        const colW = Math.min(296, Math.floor((hero.w - gap * 2) / 3));
+        const totalW = colW * 3 + gap * 2;
+        const startX = hero.x + Math.max(0, Math.round((hero.w - totalW) / 2));
+        const x1 = startX;
+        const x2 = startX + colW + gap;
+        const x3 = startX + (colW + gap) * 2;
+
+        pos['group-demo-work'] = { x: x1, y: groupY, w: colW, h: TITLEBAR_H };
+        pos['note-demo-q4'] = { x: x1, y: noteQ4Y, w: colW, h: 210 };
+        pos['note-demo-today'] = { x: x2, y: hero.y + 14, w: colW, h: 246 };
+        pos['note-demo-wifi'] = { x: x3, y: hero.y + 26, w: colW, h: 224 };
+      } else if (hero.w >= 600) {
+        const gap = 16;
+        const colW = Math.min(320, Math.floor((hero.w - gap) / 2));
+        const totalW = colW * 2 + gap;
+        const startX = hero.x + Math.max(0, Math.round((hero.w - totalW) / 2));
+        const x1 = startX;
+        const x2 = startX + colW + gap;
+
+        pos['group-demo-work'] = { x: x1, y: groupY, w: colW, h: TITLEBAR_H };
+        pos['note-demo-q4'] = { x: x1, y: noteQ4Y, w: colW, h: 210 };
+        pos['note-demo-today'] = { x: x2, y: hero.y + 8, w: colW, h: 240 };
+        pos['note-demo-wifi'] = { x: x2, y: hero.y + 264, w: colW, h: 216 };
       } else {
         const w = Math.min(340, hero.w);
-        pos['note-demo-today'] = { x: hero.x, y: hero.y + 8, w, h: 240 };
-        pos['note-demo-wifi'] = { x: hero.x, y: hero.y + 260, w, h: 220 };
+        const x = hero.x + Math.max(0, Math.round((hero.w - w) / 2));
+        pos['group-demo-work'] = { x, y: groupY, w, h: TITLEBAR_H };
+        pos['note-demo-q4'] = { x, y: noteQ4Y, w, h: 200 };
+        pos['note-demo-today'] = { x, y: hero.y + 264, w, h: 240 };
+        pos['note-demo-wifi'] = { x, y: hero.y + 518, w, h: 216 };
       }
     }
     const write = anchorRect('anchorWrite');
@@ -3546,16 +3590,16 @@
     }
     const grp = anchorRect('anchorGroup');
     if (grp) {
-      pos['group-demo-work'] = { x: grp.x, y: grp.y + 4, w: Math.min(312, grp.w), h: TITLEBAR_H };
+      const grpY = grp.y + 4;
+      const grpNoteY = grpY + TITLEBAR_H + SNAP_GAP;
+      pos['group-demo-projects'] = { x: grp.x, y: grpY, w: Math.min(312, grp.w), h: TITLEBAR_H };
       if (grp.w >= 540) {
-        pos['note-demo-q4'] = { x: grp.x, y: grp.y + 52, w: 268, h: 204 };
-        pos['note-demo-meet'] = { x: grp.x + 280, y: grp.y + 52, w: 268, h: 204 };
-        pos['note-demo-ideas'] = { x: grp.x + 120, y: grp.y + 268, w: 304, h: 172 };
+        pos['note-demo-meet'] = { x: grp.x, y: grpNoteY, w: 268, h: 204 };
+        pos['note-demo-ideas'] = { x: grp.x + 280, y: grpNoteY, w: 268, h: 204 };
       } else {
         const w = Math.min(340, grp.w);
-        pos['note-demo-q4'] = { x: grp.x, y: grp.y + 52, w, h: 190 };
-        pos['note-demo-meet'] = { x: grp.x, y: grp.y + 252, w, h: 190 };
-        pos['note-demo-ideas'] = { x: grp.x, y: grp.y + 452, w, h: 165 };
+        pos['note-demo-meet'] = { x: grp.x, y: grpNoteY, w, h: 190 };
+        pos['note-demo-ideas'] = { x: grp.x, y: grpNoteY + 190 + SNAP_GAP, w, h: 165 };
       }
     }
     const mgr = anchorRect('anchorManager');
@@ -3603,8 +3647,10 @@
       }
     }
 
-    const g = findGroup('demo-work');
-    if (g) await openGroupWindow(g);
+    for (const gid of ['demo-work', 'demo-projects']) {
+      const g = findGroup(gid);
+      if (g) await openGroupWindow(g);
+    }
 
     for (const id of ['demo-today', 'demo-wifi', 'demo-launch', 'demo-q4', 'demo-meet', 'demo-ideas']) {
       const n = findNote(id);

@@ -603,7 +603,7 @@
 
   const panels = { settings: settingsView, help: $('helpView') };
   // The open sections of each tab, by data-sec (kept when Sync comes and goes).
-  const openSecs = { settings: new Set(['appearance']), help: new Set(['0']) };
+  const openSecs = { settings: new Set(), help: new Set() };
   // Memories and Groups share one search; Settings and Help keep their own.
   const queries = { list: '', settings: '', help: '' };
   let queryKey = 'list';

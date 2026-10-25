@@ -112,14 +112,18 @@ window.MemoChrome = {
 
     titlebar.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || e.target.closest('button, input')) return;
-      titlebar.setPointerCapture(e.pointerId); // follow the mouse even outside the window
-      drag = { sx: e.screenX, sy: e.screenY, cx: e.clientX, cy: e.clientY, started: false, queued: false, chain: Promise.resolve() };
+      const active = document.activeElement;
+      if (active && active.matches('input') && titlebar.contains(active)) active.blur();
+      try { titlebar.setPointerCapture(e.pointerId); } catch (_) {}
+      drag = { sx: e.screenX || e.clientX, sy: e.screenY || e.clientY, cx: e.clientX, cy: e.clientY, started: false, queued: false, chain: Promise.resolve() };
     });
 
     titlebar.addEventListener('pointermove', (e) => {
       if (!drag) return;
       if (!drag.started) {
-        if (Math.hypot(e.screenX - drag.sx, e.screenY - drag.sy) < 3) return; // a click, not a drag
+        const sx = e.screenX || e.clientX;
+        const sy = e.screenY || e.clientY;
+        if (Math.hypot(sx - drag.sx, sy - drag.sy) < 3) return; // a click, not a drag
         drag.started = true;
         send(drag, 'drag_start', { cx: drag.cx, cy: drag.cy });
       }
@@ -162,7 +166,7 @@ window.MemoChrome = {
         if (e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
-        handle.setPointerCapture(e.pointerId);
+        try { handle.setPointerCapture(e.pointerId); } catch (_) {}
         const r = {
           edges,
           cx: e.clientX,

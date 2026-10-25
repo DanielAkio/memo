@@ -234,11 +234,13 @@
   // memories to the front with it. Only single clicks: the second click of
   // a double-click renames, and raising the notes would blur the name field.
   let downAt = null;
-  titlebar.addEventListener('pointerdown', (e) => { downAt = [e.screenX, e.screenY]; });
+  titlebar.addEventListener('pointerdown', (e) => { downAt = [e.screenX || e.clientX, e.screenY || e.clientY]; });
   titlebar.addEventListener('click', (e) => {
     if (!group || !group.open || renaming || e.detail > 1 || !downAt) return;
     if (e.target.closest('button, input')) return;
-    if (Math.hypot(e.screenX - downAt[0], e.screenY - downAt[1]) >= 3) return; // a drag
+    const sx = e.screenX || e.clientX;
+    const sy = e.screenY || e.clientY;
+    if (Math.hypot(sx - downAt[0], sy - downAt[1]) >= 3) return; // a drag
     invoke('show_group_notes').catch((err) => console.error('show_group_notes', err));
   });
 

@@ -189,7 +189,7 @@ try {
   });
 
   // ------------------------------------------------ 3. Note window chrome
-  await step('Note window chrome: pin, double-click rename, colour picker, close != trash', async () => {
+  await step('Note window chrome: pin, double-click rename, colour picker, touch drag, close != trash', async () => {
     const res = await page.evaluate(async () => {
       const doc = window.Memo.frameDoc('note-ed1');
       // 1. Pin
@@ -214,12 +214,31 @@ try {
       const color = window.Memo.notes.ed1.color;
       const frameColor = doc.getElementById('frame').dataset.color;
 
-      // 4. Close button (✕) closes (hidden=true) and does NOT trash (trashedAt=null)
+      // 4. Touch action & touch drag
+      const titlebarTouchAction = doc.defaultView.getComputedStyle(titlebar).touchAction;
+      const gripTouchAction = doc.defaultView.getComputedStyle(doc.getElementById('grip')).touchAction;
+      const rsTouchAction = doc.defaultView.getComputedStyle(doc.querySelector('.rs-se')).touchAction;
+
+      const calls = [];
+      window.Memo.hooks.drag_start = (label) => { calls.push(['drag_start', label]); };
+      window.Memo.hooks.drag_to = (label) => { calls.push(['drag_to', label]); };
+      window.Memo.hooks.drag_end = (label) => { calls.push(['drag_end', label]); };
+
+      titlebar.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, pointerType: 'touch', button: 0, clientX: 50, clientY: 10, screenX: 50, screenY: 10, bubbles: true }));
+      titlebar.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, pointerType: 'touch', button: 0, clientX: 60, clientY: 20, screenX: 60, screenY: 20, bubbles: true }));
+      titlebar.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'touch', button: 0, clientX: 60, clientY: 20, screenX: 60, screenY: 20, bubbles: true }));
+      await new Promise((r) => setTimeout(r, 30));
+
+      delete window.Memo.hooks.drag_start;
+      delete window.Memo.hooks.drag_to;
+      delete window.Memo.hooks.drag_end;
+
+      // 5. Close button (✕) closes (hidden=true) and does NOT trash (trashedAt=null)
       doc.getElementById('closeBtn').click();
       await new Promise((r) => setTimeout(r, 30));
       const { hidden, trashedAt } = window.Memo.notes.ed1;
 
-      return { pinned, title, shownName, color, frameColor, hidden, trashedAt };
+      return { pinned, title, shownName, color, frameColor, hidden, trashedAt, titlebarTouchAction, gripTouchAction, rsTouchAction, calls };
     });
 
     assert.equal(res.pinned, true);
@@ -227,6 +246,12 @@ try {
     assert.equal(res.shownName, 'Lista da semana');
     assert.equal(res.color, 'coral');
     assert.equal(res.frameColor, 'coral');
+    assert.equal(res.titlebarTouchAction, 'none', 'Titlebar must have touch-action: none');
+    assert.equal(res.gripTouchAction, 'none', 'Grip must have touch-action: none');
+    assert.equal(res.rsTouchAction, 'none', 'Resize handle must have touch-action: none');
+    assert.ok(res.calls.some((c) => c[0] === 'drag_start'), 'Touch drag must call drag_start');
+    assert.ok(res.calls.some((c) => c[0] === 'drag_to'), 'Touch drag must call drag_to');
+    assert.ok(res.calls.some((c) => c[0] === 'drag_end'), 'Touch drag must call drag_end');
     assert.equal(res.hidden, true, 'Closing with ✕ must set hidden=true');
     assert.equal(res.trashedAt, null, 'Closing with ✕ must NOT trash the note');
   });
@@ -370,10 +395,12 @@ try {
       // Switch to Settings tab
       doc.getElementById('tabSettings').click();
       const settingsVisible = !doc.getElementById('settingsView').hidden;
+      const openSettingsCount = doc.querySelectorAll('#settingsView .sec.is-open').length;
 
       // Switch to Help tab and check rendered sections + demos
       doc.getElementById('tabHelp').click();
       const helpSections = doc.querySelectorAll('#helpView .sec').length;
+      const openHelpCount = doc.querySelectorAll('#helpView .sec.is-open').length;
       const helpDemos = doc.querySelectorAll('#helpView .help-demo').length;
 
       return {
@@ -391,7 +418,9 @@ try {
         groupCardsCount,
         g1DeletedForever,
         settingsVisible,
+        openSettingsCount,
         helpSections,
+        openHelpCount,
         helpDemos,
       };
     });
@@ -410,7 +439,9 @@ try {
     assert.equal(mgrRes.groupCardsCount, 1);
     assert.equal(mgrRes.g1DeletedForever, true, 'Middle click on group in trash should permanently delete group');
     assert.equal(mgrRes.settingsVisible, true);
+    assert.equal(mgrRes.openSettingsCount, 0, 'Settings sections should all be closed by default');
     assert.equal(mgrRes.helpSections, 5);
+    assert.equal(mgrRes.openHelpCount, 0, 'Help sections should all be closed by default');
     assert.ok(mgrRes.helpDemos > 10, 'Help tab should render interactive demo elements');
   });
 

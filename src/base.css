@@ -236,6 +236,7 @@ html, body {
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
+  touch-action: none;
 }
 
 .actions {
@@ -287,7 +288,7 @@ html, body {
 
 /* Resize handles (created by chrome.js): thin strips on the edges and squares
    in the corners, invisible, cursor only. */
-.rs { position: absolute; z-index: 30; }
+.rs { position: absolute; z-index: 30; touch-action: none; }
 .rs-n, .rs-s { left: 8px; right: 8px; height: 4px; cursor: ns-resize; }
 .rs-e, .rs-w { top: 8px; bottom: 8px; width: 4px; cursor: ew-resize; }
 .rs-n { top: 0; }
@@ -312,6 +313,7 @@ html, body {
   place-items: center;
   cursor: nwse-resize;
   color: var(--color-smoke);
+  touch-action: none;
 }
 .grip svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; }
 .grip:hover { color: var(--color-fog); }
