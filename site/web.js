@@ -3114,7 +3114,7 @@
       },
       window: { getCurrentWindow: () => winApi },
       webviewWindow: { getCurrentWebviewWindow: () => winApi },
-      app: { getVersion: async () => '0.7.1 (Web)' },
+      app: { getVersion: async () => '0.8.0 (Web)' },
     };
   }
 
