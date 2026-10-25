@@ -8,8 +8,10 @@
   <meta property="og:title" content="Memo: sticky memories you pin on top of everything">
   <meta property="og:description" content="A small, free notes app for Windows, macOS and Linux. Pin a memory and it stays on top of every other app.">
   <meta property="og:image" content="https://danielakio.github.io/memo/media/pin-dark-en.gif">
+  <meta name="memo-google-client-id" content="">
   <link rel="icon" href="media/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="web.css">
   <script src="prefs.js"></script>
 </head>
 <body class="home">
@@ -22,38 +24,18 @@
   <section class="hero">
     <h1 lang="en">Sticky memories you pin on top of everything.</h1>
     <h1 lang="pt-BR">Memórias que você fixa por cima de tudo.</h1>
-    <p lang="en" class="lead">Memo is a small, free notes app. Write something down, click the pin, and it stays in sight over
-      every other app while you work.</p>
-    <p lang="pt-BR" class="lead">O Memo é um app de notas leve e gratuito. Anote, clique no alfinete, e a memória fica à vista por
-      cima de todos os outros apps enquanto você trabalha.</p>
     <div class="cta">
       <a lang="en" class="button" data-download href="https://github.com/DanielAkio/memo/releases/latest">Download Memo</a>
       <a lang="pt-BR" class="button" data-download href="https://github.com/DanielAkio/memo/releases/latest">Baixar o Memo</a>
       <a lang="en" class="button ghost" href="app.html">Use in browser</a>
       <a lang="pt-BR" class="button ghost" href="app.html">Usar no navegador</a>
     </div>
-    <p lang="en" class="os-hint" data-os="macOS" hidden>On a Mac, macOS asks you to allow Memo the first time you open it.
-      <a href="#mac">Here's how</a></p>
-    <p lang="pt-BR" class="os-hint" data-os="macOS" hidden>No Mac, o macOS pede que você libere o Memo na primeira vez que ele é aberto.
-      <a href="#mac">Veja como</a></p>
-    <p lang="en" class="os-hint" data-os="Windows" hidden>Your browser or Windows may warn about the download the first time.
-      <a href="#windows">Here's why</a></p>
-    <p lang="pt-BR" class="os-hint" data-os="Windows" hidden>O navegador ou o Windows podem avisar sobre o download na primeira vez.
-      <a href="#windows">Entenda por quê</a></p>
     <p lang="en" class="facts"><span>Free</span><span>No account</span><span>Works offline</span><span>Windows, macOS, Linux, Web</span></p>
     <p lang="pt-BR" class="facts"><span>Gratuito</span><span>Sem cadastro</span><span>Funciona offline</span><span>Windows, macOS, Linux, Web</span></p>
   </section>
 
-  <div class="shot">
-    <picture lang="en">
-      <source media="(prefers-color-scheme: light)" srcset="media/pin-light-en.gif">
-      <img src="media/pin-dark-en.gif" width="960" height="540" loading="lazy" alt="A memory with a to-do list is pinned over a spreadsheet and stays in sight while the spreadsheet is being edited">
-    </picture>
-    <picture lang="pt-BR">
-      <source media="(prefers-color-scheme: light)" srcset="media/pin-light-pt.gif">
-      <img src="media/pin-dark-pt.gif" width="960" height="540" loading="lazy" alt="Uma memória com uma lista de tarefas é fixada sobre uma planilha e continua à vista enquanto a planilha é editada">
-    </picture>
-  </div>
+  <!-- Loose Memo notes float directly here on the page (positioned by web.js) -->
+  <div class="memo-anchor hero-anchor" id="anchorHero"></div>
 
   <section class="benefits" id="features">
     <div class="benefit">
@@ -104,16 +86,7 @@
       <p lang="en">Pick a colour so you know what's what at a glance, or any colour you like with the eyedropper.</p>
       <p lang="pt-BR">Escolha uma cor para saber o que é o quê num relance, ou qualquer cor que quiser com o conta-gotas.</p>
     </div>
-    <div class="shot">
-      <picture lang="en">
-        <source media="(prefers-color-scheme: light)" srcset="media/write-light-en.gif">
-        <img src="media/write-dark-en.gif" width="960" height="540" loading="lazy" alt="Naming a memory, typing a checklist and a command between backticks that turns into code, highlighting a line, ticking two items and picking the memory's colour">
-      </picture>
-      <picture lang="pt-BR">
-        <source media="(prefers-color-scheme: light)" srcset="media/write-light-pt.gif">
-        <img src="media/write-dark-pt.gif" width="960" height="540" loading="lazy" alt="Dando nome a uma memória, digitando uma lista de tarefas e um comando entre crases que vira código, destacando uma linha, marcando dois itens e escolhendo a cor da memória">
-      </picture>
-    </div>
+    <div class="memo-anchor write-anchor" id="anchorWrite"></div>
   </section>
 
   <section class="feature flip">
@@ -129,16 +102,7 @@
       <p lang="pt-BR">Solte uma memória sobre a barra para colocá-la no grupo. Cada grupo ganha uma cor própria, que tinge
         as suas memórias para você distingui-las.</p>
     </div>
-    <div class="shot">
-      <picture lang="en">
-        <source media="(prefers-color-scheme: light)" srcset="media/group-light-en.gif">
-        <img src="media/group-dark-en.gif" width="960" height="540" loading="lazy" alt="A group bar puts its memories away and brings them back; a memory dropped on the bar joins the group">
-      </picture>
-      <picture lang="pt-BR">
-        <source media="(prefers-color-scheme: light)" srcset="media/group-light-pt.gif">
-        <img src="media/group-dark-pt.gif" width="960" height="540" loading="lazy" alt="A barra de um grupo guarda suas memórias e as traz de volta; uma memória solta sobre a barra entra no grupo">
-      </picture>
-    </div>
+    <div class="memo-anchor group-anchor" id="anchorGroup"></div>
   </section>
 
   <section class="feature">
@@ -155,16 +119,7 @@
         direito em qualquer barra, abre todos os comandos do Memo, de um grupo novo às Configurações, de onde você
         estiver.</p>
     </div>
-    <div class="shot">
-      <picture lang="en">
-        <source media="(prefers-color-scheme: light)" srcset="media/manager-light-en.gif">
-        <img src="media/manager-dark-en.gif" width="960" height="540" loading="lazy" alt="The Memo Manager searches memories, moves one to the trash, restores it from the trash and reopens it">
-      </picture>
-      <picture lang="pt-BR">
-        <source media="(prefers-color-scheme: light)" srcset="media/manager-light-pt.gif">
-        <img src="media/manager-dark-pt.gif" width="960" height="540" loading="lazy" alt="O Gerenciador do Memo busca memórias, manda uma para a lixeira, restaura e reabre">
-      </picture>
-    </div>
+    <div class="memo-anchor manager-anchor" id="anchorManager"></div>
   </section>
 
   <section class="feature pair">
@@ -320,6 +275,31 @@
     © 2026 Daniel Akio Teixeira
   </footer>
 </main>
+
+<!-- Loose Memo components rendered directly on the page -->
+<div id="desk" aria-label="Memo">
+  <div id="snapPreview" class="snap-preview" hidden aria-hidden="true">
+    <div class="snap-box"></div>
+  </div>
+</div>
+
+<div id="trayBar" class="tray-bar" role="toolbar" aria-label="Memo">
+  <button type="button" id="trayManagerBtn" class="tray-main" title="Gerenciador do Memo">
+    <img src="media/icon.svg" width="16" height="16" alt="" aria-hidden="true">
+    <span id="trayLabel">Memo</span>
+  </button>
+  <button type="button" id="trayNewBtn" class="tray-icon-btn" aria-label="Nova memória" title="Nova memória">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
+  </button>
+  <button type="button" id="trayMenuBtn" class="tray-icon-btn" aria-label="Mais comandos" title="Mais comandos" aria-haspopup="menu">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.75 8h0M8 8h0M12.25 8h0" class="dots"/></svg>
+  </button>
+</div>
+
+<div id="contextMenu" class="ctx-menu" role="menu" hidden></div>
+<div id="contextSubmenu" class="ctx-menu ctx-sub" role="menu" hidden></div>
+
 <script src="site.js"></script>
+<script src="web.js"></script>
 </body>
 </html>

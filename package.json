@@ -2,13 +2,16 @@
   "name": "memo",
   "version": "0.7.1",
   "private": true,
-  "description": "Sticky memories you pin on top of everything — Windows, macOS and Linux",
+  "description": "Sticky memories you pin on top of everything â€” Windows, macOS and Linux",
   "license": "MIT",
   "scripts": {
     "dev": "tauri dev",
     "web": "node tools/serve-web.mjs",
     "build": "tauri build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "check": "node tools/check.mjs",
+    "test:ui": "node tools/test-ui.mjs",
+    "test": "node tools/check.mjs && node tools/test-ui.mjs && cargo test --manifest-path src-tauri/Cargo.toml -q"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

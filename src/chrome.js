@@ -8,7 +8,7 @@
 // Picture-in-Picture window, MemoWeb supplies the Tauri API for each frame.
 (() => {
   if (window.__TAURI__) return;
-  const host = (window.top && window.top.MemoWeb)
+  const host = (window.parent && window.parent.MemoWeb) || (window.parent && window.parent.parent && window.parent.parent.MemoWeb) || (window.top && window.top.MemoWeb)
     || (window.parent && window.parent.MemoWeb)
     || (window.opener && window.opener.MemoWeb);
   if (host) window.__TAURI__ = host.createTauri(window);

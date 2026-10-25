@@ -1,6 +1,6 @@
-// Stage for the site's demo GIFs: a fake desktop where each Memo window is
-// an iframe of the real app page (src/), backed by the fake Tauri API in
-// mock.js. record.mjs drives it.
+// Stage for the site's demo GIFs and UI tests: a fake desktop where each
+// Memo window is an iframe of the real app page (src/), backed by the fake
+// Tauri API in mock.js.
 (() => {
   const q = new URLSearchParams(location.search);
   const theme = q.get('theme') || 'dark';
@@ -75,9 +75,14 @@
       case 'load_group': return g ? [copy(g), members(g.id).length] : null;
       case 'rename_group': g.name = a.name.trim(); M.emit('groups-changed'); return g.name;
       case 'set_group_color': g.color = a.color; M.emit('groups-changed'); return null;
+      case 'toggle_group': g.open = !g.open; M.emit('groups-changed'); return g.open;
+      case 'close_group': g.hidden = true; M.closeWin(label); M.emit('groups-changed'); return null;
       case 'load_manager': return copy(M.manager);
+      case 'set_manager_color': M.manager.color = a.color; return null;
       case 'set_manager_layout': M.manager.layout = a.layout; M.emit('layout-changed', a.layout); return null;
       case 'take_manager_view': { const v = M.view; M.view = null; return v; }
+      case 'change_theme': M.theme = a.theme; M.emit('theme-changed', a.theme); return null;
+      case 'change_language': M.lang = a.language === 'en' ? 'en' : 'pt'; M.emit('language-changed', M.lang); return M.lang;
       case 'get_default_color': return 'iris';
       case 'get_new_note_defaults': return ['', '', ''];
       case 'get_group_defaults': return ['random', ''];
@@ -88,8 +93,28 @@
       case 'get_updates': return [true, { checking: false, available: null, progress: null, upToDate: false, error: null }];
       case 'get_ai_control': return [false, 'memo'];
       case 'get_ai_clients': return [];
+      case 'move_note_to_group': M.notes[a.id].groupId = a.groupId; M.emit('groups-changed'); M.emit('notes-changed'); return null;
       case 'move_to_trash': M.notes[a.id].trashedAt = Date.now(); M.closeWin(`note-${a.id}`); M.emit('notes-changed'); return null;
       case 'restore_note': M.notes[a.id].trashedAt = null; M.notes[a.id].hidden = true; M.emit('notes-changed'); return null;
+      case 'delete_forever': delete M.notes[a.id]; M.emit('notes-changed'); return null;
+      case 'delete_group_forever': delete M.groups[a.id]; M.emit('groups-changed'); return null;
+      case 'empty_trash':
+        for (const [k, v] of Object.entries(M.notes)) { if (v.trashedAt) delete M.notes[k]; }
+        M.emit('notes-changed');
+        return null;
+      case 'trash_group_id':
+        M.groups[a.id].trashedAt = Date.now();
+        for (const m of members(a.id)) m.trashedAt = Date.now();
+        M.closeWin(`group-${a.id}`);
+        M.emit('groups-changed');
+        M.emit('notes-changed');
+        return null;
+      case 'restore_group':
+        M.groups[a.id].trashedAt = null;
+        for (const x of Object.values(M.notes)) { if (x.groupId === a.id) x.trashedAt = null; }
+        M.emit('groups-changed');
+        M.emit('notes-changed');
+        return null;
       case 'open_note': {
         const x = M.notes[a.id];
         x.hidden = false;

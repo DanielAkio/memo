@@ -46,8 +46,11 @@
     color-mix(in srgb, var(--note-color) 20%, transparent),
     color-mix(in srgb, var(--note-color) 6%, transparent)
   );
-  background-size: 100% var(--titlebar-h);
+  background-size: 100% 100%;
   background-repeat: no-repeat;
+}
+.group.frame.menu-open:not([data-color=""]) {
+  background-size: 100% var(--titlebar-h);
 }
 /* A group bar's colour stripe runs along the top; its member notes carry
    the same top stripe (styles.css .group-tint). */

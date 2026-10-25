@@ -417,7 +417,7 @@ pub struct ManagerState {
     /// Colour label, as for notes and groups (stripe and icon).
     pub color: String,
     /// How the Memories and Groups tabs show their items (`LAYOUTS`):
-    /// "cards" (the default; empty reads as cards) or "list".
+    /// "list" (the default; empty reads as list) or "cards".
     pub layout: String,
 }
 
@@ -1128,7 +1128,7 @@ impl Store {
         if LAYOUTS.contains(&layout.as_str()) {
             layout
         } else {
-            "cards".into()
+            "list".into()
         }
     }
 
@@ -1462,5 +1462,184 @@ impl Store {
             serde_json::to_string_pretty(&*data)
         };
         write_atomic(path, &json.map_err(io::Error::other)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("memo-store-test-{name}-{}", now_nanos()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn content_vs_layout_updated_at() {
+        let dir = temp_dir("layout");
+        let store = Store::load(dir.join("notes.json"));
+        let n = store.create(Some((10, 20)));
+        let g = store.create_group(Some((30, 40)));
+
+        // Pin updated_at in the past so any content edit advances it.
+        store.data.lock().unwrap().notes[0].updated_at = 1000;
+        store.data.lock().unwrap().groups[0].updated_at = 1000;
+
+        // Layout-only updates on a note must NOT bump updated_at.
+        let n = store
+            .update(&n.id, |note| {
+                note.x = Some(100);
+                note.y = Some(200);
+                note.width = 400.0;
+                note.height = 500.0;
+                note.pinned = true;
+                note.hidden = true;
+            })
+            .unwrap();
+        assert_eq!(n.updated_at, 1000);
+
+        // Content update on a note MUST bump updated_at.
+        let n = store
+            .update(&n.id, |note| {
+                note.text = "Hello".into();
+                note.html = "<div>Hello</div>".into();
+            })
+            .unwrap();
+        assert!(n.updated_at > 1000);
+
+        // Layout-only updates on a group must NOT bump updated_at.
+        let g = store
+            .update_group(&g.id, |group| {
+                group.x = Some(120);
+                group.y = Some(240);
+                group.width = 360.0;
+                group.open = false;
+                group.pinned = true;
+                group.hidden = true;
+            })
+            .unwrap();
+        assert_eq!(g.updated_at, 1000);
+
+        // Content update on a group MUST bump updated_at.
+        let g = store
+            .update_group(&g.id, |group| {
+                group.name = "Work".into();
+            })
+            .unwrap();
+        assert!(g.updated_at > 1000);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn selectors_pristine_and_groups() {
+        let dir = temp_dir("groups");
+        let store = Store::load(dir.join("notes.json"));
+        assert!(store.is_first_run());
+
+        let n1 = store.create(None);
+        assert!(!store.is_first_run());
+        assert!(store.is_pristine(&n1));
+
+        let g = store.create_group(None);
+        assert!(store.is_pristine_group(&g.id));
+
+        // Joining a group makes both the note and the group non-pristine.
+        let n1 = store.update(&n1.id, |n| n.group_id = g.id.clone()).unwrap();
+        assert!(!store.is_pristine(&n1));
+        assert!(!store.is_pristine_group(&g.id));
+        assert_eq!(store.visible().len(), 1);
+
+        // Putting the group away hides its notes from visible() while keeping them active().
+        store.update_group(&g.id, |grp| grp.open = false);
+        assert_eq!(store.active().len(), 1);
+        assert_eq!(store.visible().len(), 0);
+
+        // Taking notes out again makes them visible, unless closed with ✕ (hidden).
+        store.update_group(&g.id, |grp| grp.open = true);
+        assert_eq!(store.visible().len(), 1);
+        store.update(&n1.id, |n| n.hidden = true);
+        assert_eq!(store.visible().len(), 0);
+        assert_eq!(store.active().len(), 1);
+
+        // Removing a group unlinks its notes and records a tombstone.
+        store.remove_group(&g.id);
+        assert_eq!(store.get(&n1.id).unwrap().group_id, "");
+        assert!(store.sync_snapshot().deleted.iter().any(|t| t.id == g.id));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn trash_purge_and_tombstones() {
+        let dir = temp_dir("trash");
+        let store = Store::load(dir.join("notes.json"));
+        let n = store.create(None);
+        store.update(&n.id, |note| note.trashed_at = Some(1_000));
+        assert!(store.active().is_empty());
+
+        // Before TRASH_TTL_MS: kept.
+        assert!(!store.purge_trash(1_000 + TRASH_TTL_MS - 1));
+        assert!(store.get(&n.id).is_some());
+
+        // At TRASH_TTL_MS: purged and buried as a tombstone.
+        let purge_time = 1_000 + TRASH_TTL_MS;
+        assert!(store.purge_trash(purge_time));
+        assert!(store.get(&n.id).is_none());
+        assert!(store.sync_snapshot().deleted.iter().any(|t| t.id == n.id));
+
+        // After TOMBSTONE_TTL_MS: tombstone is pruned.
+        assert!(store.purge_trash(purge_time + TOMBSTONE_TTL_MS));
+        assert!(store.sync_snapshot().deleted.is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn corrupted_backup_and_export_import() {
+        let dir = temp_dir("io");
+        let notes_path = dir.join("notes.json");
+
+        // Unreadable notes.json must be backed up as notes.corrupted-*.json, never lost.
+        fs::write(&notes_path, "{ not valid json").unwrap();
+        let store = Store::load(notes_path.clone());
+        let backups: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with("notes.corrupted-"))
+            .collect();
+        assert_eq!(backups.len(), 1);
+
+        let keep = store.create(None);
+        store.update(&keep.id, |n| {
+            n.title = "Keep".into();
+            n.updated_at = 2_000;
+        });
+        let trashed = store.create(None);
+        store.update(&trashed.id, |n| n.trashed_at = Some(2_000));
+
+        // Export omits trashed notes and tombstones.
+        let export_path = dir.join("export.json");
+        store.export_to(&export_path).unwrap();
+
+        let dir2 = temp_dir("io2");
+        let store2 = Store::load(dir2.join("notes.json"));
+        let imported = store2.import_from(&export_path).unwrap();
+        assert_eq!(imported, vec![keep.id.clone()]);
+        assert!(store2.get(&trashed.id).is_none());
+
+        // Importing an older version does not overwrite a newer local edit.
+        store2.update(&keep.id, |n| {
+            n.title = "Newer local".into();
+            n.updated_at = 5_000;
+        });
+        let imported_again = store2.import_from(&export_path).unwrap();
+        assert!(imported_again.is_empty());
+        assert_eq!(store2.get(&keep.id).unwrap().title, "Newer local");
+
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::remove_dir_all(&dir2);
     }
 }

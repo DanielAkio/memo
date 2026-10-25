@@ -276,6 +276,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   pointer-events: auto;
 }
 .table-add {
+  z-index: 6;
   display: grid;
   place-items: center;
   width: 18px;
@@ -285,9 +286,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   border-radius: 50%;
   color: var(--color-fog);
   cursor: default;
-  visibility: hidden;
 }
-.table-add.is-shown { visibility: visible; }
 .table-tools {
   display: flex;
   padding: 1px;
@@ -404,7 +403,6 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   color: var(--color-ash);
   pointer-events: auto;
   cursor: default;
-  visibility: hidden;
 }
 .code-copy svg {
   width: 13px;
@@ -415,10 +413,6 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.code-hl.is-hovered .code-copy,
-.code-copy:hover,
-.code-copy:focus-visible,
-.code-copy.copied { visibility: visible; }
 .code-copy:hover,
 .code-copy:focus-visible,
 .code-copy.copied { color: var(--color-mist); }

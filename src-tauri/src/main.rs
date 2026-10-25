@@ -1825,6 +1825,10 @@ fn change_zoom(app: AppHandle, step: i32) -> f64 {
         let _ = window.set_zoom(zoom);
         if is_group(window) {
             if let Some(group) = store.group(&group_id_of(window)) {
+                let _ = window.set_min_size(Some(tauri::LogicalSize::new(
+                    GROUP_MIN_W,
+                    TITLEBAR_H * zoom,
+                )));
                 set_logical_size(window, group.width, TITLEBAR_H * zoom);
             }
         }
@@ -1973,6 +1977,7 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("group.html".into()))
         .title(group_title(&group.name))
         .inner_size(group.width, TITLEBAR_H * app.state::<Shared>().zoom())
+        .min_inner_size(GROUP_MIN_W, TITLEBAR_H * app.state::<Shared>().zoom())
         .decorations(false)
         // GTK sizes a non-resizable window to its content's natural size,
         // which for a webview is at least 200 px tall: on Linux the bar would
@@ -2000,6 +2005,10 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
     track_geometry(app, &window);
     let _ = window.set_zoom(app.state::<Shared>().zoom());
     window.show()?;
+    // Sized after show: on Windows calling set_size while hidden makes Tao
+    // calculate a bogus non-client height offset and stretch the bar.
+    let zoom = app.state::<Shared>().zoom();
+    set_logical_size(&window, group.width, TITLEBAR_H * zoom);
     Ok(window)
 }
 

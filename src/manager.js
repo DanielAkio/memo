@@ -732,18 +732,22 @@
     if (view === 'groups') showGroup(item.dataset.gid);
     else act('open', item.dataset.id);
   });
-  // Middle click (wheel button) on a memory or group moves it to the trash,
-  // like its trash button; in the trash it does nothing (deleting stays a
-  // deliberate click). Same in the list and in cards.
+  // Middle click (wheel button) on a memory or group moves it to the trash
+  // or deletes it forever if already in the trash, like its trash/delete button.
+  // Same in the list and in cards.
   list.addEventListener('mousedown', (e) => {
     if (e.button === 1 && e.target.closest('.card')) e.preventDefault(); // no autoscroll
   });
   list.addEventListener('auxclick', (e) => {
     const item = e.target.closest('.card');
-    if (e.button !== 1 || !item || inTrash() || e.target.closest('select')) return;
+    if (e.button !== 1 || !item || e.target.closest('select')) return;
     e.preventDefault();
-    if (item.dataset.gid) invoke('trash_group_id', { id: item.dataset.gid }).catch((err) => console.error('trash', err));
-    else act('trash', item.dataset.id);
+    if (item.dataset.gid) {
+      const command = inTrash() ? 'delete_group_forever' : 'trash_group_id';
+      invoke(command, { id: item.dataset.gid }).catch((err) => console.error(command, err));
+    } else {
+      act(inTrash() ? 'delete' : 'trash', item.dataset.id);
+    }
   });
 
   emptyTrashBtn.addEventListener('click', async () => {
@@ -809,7 +813,7 @@
     if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); return; }
     if (mod && key === 'f') {
       e.preventDefault();
-      search.focus();
+      search.focus({ preventScroll: true });
       search.select();
     } else if (e.key === 'Escape' && document.activeElement === search && search.value) {
       search.value = '';
@@ -909,8 +913,24 @@
     renderWindow();
   }
 
+  function isMobileWeb() {
+    const host = (window.top && window.top.MemoWeb) || (window.opener && window.opener.MemoWeb);
+    if (!host) return false;
+    if (typeof host.isMobile === 'function') return host.isMobile();
+    return window.innerWidth < 680;
+  }
+
+  function syncMobileState() {
+    const mobile = isMobileWeb();
+    document.documentElement.classList.toggle('is-mobile', mobile);
+    $('closeBtn').hidden = mobile;
+  }
+
   const newNote = () => invoke('new_note').catch((err) => console.error('new_note', err));
-  const closeWindow = () => invoke('close_manager').catch((err) => console.error('close_manager', err));
+  const closeWindow = () => {
+    if (isMobileWeb()) return;
+    invoke('close_manager').catch((err) => console.error('close_manager', err));
+  };
 
   window.MemoChrome.attach({
     frame,
@@ -923,12 +943,17 @@
   window.MemoChrome.titleMenu({
     titlebar: $('titlebar'),
     more: $('moreBtn'),
-    items: () => [
-      { label: t('pin'), checked: !!win.pinned, run: togglePin },
-      { label: t('managerColor'), run: openMgrColors },
-      { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err)) },
-      { label: t('close'), run: closeWindow },
-    ],
+    items: () => {
+      const items = [
+        { label: t('pin'), checked: !!win.pinned, run: togglePin },
+        { label: t('managerColor'), run: openMgrColors },
+        { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err)) },
+      ];
+      if (!isMobileWeb()) {
+        items.push({ label: t('close'), run: closeWindow });
+      }
+      return items;
+    },
     onOpen: closeMgrColors,
   });
   pinBtn.addEventListener('click', togglePin);
@@ -937,6 +962,9 @@
     invoke('new_group').catch((err) => console.error('new_group', err));
   });
   $('closeBtn').addEventListener('click', closeWindow);
+  syncMobileState();
+  window.addEventListener('resize', syncMobileState);
+  window.addEventListener('memo-mobile-changed', syncMobileState);
 
   window.addEventListener('focus', () => frame.classList.add('is-focused'));
   window.addEventListener('blur', () => frame.classList.remove('is-focused'));
@@ -1432,6 +1460,7 @@
         const row = $(id)?.closest('.setting');
         if (row) row.hidden = true;
       }
+      syncMobileState();
     }
     win = await invoke('load_manager');
     applyLayout(win.layout, false);
@@ -1460,7 +1489,9 @@
     // defaults may differ, so start over.
     listen('store-replaced', () => location.reload());
     await Promise.all([load(), loadDefaults(), loadGroupDefaults(), loadDataDir()]);
-    search.focus();
+    if (!new URLSearchParams(location.search).has('nofocus')) {
+      search.focus({ preventScroll: true });
+    }
   }
 
   init().catch((err) => console.error('init', err));

@@ -2066,8 +2066,7 @@
     return true;
   }
 
-  // The "+" buttons and tools of the table under the mouse. Each "+" shows
-  // only while the mouse is near its edge.
+  // The "+" buttons and tools of the table under the mouse.
   function setHoveredTable(table, x = 0, y = 0) {
     hoveredTable = table && table.isConnected ? table : null;
     tableLayer.hidden = !hoveredTable;
@@ -2076,9 +2075,6 @@
       tableMark.hidden = true;
       return;
     }
-    const r = hoveredTable.getBoundingClientRect();
-    const near = { left: x < r.left + 16, right: x > r.right - 16, bottom: y > r.bottom - 12 };
-    for (const btn of tableLayer.querySelectorAll('[data-add]')) btn.classList.toggle('is-shown', near[btn.dataset.add]);
     renderTableTools();
   }
 
@@ -3477,8 +3473,8 @@
       await loadGroups();
     }
     if (document.hasFocus()) frame.classList.add('is-focused');
-    if (!EMBED) {
-      editor.focus();
+    if (!EMBED && !new URLSearchParams(location.search).has('nofocus')) {
+      editor.focus({ preventScroll: true });
       const r = document.createRange();
       r.selectNodeContents(editor);
       r.collapse(false);

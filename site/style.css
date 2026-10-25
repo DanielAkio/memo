@@ -83,7 +83,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 /* ------------------------------------------------------------ home page */
 .home main { max-width: 1040px; }
 .hero { text-align: center; margin: 24px auto 40px; max-width: 720px; }
-.hero h1 { font-size: clamp(34px, 6vw, 56px); margin-bottom: 16px; }
+.hero h1 { font-size: clamp(34px, 6vw, 56px); margin-bottom: 60px; }
 .hero .lead { font-size: clamp(17px, 2.2vw, 20px); }
 .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .facts { margin-top: 16px; font-size: 14px; color: var(--muted); }
@@ -94,6 +94,17 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   border: 1px solid var(--line); background: var(--surface);
 }
 .shot img { width: 100%; aspect-ratio: 16 / 9; }
+
+/* Invisible layout anchors where loose Memo windows start on the landing page */
+.memo-anchor { width: 100%; pointer-events: none; }
+.hero-anchor { min-height: 280px; margin: 12px 0 36px; }
+.write-anchor { min-height: 360px; }
+.group-anchor { min-height: 460px; }
+.manager-anchor { min-height: 460px; }
+@media (max-width: 860px) {
+  .hero-anchor { min-height: 510px; }
+  .group-anchor { min-height: 640px; }
+}
 
 .benefits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 56px 0; }
 .benefit { padding: 20px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }

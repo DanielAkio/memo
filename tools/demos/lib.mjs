@@ -1,23 +1,34 @@
-// Recording helpers for the demo GIFs: a static server for the repo, a page
-// with the stage, a fake cursor that follows the real mouse, and frames
-// captured as screenshots with explicit durations, encoded with ffmpeg.
+// Recording and testing helpers for the real app pages (src/) in a fake
+// desktop (stage.html) with a fake Tauri API (mock.js).
 import { createRequire } from 'module';
 import { execSync, execFileSync } from 'child_process';
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const here = path.dirname(new URL(import.meta.url).pathname);
+const here = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(here, '../..');
 
 // Playwright from the repo (npm install --no-save playwright) or a global install.
 function playwright() {
   try {
-    return createRequire(`${ROOT}/`)('playwright');
+    return createRequire(path.join(ROOT, 'package.json'))('playwright');
   } catch {
     const global = execSync('npm root -g').toString().trim();
-    return createRequire(`${global}/`)('playwright');
+    return createRequire(path.join(global, 'noop.js'))('playwright');
   }
+}
+
+async function launchChromium(chromium) {
+  for (const opts of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
+    try {
+      return await chromium.launch(opts);
+    } catch {
+      // try next browser channel
+    }
+  }
+  return chromium.launch();
 }
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -26,7 +37,9 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
 // app's pages (/src/…) share an origin.
 export function serve() {
   const server = http.createServer((req, res) => {
-    const file = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+    const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    if (urlPath === '/favicon.ico') { res.writeHead(204).end(); return; }
+    const file = path.join(ROOT, urlPath);
     if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       res.writeHead(404).end();
       return;
@@ -39,17 +52,26 @@ export function serve() {
 
 export async function open({ port, theme, lang }) {
   const { chromium } = playwright();
-  const browser = await chromium.launch();
+  const browser = await launchChromium(chromium);
   const ctx = await browser.newContext({
     viewport: { width: 960, height: 540 }, deviceScaleFactor: 2,
     colorScheme: theme, locale: lang === 'pt' ? 'pt-BR' : 'en-US',
   });
   await ctx.addInitScript(fs.readFileSync(path.join(here, 'mock.js'), 'utf8'));
   const page = await ctx.newPage();
-  page.on('console', (m) => { if (m.type() === 'error') console.log('console:', m.text()); });
-  page.on('pageerror', (e) => console.log('pageerror:', e.message));
+  const errors = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') {
+      errors.push(`console: ${m.text()}`);
+      console.log('console:', m.text());
+    }
+  });
+  page.on('pageerror', (e) => {
+    errors.push(`pageerror: ${e.message}`);
+    console.log('pageerror:', e.message);
+  });
   await page.goto(`http://127.0.0.1:${port}/tools/demos/stage.html?theme=${theme}&lang=${lang}`);
-  return { browser, page };
+  return { browser, page, errors };
 }
 
 export class Rec {

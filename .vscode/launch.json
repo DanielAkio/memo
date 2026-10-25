@@ -10,6 +10,18 @@
       "command": "npm install --no-audit --no-fund; npm run dev"
     },
     {
+      "name": "Run site / web app",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "npm run web",
+      "serverReadyAction": {
+        "pattern": "Memo Site running at (https?://[^\\s]+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      }
+    },
+    {
       "name": "Build Windows installer (Docker)",
       "type": "node-terminal",
       "request": "launch",

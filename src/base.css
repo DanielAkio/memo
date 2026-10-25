@@ -275,12 +275,9 @@ html, body {
 .icon-btn:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
 
 /* Titlebar buttons are always visible (and take their room), focused or not. */
-.pin { opacity: 0.55; }
-.is-focused .pin, .frame:hover .pin { opacity: 1; }
 
 /* Pinned: filled white pin on a subtle grey background, no colour. */
 .pin[aria-pressed="true"] {
-  opacity: 1;
   background: var(--overlay-active);
   color: var(--color-paper);
 }

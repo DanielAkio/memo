@@ -20,12 +20,13 @@ Subsystem detail lives in `.ai/skills/` and is loaded on demand — **load the m
 
 ```bash
 npm install
+npm test         # static invariants (check.mjs) + Playwright UI suite (test-ui.mjs) + cargo test
 npm run dev      # tauri dev (also "Run in dev mode" in .vscode/launch.json)
 npm run build    # installers in src-tauri/target/release/bundle/
 cd src-tauri && cargo check && cargo clippy   # Rust-only checks
 ```
 
-No linters or JS build step; the only tests are the sync one (a fake Drive, no network) and the image-file ones in `images.rs` (`cargo test`). Windows installer without a toolchain: `docker compose -f docker/compose.yml run --build --rm windows` (NSIS `*-setup.exe` in `dist/`). More in `memo-checks`.
+Always run `npm test` after making changes to catch regressions: `tools/check.mjs` verifies JS syntax, Tauri commands/events, `i18n.js` keys/demos and colour parity; `tools/test-ui.mjs` runs the real pages in headless Chromium/Edge via `tools/demos/stage.html`; `cargo test` runs unit tests in `store.rs`, `mcp.rs`, `clients.rs`, `images.rs` and `sync.rs`. Windows installer without a toolchain: `docker compose -f docker/compose.yml run --build --rm windows` (NSIS `*-setup.exe` in `dist/`). More in `memo-checks`.
 
 ## Layout
 
@@ -48,13 +49,16 @@ src-tauri/
   src/mcp.rs             AI control: MCP tools; local HTTP endpoint in the app + `memo --mcp` stdio bridge (opt-in)
   src/clients.rs         AI control setup: finds MCP clients here and adds/removes Memo in their config files
   src/updater.rs         in-app updates (tauri-plugin-updater): checks, download + install, status for Settings/tray
-  src/sync.rs            Drive sync engine: pull (changes API), apply, push; conflicts; has the repo's only test (fake Drive)
+  src/sync.rs            Drive sync engine: pull (changes API), apply, push; conflicts; fake-Drive test
   src/welcome.rs         first-run welcome note (HTML + matching plain text)
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
   capabilities/default.json  permissions for note-*, group-* and manager windows
 site/                    GitHub Pages home page + privacy policy (en + pt in each page) for Google's consent screen
   media/                 demo GIFs (<scene>-<dark|light>-<en|pt>.gif), also used by README.md
-tools/demos/             records the site/README GIFs from the real pages (Playwright + fake Tauri API; docs/development.md)
+tools/
+  check.mjs              fast static & invariant checks (JS syntax, Tauri commands/events, i18n, colours)
+  test-ui.mjs            headless Playwright UI tests on the real pages via tools/demos/stage.html
+  demos/                 records the site/README GIFs from the real pages (Playwright + fake Tauri API; docs/development.md)
 docs/google-cloud.md     Google Cloud project / OAuth client setup for cloud sync
 docs/development.md      building, running, installers, sync builds (moved out of the README)
 docs/code-signing.md     Windows installer signing through SignPath Foundation (CI setup)

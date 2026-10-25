@@ -54,7 +54,8 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
-html, body {
+body:not(.home),
+html:has(> body:not(.home)) {
   margin: 0;
   width: 100%;
   height: 100%;
@@ -66,10 +67,30 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+body.home {
+  position: relative;
+  overflow-x: hidden;
+}
+
 #desk {
   position: fixed;
   inset: 0;
   overflow: hidden;
+}
+
+/* On the official landing page (body.home), Memo components float loose
+   directly over the page without any enclosing window/stage box. */
+body.home #desk {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: auto;
+  width: 100%;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 40;
 }
 
 /* Floating Memo window container */
@@ -79,6 +100,13 @@ html, body {
   border-radius: 0;
   background: var(--color-carbon);
   transition: opacity 0.14s ease;
+  pointer-events: auto;
+}
+
+/* On the landing page, pinning a memory locks it to the viewport (position: fixed)
+   so it stays in sight over the entire website while scrolling. */
+body.home .win.pinned {
+  position: fixed;
 }
 
 .win.in-pip {
@@ -99,13 +127,17 @@ html, body {
 }
 
 /* While dragging or resizing any window, shield iframes so pointer events stay smooth */
+body.interacting {
+  user-select: none;
+}
+
 body.interacting .win:not(.active-gesture) iframe {
   pointer-events: none;
 }
 
 /* Aero Snap preview zone (matches src/snap.html) */
 .snap-preview {
-  position: absolute;
+  position: fixed;
   z-index: 90;
   pointer-events: none;
   transition: left 0.08s ease, top 0.08s ease, width 0.08s ease, height 0.08s ease;
@@ -276,19 +308,21 @@ body.interacting .win:not(.active-gesture) iframe {
   stroke-linejoin: round;
 }
 
-/* Mobile / small screen (< 680px): full-screen single-view navigation */
+/* Mobile / small screen (< 680px) in the standalone app.html workspace */
 @media (max-width: 679px) {
-  .win {
+  body:not(.home) .win {
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
     height: 100% !important;
     box-shadow: none;
   }
-  .win.is-group {
+  body:not(.home) .win.is-group {
     display: none !important;
   }
-  .tray-bar {
+  body:not(.home) .tray-bar {
     display: none;
   }
 }
+
+

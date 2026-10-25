@@ -70,6 +70,12 @@ body {
   color: var(--color-mist);
 }
 
+/* On mobile web, the manager is the primary view and cannot be closed. */
+:root.is-mobile #closeBtn,
+#closeBtn[hidden] {
+  display: none !important;
+}
+
 /* Everything below the titlebar. */
 .mgr-body {
   flex: 1;
@@ -873,7 +879,6 @@ textarea.field { resize: vertical; min-height: 84px; }
 /* Window chrome mock-ups: a titlebar, colour dots, fields, a card. */
 .help-demo .icon-btn { display: inline-grid; width: 26px; height: 26px; vertical-align: middle; }
 .help-demo .icon-btn svg { width: 15px; height: 15px; }
-.help-demo .pin { opacity: 1; }
 .help-demo .demo-hot { background: var(--overlay-active); color: var(--color-paper); }
 .demo-row,
 .demo-dots { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }

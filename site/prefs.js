@@ -4,7 +4,7 @@
 // switches in place, is remembered and wins over the browser from then on.
 // Theme: follows the system's light/dark setting (style.css) until the
 // visitor flips the nav's theme button; that choice is remembered and set
-// as data-theme on <html>, which the CSS and the GIFs' <picture>s obey.
+// as data-theme on <html>, which the CSS and the loose Memo windows obey.
 (function () {
   function load(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
   function save(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
@@ -41,6 +41,7 @@
       if (isTitle) el.textContent = text; else el.content = text;
     });
     labelButtons();
+    window.postMessage({ type: 'memo-site-prefs', lang: pt ? 'pt' : 'en' }, '*');
   }
 
   // Theme
@@ -59,7 +60,6 @@
     });
   }
 
-
   function labelButtons() {
     var dark = current() === 'dark';
     var label = isPt ? (dark ? 'Mudar para o tema claro' : 'Mudar para o tema escuro')
@@ -77,6 +77,7 @@
         save('memo-theme', html.dataset.theme);
         applyToPictures();
         labelButtons();
+        window.postMessage({ type: 'memo-site-prefs', theme: html.dataset.theme }, '*');
       });
     });
     if (bilingual) setLang(isPt);

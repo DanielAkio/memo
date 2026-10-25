@@ -277,8 +277,11 @@
   const idOf = (label) => label.replace(/^(note|group)-/, '');
   const isNote = (label) => label.startsWith('note-');
   const isGroup = (label) => label.startsWith('group-');
+  const SCENE = new URLSearchParams(location.search).get('scene') || '';
+  const IS_SITE_HOME = document.body.classList.contains('home');
+  if (SCENE) document.documentElement.dataset.scene = SCENE;
   const isValidColor = (c) => COLORS.includes(c) || /^#[0-9a-f]{6}$/i.test(c || '');
-  const isMobile = () => window.innerWidth < 680;
+  const isMobile = () => !SCENE && !IS_SITE_HOME && window.innerWidth < 680;
 
   function genId() {
     if (crypto.randomUUID) return crypto.randomUUID();
@@ -339,6 +342,7 @@
   }
 
   async function loadAllImagesFromDb() {
+    if (IS_SITE_HOME) return;
     const db = await openDb();
     if (!db) return;
     await new Promise((resolve) => {
@@ -362,6 +366,7 @@
 
   async function saveImageToDb(record) {
     imageCache.set(record.name, record);
+    if (IS_SITE_HOME) return;
     const db = await openDb();
     if (!db) return;
     try {
@@ -471,7 +476,7 @@
       defaultGroupColor: 'random',
       defaultGroupTitle: '',
       defaultsUpdatedAt: 0,
-      manager: { x: null, y: null, width: 560, height: 480, pinned: false, color: 'iris', layout: 'cards' },
+      manager: { x: null, y: null, width: 560, height: 480, pinned: false, color: 'iris', layout: 'list' },
       notes: [],
       groups: [],
       deleted: [],
@@ -512,11 +517,18 @@
   }
 
   function loadStore() {
+    if (IS_SITE_HOME) return;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) data = normalizeData(JSON.parse(raw));
     } catch (err) {
       console.error('Failed to read localStorage store', err);
+    }
+    // Clean up any demo notes that may have leaked into web storage from earlier landing page runs
+    data.notes = data.notes.filter((n) => !n.demoSeed && !n.id.startsWith('demo-'));
+    data.groups = data.groups.filter((g) => !g.demoSeed && !g.id.startsWith('demo-'));
+    if (data.notes.length === 0 && data.groups.length === 0) {
+      data.nextSeq = 1;
     }
     purgeExpired(nowMs());
   }
@@ -524,6 +536,7 @@
   function flushStore() {
     clearTimeout(saveTimer);
     saveTimer = null;
+    if (IS_SITE_HOME) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (err) {
@@ -532,12 +545,13 @@
   }
 
   function markDirty(contentChanged = false) {
+    if (IS_SITE_HOME) return;
     if (!saveTimer) saveTimer = setTimeout(flushStore, 400);
     if (contentChanged) scheduleCloudSync();
   }
 
   window.addEventListener('beforeunload', () => {
-    if (saveTimer) flushStore();
+    if (!IS_SITE_HOME && saveTimer) flushStore();
   });
 
   function bury(id, at = nowMs()) {
@@ -663,7 +677,10 @@
     const before = noteContentSnapshot(n);
     fn(n);
     const changed = noteContentSnapshot(n) !== before;
-    if (changed) n.updatedAt = nowMs();
+    if (changed) {
+      n.updatedAt = nowMs();
+      n.demoSeed = false;
+    }
     markDirty(changed);
     return n;
   }
@@ -674,7 +691,10 @@
     const before = groupContentSnapshot(g);
     fn(g);
     const changed = groupContentSnapshot(g) !== before;
-    if (changed) g.updatedAt = nowMs();
+    if (changed) {
+      g.updatedAt = nowMs();
+      g.demoSeed = false;
+    }
     markDirty(changed);
     return g;
   }
@@ -736,6 +756,15 @@
   // ------------------------------------------------ window geometry & snap
 
   function workArea() {
+    if (IS_SITE_HOME) {
+      const docEl = document.documentElement;
+      return {
+        left: SNAP_GAP,
+        top: SNAP_GAP,
+        right: Math.max(360, (docEl.clientWidth || window.innerWidth) - SNAP_GAP),
+        bottom: Math.max(1200, (docEl.scrollHeight || window.innerHeight) - SNAP_GAP),
+      };
+    }
     return {
       left: SNAP_GAP,
       top: SNAP_GAP,
@@ -881,10 +910,16 @@
     snapPreview.hidden = false;
   }
 
-  function groupUnderCursor(px, py) {
+  function groupUnderCursor(px, py, sourceLabel = null) {
+    const srcWin = sourceLabel ? wins[sourceLabel] : null;
+    const srcPinned = !!(IS_SITE_HOME && srcWin && srcWin.pinned);
+    const docX = srcPinned ? px + window.scrollX : px;
+    const docY = srcPinned ? py + window.scrollY : py;
     for (const [label, w] of Object.entries(wins)) {
       if (!isGroup(label)) continue;
-      if (px >= w.x && px <= w.x + w.w && py >= w.y && py <= w.y + w.h) {
+      const gx = IS_SITE_HOME && w.pinned ? w.x + window.scrollX : w.x;
+      const gy = IS_SITE_HOME && w.pinned ? w.y + window.scrollY : w.y;
+      if (docX >= gx && docX <= gx + w.w && docY >= gy && docY <= gy + w.h) {
         return idOf(label);
       }
     }
@@ -893,13 +928,43 @@
 
   // ------------------------------------------- Document Picture-in-Picture
 
+  function unpinFromPip(label) {
+    const id = idOf(label);
+    const target = isNote(label) ? findNote(id) : isGroup(label) ? findGroup(id) : data.manager;
+    if (target) target.pinned = false;
+    const cur = wins[label];
+    if (cur) {
+      const wasPinned = !!cur.pinned;
+      cur.pinned = false;
+      cur.el.classList.remove('pinned');
+      cur.el.style.zIndex = String(++zNormal);
+      if (IS_SITE_HOME && wasPinned) {
+        setWinRect(label, cur.x + window.scrollX, cur.y + window.scrollY, cur.w, cur.h, false);
+      }
+      if (cur.el && cur.f.parentElement !== cur.el) {
+        cur.el.classList.remove('in-pip');
+        cur.el.appendChild(cur.f);
+      }
+      try {
+        const pinBtn = cur.f.contentDocument?.getElementById('pinBtn');
+        if (pinBtn) pinBtn.setAttribute('aria-pressed', 'false');
+      } catch {}
+    }
+    markDirty(false);
+    emit('store-replaced');
+    notifyGroups();
+    notifyNotes();
+  }
+
   async function openPipForWindow(label) {
     if (isMobile() || !('documentPictureInPicture' in window)) return false;
     const w = wins[label];
     if (!w) return false;
     try {
       if (activePip && activePip.label !== label) {
-        closePipForWindow(activePip.label, false);
+        const prevLabel = activePip.label;
+        closePipForWindow(prevLabel, true);
+        unpinFromPip(prevLabel);
       }
       const pipWin = await window.documentPictureInPicture.requestWindow({
         width: Math.max(240, w.w),
@@ -917,13 +982,16 @@
       activePip = { label, pipWin };
 
       pipWin.addEventListener('pagehide', () => {
-        if (activePip && activePip.label === label) {
+        const wasActive = activePip && activePip.label === label;
+        if (wasActive) {
           activePip = null;
-        }
-        const cur = wins[label];
-        if (cur && cur.el && cur.f.parentElement !== cur.el) {
-          cur.el.classList.remove('in-pip');
-          cur.el.appendChild(cur.f);
+          unpinFromPip(label);
+        } else {
+          const cur = wins[label];
+          if (cur && cur.el && cur.f.parentElement !== cur.el) {
+            cur.el.classList.remove('in-pip');
+            cur.el.appendChild(cur.f);
+          }
         }
       });
       return true;
@@ -1015,7 +1083,7 @@
     }
   }
 
-  function openWindow(label, page, { x, y, w, h, pinned = false }) {
+  function openWindow(label, page, { x, y, w, h, pinned = false, autofocus = !IS_SITE_HOME }) {
     if (wins[label]) {
       raiseWindow(label);
       return Promise.resolve(wins[label]);
@@ -1024,6 +1092,7 @@
     const kindClass = isNote(label) ? 'is-note' : isGroup(label) ? 'is-group' : 'is-manager';
     const el = document.createElement('div');
     el.className = `win ${kindClass}${pinned ? ' pinned' : ''}`;
+    el.dataset.label = label;
     const z = pinned ? ++zPinned : ++zNormal;
     Object.assign(el.style, {
       left: `${clamped.x}px`,
@@ -1034,7 +1103,12 @@
     });
 
     const f = document.createElement('iframe');
-    f.src = `${srcBase}/${page}${page.includes('?') ? '&' : '?'}label=${encodeURIComponent(label)}`;
+    f.name = label;
+    const query = new URLSearchParams();
+    query.set('label', label);
+    if (!autofocus) query.set('nofocus', '1');
+    const sep = page.includes('?') ? '&' : '?';
+    f.src = `${srcBase}/${page}${sep}${query.toString()}`;
     el.appendChild(f);
     desk.appendChild(el);
 
@@ -1053,6 +1127,12 @@
     return new Promise((resolve) => {
       f.addEventListener('load', () => {
         applyZoomToFrame(f);
+        if (label === 'manager') {
+          try {
+            f.contentDocument.documentElement.classList.toggle('is-mobile', isMobile());
+            f.contentWindow.dispatchEvent(new Event('memo-mobile-changed'));
+          } catch {}
+        }
         try {
           f.contentWindow.addEventListener('pointerdown', () => {
             closeContextMenu();
@@ -1070,6 +1150,7 @@
   }
 
   function closeWindow(label) {
+    if (label === 'manager' && isMobile()) return;
     closePipForWindow(label, true);
     const w = wins[label];
     if (!w) return;
@@ -1095,7 +1176,7 @@
     }
   });
 
-  function openNoteWindow(n) {
+  function openNoteWindow(n, autofocus = !IS_SITE_HOME) {
     const z = data.zoom || 1;
     const w = Math.round((n.width || DEFAULT_W) * z);
     const h = Math.round((n.height || DEFAULT_H) * z);
@@ -1106,10 +1187,10 @@
       n.y = pos.y;
       markDirty(false);
     }
-    return openWindow(`note-${n.id}`, 'index.html', { x: pos.x, y: pos.y, w, h, pinned: !!n.pinned });
+    return openWindow(`note-${n.id}`, 'index.html', { x: pos.x, y: pos.y, w, h, pinned: !!n.pinned, autofocus });
   }
 
-  function openGroupWindow(g) {
+  function openGroupWindow(g, autofocus = !IS_SITE_HOME) {
     const z = data.zoom || 1;
     const w = Math.round((g.width || GROUP_W) * z);
     const h = Math.round(TITLEBAR_H * z);
@@ -1120,10 +1201,10 @@
       g.y = pos.y;
       markDirty(false);
     }
-    return openWindow(`group-${g.id}`, 'group.html', { x: pos.x, y: pos.y, w, h, pinned: !!g.pinned });
+    return openWindow(`group-${g.id}`, 'group.html', { x: pos.x, y: pos.y, w, h, pinned: !!g.pinned, autofocus });
   }
 
-  function openManagerWindow(targetView = null) {
+  function openManagerWindow(targetView = null, autofocus = !IS_SITE_HOME) {
     if (targetView) pendingManagerView = targetView;
     if (wins.manager) {
       raiseWindow('manager');
@@ -1143,7 +1224,7 @@
     const y = m.y != null ? m.y : Math.max(wa.top + 20, Math.round((wa.bottom - h) / 2));
     m.x = x;
     m.y = y;
-    return openWindow('manager', 'manager.html', { x, y, w, h, pinned: !!m.pinned });
+    return openWindow('manager', 'manager.html', { x, y, w, h, pinned: !!m.pinned, autofocus });
   }
 
   function createNote({ parentLabel = null, groupId = '' } = {}) {
@@ -1175,7 +1256,7 @@
     };
     data.notes.push(note);
     markDirty(true);
-    openNoteWindow(note);
+    openNoteWindow(note, true);
     notifyNotes();
     if (groupId) notifyGroups();
     return note;
@@ -1478,6 +1559,7 @@
       setWinRect(label, Math.round(px - grabX), w.y, prev.w, prev.h);
     }
 
+    w.userMoved = true;
     w.el.classList.add('active-gesture');
     document.body.classList.add('interacting');
     activeDrag = {
@@ -1504,7 +1586,7 @@
     setWinRect(label, snapped.x, snapped.y, w.w, w.h);
 
     if (isNote(label)) {
-      const overGid = groupUnderCursor(px, py);
+      const overGid = groupUnderCursor(px, py, label);
       if (overGid !== activeDrag.hoverGroup) {
         if (activeDrag.hoverGroup) emit('drop-hover', [activeDrag.hoverGroup, false]);
         activeDrag.hoverGroup = overGid;
@@ -1573,6 +1655,7 @@
     if (!w || w.el.classList.contains('in-pip')) return;
     raiseWindow(label);
     delete restoreSizes[label];
+    w.userMoved = true;
     w.el.classList.add('active-gesture');
     document.body.classList.add('interacting');
     activeResize = {
@@ -1657,7 +1740,7 @@
     const lang = effectiveLanguage();
     const L = TRAY_LABELS[lang];
     const th = effectiveTheme();
-    const lay = data.manager.layout === 'list' ? 'list' : 'cards';
+    const lay = data.manager.layout === 'cards' ? 'cards' : 'list';
     const langSet = data.language || 'system';
 
     const items = [
@@ -1795,8 +1878,9 @@
     let x = lastPointer.x;
     let y = lastPointer.y;
     if (Array.isArray(at) && at.length === 2 && w) {
-      x = (isMobile() ? 0 : w.x) + at[0] * z;
-      y = (isMobile() ? 0 : w.y) + at[1] * z;
+      const r = w.el.getBoundingClientRect();
+      x = r.left + at[0] * z;
+      y = r.top + at[1] * z;
     }
     const mapOwn = (list) => (list || []).map((it) => {
       if (!it) return null;
@@ -1816,6 +1900,18 @@
       if (picked && picked.run) picked.run();
     });
   }
+
+  function updateMobileState() {
+    const mobile = isMobile();
+    document.documentElement.classList.toggle('is-mobile', mobile);
+    if (wins.manager && wins.manager.f) {
+      try {
+        wins.manager.f.contentDocument.documentElement.classList.toggle('is-mobile', mobile);
+        wins.manager.f.contentWindow.dispatchEvent(new Event('memo-mobile-changed'));
+      } catch {}
+    }
+  }
+  window.addEventListener('resize', updateMobileState);
 
   const lastPointer = { x: 240, y: 180 };
   window.addEventListener('pointermove', (e) => {
@@ -1961,10 +2057,12 @@
 
   function setThemeSetting(theme) {
     data.theme = theme === 'light' || theme === 'dark' ? theme : 'system';
-    try {
-      if (data.theme === 'system') localStorage.removeItem('memo-theme');
-      else localStorage.setItem('memo-theme', data.theme);
-    } catch {}
+    if (!IS_SITE_HOME) {
+      try {
+        if (data.theme === 'system') localStorage.removeItem('memo-theme');
+        else localStorage.setItem('memo-theme', data.theme);
+      } catch {}
+    }
     applyDesktopThemeAndLang();
     markDirty(false);
     emit('theme-changed', data.theme);
@@ -1973,16 +2071,18 @@
   function setLanguageSetting(language) {
     data.language = language === 'pt-BR' || language === 'en' ? language : 'system';
     const eff = effectiveLanguage();
-    try {
-      localStorage.setItem('memo-lang', eff);
-    } catch {}
+    if (!IS_SITE_HOME) {
+      try {
+        localStorage.setItem('memo-lang', eff);
+      } catch {}
+    }
     applyDesktopThemeAndLang();
     markDirty(false);
     emit('language-changed', eff);
   }
 
   function setManagerLayout(layout) {
-    data.manager.layout = layout === 'list' ? 'list' : 'cards';
+    data.manager.layout = layout === 'cards' ? 'cards' : 'list';
     markDirty(false);
     emit('layout-changed', data.manager.layout);
   }
@@ -2025,6 +2125,7 @@
   let syncTimer = null;
 
   function googleClientId() {
+    if (IS_SITE_HOME) return '';
     const meta = document.querySelector('meta[name="memo-google-client-id"]')?.content?.trim();
     if (meta) return meta;
     if (window.MEMO_GOOGLE_CLIENT_ID) return String(window.MEMO_GOOGLE_CLIENT_ID).trim();
@@ -2036,6 +2137,7 @@
   }
 
   function loadStoredToken() {
+    if (IS_SITE_HOME) return null;
     try {
       const raw = localStorage.getItem(TOKEN_KEY);
       if (!raw) return null;
@@ -2048,6 +2150,7 @@
   }
 
   function saveStoredToken(accessToken, expiresInSec) {
+    if (IS_SITE_HOME) return;
     try {
       localStorage.setItem(TOKEN_KEY, JSON.stringify({
         accessToken,
@@ -2057,6 +2160,7 @@
   }
 
   function clearStoredToken() {
+    if (IS_SITE_HOME) return;
     try {
       localStorage.removeItem(TOKEN_KEY);
     } catch {}
@@ -2069,6 +2173,7 @@
   }
 
   function connectCloudAccount() {
+    if (IS_SITE_HOME) return Promise.reject('unavailable');
     if (oauthCancel) return Promise.reject('busy');
     const clientId = googleClientId();
     if (!clientId) return Promise.reject('unavailable');
@@ -2166,6 +2271,7 @@
   }
 
   function disconnectCloudAccount() {
+    if (IS_SITE_HOME) return;
     clearStoredToken();
     data.sync = { account: '', pageToken: null, files: {}, deferred: [], lastSync: 0 };
     cloudStatus = { syncing: false, lastSync: 0, pending: 0, error: null };
@@ -2333,7 +2439,7 @@
   }
 
   async function runCloudSync() {
-    if (!data.sync || !data.sync.account || cloudStatus.syncing) return;
+    if (IS_SITE_HOME || !data.sync || !data.sync.account || cloudStatus.syncing) return;
     const token = loadStoredToken();
     if (!token) {
       updateCloudStatus({ syncing: false, error: 'reauth' });
@@ -2591,13 +2697,14 @@
   }
 
   function scheduleCloudSync() {
-    if (!data.sync || !data.sync.account) return;
+    if (IS_SITE_HOME || !data.sync || !data.sync.account) return;
     updateCloudStatus({});
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => runCloudSync(), 3000);
   }
 
   function syncCloudNow() {
+    if (IS_SITE_HOME) return;
     clearTimeout(syncTimer);
     runCloudSync();
   }
@@ -2688,8 +2795,16 @@
         target.pinned = !!args.pinned;
         const w = wins[label];
         if (w) {
+          const wasPinned = !!w.pinned;
           w.pinned = target.pinned;
           w.el.classList.toggle('pinned', w.pinned);
+          if (IS_SITE_HOME && wasPinned !== w.pinned) {
+            if (w.pinned) {
+              setWinRect(label, w.x - window.scrollX, w.y - window.scrollY, w.w, w.h, false);
+            } else {
+              setWinRect(label, w.x + window.scrollX, w.y + window.scrollY, w.w, w.h, false);
+            }
+          }
           raiseWindow(label);
           if (target.pinned) {
             await openPipForWindow(label);
@@ -3009,6 +3124,7 @@
     openManager: openManagerWindow,
     createNote,
     createGroup,
+    isMobile,
   };
 
   // ---------------------------------------------------------------- startup
@@ -3024,14 +3140,568 @@
     srcBase = '../src';
   }
 
+  // ------------------------------------------------ interactive site scenes
+
+  function demoCatalog(lang) {
+    const pt = lang === 'pt';
+    const day = 86_400_000;
+    const now = nowMs();
+    return {
+      group: {
+        id: 'demo-work',
+        name: pt ? 'Trabalho' : 'Work',
+        color: 'teal',
+        x: 56,
+        y: 36,
+        width: 312,
+        open: true,
+        pinned: false,
+        hidden: false,
+      },
+      notes: [
+        {
+          id: 'demo-today',
+          title: pt ? 'Hoje' : 'Today',
+          text: pt
+            ? '[x] Conhecer o Memo\n[ ] Clique aqui para marcar esta tarefa\n[ ] Dois cliques no título para renomear\n[ ] Digite qualquer anotação aqui'
+            : '[x] Discover Memo\n[ ] Click here to check off this task\n[ ] Double-click title bar to rename\n[ ] Type any note right here',
+          html: '',
+          color: 'yellow',
+          groupId: '',
+          x: 596,
+          y: 68,
+          width: 304,
+          height: 252,
+          pinned: false,
+          hidden: false,
+          updatedAt: now - 300_000,
+        },
+        {
+          id: 'demo-launch',
+          title: pt ? 'Dia do lançamento' : 'Launch day',
+          text: pt
+            ? '[x] Enviar a newsletter\n[x] Atualizar o site\n[ ] Avisar o time\n\nColetiva às 15h\nDepois rode npm run deploy'
+            : '[x] Send the newsletter\n[x] Update the website\n[ ] Tell the team\n\nPress call at 3pm\nThen run npm run deploy',
+          html: pt
+            ? '<div class="check done">Enviar a newsletter</div><div class="check done">Atualizar o site</div><div class="check">Avisar o time</div><div><br></div><div><span style="background-color: rgb(255, 230, 0)">Coletiva às 15h</span></div><div>Depois rode <code>npm run deploy</code></div>'
+            : '<div class="check done">Send the newsletter</div><div class="check done">Update the website</div><div class="check">Tell the team</div><div><br></div><div><span style="background-color: rgb(255, 230, 0)">Press call at 3pm</span></div><div>Then run <code>npm run deploy</code></div>',
+          color: 'yellow',
+          groupId: '',
+          x: 244,
+          y: 26,
+          width: 376,
+          height: 360,
+          pinned: false,
+          hidden: false,
+          updatedAt: now - 450_000,
+        },
+        {
+          id: 'demo-groceries',
+          title: pt ? 'Compras' : 'Groceries',
+          text: pt ? 'Café\nPão\nLeite' : 'Coffee\nBread\nMilk',
+          html: '',
+          color: 'yellow',
+          groupId: '',
+          x: 612,
+          y: 64,
+          width: 312,
+          height: 220,
+          pinned: false,
+          hidden: false,
+          updatedAt: now - 600_000,
+        },
+        {
+          id: 'demo-q4',
+          title: pt ? 'Plano do T4' : 'Q4 plan',
+          text: pt
+            ? '[ ] Contratar designer\n[ ] Nova página de preços\n[ ] Pesquisa com clientes'
+            : '[ ] Hire a designer\n[ ] New pricing page\n[ ] Customer survey',
+          html: '',
+          color: 'teal',
+          groupId: 'demo-work',
+          x: 56,
+          y: 88,
+          width: 296,
+          height: 204,
+          pinned: false,
+          hidden: false,
+          updatedAt: now - (1 * day + 3_600_000),
+        },
+        {
+          id: 'demo-meet',
+          title: pt ? 'Notas da reunião' : 'Meeting notes',
+          text: pt
+            ? '- Lançar a 0.4 na sexta\n- Ana cuida das notas da versão\n- Próxima reunião: terça'
+            : '- Ship 0.4 on Friday\n- Ana owns the release notes\n- Next sync: Tuesday',
+          html: '',
+          color: 'yellow',
+          groupId: 'demo-work',
+          x: 366,
+          y: 88,
+          width: 296,
+          height: 204,
+          pinned: false,
+          hidden: false,
+          updatedAt: now - (2 * day + 3_600_000),
+        },
+        {
+          id: 'demo-wifi',
+          title: pt ? 'Senha do Wi-Fi' : 'Wi-Fi password',
+          text: 'memo-2026',
+          html: '',
+          color: 'iris',
+          groupId: '',
+          x: 612,
+          y: 110,
+          width: 290,
+          height: 190,
+          pinned: false,
+          hidden: true,
+          updatedAt: now - (3 * day + 3_600_000),
+        },
+        {
+          id: 'demo-ideas',
+          title: pt ? 'Ideias' : 'Ideas',
+          text: pt
+            ? 'Modo escuro no site\nAtalho para duplicar uma memória'
+            : 'Dark mode for the website\nA shortcut to duplicate a memory',
+          html: '',
+          color: 'coral',
+          groupId: '',
+          x: 556,
+          y: 312,
+          width: 324,
+          height: 180,
+          pinned: false,
+          hidden: false,
+          updatedAt: now - (4 * day + 3_600_000),
+        },
+        {
+          id: 'demo-books',
+          title: pt ? 'Livros para ler' : 'Books to read',
+          text: pt ? 'O Hobbit\nDuna' : 'The Hobbit\nDune',
+          html: '',
+          color: 'green',
+          groupId: '',
+          x: 612,
+          y: 140,
+          width: 290,
+          height: 190,
+          pinned: false,
+          hidden: true,
+          updatedAt: now - (5 * day + 3_600_000),
+        },
+        {
+          id: 'demo-trip',
+          title: pt ? 'Orçamento da viagem' : 'Trip budget',
+          text: pt ? 'Hotel 1.300\nPassagens 900' : 'Hotel 1,300\nFlights 900',
+          html: '',
+          color: '',
+          groupId: '',
+          x: 612,
+          y: 170,
+          width: 290,
+          height: 190,
+          pinned: false,
+          hidden: true,
+          updatedAt: now - (6 * day + 3_600_000),
+        },
+      ],
+    };
+  }
+
+  function seedDemoData(lang, force = false) {
+    const cat = demoCatalog(lang);
+    let grp = findGroup(cat.group.id);
+    if (!grp) {
+      data.groups.push(Object.assign({
+        seq: data.nextSeq++,
+        createdAt: nowMs(),
+        updatedAt: nowMs(),
+        trashedAt: null,
+        demoSeed: true,
+      }, cat.group));
+    } else if (force || grp.demoSeed) {
+      grp.name = cat.group.name;
+      if (force) {
+        Object.assign(grp, cat.group, { trashedAt: null, demoSeed: true });
+      }
+    }
+
+    for (const item of cat.notes) {
+      const existing = findNote(item.id);
+      if (!existing) {
+        data.notes.push(Object.assign({
+          seq: data.nextSeq++,
+          createdAt: item.updatedAt,
+          trashedAt: null,
+          welcomeCopy: false,
+          demoSeed: true,
+        }, item));
+      } else if (force) {
+        Object.assign(existing, item, { trashedAt: null, demoSeed: true });
+      } else if (existing.demoSeed) {
+        existing.title = item.title;
+        existing.text = item.text;
+        existing.html = item.html;
+      }
+    }
+  }
+
+  function buildPinSpreadsheet(lang) {
+    const pt = lang === 'pt';
+    const oldSheet = document.getElementById('sheet');
+    if (oldSheet) oldSheet.remove();
+    const oldDock = document.getElementById('demoDock');
+    if (oldDock) oldDock.remove();
+
+    const rows = [
+      [pt ? 'Categoria' : 'Category', ...(pt ? 'Jan Fev Mar Abr Mai Jun Jul' : 'Jan Feb Mar Apr May Jun Jul').split(' ')],
+      [pt ? 'Aluguel' : 'Rent', 5214, 5847, 1839, 2904, 3120, 4410, 3807],
+      [pt ? 'Equipe' : 'Team', 8710, 6105, 4497, 3352, 6620, 2981, 5039],
+      ['Marketing', 5287, 2916, 6848, 2218, 4093, 3367, 4636],
+      ['Software', 1251, 9252, 9529, 1840, 2210, 6115, 2702],
+      [pt ? 'Viagens' : 'Travel', 4573, 5753, 6847, 3327, 2333, 9671, 4811],
+      [pt ? 'Eventos' : 'Events', 2893, 5723, 3773, 2182, 7756, 3965, 3951],
+      [pt ? 'Materiais' : 'Supplies', 1517, 9136, 2948, 8757, 5036, 2924, 6227],
+      [pt ? 'Consultoria' : 'Consulting', 4416, 7630, 6675, 2024, 2815, 4853, 1612],
+    ];
+    const title = pt ? 'Orçamento 2027.xlsx' : 'Budget 2027.xlsx';
+    const fmt = (v) => (typeof v === 'number' ? v.toLocaleString(pt ? 'pt-BR' : 'en-US') : v);
+    const head = '<tr><th></th>' + 'ABCDEFGH'.split('').map((c) => `<th>${c}</th>`).join('') + '</tr>';
+    const body = rows.map((r, i) => `<tr><td class="rn">${i + 1}</td>${r.map((v) => `<td>${fmt(v)}</td>`).join('')}</tr>`).join('');
+
+    desk.insertAdjacentHTML('beforeend', `
+      <div class="demo-app" id="sheet" style="left:36px;top:22px;width:888px;height:442px;z-index:${++zNormal}">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span id="sheetTitle">${title}</span></div>
+        <div class="tools"><span>B</span><span>I</span><span>%</span><span>Σ</span><span class="fx" id="fx"></span></div>
+        <table class="sheet"><tbody>${head}${body}</tbody></table>
+      </div>
+      <div class="demo-dock" id="demoDock">
+        <i></i><i></i>
+        <button type="button" class="dock-memo" id="memoIcon" title="Memo" aria-label="Memo">
+          <img src="media/icon.svg" width="16" height="16" alt="" aria-hidden="true">
+        </button>
+        <i></i><i></i>
+      </div>
+    `);
+
+    const sheet = document.getElementById('sheet');
+    const fx = document.getElementById('fx');
+    let sel = null;
+    let typed = null;
+    const select = (td) => {
+      if (sel) sel.classList.remove('sel');
+      sel = td;
+      typed = null;
+      td.classList.add('sel');
+      fx.textContent = td.textContent;
+    };
+    sheet.addEventListener('pointerdown', (e) => {
+      sheet.style.zIndex = String(++zNormal);
+      for (const other of Object.values(wins)) {
+        try {
+          other.f.contentDocument?.getElementById('frame')?.classList.remove('is-focused');
+        } catch {}
+      }
+      const td = e.target.closest('td');
+      if (td && !td.classList.contains('rn')) select(td);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!sel || !document.body.contains(sel)) return;
+      if (/^[0-9]$/.test(e.key)) {
+        typed = (typed || '') + e.key;
+        sel.textContent = typed;
+        fx.textContent = typed;
+      } else if (e.key === 'Backspace' && sel) {
+        typed = (typed || '').slice(0, -1);
+        sel.textContent = typed;
+        fx.textContent = typed;
+      } else if (e.key === 'Enter') {
+        if (typed) sel.textContent = Number(typed).toLocaleString(pt ? 'pt-BR' : 'en-US');
+        const tr = sel.parentElement.nextElementSibling;
+        if (tr) select(tr.children[[...sel.parentElement.children].indexOf(sel)]);
+      }
+    });
+    document.getElementById('memoIcon').addEventListener('click', async () => {
+      const n = findNote('demo-today');
+      if (n) {
+        n.hidden = false;
+        await openNoteWindow(n);
+        raiseWindow('note-demo-today');
+      }
+    });
+  }
+
+  async function bootScene(scene, forceReset = false) {
+    for (const label of Object.keys(wins)) {
+      closeWindow(label);
+    }
+    const lang = effectiveLanguage();
+    seedDemoData(lang, forceReset);
+    if (forceReset) markDirty(false);
+
+    if (scene === 'pin') {
+      data.zoom = 1;
+      buildPinSpreadsheet(lang);
+      const n = findNote('demo-today');
+      if (n) {
+        n.hidden = false;
+        if (forceReset) {
+          n.x = 596;
+          n.y = 68;
+          n.width = 304;
+          n.height = 252;
+        }
+        await openNoteWindow(n);
+        raiseWindow('note-demo-today');
+      }
+      return;
+    }
+
+    if (scene === 'write') {
+      data.zoom = 1.25;
+      const n = findNote('demo-launch');
+      if (n) {
+        n.hidden = false;
+        if (forceReset || n.x === null) {
+          n.x = 244;
+          n.y = 26;
+          n.width = 376;
+          n.height = 360;
+        }
+        const w = await openNoteWindow(n);
+        raiseWindow('note-demo-launch');
+        setTimeout(() => {
+          try {
+            const btn = w?.f?.contentDocument?.getElementById('trayBtn');
+            if (btn && btn.getAttribute('aria-pressed') !== 'true') btn.click();
+          } catch {}
+        }, 120);
+      }
+      return;
+    }
+
+    if (scene === 'group') {
+      data.zoom = 1;
+      const g = findGroup('demo-work');
+      if (g) {
+        g.hidden = false;
+        g.open = true;
+        await openGroupWindow(g);
+      }
+      for (const id of ['demo-q4', 'demo-meet', 'demo-ideas']) {
+        const n = findNote(id);
+        if (n) {
+          n.hidden = false;
+          await openNoteWindow(n);
+        }
+      }
+      raiseWindow('note-demo-ideas');
+      return;
+    }
+
+    if (scene === 'manager') {
+      data.zoom = 1;
+      Object.assign(data.manager, { x: 32, y: 20, width: 556, height: 492, color: 'iris' });
+      await openManagerWindow({ view: 'notes', scope: 'current' });
+      const n = findNote('demo-groceries');
+      if (n) {
+        n.hidden = false;
+        await openNoteWindow(n);
+      }
+      raiseWindow('manager');
+    }
+  }
+
+  function anchorRect(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      x: Math.round(r.left + window.scrollX),
+      y: Math.round(r.top + window.scrollY),
+      w: Math.max(240, Math.round(r.width)),
+      h: Math.round(r.height),
+    };
+  }
+
+  function computeSiteHomePositions() {
+    const pos = {};
+    const hero = anchorRect('anchorHero');
+    if (hero) {
+      if (hero.w >= 640) {
+        pos['note-demo-today'] = { x: hero.x + Math.round(hero.w / 2) - 318, y: hero.y + 8, w: 304, h: 252 };
+        pos['note-demo-wifi'] = { x: hero.x + Math.round(hero.w / 2) + 14, y: hero.y + 24, w: 296, h: 224 };
+      } else {
+        const w = Math.min(340, hero.w);
+        pos['note-demo-today'] = { x: hero.x, y: hero.y + 8, w, h: 240 };
+        pos['note-demo-wifi'] = { x: hero.x, y: hero.y + 260, w, h: 220 };
+      }
+    }
+    const write = anchorRect('anchorWrite');
+    if (write) {
+      const w = Math.min(440, write.w);
+      pos['note-demo-launch'] = { x: write.x + Math.max(0, Math.round((write.w - w) / 2)), y: write.y + 4, w, h: 348 };
+    }
+    const grp = anchorRect('anchorGroup');
+    if (grp) {
+      pos['group-demo-work'] = { x: grp.x, y: grp.y + 4, w: Math.min(312, grp.w), h: TITLEBAR_H };
+      if (grp.w >= 540) {
+        pos['note-demo-q4'] = { x: grp.x, y: grp.y + 52, w: 268, h: 204 };
+        pos['note-demo-meet'] = { x: grp.x + 280, y: grp.y + 52, w: 268, h: 204 };
+        pos['note-demo-ideas'] = { x: grp.x + 120, y: grp.y + 268, w: 304, h: 172 };
+      } else {
+        const w = Math.min(340, grp.w);
+        pos['note-demo-q4'] = { x: grp.x, y: grp.y + 52, w, h: 190 };
+        pos['note-demo-meet'] = { x: grp.x, y: grp.y + 252, w, h: 190 };
+        pos['note-demo-ideas'] = { x: grp.x, y: grp.y + 452, w, h: 165 };
+      }
+    }
+    const mgr = anchorRect('anchorManager');
+    if (mgr) {
+      pos.manager = { x: mgr.x, y: mgr.y + 4, w: Math.min(560, mgr.w), h: 452 };
+    }
+    return pos;
+  }
+
+  function alignSiteHomeWindows(force = false) {
+    if (!IS_SITE_HOME) return;
+    const pos = computeSiteHomePositions();
+    for (const [label, rect] of Object.entries(pos)) {
+      const w = wins[label];
+      if (!w) continue;
+      if (!force && (w.userMoved || w.pinned)) continue;
+      setWinRect(label, rect.x, rect.y, rect.w, rect.h, false);
+    }
+  }
+
+  async function bootSiteHome() {
+    data = defaultData();
+    data.zoom = 1;
+    const lang = effectiveLanguage();
+    seedDemoData(lang, true);
+    const pt = lang === 'pt';
+    const wifi = findNote('demo-wifi');
+    if (wifi && wifi.demoSeed) {
+      wifi.text = pt
+        ? 'Rede: Memo-5G\nSenha: memo-2026\n\nDica: clique no alfinete (↖) e role a página!'
+        : 'Network: Memo-5G\nPass: memo-2026\n\nTip: click the pin (↖) and scroll the page!';
+      wifi.html = '';
+    }
+
+    const pos = computeSiteHomePositions();
+    for (const [label, rect] of Object.entries(pos)) {
+      if (label === 'manager') {
+        Object.assign(data.manager, { x: rect.x, y: rect.y, width: rect.w, height: rect.h, color: 'iris', pinned: false });
+      } else if (isGroup(label)) {
+        const g = findGroup(idOf(label));
+        if (g) Object.assign(g, { x: rect.x, y: rect.y, width: rect.w, hidden: false, open: true, pinned: false });
+      } else if (isNote(label)) {
+        const n = findNote(idOf(label));
+        if (n) Object.assign(n, { x: rect.x, y: rect.y, width: rect.w, height: rect.h, hidden: false, pinned: false });
+      }
+    }
+
+    const g = findGroup('demo-work');
+    if (g) await openGroupWindow(g);
+
+    for (const id of ['demo-today', 'demo-wifi', 'demo-launch', 'demo-q4', 'demo-meet', 'demo-ideas']) {
+      const n = findNote(id);
+      if (n) {
+        const w = await openNoteWindow(n);
+        if (id === 'demo-launch') {
+          setTimeout(() => {
+            try {
+              const btn = w?.f?.contentDocument?.getElementById('trayBtn');
+              if (btn && btn.getAttribute('aria-pressed') !== 'true') btn.click();
+            } catch {}
+          }, 150);
+        }
+      }
+    }
+
+    await openManagerWindow({ view: 'notes', scope: 'current' }, false);
+    raiseWindow('note-demo-today');
+    if (!location.hash && window.scrollY !== 0) {
+      window.scrollTo(0, 0);
+    }
+    window.addEventListener('resize', () => alignSiteHomeWindows(false));
+  }
+
+  window.addEventListener('message', (e) => {
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.type === 'memo-site-prefs') {
+      if (e.data.theme === 'light' || e.data.theme === 'dark' || e.data.theme === 'system') {
+        setThemeSetting(e.data.theme);
+      }
+      if (e.data.lang === 'pt' || e.data.lang === 'pt-BR' || e.data.lang === 'en') {
+        const nextLang = e.data.lang === 'en' ? 'en' : 'pt-BR';
+        setLanguageSetting(nextLang);
+        if (SCENE || IS_SITE_HOME) {
+          const eff = effectiveLanguage();
+          seedDemoData(eff, false);
+          if (IS_SITE_HOME) {
+            const wifi = findNote('demo-wifi');
+            if (wifi && wifi.demoSeed) {
+              wifi.text = eff === 'pt'
+                ? 'Rede: Memo-5G\nSenha: memo-2026\n\nDica: clique no alfinete (↖) e role a página!'
+                : 'Network: Memo-5G\nPass: memo-2026\n\nTip: click the pin (↖) and scroll the page!';
+              wifi.html = '';
+            }
+          }
+          if (SCENE === 'pin') buildPinSpreadsheet(eff);
+          for (const w of Object.values(wins)) {
+            if (isNote(w.label)) {
+              try { w.f.contentWindow.location.reload(); } catch {}
+            }
+          }
+          notifyGroups();
+          notifyNotes();
+        }
+      }
+    } else if (e.data.type === 'memo-reset-scene' && SCENE) {
+      bootScene(SCENE, true);
+    } else if (e.data.type === 'memo-persist-scene' && SCENE) {
+      flushStore();
+    }
+  });
+
+  window.addEventListener('storage', (e) => {
+    if (IS_SITE_HOME) return;
+    if (e.key === STORAGE_KEY && e.newValue) {
+      try {
+        data = normalizeData(JSON.parse(e.newValue));
+        data.notes = data.notes.filter((n) => !n.demoSeed && !n.id.startsWith('demo-'));
+        data.groups = data.groups.filter((g) => !g.demoSeed && !g.id.startsWith('demo-'));
+        applyDesktopThemeAndLang();
+        notifyGroups();
+        notifyNotes();
+      } catch {}
+    }
+  });
+
   async function boot() {
     await resolveSrcBase();
-    await loadAllImagesFromDb();
-    loadStore();
+    if (!IS_SITE_HOME) {
+      await loadAllImagesFromDb();
+      loadStore();
+    }
     applyDesktopThemeAndLang();
+
+    if (IS_SITE_HOME) {
+      await bootSiteHome();
+      return;
+    }
+
+    if (SCENE) {
+      await bootScene(SCENE, false);
+      return;
+    }
 
     const first = isFirstRun();
     const mobile = isMobile();
+    document.documentElement.classList.toggle('is-mobile', mobile);
     await openManagerWindow();
 
     if (!mobile) {
