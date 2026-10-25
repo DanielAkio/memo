@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Bundle web app
         env:
-          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID || vars.GOOGLE_WEB_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
         run: |
           cp -r src site/src
           if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
