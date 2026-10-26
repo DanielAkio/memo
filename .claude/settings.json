@@ -13,18 +13,5 @@
       "Read(/node_modules/**)",
       "Read(/dist/**)"
     ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.ai/hooks/large-read-guard.js\""
-          }
-        ]
-      }
-    ]
   }
 }

@@ -68,10 +68,10 @@ docs/style.md            visual reference ("Linear"-style dark system); base.css
 
 ## Working cheaply
 
-Tokens spent on things that don't help understand or change the project are waste. `.claude/settings.json` and `.agents/hooks.json` enforce part of this:
+Tokens spent on things that don't help understand or change the project are waste. `.claude/settings.json` enforces part of this:
 
 - **Never read** `src/vendor/**`, `src-tauri/icons/**`, `assets/**`, `Cargo.lock`, `package-lock.json`, `src-tauri/target/**`, `src-tauri/gen/**`, `node_modules/**`, `dist/**` (Read is denied). For a dependency version use `cargo tree -i <crate>` or grep `Cargo.toml`.
-- **Big files are read by section.** A hook (`.ai/hooks/large-read-guard.js`) refuses a whole-file Read over 40 KB (`main.rs`, `app.js`): grep for the symbol, then Read with `offset`/`limit` (or `StartLine`/`EndLine`). `memo-code-map` lists the sections.
+- **Big files:** `memo-code-map` lists section maps of the big files (`main.rs`, `app.js`) to find symbols and line numbers cheaply.
 - **Command output is capped** (`bashOutputMaxChars`). Filter long output yourself: `cargo check 2>&1 | grep -E '^(warning|error)' -A5 | head -60`, `git diff --stat` before a full diff, `git log --oneline -n 10`.
 - Don't re-read a file you just edited or read; don't paste whole files or logs into replies; load only the skill the task needs.
 
