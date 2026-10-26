@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Permissions for the note windows, the group bars and the manager window",
-  "windows": ["note-*", "group-*", "manager"],
+  "windows": ["note-*", "group-*", "board-*", "manager"],
   "permissions": [
     "core:default",
     "core:window:allow-set-title"

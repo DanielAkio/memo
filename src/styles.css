@@ -522,7 +522,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   text-decoration-color: var(--color-ash);
 }
 
-.editor::-webkit-scrollbar { width: 10px; }
+.editor::-webkit-scrollbar { width: 10px; height: 10px; }
 .editor::-webkit-scrollbar-track { background: transparent; }
 .editor::-webkit-scrollbar-thumb {
   background: var(--color-graphite);

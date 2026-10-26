@@ -20,8 +20,9 @@ use std::{
 };
 
 use store::{
-    is_valid_color, now_ms, Config, Group, ManagerState, Note, Store, DEFAULT_H, DEFAULT_TEXT_MAX,
-    DEFAULT_W, GROUP_NAME_MAX, LANGUAGES, LAYOUTS, RANDOM_COLOR, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
+    is_valid_color, now_ms, Board, BoardColumn, Config, Group, ManagerState, Note, Store, BOARD_MIN_H,
+    BOARD_MIN_W, BOARD_NAME_MAX, DEFAULT_H, DEFAULT_TEXT_MAX, DEFAULT_W, GROUP_NAME_MAX, LANGUAGES,
+    LAYOUTS, RANDOM_COLOR, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
 };
 use tauri::{
     menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu},
@@ -104,7 +105,19 @@ fn is_group(window: &WebviewWindow) -> bool {
     window.label().starts_with("group-")
 }
 
-/// The app's real windows (notes, groups and manager), i.e. not the Snap
+fn is_board(window: &WebviewWindow) -> bool {
+    window.label().starts_with("board-")
+}
+
+fn board_label(id: &str) -> String {
+    format!("board-{id}")
+}
+
+fn board_id_of(window: &WebviewWindow) -> String {
+    window.label().trim_start_matches("board-").to_string()
+}
+
+/// The app's real windows (notes, groups, boards and manager), i.e. not the Snap
 /// preview.
 fn is_app_window(window: &WebviewWindow) -> bool {
     window.label() != SNAP_PREVIEW
@@ -119,6 +132,11 @@ fn notify(app: &AppHandle) {
 /// notes' footers, the group bars and the manager refresh on it.
 fn groups_changed(app: &AppHandle) {
     let _ = app.emit("groups-changed", ());
+}
+
+/// Tells windows that boards changed.
+fn boards_changed(app: &AppHandle) {
+    let _ = app.emit("boards-changed", ());
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +200,27 @@ struct ManagerView {
 }
 
 static MANAGER_VIEW: Mutex<Option<ManagerView>> = Mutex::new(None);
+static BOARD_TRANSIENT_NOTES: Mutex<Option<HashSet<String>>> = Mutex::new(None);
+
+fn mark_board_transient(note_id: &str) {
+    let mut lock = BOARD_TRANSIENT_NOTES.lock().unwrap();
+    let set = lock.get_or_insert_with(HashSet::new);
+    set.insert(note_id.to_string());
+}
+
+fn take_board_transient(note_id: &str) -> bool {
+    let mut lock = BOARD_TRANSIENT_NOTES.lock().unwrap();
+    if let Some(set) = lock.as_mut() {
+        set.remove(note_id)
+    } else {
+        false
+    }
+}
+
+fn is_board_transient(note_id: &str) -> bool {
+    let lock = BOARD_TRANSIENT_NOTES.lock().unwrap();
+    lock.as_ref().map(|s| s.contains(note_id)).unwrap_or(false)
+}
 
 /// Opens the manager on `view` ("notes", "groups", "settings", "help"), with
 /// the list showing `scope` ("current" or "trash").
@@ -257,6 +296,7 @@ fn manager_title(lang: &str) -> &'static str {
 struct TrayLabels {
     new_note: &'static str,
     new_group: &'static str,
+    new_board: &'static str,
     show: &'static str,
     manager: &'static str,
     trash: &'static str,
@@ -284,6 +324,7 @@ fn tray_labels(lang: &str) -> TrayLabels {
         TrayLabels {
             new_note: "New memory",
             new_group: "New group",
+            new_board: "New board",
             show: "Show all memories",
             manager: "Memo Manager",
             trash: "Trash",
@@ -309,6 +350,7 @@ fn tray_labels(lang: &str) -> TrayLabels {
         TrayLabels {
             new_note: "Nova memória",
             new_group: "Novo grupo",
+            new_board: "Novo quadro",
             show: "Mostrar todas as memórias",
             manager: "Gerenciador do Memo",
             trash: "Lixeira",
@@ -428,11 +470,12 @@ fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
 enum Kind {
     Note(String),
     Group(String),
+    Board(String),
     Manager,
 }
 
 /// Saves position and size whenever the user moves or resizes a window
-/// (note, group or manager). Moves made by a group animation are skipped,
+/// (note, group, board or manager). Moves made by a group animation are skipped,
 /// so a note keeps its own place.
 fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
     let app = app.clone();
@@ -441,6 +484,8 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
         Kind::Note(id_of(window))
     } else if is_group(window) {
         Kind::Group(group_id_of(window))
+    } else if is_board(window) {
+        Kind::Board(board_id_of(window))
     } else {
         Kind::Manager
     };
@@ -472,6 +517,9 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                     Kind::Group(id) => {
                         store.update_group(id, |g| (g.x, g.y) = (x, y));
                     }
+                    Kind::Board(id) => {
+                        store.update_board(id, |b| (b.x, b.y) = (x, y));
+                    }
                     Kind::Manager => {
                         store.update_manager(|m| (m.x, m.y) = (x, y));
                     }
@@ -491,6 +539,11 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                     Kind::Group(id) => {
                         store.update_group(id, |g| g.width = logical.width);
                     }
+                    Kind::Board(id) => {
+                        store.update_board(id, |b| {
+                            (b.width, b.height) = (logical.width, logical.height)
+                        });
+                    }
                     Kind::Manager => {
                         store.update_manager(|m| {
                             (m.width, m.height) = (logical.width, logical.height)
@@ -501,8 +554,30 @@ fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
             WindowEvent::ThemeChanged(_) => apply_background(&win, &store.theme()),
             // Coming back to Memo: fetch what changed on other computers.
             WindowEvent::Focused(true) => sync::on_focus(),
+            WindowEvent::Focused(false) => {
+                if is_note(&win) {
+                    let note_id = id_of(&win);
+                    if is_board_transient(&note_id) {
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(Duration::from_millis(150)).await;
+                            let label = label_for(&note_id);
+                            if let Some(w) = app.get_webview_window(&label) {
+                                if !w.is_focused().unwrap_or(false) {
+                                    take_board_transient(&note_id);
+                                    close_note_by_id(&app, &note_id);
+                                    boards_changed(&app);
+                                }
+                            }
+                        });
+                    }
+                }
+            }
             WindowEvent::Destroyed => {
                 app.state::<Sliding>().0.lock().unwrap().remove(win.label());
+                if is_note(&win) {
+                    take_board_transient(&id_of(&win));
+                }
             }
             _ => {}
         }
@@ -879,6 +954,22 @@ struct Rect {
     h: i32,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+enum DropTarget {
+    Group(String),
+    BoardColumn(String, String),
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnBounds {
+    pub id: String,
+    pub left: f64,
+    pub right: f64,
+    pub top: f64,
+    pub bottom: f64,
+}
+
 struct Drag {
     /// Cursor offset from the window's outer corner, in logical pixels: on
     /// a monitor with another scale the window changes size, and the cursor
@@ -888,8 +979,8 @@ struct Drag {
     start: (i32, i32),
     /// Snap zone under the cursor at the last move.
     zone: Option<Rect>,
-    /// Group bar under the cursor (a note dropped there joins that group).
-    drop: Option<String>,
+    /// Drop target under the cursor (group bar or board column).
+    drop: Option<DropTarget>,
 }
 
 #[derive(Default)]
@@ -901,6 +992,8 @@ struct Drags {
     restore: Mutex<HashMap<String, (f64, f64)>>,
     /// Resizes in progress, by window label.
     resizes: Mutex<HashMap<String, Resize>>,
+    /// Active column bounds by board id for drag-drop.
+    board_columns: Mutex<HashMap<String, Vec<ColumnBounds>>>,
 }
 
 /// Cursor and visible rect when a resize handle was grabbed.
@@ -1099,17 +1192,40 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
     let (vx, vy) = snapped(window, x + dx, y + dy, w, h);
     desk::set_position(window, vx - dx, vy - dy);
 
-    // A note over a group bar can be dropped into it (the bar lights up);
+    // A note over a group bar or board column can be dropped into it;
+    // a board over a group bar can be dropped into it;
     // group bars themselves don't Snap.
     let app = window.app_handle();
-    if is_note(window) {
-        let target = group_under(window, cursor);
-        if target != drag.drop {
-            if let Some(old) = &drag.drop {
-                let _ = app.emit("drop-hover", (old, false));
+    if is_note(window) || is_board(window) {
+        let target = if let Some(gid) = group_under(window, cursor) {
+            Some(DropTarget::Group(gid))
+        } else if is_note(window) {
+            if let Some((bid, cid)) = board_col_under(app, cursor) {
+                Some(DropTarget::BoardColumn(bid, cid))
+            } else {
+                None
             }
-            if let Some(new) = &target {
-                let _ = app.emit("drop-hover", (new, true));
+        } else {
+            None
+        };
+        if target != drag.drop {
+            match &drag.drop {
+                Some(DropTarget::Group(old)) => {
+                    let _ = app.emit("drop-hover", (old, false));
+                }
+                Some(DropTarget::BoardColumn(bid, cid)) => {
+                    let _ = app.emit("board-drop-hover", (bid, cid, false));
+                }
+                None => {}
+            }
+            match &target {
+                Some(DropTarget::Group(new)) => {
+                    let _ = app.emit("drop-hover", (new, true));
+                }
+                Some(DropTarget::BoardColumn(bid, cid)) => {
+                    let _ = app.emit("board-drop-hover", (bid, cid, true));
+                }
+                None => {}
             }
             drag.drop = target;
         }
@@ -1123,14 +1239,24 @@ fn drag_move(window: &WebviewWindow, drags: &Drags) {
     show_snap_preview(app, drag.zone);
 }
 
-/// The group bar under `cursor` (not the note's own group), by id.
-fn group_under(note: &WebviewWindow, cursor: (f64, f64)) -> Option<String> {
-    let own = note
-        .state::<Shared>()
-        .get(&id_of(note))
-        .map(|n| n.group_id)
-        .unwrap_or_default();
-    note.app_handle()
+/// The group bar under `cursor` (not the note or board's own group), by id.
+fn group_under(window: &WebviewWindow, cursor: (f64, f64)) -> Option<String> {
+    let own = if is_note(window) {
+        window
+            .state::<Shared>()
+            .get(&id_of(window))
+            .map(|n| n.group_id)
+            .unwrap_or_default()
+    } else if is_board(window) {
+        window
+            .state::<Shared>()
+            .board(&board_id_of(window))
+            .map(|b| b.group_id)
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    window.app_handle()
         .webview_windows()
         .into_values()
         .filter(|w| {
@@ -1150,6 +1276,34 @@ fn group_under(note: &WebviewWindow, cursor: (f64, f64)) -> Option<String> {
         .filter(|id| *id != own)
 }
 
+/// The board column under `cursor`, if any.
+fn board_col_under(app: &AppHandle, cursor: (f64, f64)) -> Option<(String, String)> {
+    let board_windows: Vec<WebviewWindow> = app
+        .webview_windows()
+        .into_values()
+        .filter(|w| is_board(w) && w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false))
+        .collect();
+
+    for w in board_windows {
+        let (Some((bx, by)), Some((bw, bh))) = (desk::inner_position(&w), desk::inner_size(&w)) else {
+            continue;
+        };
+        if cursor.0 >= bx as f64 && cursor.0 < (bx + bw) as f64 && cursor.1 >= by as f64 && cursor.1 < (by + bh) as f64 {
+            let rel_x = cursor.0 - bx as f64;
+            let rel_y = cursor.1 - by as f64;
+            let bid = board_id_of(&w);
+            let drags = app.state::<Drags>();
+            let cols = drags.board_columns.lock().unwrap().get(&bid).cloned().unwrap_or_default();
+            for col in cols {
+                if rel_x >= col.left && rel_x < col.right && rel_y >= col.top && rel_y < col.bottom {
+                    return Some((bid, col.id));
+                }
+            }
+        }
+    }
+    None
+}
+
 /// End of the drag: final move, then, if released in a Snap zone, the window
 /// takes the zone's rect (its size is kept to restore on the next drag).
 #[tauri::command]
@@ -1161,13 +1315,40 @@ fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
     let Some(drag) = drag else {
         return;
     };
-    // Dropped on a group bar: the note joins it, going back to where the drag
-    // started (open group) or into the bar (closed group).
-    if let Some(group) = drag.drop {
+    // Dropped on a group bar or board column.
+    if let Some(target) = drag.drop {
         let app = window.app_handle();
-        let _ = app.emit("drop-hover", (&group, false));
-        join_group(app, &id_of(&window), &group, Some(drag.start));
-        return;
+        match target {
+            DropTarget::Group(group) => {
+                let _ = app.emit("drop-hover", (&group, false));
+                if is_board(&window) {
+                    join_board_to_group(app, &board_id_of(&window), &group, Some(drag.start));
+                } else {
+                    join_group(app, &id_of(&window), &group, Some(drag.start));
+                }
+                return;
+            }
+            DropTarget::BoardColumn(bid, cid) => {
+                let _ = app.emit("board-drop-hover", (&bid, &cid, false));
+                let note_id = id_of(&window);
+                let store = app.state::<Shared>();
+                store.update_board(&bid, |b| {
+                    for col in &mut b.columns {
+                        col.note_ids.retain(|id| id != &note_id);
+                    }
+                    if let Some(col) = b.columns.iter_mut().find(|c| c.id == cid) {
+                        col.note_ids.push(note_id.clone());
+                    }
+                });
+                store.flush();
+                store.update(&note_id, |n| n.hidden = true);
+                store.flush();
+                let _ = window.destroy();
+                boards_changed(app);
+                notify(app);
+                return;
+            }
+        }
     }
     let Some(zone) = drag.zone else {
         return;
@@ -1326,7 +1507,7 @@ fn raise_notes(app: &AppHandle) -> bool {
     let mut windows: Vec<WebviewWindow> = app
         .webview_windows()
         .into_values()
-        .filter(|w| is_note(w) || is_group(w))
+        .filter(|w| is_note(w) || is_group(w) || is_board(w))
         .collect();
     // Each focused window goes on top of the previous ones.
     windows.sort_by_key(is_group);
@@ -1437,6 +1618,8 @@ fn set_pinned(
         store.update(&id_of(&window), |n| n.pinned = pinned);
     } else if is_group(&window) {
         store.update_group(&group_id_of(&window), |g| g.pinned = pinned);
+    } else if is_board(&window) {
+        store.update_board(&board_id_of(&window), |b| b.pinned = pinned);
     } else {
         store.update_manager(|m| m.pinned = pinned);
     }
@@ -1730,6 +1913,56 @@ async fn open_note(app: AppHandle, id: String) -> Result<(), String> {
             open_note_window(&app, &note).map_err(|e| e.to_string())?;
         }
     }
+    notify(&app);
+    Ok(())
+}
+
+/// Opens a note from a board. The note opens on desktop and, when clicked outside
+/// (loses focus), returns back to the board (closes from desktop).
+#[tauri::command]
+async fn open_board_note(app: AppHandle, id: String) -> Result<(), String> {
+    let note = app
+        .state::<Shared>()
+        .get(&id)
+        .filter(|n| n.trashed_at.is_none())
+        .ok_or("note not found")?;
+    mark_board_transient(&id);
+    let store = app.state::<Shared>();
+    let note = store.update(&id, |n| n.hidden = false).unwrap_or(note);
+    let window = open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    let _ = window.show();
+    let _ = window.set_focus();
+    notify(&app);
+    Ok(())
+}
+
+/// Takes a note out of any board: removes it from all boards, marks hidden=false,
+/// and opens it on desktop at (screen_x, screen_y) if supplied.
+#[tauri::command]
+async fn take_note_out_of_board(
+    app: AppHandle,
+    id: String,
+    screen_x: Option<i32>,
+    screen_y: Option<i32>,
+    store: State<'_, Shared>,
+) -> Result<(), String> {
+    take_board_transient(&id);
+    store.remove_note_from_boards(&id);
+    let note = store.update(&id, |n| {
+        n.hidden = false;
+        if let (Some(sx), Some(sy)) = (screen_x, screen_y) {
+            n.x = Some(sx);
+            n.y = Some(sy);
+        }
+    }).ok_or_else(|| "note not found".to_string())?;
+    store.flush();
+    let window = open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    if let (Some(sx), Some(sy)) = (screen_x, screen_y) {
+        desk::set_position(&window, sx, sy);
+    }
+    let _ = window.show();
+    let _ = window.set_focus();
+    boards_changed(&app);
     notify(&app);
     Ok(())
 }
@@ -2069,8 +2302,44 @@ fn take_out(app: &AppHandle, id: &str) {
             }
         }
     }
+    for board in store.board_members(id) {
+        let board = store.update_board(&board.id, |b| b.hidden = false).unwrap_or(board);
+        let label = board_label(&board.id);
+        if app.get_webview_window(&label).is_some() {
+            continue;
+        }
+        app.state::<Sliding>()
+            .0
+            .lock()
+            .unwrap()
+            .insert(label.clone());
+        let Ok(window) = build_board_window(app, &board) else {
+            app.state::<Sliding>().0.lock().unwrap().remove(&label);
+            continue;
+        };
+        let target = match (board.x, board.y) {
+            (Some(x), Some(y)) if is_on_screen(&window, x, y) => Ok((x, y)),
+            _ => desk::outer_position(&window).ok_or(()),
+        };
+        match (anchor, target) {
+            (Some(from), Ok(to)) => {
+                desk::set_position(&window, from.0, from.1);
+                let _ = window.show();
+                let app = app.clone();
+                slide(window, from, to, move |w| {
+                    thread::sleep(Duration::from_millis(150));
+                    app.state::<Sliding>().0.lock().unwrap().remove(w.label());
+                });
+            }
+            _ => {
+                let _ = window.show();
+                app.state::<Sliding>().0.lock().unwrap().remove(&label);
+            }
+        }
+    }
     store.flush();
     groups_changed(app);
+    boards_changed(app);
     notify(app);
 }
 
@@ -2085,7 +2354,13 @@ fn put_in(app: &AppHandle, id: &str) {
             slide_in(app, window, anchor);
         }
     }
+    for board in store.board_members(id) {
+        if let Some(window) = app.get_webview_window(&board_label(&board.id)) {
+            slide_in(app, window, anchor);
+        }
+    }
     groups_changed(app);
+    boards_changed(app);
     notify(app);
 }
 
@@ -2162,6 +2437,56 @@ fn assign_group(app: &AppHandle, note_id: &str, group_id: &str, anchor: &Webview
     }
 }
 
+fn join_board_to_group(app: &AppHandle, board_id: &str, group_id: &str, back_to: Option<(i32, i32)>) {
+    let store = app.state::<Shared>();
+    let Some(group) = store.group(group_id) else {
+        return;
+    };
+    store.update_board(board_id, |b| b.group_id = group_id.to_string());
+    store.flush();
+    if let Some(window) = app.get_webview_window(&board_label(board_id)) {
+        if group.hidden {
+            let _ = window.destroy();
+        } else if !group.open {
+            slide_in(app, window, group_anchor(app, group_id));
+        } else if let (Some(to), Some(from)) = (back_to, desk::outer_position(&window)) {
+            slide(window, from, to, |_| {});
+        }
+    }
+    boards_changed(app);
+    groups_changed(app);
+    notify(app);
+}
+
+fn leave_board_group(app: &AppHandle, board_id: &str) {
+    let store = app.state::<Shared>();
+    let Some(board) = store.update_board(board_id, |b| {
+        b.group_id.clear();
+        b.hidden = false;
+    }) else {
+        return;
+    };
+    store.flush();
+    if board.trashed_at.is_none() && app.get_webview_window(&board_label(board_id)).is_none() {
+        let _ = open_board_window(app, &board);
+    }
+    boards_changed(app);
+    groups_changed(app);
+    notify(app);
+}
+
+fn assign_board_group(app: &AppHandle, board_id: &str, group_id: &str, anchor: &WebviewWindow) {
+    match group_id {
+        "" => leave_board_group(app, board_id),
+        "new" => {
+            let group = app.state::<Shared>().create_group(beside(anchor));
+            let _ = open_group_window(app, &group);
+            join_board_to_group(app, board_id, &group.id, None);
+        }
+        id => join_board_to_group(app, board_id, id, None),
+    }
+}
+
 /// All groups, for the notes' footer picker and the manager.
 #[tauri::command]
 fn list_groups(store: State<'_, Shared>) -> Vec<Group> {
@@ -2189,12 +2514,34 @@ async fn move_note_to_group(app: AppHandle, window: WebviewWindow, id: String, g
     assign_group(&app, &id, &group_id, &window);
 }
 
-/// The calling group bar's data and how many notes it holds.
+/// The calling board's group id ("" = none).
+#[tauri::command]
+fn get_board_group(window: WebviewWindow, store: State<'_, Shared>) -> String {
+    store
+        .board(&board_id_of(&window))
+        .map(|b| b.group_id)
+        .unwrap_or_default()
+}
+
+/// Picker of a board: moves it to `group_id` ("" = none, "new").
+#[tauri::command]
+async fn set_board_group(app: AppHandle, window: WebviewWindow, group_id: String) {
+    let id = board_id_of(&window);
+    assign_board_group(&app, &id, &group_id, &window);
+}
+
+/// Manager list: moves board `id` to `group_id` ("" = none, "new").
+#[tauri::command]
+async fn move_board_to_group(app: AppHandle, window: WebviewWindow, id: String, group_id: String) {
+    assign_board_group(&app, &id, &group_id, &window);
+}
+
+/// The calling group bar's data and how many notes & boards it holds.
 #[tauri::command]
 fn load_group(window: WebviewWindow, store: State<'_, Shared>) -> Option<(Group, usize)> {
     let id = group_id_of(&window);
     let group = store.group(&id)?;
-    Some((group, store.members(&id).len()))
+    Some((group, store.members(&id).len() + store.board_members(&id).len()))
 }
 
 /// Renames the calling group (empty = unnamed, as for notes). Returns the
@@ -2315,12 +2662,22 @@ fn raise_group(app: &AppHandle, id: &str) {
         let closed = store
             .members(id)
             .iter()
-            .any(|n| app.get_webview_window(&label_for(&n.id)).is_none());
+            .any(|n| app.get_webview_window(&label_for(&n.id)).is_none())
+            || store
+                .board_members(id)
+                .iter()
+                .any(|b| app.get_webview_window(&board_label(&b.id)).is_none());
         if closed {
             take_out(app, id);
         }
         for note in store.members(id) {
             if let Some(window) = app.get_webview_window(&label_for(&note.id)) {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }
+        for board in store.board_members(id) {
+            if let Some(window) = app.get_webview_window(&board_label(&board.id)) {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
@@ -2343,9 +2700,13 @@ fn show_group(app: &AppHandle, id: &str) {
         for note in store.members(id).iter().filter(|n| !n.hidden) {
             let _ = open_note_window(app, note);
         }
+        for board in store.board_members(id).iter().filter(|b| !b.hidden) {
+            let _ = open_board_window(app, board);
+        }
     }
     store.flush();
     groups_changed(app);
+    boards_changed(app);
     notify(app);
 }
 
@@ -2365,10 +2726,16 @@ async fn close_group(app: AppHandle, window: WebviewWindow) {
                 let _ = note_window.destroy();
             }
         }
+        for board in store.board_members(&id) {
+            if let Some(w) = app.get_webview_window(&board_label(&board.id)) {
+                let _ = w.destroy();
+            }
+        }
     }
     store.flush();
     let _ = window.destroy();
     groups_changed(&app);
+    boards_changed(&app);
     notify(&app);
 }
 
@@ -2432,6 +2799,7 @@ async fn trash_group_id(app: AppHandle, id: String) {
 fn trash_group_by_id(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
     let members = store.members(id);
+    let board_members = store.board_members(id);
     // Like a blank note: a group nobody touched is just removed.
     if store.is_pristine_group(id) {
         store.remove_group(id);
@@ -2440,12 +2808,16 @@ fn trash_group_by_id(app: &AppHandle, id: &str) {
         for note in members {
             trash(app, &note.id);
         }
+        for board in board_members {
+            let _ = trash_board_id(app.clone(), board.id.clone(), store.clone());
+        }
     }
     store.flush();
     if let Some(window) = app.get_webview_window(&group_label(id)) {
         let _ = window.destroy();
     }
     groups_changed(app);
+    boards_changed(app);
     notify(app);
 }
 
@@ -2480,9 +2852,26 @@ async fn restore_group(app: AppHandle, id: String) -> Result<(), String> {
             }
         }
     }
+    let together_boards: Vec<String> = store
+        .boards()
+        .into_iter()
+        .filter(|b| b.group_id == id && b.trashed_at.is_some_and(|t| t >= since))
+        .map(|b| b.id)
+        .collect();
+    for board_id in together_boards {
+        if let Some(board) = store.update_board(&board_id, |b| {
+            b.trashed_at = None;
+            b.hidden = false;
+        }) {
+            if group.open {
+                let _ = open_board_window(&app, &board);
+            }
+        }
+    }
     store.flush();
     open_group_window(&app, &group).map_err(|e| e.to_string())?;
     groups_changed(&app);
+    boards_changed(&app);
     notify(&app);
     Ok(())
 }
@@ -2506,6 +2895,193 @@ fn empty_group_trash(app: AppHandle, store: State<'_, Shared>) {
     store.flush();
     groups_changed(&app);
     notify(&app);
+}
+
+// ---------------------------------------------------------------------------
+// Boards
+// ---------------------------------------------------------------------------
+
+fn board_title(name: &str) -> &str {
+    if name.trim().is_empty() {
+        "Memo"
+    } else {
+        name
+    }
+}
+
+fn build_board_window(app: &AppHandle, board: &Board) -> tauri::Result<WebviewWindow> {
+    let label = board_label(&board.id);
+    let store = app.state::<Shared>();
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("board.html".into()))
+        .title(board_title(&board.name))
+        .inner_size(board.width, board.height)
+        .min_inner_size(BOARD_MIN_W, BOARD_MIN_H)
+        .decorations(false)
+        .resizable(false)
+        .always_on_top(board.pinned)
+        .background_color(CARBON)
+        .accept_first_mouse(true)
+        .visible(false)
+        .drag_and_drop(false)
+        .build()?;
+    match (board.x, board.y) {
+        (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
+            desk::set_position(&window, x, y);
+            set_logical_size(&window, board.width, board.height);
+        }
+        _ => {
+            let _ = window.center();
+        }
+    }
+    apply_theme(&window, &store.theme());
+    track_geometry(app, &window);
+    let _ = window.set_zoom(store.zoom());
+    Ok(window)
+}
+
+fn open_board_window(app: &AppHandle, board: &Board) -> tauri::Result<WebviewWindow> {
+    let label = board_label(&board.id);
+    if let Some(existing) = app.get_webview_window(&label) {
+        let _ = existing.unminimize();
+        let _ = existing.show();
+        let _ = existing.set_focus();
+        return Ok(existing);
+    }
+    let window = build_board_window(app, board)?;
+    window.show()?;
+    let _ = window.set_focus();
+    Ok(window)
+}
+
+#[tauri::command]
+async fn new_board(app: AppHandle, store: State<'_, Shared>) -> Result<Board, String> {
+    let lang = store.effective_language();
+    let default_cols = if lang == "en" {
+        vec!["To Do".into(), "In Progress".into(), "Done".into()]
+    } else {
+        vec!["A Fazer".into(), "Em Andamento".into(), "Concluído".into()]
+    };
+    let board = store.create_board(None, default_cols, None);
+    open_board_window(&app, &board).map_err(|e| e.to_string())?;
+    boards_changed(&app);
+    Ok(board)
+}
+
+#[tauri::command]
+async fn open_board(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
+    let board = store.board(&id).ok_or_else(|| "board not found".to_string())?;
+    store.update_board(&id, |b| b.hidden = false);
+    open_board_window(&app, &board).map_err(|e| e.to_string())?;
+    boards_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn load_board(window: WebviewWindow, store: State<'_, Shared>) -> Result<Option<Board>, String> {
+    Ok(store.board(&board_id_of(&window)))
+}
+
+#[tauri::command]
+fn save_board_columns(
+    app: AppHandle,
+    window: WebviewWindow,
+    columns: Vec<BoardColumn>,
+    store: State<'_, Shared>,
+) -> Result<(), String> {
+    let id = board_id_of(&window);
+    store.update_board(&id, |b| b.columns = columns);
+    boards_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn rename_board(
+    app: AppHandle,
+    window: WebviewWindow,
+    name: String,
+    store: State<'_, Shared>,
+) -> Result<String, String> {
+    let id = board_id_of(&window);
+    let clean = name.trim().chars().take(BOARD_NAME_MAX).collect::<String>();
+    store.update_board(&id, |b| b.name = clean.clone());
+    let _ = window.set_title(board_title(&clean));
+    boards_changed(&app);
+    Ok(clean)
+}
+
+#[tauri::command]
+fn set_board_color(
+    app: AppHandle,
+    window: WebviewWindow,
+    color: String,
+    store: State<'_, Shared>,
+) -> Result<(), String> {
+    if !is_valid_color(&color) {
+        return Err(format!("unknown color: {color}"));
+    }
+    let id = board_id_of(&window);
+    store.update_board(&id, |b| b.color = color);
+    boards_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+async fn close_board(
+    app: AppHandle,
+    window: WebviewWindow,
+    store: State<'_, Shared>,
+) -> Result<(), String> {
+    let id = board_id_of(&window);
+    if store.is_pristine_board(&id) {
+        store.remove_board(&id);
+    } else {
+        store.update_board(&id, |b| b.hidden = true);
+    }
+    let _ = window.destroy();
+    boards_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn list_boards(store: State<'_, Shared>) -> Result<Vec<Board>, String> {
+    Ok(store.boards())
+}
+
+#[tauri::command]
+fn trash_board_id(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window(&board_label(&id)) {
+        let _ = w.destroy();
+    }
+    store.trash_board(&id);
+    boards_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn restore_board_id(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
+    store.restore_board(&id);
+    boards_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_board_forever(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window(&board_label(&id)) {
+        let _ = w.destroy();
+    }
+    store.remove_board(&id);
+    boards_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn update_board_drop_zones(
+    window: WebviewWindow,
+    zones: Vec<ColumnBounds>,
+    drags: State<'_, Drags>,
+) {
+    let bid = board_id_of(&window);
+    drags.board_columns.lock().unwrap().insert(bid, zones);
 }
 
 // ---------------------------------------------------------------------------
@@ -3046,6 +3622,7 @@ fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKi
     let mut items = vec![
         item("new", l.new_note)?.kind(),
         item("new-group", l.new_group)?.kind(),
+        item("new-board", l.new_board)?.kind(),
         item("show", l.show)?.kind(),
         separator()?,
         item("manager", l.manager)?.kind(),
@@ -3210,6 +3787,20 @@ fn on_title_menu(app: &AppHandle, label: &str, id: &str) {
             }
             groups_changed(app);
         }
+        "new-board" => {
+            let store = app.state::<Shared>();
+            let lang = store.effective_language();
+            let default_cols = if lang == "en" {
+                vec!["To Do".into(), "In Progress".into(), "Done".into()]
+            } else {
+                vec!["A Fazer".into(), "Em Andamento".into(), "Concluído".into()]
+            };
+            let board = store.create_board(None, default_cols, beside(&window));
+            if let Ok(w) = open_board_window(app, &board) {
+                let _ = w.set_focus();
+            }
+            boards_changed(app);
+        }
         _ => on_tray_menu(app, id),
     }
 }
@@ -3226,6 +3817,20 @@ fn on_tray_menu(app: &AppHandle, id: &str) {
                 let _ = window.set_focus();
             }
             groups_changed(app);
+        }
+        "new-board" => {
+            let store = app.state::<Shared>();
+            let lang = store.effective_language();
+            let default_cols = if lang == "en" {
+                vec!["To Do".into(), "In Progress".into(), "Done".into()]
+            } else {
+                vec!["A Fazer".into(), "Em Andamento".into(), "Concluído".into()]
+            };
+            let board = store.create_board(None, default_cols, None);
+            if let Ok(w) = open_board_window(app, &board) {
+                let _ = w.set_focus();
+            }
+            boards_changed(app);
         }
         "show" => show_all(app),
         "manager" => {
@@ -3478,7 +4083,24 @@ fn main() {
             toggle_group,
             new_note_in_group,
             new_group,
-            close_group
+            close_group,
+            new_board,
+            open_board,
+            open_board_note,
+            take_note_out_of_board,
+            load_board,
+            save_board_columns,
+            rename_board,
+            set_board_color,
+            close_board,
+            list_boards,
+            trash_board_id,
+            restore_board_id,
+            delete_board_forever,
+            update_board_drop_zones,
+            get_board_group,
+            set_board_group,
+            move_board_to_group
         ])
         .setup(|app| {
             let default_dir = default_data_dir(app.handle())?;
@@ -3521,6 +4143,10 @@ fn main() {
             }
             for group in store.active_groups().iter().filter(|g| !g.hidden) {
                 open_group_window(&handle, group)?;
+            }
+            let closed_groups: std::collections::HashSet<String> = store.active_groups().into_iter().filter(|g| !g.open).map(|g| g.id).collect();
+            for board in store.active_boards().iter().filter(|b| !b.hidden && !closed_groups.contains(&b.group_id)) {
+                let _ = open_board_window(&handle, board);
             }
             if store.is_first_run() {
                 let pos = handle.get_webview_window(MANAGER).and_then(|m| beside(&m));

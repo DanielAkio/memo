@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memo</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="board.css">
+</head>
+<body>
+  <div class="frame board-frame" id="frame" data-color="">
+    <div class="group-tint" id="groupTint" aria-hidden="true"></div>
+    <header class="titlebar" id="titlebar">
+      <button class="icon-btn pin" id="pinBtn" type="button" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <g transform="translate(-.4 .4) rotate(45 8 8)">
+            <path class="pin-needle" d="M8 11.1v4.4"/>
+            <path class="pin-body" d="M5.45 8.35V2.4a1.5 1.5 0 0 1 1.5-1.5h2.1a1.5 1.5 0 0 1 1.5 1.5v5.95h1.55a1.35 1.35 0 0 1 0 2.7H3.9a1.35 1.35 0 0 1 0-2.7z"/>
+          </g>
+        </svg>
+      </button>
+
+      <button class="board-icon" id="colorBtn" type="button" data-i18n-attr="aria-label=boardColor,title=boardColor" aria-haspopup="true" aria-expanded="false">
+        <svg class="board-icon-svg" viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="2" y="2.5" width="3.5" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <rect x="6.25" y="2.5" width="3.5" height="7.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <rect x="10.5" y="2.5" width="3.5" height="9.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+      </button>
+
+      <div class="identity">
+        <span class="board-name" id="boardName"></span>
+        <input class="title-input" id="nameInput" type="text" maxlength="60" spellcheck="false"
+               data-i18n-attr="placeholder=boardName,aria-label=boardName" hidden>
+      </div>
+
+      <div class="actions">
+        <button class="icon-btn" id="moreBtn" type="button" data-i18n-attr="aria-label=moreCommands,title=moreCommands" aria-haspopup="menu">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path class="dots" d="M3.75 8h0M8 8h0M12.25 8h0"/></svg>
+        </button>
+        <button class="icon-btn close" id="closeBtn" type="button" data-i18n-attr="aria-label=close,title=close">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- <hr> hairline border separating the upper tab from the content below -->
+    <hr class="titlebar-sep">
+
+    <!-- Colour picker under the titlebar -->
+    <div class="menu color-menu" id="colorMenu" hidden>
+      <div class="menu-label" data-i18n="boardColor"></div>
+      <div class="swatches" id="swatches">
+        <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
+        <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
+        <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
+        <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
+        <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
+        <button type="button" class="swatch" data-color="mono"></button>
+        <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+        <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+      </div>
+      <input type="color" class="custom-color" id="customColor" tabindex="-1" aria-hidden="true">
+    </div>
+
+    <!-- Group picker, opened from the footer: the board's group, "no group" or
+         a new one. -->
+    <div class="menu group-menu" id="groupMenu" hidden>
+      <div class="menu-label" data-i18n="groupMenuTitle"></div>
+      <div class="menu-items" id="groupItems" role="menu"></div>
+    </div>
+
+    <!-- Board Body with horizontally scrollable columns -->
+    <main class="board-body" id="boardBody">
+      <div class="columns-track" id="columnsTrack"></div>
+    </main>
+
+    <footer class="statusbar">
+      <!-- Bottom left: the board's group (with a folder icon) or, without one,
+           "no group". Clicking opens the group picker. -->
+      <button class="foot-btn" id="footBtn" type="button" aria-haspopup="true" aria-expanded="false">
+        <svg class="foot-folder" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/></svg><span id="edited"></span>
+      </button>
+      <span class="grip" id="grip" aria-hidden="true">
+        <svg viewBox="0 0 10 10"><path d="M9 3 3 9M9 6 6 9"/></svg>
+      </span>
+    </footer>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="chrome.js"></script>
+  <script src="board.js"></script>
+</body>
+</html>

@@ -25,6 +25,7 @@ const jsFiles = [
   'src/chrome.js',
   'src/app.js',
   'src/group.js',
+  'src/board.js',
   'src/manager.js',
   'site/prefs.js',
   'tools/demos/mock.js',
@@ -57,7 +58,7 @@ if (!handlerMatch) {
 
   const jsCmds = new Set();
   const allJsStrings = new Set();
-  for (const rel of ['src/chrome.js', 'src/app.js', 'src/group.js', 'src/manager.js']) {
+  for (const rel of ['src/chrome.js', 'src/app.js', 'src/group.js', 'src/board.js', 'src/manager.js']) {
     const src = read(rel);
     for (const m of src.matchAll(/\binvoke\(\s*'([a-z0-9_]+)'/g)) {
       jsCmds.add(m[1]);
@@ -88,7 +89,7 @@ for (const file of fs.readdirSync(path.join(ROOT, 'src-tauri/src'))) {
 }
 
 const jsEvents = new Set();
-for (const rel of ['src/chrome.js', 'src/app.js', 'src/group.js', 'src/manager.js', 'src/snap.html']) {
+for (const rel of ['src/chrome.js', 'src/app.js', 'src/group.js', 'src/board.js', 'src/manager.js', 'src/snap.html']) {
   const src = read(rel);
   for (const m of src.matchAll(/\blisten\(\s*'([a-z0-9-]+)'/g)) {
     jsEvents.add(m[1]);

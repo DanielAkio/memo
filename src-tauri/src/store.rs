@@ -83,6 +83,13 @@ pub const ZOOM_STEP: f64 = 0.1;
 /// Maximum length of a group's name, in characters.
 pub const GROUP_NAME_MAX: usize = 60;
 
+/// Default logical dimensions for a board window.
+pub const BOARD_DEFAULT_W: f64 = 760.0;
+pub const BOARD_DEFAULT_H: f64 = 520.0;
+pub const BOARD_MIN_W: f64 = 380.0;
+pub const BOARD_MIN_H: f64 = 280.0;
+pub const BOARD_NAME_MAX: usize = 60;
+
 /// How long the record of a permanently deleted note or group is kept (90
 /// days), so that another device syncing later deletes it too instead of
 /// bringing it back.
@@ -219,6 +226,8 @@ struct FileData {
     /// Groups of notes (compact bars that show or hide their notes).
     groups: Vec<Group>,
     next_group_seq: u32,
+    boards: Vec<Board>,
+    next_board_seq: u32,
     /// When a new-note or new-group default last changed.
     defaults_updated_at: u64,
     /// Notes and groups deleted for good, kept for `TOMBSTONE_TTL_MS`.
@@ -403,6 +412,69 @@ impl Group {
     }
 }
 
+/// A status column inside a kanban board holding note IDs.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct BoardColumn {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+    pub note_ids: Vec<String>,
+}
+
+/// A kanban board (Trello-like) containing status columns with memories.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Board {
+    pub id: String,
+    pub name: String,
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    pub width: f64,
+    pub height: f64,
+    pub pinned: bool,
+    pub color: String,
+    pub columns: Vec<BoardColumn>,
+    pub group_id: String,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub trashed_at: Option<u64>,
+    pub hidden: bool,
+}
+
+impl Default for Board {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            x: None,
+            y: None,
+            width: BOARD_DEFAULT_W,
+            height: BOARD_DEFAULT_H,
+            pinned: false,
+            color: String::new(),
+            columns: Vec::new(),
+            group_id: String::new(),
+            created_at: 0,
+            updated_at: 0,
+            trashed_at: None,
+            hidden: false,
+        }
+    }
+}
+
+impl Board {
+    fn content(&self) -> (String, String, Vec<BoardColumn>, String, Option<u64>) {
+        (
+            self.name.clone(),
+            self.color.clone(),
+            self.columns.clone(),
+            self.group_id.clone(),
+            self.trashed_at,
+        )
+    }
+}
+
 /// State of the manager window, stored like a note's.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
@@ -430,7 +502,7 @@ impl Default for ManagerState {
             height: 640.0,
             pinned: false,
             color: DEFAULT_COLOR.to_string(),
-            layout: String::new(),
+            layout: "cards".to_string(),
         }
     }
 }
@@ -519,6 +591,20 @@ fn normalize(data: &mut FileData) {
     for note in &mut data.notes {
         if !note.group_id.is_empty() && !groups.contains(&note.group_id) {
             note.group_id.clear();
+        }
+    }
+    data.boards.retain(|b| !b.id.is_empty());
+    for board in &mut data.boards {
+        board.updated_at = board.updated_at.max(board.created_at);
+        if !board.group_id.is_empty() && !groups.contains(&board.group_id) {
+            board.group_id.clear();
+        }
+    }
+    data.next_board_seq = data.next_board_seq.max(data.boards.len() as u32 + 1);
+    let note_ids: HashSet<String> = data.notes.iter().map(|n| n.id.clone()).collect();
+    for board in &mut data.boards {
+        for col in &mut board.columns {
+            col.note_ids.retain(|id| note_ids.contains(id));
         }
     }
 }
@@ -840,6 +926,10 @@ impl Store {
                 note.group_id.clear();
                 note.updated_at = now;
             }
+            for board in data.boards.iter_mut().filter(|b| b.group_id == id) {
+                board.group_id.clear();
+                board.updated_at = now;
+            }
             bury(&mut data, [id.to_string()], now);
         }
         self.mark_dirty();
@@ -850,6 +940,14 @@ impl Store {
         self.active()
             .into_iter()
             .filter(|n| n.group_id == id)
+            .collect()
+    }
+
+    /// The group's boards that are not in the trash.
+    pub fn board_members(&self, id: &str) -> Vec<Board> {
+        self.active_boards()
+            .into_iter()
+            .filter(|b| b.group_id == id)
             .collect()
     }
 
@@ -1116,10 +1214,134 @@ impl Store {
         (name.is_empty() || name == title.trim())
             && default_color
             && self.members(id).is_empty()
+            && self.board_members(id).is_empty()
+    }
+
+    pub fn boards(&self) -> Vec<Board> {
+        self.data.lock().unwrap().boards.clone()
+    }
+
+    pub fn board(&self, id: &str) -> Option<Board> {
+        self.data
+            .lock()
+            .unwrap()
+            .boards
+            .iter()
+            .find(|b| b.id == id)
+            .cloned()
+    }
+
+    pub fn active_boards(&self) -> Vec<Board> {
+        self.boards()
+            .into_iter()
+            .filter(|b| b.trashed_at.is_none())
+            .collect()
+    }
+
+    pub fn create_board(
+        &self,
+        name: Option<String>,
+        default_cols: Vec<String>,
+        pos: Option<(i32, i32)>,
+    ) -> Board {
+        let board = {
+            let mut data = self.data.lock().unwrap();
+            let seq = data.next_board_seq.max(1);
+            data.next_board_seq = seq + 1;
+            let now = now_ms();
+            let columns = default_cols
+                .into_iter()
+                .enumerate()
+                .map(|(i, col_name)| BoardColumn {
+                    id: format!("col-{}", i + 1),
+                    name: col_name,
+                    color: String::new(),
+                    note_ids: Vec::new(),
+                })
+                .collect();
+            let board = Board {
+                id: format!("{:x}-b{}", now_nanos(), seq),
+                name: name.unwrap_or_default(),
+                color: String::new(),
+                columns,
+                x: pos.map(|p| p.0),
+                y: pos.map(|p| p.1),
+                created_at: now,
+                updated_at: now,
+                ..Default::default()
+            };
+            data.boards.push(board.clone());
+            board
+        };
+        self.mark_dirty();
+        board
+    }
+
+    pub fn update_board<F: FnOnce(&mut Board)>(&self, id: &str, f: F) -> Option<Board> {
+        let updated = {
+            let mut data = self.data.lock().unwrap();
+            let board = data.boards.iter_mut().find(|b| b.id == id)?;
+            let before = board.content();
+            f(board);
+            if board.content() != before {
+                board.updated_at = now_ms();
+            }
+            board.clone()
+        };
+        self.mark_dirty();
+        Some(updated)
+    }
+
+    pub fn trash_board(&self, id: &str) {
+        let now = now_ms();
+        self.update_board(id, |b| b.trashed_at = Some(now));
+    }
+
+    pub fn restore_board(&self, id: &str) {
+        self.update_board(id, |b| b.trashed_at = None);
+    }
+
+    pub fn remove_board(&self, id: &str) {
+        {
+            let mut data = self.data.lock().unwrap();
+            data.boards.retain(|b| b.id != id);
+        }
+        self.mark_dirty();
+    }
+
+    pub fn is_pristine_board(&self, id: &str) -> bool {
+        let Some(board) = self.board(id) else {
+            return false;
+        };
+        board.name.trim().is_empty()
+            && board.color.is_empty()
+            && board.columns.iter().all(|c| c.note_ids.is_empty())
+    }
+
+    pub fn remove_note_from_boards(&self, note_id: &str) {
+        let mut changed = false;
+        {
+            let mut data = self.data.lock().unwrap();
+            for b in &mut data.boards {
+                for col in &mut b.columns {
+                    if col.note_ids.contains(&note_id.to_string()) {
+                        col.note_ids.retain(|id| id != note_id);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if changed {
+            self.mark_dirty();
+        }
     }
 
     pub fn manager(&self) -> ManagerState {
-        self.data.lock().unwrap().manager.clone()
+        let mut mgr = self.data.lock().unwrap().manager.clone();
+        if !LAYOUTS.contains(&mgr.layout.as_str()) {
+            mgr.layout = "cards".into();
+        }
+        mgr
     }
 
     /// Layout of the manager's Memories and Groups tabs (see `LAYOUTS`).
@@ -1128,7 +1350,7 @@ impl Store {
         if LAYOUTS.contains(&layout.as_str()) {
             layout
         } else {
-            "list".into()
+            "cards".into()
         }
     }
 

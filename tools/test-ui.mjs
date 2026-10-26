@@ -324,6 +324,10 @@ try {
       const doc = window.Memo.frameDoc('manager');
       const initialCards = doc.querySelectorAll('#list .card').length;
       const ed1ClosedClass = doc.querySelector('#list .card[data-id="ed1"]').classList.contains('is-closed');
+      const defaultLayoutCards = doc.querySelector('#layoutSwitch [data-layout="cards"]').getAttribute('aria-checked') === 'true';
+      const listHasNoAsList = !doc.getElementById('list').classList.contains('as-list');
+      const ed1HasCheckComponent = Boolean(doc.querySelector('#list .card[data-id="ed1"] .card-preview .check'));
+      const ed1PreviewLimitedHeight = parseInt(doc.defaultView.getComputedStyle(doc.querySelector('#list .card[data-id="ed1"] .card-preview')).maxHeight, 10) <= 150;
 
       // Search by group name ("Trabalho" -> matches ed1)
       const search = doc.getElementById('search');
@@ -406,6 +410,10 @@ try {
       return {
         initialCards,
         ed1ClosedClass,
+        defaultLayoutCards,
+        listHasNoAsList,
+        ed1HasCheckComponent,
+        ed1PreviewLimitedHeight,
         searchByGroupCount,
         afterTrashActiveCount,
         trashCount,
@@ -427,6 +435,10 @@ try {
 
     assert.equal(mgrRes.initialCards, 2);
     assert.equal(mgrRes.ed1ClosedClass, true, 'Closed note should have .is-closed in manager');
+    assert.equal(mgrRes.defaultLayoutCards, true, 'Cards appearance should be the default in manager');
+    assert.equal(mgrRes.listHasNoAsList, true, 'List should not have .as-list by default');
+    assert.equal(mgrRes.ed1HasCheckComponent, true, 'Note cards in manager should render text components like .check');
+    assert.equal(mgrRes.ed1PreviewLimitedHeight, true, 'Note card preview should have limited height');
     assert.equal(mgrRes.searchByGroupCount, 1, 'Search should match by group name');
     assert.equal(mgrRes.afterTrashActiveCount, 1);
     assert.equal(mgrRes.trashCount, 1);
@@ -495,7 +507,125 @@ try {
     assert.equal(res.hasCloseMenuItem, false, 'Title menu should not have Fechar/Close on mobile web');
   });
 
-  // ------------------------------------------------ 7. Web vs Landing page storage isolation
+  // ------------------------------------------------ 7. Board component
+  await step('Board component: creation via manager button, right-click on upper tab, and board window column management', async () => {
+    const res = await page.evaluate(async () => {
+      const mgrDoc = window.Memo.frameDoc('manager');
+      const newBoardBtn = mgrDoc.getElementById('newBoardBtn');
+      const mgrHead = mgrDoc.querySelector('.mgr-head');
+
+      const initialBoardCount = Object.keys(window.Memo.boards).length;
+
+      // 1. Click button next to folder creator
+      newBoardBtn.click();
+      await new Promise((r) => setTimeout(r, 300));
+      const countAfterBtn = Object.keys(window.Memo.boards).length;
+
+      // 2. Right-click on upper tab
+      mgrHead.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      const countAfterRightClick = Object.keys(window.Memo.boards).length;
+
+      // 3. Inspect opened board window
+      const boardIds = Object.keys(window.Memo.boards);
+      const latestBoardId = boardIds[boardIds.length - 1];
+      const boardDoc = window.Memo.frameDoc(`board-${latestBoardId}`);
+
+      let columnsCount = 0;
+      let noAddColBtn = false;
+      let hasFooterStatusbar = false;
+      let hasFootBtn = false;
+      let footBtnOpensMenu = false;
+      if (boardDoc) {
+        columnsCount = boardDoc.querySelectorAll('.board-column').length;
+        noAddColBtn = !boardDoc.getElementById('addColumnBtn') && !boardDoc.getElementById('addColBtn');
+        const foot = boardDoc.querySelector('footer.statusbar');
+        const fBtn = boardDoc.getElementById('footBtn');
+        const gMenu = boardDoc.getElementById('groupMenu');
+        hasFooterStatusbar = Boolean(foot);
+        hasFootBtn = Boolean(fBtn);
+        if (fBtn && gMenu) {
+          fBtn.click();
+          footBtnOpensMenu = !gMenu.hidden;
+          fBtn.click();
+        }
+      }
+
+      // 4. Test dragging a card between columns and rendering text components
+      window.Memo.addNote({ id: 'bn1', title: 'Card 1', text: '[ ] Task 1\n- Item 2', trashedAt: null });
+      const testNoteId = 'bn1';
+      const targetBoard = window.Memo.boards[latestBoardId];
+      let cardMovedToCol1 = false;
+      let card = null;
+      let targetCol = null;
+      let boardCardSnippetHasCheck = false;
+      let boardCardSnippetLimitedHeight = false;
+      let noteWindowOpenedOnClick = false;
+      if (targetBoard && targetBoard.columns.length >= 2) {
+        targetBoard.columns[0].noteIds = [testNoteId];
+        targetBoard.columns[1].noteIds = [];
+        window.Memo.emit('notes-changed');
+        window.Memo.emit('boards-changed');
+        await new Promise((r) => setTimeout(r, 250));
+
+        card = boardDoc.querySelector(`.board-card[data-note-id="${testNoteId}"]`);
+        if (card) {
+          const snippet = card.querySelector('.card-snippet');
+          boardCardSnippetHasCheck = Boolean(snippet && snippet.querySelector('.check'));
+          if (snippet) {
+            boardCardSnippetLimitedHeight = parseInt(boardDoc.defaultView.getComputedStyle(snippet).maxHeight, 10) <= 150;
+          }
+        }
+        if (card) {
+          card.click();
+          await new Promise((r) => setTimeout(r, 100));
+          noteWindowOpenedOnClick = Boolean(window.Memo.wins[`note-${testNoteId}`]);
+        }
+
+        targetCol = boardDoc.querySelectorAll('.board-column')[1];
+        if (card && targetCol) {
+          const dt = new DataTransfer();
+          card.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true }));
+          targetCol.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true }));
+          targetCol.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true }));
+          await new Promise((r) => setTimeout(r, 250));
+          cardMovedToCol1 = targetBoard.columns[1].noteIds.includes(testNoteId) &&
+                            !targetBoard.columns[0].noteIds.includes(testNoteId);
+        }
+      }
+
+      return {
+        initialBoardCount,
+        countAfterBtn,
+        countAfterRightClick,
+        hasBoardDoc: Boolean(boardDoc),
+        columnsCount,
+        noAddColBtn,
+        hasFooterStatusbar,
+        hasFootBtn,
+        footBtnOpensMenu,
+        cardMovedToCol1,
+        noteWindowOpenedOnClick,
+        boardCardSnippetHasCheck,
+        boardCardSnippetLimitedHeight,
+      };
+    });
+
+    assert.equal(res.countAfterBtn, res.initialBoardCount + 1, 'Clicking new board button should create a board');
+    assert.equal(res.countAfterRightClick, res.initialBoardCount + 2, 'Right-clicking upper tab should create a board');
+    assert.equal(res.hasBoardDoc, true, 'Board window should be opened in stage');
+    assert.ok(res.columnsCount >= 3, 'Board window should render default columns');
+    assert.equal(res.noAddColBtn, true, 'Add column buttons should be removed from board');
+    assert.equal(res.hasFooterStatusbar, true, 'Board window should have a statusbar footer at the bottom');
+    assert.equal(res.hasFootBtn, true, 'Board statusbar should contain a footBtn group selector');
+    assert.equal(res.footBtnOpensMenu, true, 'Clicking board footBtn should open group picker menu');
+    assert.equal(res.cardMovedToCol1, true, 'Dragging a memory card from one column to another should move it');
+    assert.equal(res.noteWindowOpenedOnClick, true, 'One left click on a memory card should open its note window');
+    assert.equal(res.boardCardSnippetHasCheck, true, 'Board cards should render text components like .check');
+    assert.equal(res.boardCardSnippetLimitedHeight, true, 'Board card snippet should have limited height');
+  });
+
+  // ------------------------------------------------ 8. Web vs Landing page storage isolation
   await step('Web vs Landing page: landing page is ephemeral, web version persists data', async () => {
     const sitePage = await browser.newPage();
     const webPage = await browser.newPage();
@@ -567,7 +697,21 @@ try {
       }, webNoteLabel);
       assert.ok(webTextAfterReload.includes('Persisted web note content 12345'), 'Web version note content must be preserved across reload');
 
-      // 3. Re-verify landing page did not receive web version's notes
+      // 3. Board creation in web version
+      await webPage.evaluate(async () => {
+        const mgrFrame = document.querySelector('iframe[name="manager"]');
+        if (mgrFrame) {
+          const btn = mgrFrame.contentDocument.getElementById('newBoardBtn');
+          if (btn) btn.click();
+        }
+      });
+      await webPage.waitForSelector('iframe[name^="board-"]', { timeout: 3000 });
+      const hasWebBoard = await webPage.evaluate(() => {
+        return Boolean(document.querySelector('iframe[name^="board-"]'));
+      });
+      assert.equal(hasWebBoard, true, 'Board creation must work in web version and open board window');
+
+      // 4. Re-verify landing page did not receive web version's notes
       await sitePage.reload();
       await sitePage.waitForSelector('iframe[name="note-demo-wifi"]');
       const siteNotes = await sitePage.evaluate(() => {

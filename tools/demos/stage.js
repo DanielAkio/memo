@@ -10,8 +10,8 @@
   const now = Date.now();
 
   const M = {
-    theme, lang, notes: {}, groups: {}, wins: {}, listeners: [],
-    manager: { x: null, y: null, width: 560, height: 420, pinned: false, color: 'iris' },
+    theme, lang, notes: {}, groups: {}, boards: {}, wins: {}, listeners: [],
+    manager: { x: null, y: null, width: 560, height: 420, pinned: false, color: 'iris', layout: 'cards' },
     view: null, hooks: {},
   };
   window.Memo = M;
@@ -30,6 +30,19 @@
     }, g);
     return M.groups[g.id];
   };
+  M.addBoard = (b) => {
+    M.boards[b.id] = Object.assign({
+      name: '', x: null, y: null, width: 760, height: 520, pinned: false, color: '',
+      groupId: '',
+      columns: [
+        { id: 'col-1', name: 'To Do', color: '', noteIds: [] },
+        { id: 'col-2', name: 'In Progress', color: '', noteIds: [] },
+        { id: 'col-3', name: 'Done', color: '', noteIds: [] },
+      ],
+      createdAt: now, updatedAt: now, trashedAt: null, hidden: false,
+    }, b);
+    return M.boards[b.id];
+  };
 
   M.listen = (ev, cb, w) => {
     const l = { ev, cb, w };
@@ -43,14 +56,17 @@
     }
   };
 
-  const idOf = (label) => label.replace(/^(note|group)-/, '');
+  const idOf = (label) => label.replace(/^(note|group|board)-/, '');
   const copy = (o) => JSON.parse(JSON.stringify(o));
   const members = (gid) => Object.values(M.notes).filter((n) => n.groupId === gid && !n.trashedAt);
+  const boardMembers = (gid) => Object.values(M.boards).filter((b) => b.groupId === gid && !b.trashedAt);
+  const allMembersCount = (gid) => members(gid).length + boardMembers(gid).length;
 
   M.invoke = async (label, cmd, a) => {
     const id = idOf(label);
     const n = M.notes[id];
     const g = M.groups[id];
+    const b = M.boards[id];
     const hook = M.hooks[cmd];
     if (hook) { const r = await hook(label, a); if (r !== undefined) return r; }
     switch (cmd) {
@@ -59,7 +75,42 @@
       case 'get_zoom': return 1;
       case 'load_note': return n ? copy(n) : null;
       case 'get_note_group': return n ? n.groupId : '';
+      case 'get_board_group': return b ? (b.groupId || '') : '';
+      case 'set_board_group': if (b) { b.groupId = a.groupId; M.emit('groups-changed'); M.emit('boards-changed'); } return null;
+      case 'move_board_to_group': if (M.boards[a.id]) { M.boards[a.id].groupId = a.groupId; M.emit('groups-changed'); M.emit('boards-changed'); } return null;
       case 'list_groups': return Object.values(M.groups).map(copy);
+      case 'list_boards': return Object.values(M.boards).map(copy);
+      case 'load_board': return b ? copy(b) : null;
+      case 'save_board_columns': if (b) { b.columns = a.columns; b.updatedAt = Date.now(); M.emit('boards-changed'); } return null;
+      case 'rename_board': if (b) { b.name = a.name.trim(); b.updatedAt = Date.now(); M.emit('boards-changed'); return b.name; } return '';
+      case 'set_board_color': if (b) { b.color = a.color; M.emit('boards-changed'); } return null;
+      case 'close_board': if (b) { b.hidden = true; M.closeWin(label); M.emit('boards-changed'); } return null;
+      case 'new_board': {
+        const nb = M.addBoard({ id: `b-${Date.now()}` });
+        M.openWin(`board-${nb.id}`, '/src/board.html', { x: 40, y: 40, w: 760, h: 520 });
+        M.emit('boards-changed');
+        return copy(nb);
+      }
+      case 'open_board': {
+        const target = M.boards[a.id];
+        if (target) { target.hidden = false; M.openWin(`board-${target.id}`, '/src/board.html', { x: 40, y: 40, w: 760, h: 520 }); M.emit('boards-changed'); }
+        return null;
+      }
+      case 'trash_board_id': {
+        if (M.boards[a.id]) { M.boards[a.id].trashedAt = Date.now(); M.closeWin(`board-${a.id}`); M.emit('boards-changed'); }
+        return null;
+      }
+      case 'restore_board_id': {
+        if (M.boards[a.id]) { M.boards[a.id].trashedAt = null; M.emit('boards-changed'); }
+        return null;
+      }
+      case 'delete_board_forever': {
+        delete M.boards[a.id];
+        M.emit('boards-changed');
+        return null;
+      }
+      case 'update_board_drop_zones': return null;
+      case 'list_notes_including_trash':
       case 'list_notes': return Object.values(M.notes).map((x) => Object.assign(copy(x), { html: '' }));
       case 'save_text': Object.assign(n, { text: a.text, html: a.html, updatedAt: Date.now() }); M.emit('notes-changed'); return null;
       case 'set_title': n.title = a.title.trim(); n.updatedAt = Date.now(); M.emit('notes-changed'); return n.title;
@@ -72,7 +123,7 @@
         return a.pinned;
       }
       case 'set_note_group': n.groupId = a.groupId; M.emit('groups-changed'); return null;
-      case 'load_group': return g ? [copy(g), members(g.id).length] : null;
+      case 'load_group': return g ? [copy(g), allMembersCount(g.id)] : null;
       case 'rename_group': g.name = a.name.trim(); M.emit('groups-changed'); return g.name;
       case 'set_group_color': g.color = a.color; M.emit('groups-changed'); return null;
       case 'toggle_group': g.open = !g.open; M.emit('groups-changed'); return g.open;
@@ -105,16 +156,33 @@
       case 'trash_group_id':
         M.groups[a.id].trashedAt = Date.now();
         for (const m of members(a.id)) m.trashedAt = Date.now();
+        for (const b of boardMembers(a.id)) { b.trashedAt = Date.now(); M.closeWin(`board-${b.id}`); }
         M.closeWin(`group-${a.id}`);
         M.emit('groups-changed');
         M.emit('notes-changed');
+        M.emit('boards-changed');
         return null;
       case 'restore_group':
         M.groups[a.id].trashedAt = null;
         for (const x of Object.values(M.notes)) { if (x.groupId === a.id) x.trashedAt = null; }
+        for (const x of Object.values(M.boards)) { if (x.groupId === a.id) x.trashedAt = null; }
         M.emit('groups-changed');
         M.emit('notes-changed');
+        M.emit('boards-changed');
         return null;
+      case 'take_note_out_of_board': {
+        const x = M.notes[a.id];
+        if (x) {
+          x.hidden = false;
+          if (a.screenX != null) x.x = a.screenX;
+          if (a.screenY != null) x.y = a.screenY;
+          if (!M.wins[`note-${a.id}`]) M.openNote(a.id);
+          M.emit('notes-changed');
+          M.emit('boards-changed');
+        }
+        return null;
+      }
+      case 'open_board_note':
       case 'open_note': {
         const x = M.notes[a.id];
         x.hidden = false;
@@ -188,8 +256,8 @@
     desk.style.transform = `translate(${ox}px, ${oy}px) scale(${k})`;
     desk.style.background = 'transparent';
   };
-  M.frameDoc = (label) => M.wins[label].f.contentDocument;
-  M.frameWin = (label) => M.wins[label].f.contentWindow;
+  M.frameDoc = (label) => (M.wins[label] ? M.wins[label].f.contentDocument : null);
+  M.frameWin = (label) => (M.wins[label] ? M.wins[label].f.contentWindow : null);
 
   // ----------------------------------------------------------------- cursor
 

@@ -240,7 +240,7 @@ body {
 }
 /* Same thin scrollbar in the list and in the Settings tab. */
 .list-wrap::-webkit-scrollbar,
-.settings::-webkit-scrollbar { width: 10px; }
+.settings::-webkit-scrollbar { width: 10px; height: 10px; }
 .list-wrap::-webkit-scrollbar-track,
 .settings::-webkit-scrollbar-track { background: transparent; }
 .list-wrap::-webkit-scrollbar-thumb,
@@ -301,18 +301,7 @@ body {
   color: var(--color-mist);
 }
 .card-title.is-empty { color: var(--color-ash); font-weight: 400; }
-/* The text under the title, line by line, as much as fits in four lines. */
-.card-preview {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  overflow: hidden;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--color-fog);
-}
+/* The preview under the title (styles in base.css) */
 /* The foot stays at the bottom: date (or days left), then the actions on the
    right; when they don't fit, the actions go below, still on the right. */
 .card-foot {
@@ -424,6 +413,20 @@ body {
 
 /* Groups tab: the folder takes the place of a memory's colour dot. */
 .group-card-folder { width: 16px; height: 16px; margin: 0 -4px; }
+
+/* Boards tab: the board icon takes the place of a memory's colour dot. */
+.card-board-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0 -4px;
+  fill: none;
+  stroke: var(--color-fog);
+  stroke-linejoin: round;
+}
+.card-board-icon[data-color]:not([data-color=""]) {
+  stroke: var(--note-color);
+}
 .out-in svg { transition: transform 160ms ease; }
 .out-in:not(.is-open) svg { transform: rotate(180deg); }
 

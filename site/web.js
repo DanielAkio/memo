@@ -274,9 +274,10 @@
 
   const nowMs = () => Date.now();
   const copy = (o) => JSON.parse(JSON.stringify(o));
-  const idOf = (label) => label.replace(/^(note|group)-/, '');
+  const idOf = (label) => label.replace(/^(note|group|board)-/, '');
   const isNote = (label) => label.startsWith('note-');
   const isGroup = (label) => label.startsWith('group-');
+  const isBoard = (label) => label.startsWith('board-');
   const SCENE = new URLSearchParams(location.search).get('scene') || '';
   const IS_SITE_HOME = document.body.classList.contains('home');
   if (SCENE) document.documentElement.dataset.scene = SCENE;
@@ -476,9 +477,10 @@
       defaultGroupColor: 'random',
       defaultGroupTitle: '',
       defaultsUpdatedAt: 0,
-      manager: { x: null, y: null, width: 560, height: 480, pinned: false, color: 'iris', layout: 'list' },
+      manager: { x: null, y: null, width: 560, height: 480, pinned: false, color: 'iris', layout: 'cards' },
       notes: [],
       groups: [],
+      boards: [],
       deleted: [],
       sync: { account: '', pageToken: null, files: {}, deferred: [], lastSync: 0 },
     };
@@ -496,6 +498,7 @@
     out.sync.deferred = Array.isArray(out.sync.deferred) ? out.sync.deferred : [];
     out.notes = Array.isArray(out.notes) ? out.notes : [];
     out.groups = Array.isArray(out.groups) ? out.groups : [];
+    out.boards = Array.isArray(out.boards) ? out.boards : [];
     out.deleted = Array.isArray(out.deleted) ? out.deleted : [];
     const activeGids = new Set(out.groups.filter((g) => !g.trashedAt).map((g) => g.id));
     for (const n of out.notes) {
@@ -512,6 +515,21 @@
       if (g.open === undefined) g.open = true;
       if (g.trashedAt === undefined) g.trashedAt = null;
       if (!isValidColor(g.color || '')) g.color = 'iris';
+    }
+    for (const b of out.boards) {
+      if (!b.updatedAt) b.updatedAt = b.createdAt || nowMs();
+      if (typeof b.groupId !== 'string') b.groupId = '';
+      if (typeof b.width !== 'number' || b.width < 400) b.width = 760;
+      if (typeof b.height !== 'number' || b.height < 300) b.height = 520;
+      if (b.trashedAt === undefined) b.trashedAt = null;
+      if (!isValidColor(b.color || '')) b.color = '';
+      if (!Array.isArray(b.columns)) {
+        b.columns = [
+          { id: 'c1', name: 'A Fazer', noteIds: [] },
+          { id: 'c2', name: 'Em Andamento', noteIds: [] },
+          { id: 'c3', name: 'Concluído', noteIds: [] },
+        ];
+      }
     }
     return out;
   }
@@ -657,6 +675,8 @@
     if (!g) return false;
     const members = activeNotes().filter((n) => n.groupId === g.id);
     if (members.length > 0) return false;
+    const bMembers = activeBoards().filter((b) => b.groupId === g.id);
+    if (bMembers.length > 0) return false;
     const defTitle = (data.defaultGroupTitle || '').trim();
     if (g.name !== '' && g.name !== defTitle) return false;
     const dc = data.defaultGroupColor || 'random';
@@ -1303,6 +1323,105 @@
     return note;
   }
 
+  const BOARD_MIN_W = 400;
+  const BOARD_MIN_H = 300;
+  const BOARD_DEFAULT_W = 760;
+  const BOARD_DEFAULT_H = 520;
+
+  function findBoard(id) {
+    return data.boards.find((b) => b.id === id);
+  }
+
+  function activeBoards() {
+    return data.boards.filter((b) => !b.trashedAt);
+  }
+
+  function notifyBoards() {
+    emit('boards-changed');
+  }
+
+  function openBoardWindow(b, autofocus = !IS_SITE_HOME) {
+    const z = data.zoom || 1;
+    const w = Math.round((b.width || BOARD_DEFAULT_W) * z);
+    const h = Math.round((b.height || BOARD_DEFAULT_H) * z);
+    let pos = { x: b.x, y: b.y };
+    if (pos.x == null || pos.y == null) {
+      pos = beside('manager', w, h);
+      b.x = pos.x;
+      b.y = pos.y;
+      markDirty(false);
+    }
+    return openWindow(`board-${b.id}`, 'board.html', { x: pos.x, y: pos.y, w, h, pinned: !!b.pinned, autofocus });
+  }
+
+  function createBoard(parentLabel = 'manager') {
+    const z = data.zoom || 1;
+    const pos = beside(parentLabel, Math.round(BOARD_DEFAULT_W * z), Math.round(BOARD_DEFAULT_H * z));
+    const now = nowMs();
+    const lang = effectiveLanguage();
+    const defaultCols = lang === 'en'
+      ? ['To Do', 'In Progress', 'Done']
+      : ['A Fazer', 'Em Andamento', 'Concluído'];
+    const columns = defaultCols.map((name) => ({
+      id: genId(),
+      name,
+      noteIds: [],
+    }));
+    const board = {
+      id: genId(),
+      name: '',
+      color: '',
+      groupId: '',
+      x: pos.x,
+      y: pos.y,
+      width: BOARD_DEFAULT_W,
+      height: BOARD_DEFAULT_H,
+      pinned: false,
+      hidden: false,
+      trashedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      columns,
+    };
+    data.boards.push(board);
+    markDirty(true);
+    openBoardWindow(board);
+    notifyBoards();
+    return board;
+  }
+
+  function updateBoard(id, fn) {
+    const b = findBoard(id);
+    if (!b) return null;
+    fn(b);
+    b.updatedAt = nowMs();
+    markDirty(true);
+    return b;
+  }
+
+  function trashBoardById(id) {
+    const b = findBoard(id);
+    if (!b) return;
+    closeWindow(`board-${id}`);
+    updateBoard(id, (x) => { x.trashedAt = nowMs(); });
+    notifyBoards();
+  }
+
+  function restoreBoardById(id) {
+    const b = findBoard(id);
+    if (!b) return;
+    updateBoard(id, (x) => { x.trashedAt = null; });
+    notifyBoards();
+  }
+
+  function deleteBoardForever(id) {
+    closeWindow(`board-${id}`);
+    data.boards = data.boards.filter((b) => b.id !== id);
+    bury(id);
+    markDirty(true);
+    notifyBoards();
+  }
+
   function createGroup(parentLabel = 'manager') {
     const z = data.zoom || 1;
     const pos = beside(parentLabel, Math.round(GROUP_W * z), Math.round(TITLEBAR_H * z));
@@ -1384,9 +1503,31 @@
         });
       }
     }
+    const bMembers = activeBoards().filter((b) => b.groupId === g.id);
+    for (const b of bMembers) {
+      b.hidden = false;
+      const label = `board-${b.id}`;
+      if (!wins[label]) {
+        const z = data.zoom || 1;
+        const w = Math.round((b.width || BOARD_DEFAULT_W) * z);
+        const h = Math.round((b.height || BOARD_DEFAULT_H) * z);
+        const target = b.x != null && b.y != null ? clampToWorkArea(b.x, b.y, w, h) : beside(`group-${g.id}`, w, h);
+        b.x = target.x;
+        b.y = target.y;
+        const startX = barWin ? barWin.x : target.x;
+        const startY = barWin ? barWin.y : target.y;
+        const winObj = await openWindow(label, 'board.html', { x: startX, y: startY, w: target.w, h: target.h, pinned: !!b.pinned });
+        requestAnimationFrame(() => {
+          winObj.el.classList.add('sliding');
+          setWinRect(label, target.x, target.y, target.w, target.h, false);
+          setTimeout(() => winObj.el.classList.remove('sliding'), 170);
+        });
+      }
+    }
     raiseWindow(`group-${g.id}`);
     notifyGroups();
     notifyNotes();
+    notifyBoards();
   }
 
   function putAwayGroup(g) {
@@ -1408,8 +1549,24 @@
         closeWindow(label);
       }
     }
+    const bMembers = activeBoards().filter((b) => b.groupId === g.id);
+    for (const b of bMembers) {
+      const label = `board-${b.id}`;
+      const w = wins[label];
+      if (!w) continue;
+      if (barWin) {
+        w.el.classList.add('sliding');
+        w.el.style.left = `${barWin.x}px`;
+        w.el.style.top = `${barWin.y}px`;
+        w.el.style.opacity = '0';
+        setTimeout(() => closeWindow(label), 150);
+      } else {
+        closeWindow(label);
+      }
+    }
     notifyGroups();
     notifyNotes();
+    notifyBoards();
   }
 
   function toggleGroupById(gid) {
@@ -1430,11 +1587,17 @@
         if (!wins[`note-${n.id}`]) openNoteWindow(n);
         raiseWindow(`note-${n.id}`);
       }
+      for (const b of activeBoards().filter((x) => x.groupId === gid)) {
+        b.hidden = false;
+        if (!wins[`board-${b.id}`]) openBoardWindow(b);
+        raiseWindow(`board-${b.id}`);
+      }
     }
     raiseWindow(`group-${gid}`);
     markDirty(false);
     notifyGroups();
     notifyNotes();
+    notifyBoards();
   }
 
   function closeGroupById(gid) {
@@ -1452,9 +1615,13 @@
     for (const n of activeNotes().filter((x) => x.groupId === gid)) {
       closeWindow(`note-${n.id}`);
     }
+    for (const b of activeBoards().filter((x) => x.groupId === gid)) {
+      closeWindow(`board-${b.id}`);
+    }
     markDirty(false);
     notifyGroups();
     notifyNotes();
+    notifyBoards();
   }
 
   function trashGroupById(gid) {
@@ -1462,7 +1629,8 @@
     if (!g) return;
     closeWindow(`group-${gid}`);
     const members = activeNotes().filter((n) => n.groupId === gid);
-    if (!g.name.trim() && members.length === 0) {
+    const bMembers = activeBoards().filter((b) => b.groupId === gid);
+    if (!g.name.trim() && members.length === 0 && bMembers.length === 0) {
       data.groups = data.groups.filter((x) => x.id !== gid);
       markDirty(false);
       notifyGroups();
@@ -1474,8 +1642,13 @@
       closeWindow(`note-${n.id}`);
       updateNote(n.id, (x) => { x.trashedAt = t0 + 1; });
     }
+    for (const b of bMembers) {
+      closeWindow(`board-${b.id}`);
+      updateBoard(b.id, (x) => { x.trashedAt = t0 + 1; });
+    }
     notifyGroups();
     notifyNotes();
+    notifyBoards();
   }
 
   function restoreGroupById(gid) {
@@ -1494,14 +1667,47 @@
         });
       }
     }
+    for (const b of data.boards) {
+      if (b.groupId === gid && b.trashedAt && b.trashedAt >= t0) {
+        updateBoard(b.id, (x) => {
+          x.trashedAt = null;
+          x.hidden = false;
+        });
+      }
+    }
     openGroupWindow(g);
     if (g.open) {
       for (const n of activeNotes().filter((x) => x.groupId === gid && !x.hidden)) {
         openNoteWindow(n);
       }
+      for (const b of activeBoards().filter((x) => x.groupId === gid && !x.hidden)) {
+        openBoardWindow(b);
+      }
     }
     notifyGroups();
     notifyNotes();
+    notifyBoards();
+  }
+
+  function assignBoardGroup(boardId, groupId, parentLabel) {
+    const b = findBoard(boardId);
+    if (!b) return;
+    let targetGid = groupId || '';
+    if (targetGid === 'new') {
+      const g = createGroup(parentLabel || `board-${boardId}`);
+      targetGid = g.id;
+    }
+    updateBoard(boardId, (x) => {
+      x.groupId = targetGid;
+    });
+    if (targetGid) {
+      const g = findGroup(targetGid);
+      if (g && !g.open) closeWindow(`board-${boardId}`);
+    } else if (!b.hidden && !wins[`board-${boardId}`]) {
+      openBoardWindow(b);
+    }
+    notifyGroups();
+    notifyBoards();
   }
 
   function assignNoteGroup(noteId, groupId, parentLabel) {
@@ -2715,6 +2921,7 @@
     const id = idOf(label);
     const n = isNote(label) ? findNote(id) : null;
     const g = isGroup(label) ? findGroup(id) : null;
+    const b = isBoard(label) ? findBoard(id) : null;
 
     switch (cmd) {
       case 'get_language':
@@ -2832,12 +3039,92 @@
         if (n) assignNoteGroup(n.id, args.groupId, label);
         return null;
 
+      // Board commands
+      case 'list_boards':
+        return copy(data.boards);
+      case 'load_board': {
+        const brd = b || findBoard(id);
+        return brd ? copy(brd) : null;
+      }
+      case 'get_board_group':
+        return b ? (b.groupId || '') : '';
+      case 'set_board_group':
+        if (b) assignBoardGroup(b.id, args.groupId, label);
+        return null;
+      case 'move_board_to_group':
+        assignBoardGroup(args.id, args.groupId, 'manager');
+        return null;
+      case 'save_board_columns': {
+        updateBoard(id, (x) => { x.columns = args.columns; });
+        notifyBoards();
+        return null;
+      }
+      case 'rename_board': {
+        const brd = updateBoard(id, (x) => { x.name = String(args.name || '').trim().slice(0, 60); });
+        notifyBoards();
+        return brd ? brd.name : '';
+      }
+      case 'set_board_color': {
+        const color = isValidColor(args.color) ? args.color : '';
+        updateBoard(id, (x) => { x.color = color; });
+        notifyBoards();
+        return null;
+      }
+      case 'close_board': {
+        const brd = b || findBoard(id);
+        if (brd) {
+          brd.hidden = true;
+          closeWindow(label);
+          notifyBoards();
+        }
+        return null;
+      }
+      case 'new_board':
+        createBoard(label);
+        return null;
+      case 'open_board': {
+        const brd = findBoard(args.id);
+        if (brd) {
+          brd.hidden = false;
+          openBoardWindow(brd);
+          notifyBoards();
+        }
+        return null;
+      }
+      case 'trash_board_id':
+        trashBoardById(args.id);
+        return null;
+      case 'restore_board_id':
+        restoreBoardById(args.id);
+        return null;
+      case 'delete_board_forever':
+        deleteBoardForever(args.id);
+        return null;
+      case 'update_board_drop_zones':
+        return null;
+      case 'take_note_out_of_board': {
+        for (const brd of data.boards) {
+          for (const col of brd.columns) {
+            col.noteIds = col.noteIds.filter((noteId) => noteId !== args.id);
+          }
+        }
+        const note = findNote(args.id);
+        if (note) {
+          note.hidden = false;
+          if (args.screenX != null) note.x = args.screenX;
+          if (args.screenY != null) note.y = args.screenY;
+          openNoteWindow(note);
+          notifyNotes();
+          notifyBoards();
+        }
+        return null;
+      }
       // Group commands
       case 'list_groups':
         return copy(data.groups);
       case 'load_group':
         if (!g) return null;
-        return [copy(g), activeNotes().filter((x) => x.groupId === g.id).length];
+        return [copy(g), activeNotes().filter((x) => x.groupId === g.id).length + activeBoards().filter((x) => x.groupId === g.id).length];
       case 'rename_group': {
         const grp = g || findGroup(args.id);
         if (!grp) return '';
@@ -2942,6 +3229,7 @@
         return null;
       case 'list_notes':
         return data.notes.map((x) => Object.assign(copy(x), { html: '' }));
+      case 'open_board_note':
       case 'open_note': {
         const target = findNote(args.id);
         if (!target) return null;
@@ -3114,7 +3402,7 @@
       },
       window: { getCurrentWindow: () => winApi },
       webviewWindow: { getCurrentWebviewWindow: () => winApi },
-      app: { getVersion: async () => '0.8.0 (Web)' },
+      app: { getVersion: async () => '0.9.0 (Web)' },
     };
   }
 
@@ -3753,6 +4041,9 @@
     if (!mobile) {
       for (const g of activeGroups().filter((x) => !x.hidden)) {
         await openGroupWindow(g);
+      }
+      for (const brd of activeBoards().filter((x) => !x.hidden)) {
+        await openBoardWindow(brd);
       }
     }
 

@@ -32,9 +32,11 @@
   let notes = [];
   let groups = []; // active groups
   let trashedGroups = [];
+  let boards = [];
+  let trashedBoards = [];
   let view = 'notes';
-  // Memories and Groups each list either the current ones or the trash.
-  const scopes = { notes: 'current', groups: 'current' };
+  // Memories, Groups and Boards each list either the current ones or the trash.
+  const scopes = { notes: 'current', groups: 'current', boards: 'current' };
   // The tray's update items open Settings scrolled to the version row.
   let scrollToUpdate = false;
   const inTrash = () => scopes[view] === 'trash';
@@ -100,6 +102,7 @@
 
   // Same folder as a group bar and a note's footer.
   const FOLDER_ICON = '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>';
+  const BOARD_ICON = '<rect x="2" y="2.5" width="3.5" height="11" rx="1" stroke-width="1.3"/><rect x="6.25" y="2.5" width="3.5" height="7.5" rx="1" stroke-width="1.3"/><rect x="10.5" y="2.5" width="3.5" height="9.5" rx="1" stroke-width="1.3"/>';
   const TRASH_ICON = '<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/>';
 
   // ------------------------------------------------------------- render
@@ -146,19 +149,20 @@
     const labels = {
       notes: t('tabNotes'),
       groups: t('tabGroups'),
+      boards: t('tabBoards'),
       settings: t('tabSettings'),
       help: t('tabHelp'),
     };
     for (const option of $('viewSelect').options) option.textContent = labels[option.value];
     $('viewSelect').value = view;
     fitTabs();
-    const listView = view === 'notes' || view === 'groups';
+    const listView = view === 'notes' || view === 'groups' || view === 'boards';
     for (const seg of document.querySelectorAll('#scopeSwitch .seg')) {
       seg.setAttribute('aria-checked', String(listView && seg.dataset.scope === scopes[view]));
     }
     trashBar.hidden = !(listView && inTrash());
-    $('trashInfo').textContent = t(view === 'groups' ? 'groupTrashInfo' : 'trashInfo');
-    emptyTrashBtn.disabled = (view === 'groups' ? trashedGroups : trashed).length === 0;
+    $('trashInfo').textContent = t(view === 'groups' ? 'groupTrashInfo' : view === 'boards' ? 'boardTrashInfo' : 'trashInfo');
+    emptyTrashBtn.disabled = (view === 'groups' ? trashedGroups : view === 'boards' ? trashedBoards : trashed).length === 0;
     document.body.classList.toggle('notes-view', listView && !inTrash());
 
     // Settings and Help tabs: no list, no scope and no sort, but sections.
@@ -193,6 +197,15 @@
       else empty.textContent = t(inTrash() ? 'trashIsEmpty' : 'noGroups');
       return;
     }
+    if (view === 'boards') {
+      const source = inTrash() ? trashedBoards : boards;
+      const shownBoards = source.filter((b) => !q || fold(b.name || t('untitled')).includes(q));
+      list.replaceChildren(...shownBoards.map((b) => (inTrash() ? boardTrashCard(b) : boardCard(b))));
+      empty.hidden = shownBoards.length > 0;
+      if (q) empty.textContent = t('nothingFound', { q: search.value.trim() });
+      else empty.textContent = t(inTrash() ? 'trashIsEmpty' : 'noBoards');
+      return;
+    }
     const source = inTrash() ? trashed : active;
     // The group's name counts for the search too.
     const shown = q
@@ -212,7 +225,13 @@
     const head = el('div', 'card-head');
     head.append(mark, el('div', `card-title${named ? '' : ' is-empty'}`, title));
     item.append(head);
-    if (preview) item.append(el('div', 'card-preview', preview));
+    if (preview) {
+      if (typeof preview === 'string') {
+        item.append(el('div', 'card-preview', preview));
+      } else {
+        item.append(preview);
+      }
+    }
     const foot = el('div', 'card-foot');
     foot.append(el('span', 'card-meta', meta), actions);
     item.append(foot);
@@ -224,7 +243,10 @@
     dot.dataset.color = isCustomColor(note.color) ? 'custom' : note.color || '';
     if (isCustomColor(note.color)) dot.style.setProperty('--note-color', note.color);
     const { title, preview, named } = titleAndPreview(note);
-    const item = card(dot, title, named, preview, meta, actions);
+    const prev = layout === 'cards' && window.MemoCard
+      ? (window.MemoCard.render(note, { skipFirst: !named, className: 'card-preview' }) || '')
+      : preview;
+    const item = card(dot, title, named, prev, meta, actions);
     item.dataset.id = note.id;
     return item;
   }
@@ -276,7 +298,8 @@
   }
 
   function groupCard(group, active) {
-    const count = active.filter((n) => n.groupId === group.id).length;
+    const count = active.filter((n) => n.groupId === group.id).length
+                + boards.filter((b) => b.groupId === group.id).length;
     const state = t(group.hidden ? 'stateClosed' : group.open ? 'groupStateOut' : 'groupStateIn');
     const toggle = el('button', `icon-btn out-in${group.open ? ' is-open' : ''}`);
     toggle.type = 'button';
@@ -309,10 +332,19 @@
     return folder;
   }
 
+  function boardIcon(board) {
+    const bIcon = icon(BOARD_ICON);
+    bIcon.classList.add('card-board-icon');
+    bIcon.dataset.color = isCustomColor(board.color) ? 'custom' : board.color || '';
+    if (isCustomColor(board.color)) bIcon.style.setProperty('--note-color', board.color);
+    return bIcon;
+  }
+
   // A group in the trash, as a trashed memory's card: the memories that went
   // with it (they come back when it is restored), days left, restore / delete.
   function groupTrashCard(group, trashed) {
-    const count = trashed.filter((n) => n.groupId === group.id && n.trashedAt >= group.trashedAt).length;
+    const count = trashed.filter((n) => n.groupId === group.id && n.trashedAt >= group.trashedAt).length
+                + trashedBoards.filter((b) => b.groupId === group.id && b.trashedAt >= group.trashedAt).length;
     const restore = el('button', 'btn', t('restore'));
     restore.type = 'button';
     restore.dataset.gact = 'restore';
@@ -324,6 +356,80 @@
     actions.append(restore, del);
     return groupBase(group, t(count === 1 ? 'groupCountOne' : 'groupCountMany', { n: count }),
       purgeLabel(group.trashedAt), actions);
+  }
+
+  function boardGroupSelect(board) {
+    const select = el('select', 'card-group');
+    select.title = t('moveToGroup');
+    select.setAttribute('aria-label', t('moveToGroup'));
+    const sorted = groups.slice()
+      .sort((a, b) => a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true }));
+    select.append(
+      new Option(t('noGroup'), ''),
+      ...sorted.map((g) => new Option(g.name || t('untitled'), g.id)),
+      new Option(`${t('newGroup')}…`, 'new'),
+    );
+    select.value = board.groupId || '';
+    select.addEventListener('change', () => {
+      invoke('move_board_to_group', { id: board.id, groupId: select.value })
+        .catch((err) => console.error('move_board_to_group', err));
+    });
+    return select;
+  }
+
+  function boardCard(board) {
+    const title = board.name ? board.name : t('untitled');
+    const named = Boolean(board.name);
+    const colCount = (board.columns || []).length;
+    const memoryCount = (board.columns || []).reduce((acc, col) => acc + (col.noteIds || []).length, 0);
+    const preview = `${colCount} ${t('columnName').toLowerCase()}s · ${memoryCount} ${t('tabNotes').toLowerCase()}`;
+
+    const del = el('button', 'icon-btn');
+    del.type = 'button';
+    del.title = t('moveToTrash');
+    del.append(icon(TRASH_ICON));
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      invoke('trash_board_id', { id: board.id }).catch((err) => console.error(err));
+    });
+
+    const actions = el('div', 'card-actions');
+    actions.append(boardGroupSelect(board), del);
+
+    const item = card(boardIcon(board), title, named, preview, editedLabel(board.updatedAt), actions);
+    item.classList.add('board-card');
+    item.dataset.bid = board.id;
+    item.classList.toggle('is-closed', Boolean(board.hidden));
+    item.tabIndex = 0;
+    return item;
+  }
+
+  function boardTrashCard(board) {
+    const title = board.name ? board.name : t('untitled');
+    const named = Boolean(board.name);
+
+    const restore = el('button', 'btn', t('restore'));
+    restore.type = 'button';
+    restore.addEventListener('click', (e) => {
+      e.stopPropagation();
+      invoke('restore_board_id', { id: board.id }).catch((err) => console.error(err));
+    });
+
+    const del = el('button', 'btn danger', t('delete'));
+    del.type = 'button';
+    del.title = t('deleteBoardForever');
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      invoke('delete_board_forever', { id: board.id }).catch((err) => console.error(err));
+    });
+
+    const actions = el('div', 'card-actions');
+    actions.append(restore, del);
+
+    const item = card(boardIcon(board), title, named, '', purgeLabel(board.trashedAt), actions);
+    item.classList.add('board-card');
+    item.dataset.bid = board.id;
+    return item;
   }
 
   const OUT_IN_ICON = '<path d="M4.5 9.75 8 6.25l3.5 3.5"/>';
@@ -406,12 +512,14 @@
 
   async function load() {
     try {
-      let all;
-      [notes, defaultColor, all] = await Promise.all([
-        invoke('list_notes'), invoke('get_default_color'), invoke('list_groups'),
+      let all, allB;
+      [notes, defaultColor, all, allB] = await Promise.all([
+        invoke('list_notes'), invoke('get_default_color'), invoke('list_groups'), invoke('list_boards'),
       ]);
       groups = all.filter((g) => !g.trashedAt);
       trashedGroups = all.filter((g) => g.trashedAt);
+      boards = (allB || []).filter((b) => !b.trashedAt);
+      trashedBoards = (allB || []).filter((b) => b.trashedAt);
     } catch (err) {
       console.error('list_notes', err);
     }
@@ -721,6 +829,10 @@
       else if (!inTrash()) showGroup(item.dataset.gid);
       return;
     }
+    if (item && item.dataset.bid) {
+      if (!inTrash()) invoke('open_board', { id: item.dataset.bid }).catch((err) => console.error(err));
+      return;
+    }
     if (!item || e.target.closest('select')) return;
     const btn = e.target.closest('[data-act]');
     if (btn) act(btn.dataset.act, item.dataset.id);
@@ -730,6 +842,7 @@
     const item = e.target.closest('.card');
     if (!item || e.target !== item || e.key !== 'Enter' || inTrash()) return;
     if (view === 'groups') showGroup(item.dataset.gid);
+    else if (view === 'boards') invoke('open_board', { id: item.dataset.bid }).catch((err) => console.error(err));
     else act('open', item.dataset.id);
   });
   // Middle click (wheel button) on a memory or group moves it to the trash
@@ -745,6 +858,9 @@
     if (item.dataset.gid) {
       const command = inTrash() ? 'delete_group_forever' : 'trash_group_id';
       invoke(command, { id: item.dataset.gid }).catch((err) => console.error(command, err));
+    } else if (item.dataset.bid) {
+      const command = inTrash() ? 'delete_board_forever' : 'trash_board_id';
+      invoke(command, { id: item.dataset.bid }).catch((err) => console.error(command, err));
     } else {
       act(inTrash() ? 'delete' : 'trash', item.dataset.id);
     }
@@ -960,6 +1076,13 @@
   $('newBtn').addEventListener('click', newNote);
   $('newGroupBtn').addEventListener('click', () => {
     invoke('new_group').catch((err) => console.error('new_group', err));
+  });
+  $('newBoardBtn').addEventListener('click', () => {
+    invoke('new_board').catch((err) => console.error('new_board', err));
+  });
+  document.querySelector('.mgr-head').addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    invoke('new_board').catch((err) => console.error('new_board', err));
   });
   $('closeBtn').addEventListener('click', closeWindow);
   syncMobileState();
@@ -1485,6 +1608,7 @@
     listen('cloud-changed', loadCloud);
     listen('notes-changed', scheduleLoad);
     listen('groups-changed', scheduleLoad);
+    listen('boards-changed', scheduleLoad);
     // Switched to another folder's notes file: its theme, language and
     // defaults may differ, so start over.
     listen('store-replaced', () => location.reload());

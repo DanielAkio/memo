@@ -28,7 +28,14 @@
       <span class="mgr-title" data-i18n="manager"></span>
       <div class="actions">
         <button class="icon-btn" id="newGroupBtn" type="button" data-i18n-attr="aria-label=newGroup,title=newGroup">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/></svg>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" stroke-width="1.3"/></svg>
+        </button>
+        <button class="icon-btn" id="newBoardBtn" type="button" data-i18n-attr="aria-label=newBoard,title=newBoard">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="2" y="2.5" width="3.5" height="11" rx="1" stroke-width="1.3"/>
+            <rect x="6.25" y="2.5" width="3.5" height="7.5" rx="1" stroke-width="1.3"/>
+            <rect x="10.5" y="2.5" width="3.5" height="9.5" rx="1" stroke-width="1.3"/>
+          </svg>
         </button>
         <button class="icon-btn" id="newBtn" type="button" data-i18n-attr="aria-label=newNote">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>
@@ -67,6 +74,9 @@
           <button type="button" class="tab" role="tab" id="tabGroups" data-view="groups" aria-selected="false">
             <span data-i18n="tabGroups"></span>
           </button>
+          <button type="button" class="tab" role="tab" id="tabBoards" data-view="boards" aria-selected="false">
+            <span data-i18n="tabBoards"></span>
+          </button>
           <button type="button" class="tab" role="tab" id="tabSettings" data-view="settings" aria-selected="false">
             <span data-i18n="tabSettings"></span>
           </button>
@@ -79,6 +89,7 @@
         <select class="field select view-select" id="viewSelect" data-i18n-attr="aria-label=sections">
           <option value="notes"></option>
           <option value="groups"></option>
+          <option value="boards"></option>
           <option value="settings"></option>
           <option value="help"></option>
         </select>
@@ -111,7 +122,7 @@
       </div>
 
       <main class="list-wrap" id="listWrap">
-        <ul class="list as-list" id="list" role="list"></ul>
+        <ul class="list" id="list" role="list"></ul>
         <p class="empty" id="empty" hidden></p>
       </main>
 
@@ -129,8 +140,8 @@
           <div class="setting">
             <span class="setting-label" id="layoutLabel" data-i18n="layout"></span>
             <div class="segmented" id="layoutSwitch" role="radiogroup" aria-labelledby="layoutLabel">
-              <button type="button" class="seg" role="radio" data-layout="cards" aria-checked="false" data-i18n="layoutCards"></button>
-              <button type="button" class="seg" role="radio" data-layout="list" aria-checked="true" data-i18n="layoutList"></button>
+              <button type="button" class="seg" role="radio" data-layout="cards" aria-checked="true" data-i18n="layoutCards"></button>
+              <button type="button" class="seg" role="radio" data-layout="list" aria-checked="false" data-i18n="layoutList"></button>
             </div>
           </div>
           <div class="setting">
