@@ -2922,7 +2922,6 @@ fn build_board_window(app: &AppHandle, board: &Board) -> tauri::Result<WebviewWi
         .background_color(CARBON)
         .accept_first_mouse(true)
         .visible(false)
-        .drag_and_drop(false)
         .build()?;
     match (board.x, board.y) {
         (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
