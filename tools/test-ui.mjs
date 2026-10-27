@@ -989,6 +989,10 @@ try {
       out.copied = toast('note-sh-note').textContent;
       M.emit('share-available', { kind: 'board', name: 'Plano', notes: 3, boards: 1 });
       out.offer = toast('board-sh-board').textContent;
+      // Every window shows it (the memory after its "Copied").
+      await new Promise((r) => setTimeout(r, 3600));
+      out.everywhere = ['note-sh-note', 'board-sh-board', 'group-sh-group']
+        .every((l) => toast(l) && !toast(l).hidden && toast(l).querySelector('.share-import'));
       out.groupGrew = calls.some(([k, h]) => k === 'height' && h > 40);
       toast('board-sh-board').querySelector('.share-import').click();
       await new Promise((r) => setTimeout(r, 50));
@@ -1002,9 +1006,10 @@ try {
     assert.ok(res.copied.startsWith('Copiado'), `"Share" says it copied (${res.copied})`);
     assert.ok(res.offer.includes('Quadro compartilhado: “Plano” · 3 memórias') && res.offer.includes('Importar'),
       `The offer names the shared board, with Import (${res.offer})`);
+    assert.equal(res.everywhere, true, 'The offer shows in every window, after "Copied" where that was showing');
     assert.equal(res.groupGrew, true, 'A group bar grows to show the offer');
     assert.equal(res.imported, true, 'Import asks the app to import it into that window');
-    assert.equal(res.hidden, true, 'The offer goes away once used');
+    assert.equal(res.hidden, true, 'The offer goes away in every window once imported');
   });
 
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
@@ -1450,11 +1455,15 @@ try {
         await inv(`note-${c}`, 'rename', { name: 'Contas' });
         for (const id of [a, c]) await inv(`note-${id}`, 'set_note_group', { groupId: gid });
         const groupText = await inv(`group-${gid}`, 'copy_share');
-        return { boardText, groupText, bid, gid };
+        await new Promise((r) => setTimeout(r, 200));
+        const toast = document.querySelector('iframe[name="manager"]').contentDocument.querySelector('.share-toast');
+        const ownOffered = Boolean(toast && !toast.hidden && toast.textContent.includes('Grupo compartilhado: “Casa”'));
+        return { boardText, groupText, bid, gid, ownOffered };
       });
       assert.ok(shared.boardText.startsWith('Mercado\n') && shared.boardText.includes('- Pão\n- Leite'),
         `The board's text reads in a chat (${shared.boardText.slice(0, 80)})`);
       assert.ok(/\nmemo:v1:[A-Za-z0-9_-]+$/.test(shared.boardText), 'The text ends with the code');
+      assert.equal(shared.ownOffered, true, 'What you just copied is offered too, while it is in the clipboard');
 
       await receiver.goto(`http://127.0.0.1:${port}/site/app.html`);
       await receiver.waitForSelector('iframe[name="manager"]');

@@ -1210,7 +1210,7 @@
           f.contentWindow.addEventListener('focus', () => checkClipboard(label));
           f.contentDocument.addEventListener('paste', (e) => {
             if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
-            offerShared(e.clipboardData && e.clipboardData.getData('text/plain'), label);
+            offerShared(e.clipboardData && e.clipboardData.getData('text/plain'));
           });
           const sub = f.contentDocument.getElementById('defaultTextFrame');
           if (sub) {
@@ -1664,7 +1664,6 @@
     const footer = lang === 'en'
       ? '— Shared from Memo: copy this whole message and open Memo to import it —'
       : '— Compartilhado pelo Memo: copie esta mensagem inteira e abra o Memo para importar —';
-    shareDone.add(code); // our own code: never offered back to us
     return `${readableShare(payload, lang)}\n\n${footer}\n${code}`;
   }
 
@@ -1739,28 +1738,18 @@
     return Array.isArray(x) ? x : [];
   }
 
-  // A shared code in `text`, seen in window `label` (paste, or focus with
-  // clipboard access granted): offered there unless already handled.
-  async function offerShared(text, label) {
+  const shareSummary = (p) => ({ kind: p.kind, name: sharedName(p), notes: p.notes.length, boards: p.boards.length });
+
+  // A shared code in `text` (pasted, copied here, or in the clipboard on
+  // focus with access granted) is offered in every window until imported
+  // or dismissed; the offer goes once the clipboard holds something else.
+  async function offerShared(text) {
     const m = SHARE_CODE_RE.exec(text || '');
-    const had = Boolean(sharePending);
-    if (!m || shareDone.has(m[0])) {
-      sharePending = null;
-      if (had) emit('share-available', null);
-      return;
-    }
-    if (!sharePending || sharePending.code !== m[0]) {
-      const payload = await decodeShare(m[0]);
-      sharePending = payload ? { code: m[0], payload } : null;
-    }
-    if (sharePending) {
-      const p = sharePending.payload;
-      emitToWindow(label, 'share-available', {
-        kind: p.kind, name: sharedName(p), notes: p.notes.length, boards: p.boards.length,
-      });
-    } else if (had) {
-      emit('share-available', null);
-    }
+    const code = m && !shareDone.has(m[0]) ? m[0] : null;
+    if ((sharePending && sharePending.code) === code) return;
+    const payload = code ? await decodeShare(code) : null;
+    sharePending = payload ? { code, payload } : null;
+    emit('share-available', payload ? shareSummary(payload) : null);
   }
 
   // Browsers ask before a page reads the clipboard: on focus only once the
@@ -1769,7 +1758,7 @@
     try {
       const perm = await navigator.permissions.query({ name: 'clipboard-read' });
       if (perm.state !== 'granted') return;
-      offerShared(await navigator.clipboard.readText(), label);
+      offerShared(await navigator.clipboard.readText());
     } catch {}
   }
 
@@ -3558,8 +3547,11 @@
         if (!kind) throw new Error('nothing to share here');
         const text = await shareText(kind, id);
         await navigator.clipboard.writeText(text);
+        await offerShared(text);
         return text;
       }
+      case 'share_offer':
+        return sharePending ? shareSummary(sharePending.payload) : null;
       case 'import_share': {
         const payload = takeShare();
         if (payload) await importShare(payload, label);

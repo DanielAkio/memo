@@ -360,6 +360,7 @@ fn main() {
             share::copy_share,
             share::import_share,
             share::dismiss_share,
+            share::share_offer,
             new_group,
             new_board,
             open_board,

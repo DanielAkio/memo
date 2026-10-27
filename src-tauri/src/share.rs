@@ -346,8 +346,6 @@ pub(crate) fn share_text(store: &Store, kind: Kind, id: &str) -> Result<String, 
     } else {
         "— Compartilhado pelo Memo: copie esta mensagem inteira e abra o Memo para importar —"
     };
-    // Our own code: never offered back to us.
-    DONE.lock().unwrap().insert(hash_of(&code));
     Ok(format!("{}\n\n{footer}\n{code}", readable(&payload, lang)))
 }
 
@@ -480,59 +478,67 @@ struct Offer {
     payload: Payload,
 }
 
-/// The code offered for import, while the clipboard holds it.
+/// The shared item in the clipboard, offered in every window while it is
+/// there (copied here or elsewhere), until imported or dismissed.
 static PENDING: Mutex<Option<Offer>> = Mutex::new(None);
-/// Codes already imported, dismissed or copied from here: not offered again.
+/// Codes imported or dismissed with the offer's ✕: not offered again.
 static DONE: Mutex<BTreeSet<u64>> = Mutex::new(BTreeSet::new());
 
 pub(crate) fn pending() -> bool {
     PENDING.lock().unwrap().is_some()
 }
 
-/// Looks for a shared code in the clipboard when `window` gets the focus,
-/// and offers a new one there.
-pub(crate) fn on_focus(app: &AppHandle, window: &WebviewWindow) {
+/// Makes `offer` the pending one; when that changes, every window shows it
+/// (or hides it, `None`) and the tray follows.
+fn set_offer(app: &AppHandle, offer: Option<Offer>) {
+    let mut pending = PENDING.lock().unwrap();
+    if pending.as_ref().map(|o| o.hash) == offer.as_ref().map(|o| o.hash) {
+        return;
+    }
+    let summary = offer.as_ref().map(|o| summary(&o.payload));
+    let changed = pending.is_some() != offer.is_some();
+    *pending = offer;
+    drop(pending);
+    let _ = app.emit("share-available", summary);
+    if changed {
+        refresh_tray(app);
+    }
+}
+
+/// The offer for `text` (the clipboard's): its code, unless dismissed.
+fn offer_for(text: &str) -> Option<Offer> {
+    let code = find_code(text)?;
+    let hash = hash_of(code);
+    if DONE.lock().unwrap().contains(&hash) {
+        return None;
+    }
+    if let Some(o) = PENDING.lock().unwrap().as_ref().filter(|o| o.hash == hash) {
+        return Some(Offer { hash, payload: o.payload.clone() });
+    }
+    decode(code).map(|payload| Offer { hash, payload })
+}
+
+/// Looks at the clipboard when a Memo window gets the focus: a shared item
+/// there is offered in every window, and the offer goes once it isn't.
+pub(crate) fn on_focus(app: &AppHandle, _window: &WebviewWindow) {
     let app = app.clone();
-    let label = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move || {
         use tauri_plugin_clipboard_manager::ClipboardExt;
         let text = app.clipboard().read_text().unwrap_or_default();
-        let code = find_code(&text).map(str::to_string);
-        let mut pending = PENDING.lock().unwrap();
-        let had = pending.is_some();
-        match code.map(|c| (hash_of(&c), c)) {
-            Some((hash, _)) if DONE.lock().unwrap().contains(&hash) => *pending = None,
-            Some((hash, _)) if pending.as_ref().is_some_and(|o| o.hash == hash) => {}
-            Some((hash, code)) => *pending = decode(&code).map(|payload| Offer { hash, payload }),
-            None => *pending = None,
-        }
-        let offer = pending.as_ref().map(|o| summary(&o.payload));
-        drop(pending);
-        match offer {
-            Some(summary) => {
-                let _ = app.emit_to(label.as_str(), "share-available", Some(summary));
-            }
-            None if had => {
-                let _ = app.emit("share-available", None::<Summary>);
-            }
-            None => {}
-        }
-        if had != PENDING.lock().unwrap().is_some() {
-            refresh_tray(&app);
-        }
+        set_offer(&app, offer_for(&text));
     });
 }
 
-/// Ends the pending offer (imported or dismissed) and returns it.
+/// Ends the offer (imported or dismissed): that code is not offered again.
 fn take_offer(app: &AppHandle) -> Option<Payload> {
-    let offer = PENDING.lock().unwrap().take()?;
-    DONE.lock().unwrap().insert(offer.hash);
-    let _ = app.emit("share-available", None::<Summary>);
-    refresh_tray(app);
-    Some(offer.payload)
+    let offer = PENDING.lock().unwrap().as_ref().map(|o| (o.hash, o.payload.clone()));
+    let (hash, payload) = offer?;
+    DONE.lock().unwrap().insert(hash);
+    set_offer(app, None);
+    Some(payload)
 }
 
-/// Tray "Import shared item".
+/// The offer's Import, or the tray's "Import shared item".
 pub(crate) fn import_pending(app: &AppHandle, anchor: Option<&WebviewWindow>) {
     if let Some(payload) = take_offer(app) {
         import(app, &payload, anchor);
@@ -560,6 +566,8 @@ pub(crate) fn copy_share(
     let text = share_text(&app.state::<Shared>(), kind, &id)?;
     use tauri_plugin_clipboard_manager::ClipboardExt;
     app.clipboard().write_text(text.clone()).map_err(|e| e.to_string())?;
+    // Now in the clipboard: offered like any shared item.
+    set_offer(&app, offer_for(&text));
     Ok(text)
 }
 
@@ -569,7 +577,13 @@ pub(crate) async fn import_share(app: AppHandle, window: WebviewWindow) {
     import_pending(&app, Some(&window));
 }
 
-/// The offer's ✕: not offered again.
+/// The offer a window opening now shows (`None`: nothing to import).
+#[tauri::command]
+pub(crate) fn share_offer() -> Option<Summary> {
+    PENDING.lock().unwrap().as_ref().map(|o| summary(&o.payload))
+}
+
+/// The offer's ✕: that code is not offered again.
 #[tauri::command]
 pub(crate) fn dismiss_share(app: AppHandle) {
     take_offer(&app);

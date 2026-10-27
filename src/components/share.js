@@ -1,14 +1,16 @@
 // MemoShare: sharing memories, boards and groups through the clipboard
-// (share.rs). One small toast at the bottom of any window, for two things:
-// "Copied" after "Share (copy)", and the offer to import a shared item the
-// clipboard holds (share-available, sent to the focused window), with
-// Import and ✕. A window too short for it (a group bar) grows while it
-// shows, through `onResize(height | null)`.
+// (share.rs). One small toast at the bottom of every window, for two
+// things: "Copied" for a moment after "Share (copy)", and the offer to
+// import the shared item the clipboard holds (share-available, to every
+// window, until imported or dismissed), with Import and ✕. A window too
+// short for it (a group bar) grows while it shows, through
+// `onResize(height | null)`.
 (function () {
   const t = (k, v) => window.MemoI18n.t(k, v);
   let el = null;
   let opts = null;
   let timer = 0;
+  let current = null; // the offer's summary, shown when nothing else is
 
   function toast() {
     if (el) return el;
@@ -22,6 +24,7 @@
 
   function hide() {
     clearTimeout(timer);
+    timer = 0;
     if (!el || el.hidden) return;
     el.hidden = true;
     el.replaceChildren();
@@ -34,7 +37,13 @@
     box.replaceChildren(...children);
     box.hidden = false;
     if (opts && opts.onResize) opts.onResize(box.offsetHeight + 16);
-    if (ms) timer = setTimeout(hide, ms);
+    if (ms) {
+      timer = setTimeout(() => {
+        timer = 0;
+        if (current) offer(current);
+        else hide();
+      }, ms);
+    }
   }
 
   function text(s, className) {
@@ -63,6 +72,8 @@
   }
 
   function offer(summary) {
+    current = summary;
+    if (timer) return; // "Copied" first; the offer comes after it
     if (!summary) {
       hide();
       return;
@@ -89,10 +100,8 @@
     attach(options) {
       opts = options;
       options.listen('share-available', (e) => offer(e.payload));
-      // The offer follows the focus: another window shows it next.
-      window.addEventListener('blur', () => {
-        if (el && el.querySelector('.share-import')) hide();
-      });
+      // Opened while an item is offered: shows it too.
+      options.invoke('share_offer').then(offer).catch((err) => console.error('share_offer', err));
     },
     // "Share (copy)": the text goes to the clipboard (share.rs writes it),
     // `args` = { kind, id } outside the item's own window.
