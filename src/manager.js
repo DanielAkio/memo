@@ -44,7 +44,7 @@
   // ------------------------------------------------------------ helpers
 
   // Plain text without the list markers ("[ ] " / "[x] " / "- ").
-  const plain = (text) => (text || '').replace(/^(\s*)(?:\[[ xX]?\]|-|\d+\.)(?= |$) ?/gm, '$1');
+  const { plain } = MemoText;
   // For search: lower case, without accents.
   const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 

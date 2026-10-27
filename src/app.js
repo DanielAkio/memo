@@ -35,25 +35,18 @@
 
   const colorName = (color) => document.querySelector(`.swatch[data-color="${color}"]`).getAttribute('aria-label');
 
-  // List line in plain text: indent (2 spaces per level) followed by
-  // "[ ]"/"[]"/"[x]" (checklist), "-" (bullet) or "1." (numbered; the
-  // number itself is recomputed). "[]" is accepted because it can be typed
-  // in the new-note default text.
-  // Parameters are never named "t", which is the translation function.
-  const LIST_RE = /^( *)(?:\[([ xX]?)\]|(-)|(\d+)\.)(?= |$) ?/;
+  // The plain-text format (lists, code, tables): components/text.js.
+  const { esc, plain, LIST_RE, MAX_LEVEL, TABLE_ROW_RE, TABLE_SEP_RE, rowCells } = MemoText;
   // In the plain text (toPlain) an image is "[imagem]" / "[image]", in the
   // language it was written in, so an image-only note is not blank and the
   // manager, tray and group lists show something for it.
   const IMAGE_MARK_RE = /\[(?:imagem|image)\]/g;
-  const plain = (text) => text.replace(/^(\s*)(?:\[[ xX]?\]|-|\d+\.)(?= |$) ?/gm, '$1');
-  const MAX_LEVEL = 4;
 
   const firstLine = (text) => plain(text).split('\n').map((s) => s.trim()).find(Boolean) || t('emptyNote');
   // Table rows' "|" and "| --- |" header lines are not words.
   const TABLE_MARKS_RE = /^\s*\|(?:\s*:?-+:?\s*\|)+\s*$|(?<=^|\s)\|(?=\s|$)/gm;
   const wordCount = (text) => (plain(text).replace(IMAGE_MARK_RE, ' ').replace(TABLE_MARKS_RE, ' ').trim().match(/\S+/g) || []).length;
   const displayName = () => note.title || firstLine(note.text);
-  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ------------------------------------------------------------- render
 
@@ -284,59 +277,9 @@
     return out.replace(ZWSP, '').replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
   }
 
-  // Table rows in plain text: "| a | b |" lines; a "| --- |" line right
-  // after the first one makes it a header.
-  const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
-  const TABLE_SEP_RE = /^\s*\|(?:\s*:?-+:?\s*\|)+\s*$/;
-  // The cells of a "| a | b |" line ("\\|" is a "|" inside a cell).
-  const rowCells = (line) => line.trim().slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
-
   // HTML for notes that only have plain text (created before formatting).
   function fromPlain(text) {
-    if (!text) return '<div><br></div>';
-    const inline = (s) => s.split(/(`[^`]+`)/).map((part, i) => (i % 2 ? `<code>${esc(part.slice(1, -1))}</code>` : linkHtml(part))).join('');
-    const lines = text.split('\n');
-    const out = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      // Code block: ```lang ... ```
-      const fence = /^```([\w+#.-]*)\s*$/.exec(line);
-      if (fence) {
-        const end = lines.findIndex((l, j) => j > i && /^```\s*$/.test(l));
-        if (end > i) {
-          const body = lines.slice(i + 1, end).join('\n');
-          const lang = fence[1] ? ` data-lang="${esc(fence[1])}"` : '';
-          out.push(`<pre class="code"${lang}>${body ? esc(body) : '<br>'}</pre>`);
-          i = end;
-          continue;
-        }
-      }
-      // Table: a run of "| a | b |" lines.
-      if (TABLE_ROW_RE.test(line)) {
-        let end = i;
-        while (end + 1 < lines.length && TABLE_ROW_RE.test(lines[end + 1])) end++;
-        const rows = lines.slice(i, end + 1);
-        const head = rows.length > 1 && TABLE_SEP_RE.test(rows[1]);
-        if (head) rows.splice(1, 1);
-        const cells = rows.map(rowCells);
-        const cols = Math.max(...cells.map((r) => r.length));
-        const tr = cells.map((r) => `<tr>${Array.from({ length: cols }, (_, c) => `<td>${r[c] ? inline(r[c]) : '<br>'}</td>`).join('')}</tr>`);
-        out.push(`<table${head ? ' class="head"' : ''}><tbody>${tr.join('')}</tbody></table>`);
-        i = end;
-        continue;
-      }
-      const m = LIST_RE.exec(line);
-      if (!m) {
-        out.push(`<div>${line ? inline(line) : '<br>'}</div>`);
-        continue;
-      }
-      const body = line.slice(m[0].length);
-      const cls = m[3] ? 'bullet' : m[4] ? 'number' : `check${/x/i.test(m[2]) ? ' done' : ''}`;
-      const level = Math.min(MAX_LEVEL, Math.floor(m[1].length / 2));
-      const lvl = level ? ` data-level="${level}"` : '';
-      out.push(`<div class="${cls}"${lvl}>${body ? inline(body) : '<br>'}</div>`);
-    }
-    return out.join('');
+    return text ? MemoText.fromPlain(text, linkHtml) : '<div><br></div>';
   }
 
   // Rebuilds saved HTML with only what the editor uses: lines, <br>, <b>,
