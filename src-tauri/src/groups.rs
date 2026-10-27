@@ -187,12 +187,13 @@ pub(crate) fn put_in(app: &AppHandle, id: &str) {
     store.update_group(id, |g| g.open = false);
     store.flush();
     let anchor = group_anchor(app, id);
-    for note in store.members(id) {
+    // Pinned members stay out on screen.
+    for note in store.members(id).iter().filter(|n| !n.pinned) {
         if let Some(window) = app.get_webview_window(&Kind::Note.label(&note.id)) {
             slide_in(app, window, anchor);
         }
     }
-    for board in store.board_members(id) {
+    for board in store.board_members(id).iter().filter(|b| !b.pinned) {
         if let Some(window) = app.get_webview_window(&Kind::Board.label(&board.id)) {
             slide_in(app, window, anchor);
         }

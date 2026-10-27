@@ -58,19 +58,9 @@ pub(crate) async fn open_note(app: AppHandle, id: String) -> Result<(), String> 
         .ok_or("note not found")?;
     let store = app.state::<Shared>();
     let note = store.update(&id, |n| n.hidden = false).unwrap_or(note);
-    // Inside a closed group: reopen it and take the whole group out.
-    match store.group(&note.group_id) {
-        Some(group) if group.hidden || !group.open => {
-            if group.hidden {
-                show_group(&app, &group.id);
-            }
-            take_out(&app, &group.id);
-        }
-        _ => {
-            let win = open_note_window(&app, &note).map_err(|e| e.to_string())?;
-            ensure_note_on_screen(&app, &win, &id);
-        }
-    }
+    // Only this one, even inside a group that is put away or closed.
+    let win = open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    ensure_note_on_screen(&app, &win, &id);
     notify(&app);
     Ok(())
 }

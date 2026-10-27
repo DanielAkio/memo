@@ -651,18 +651,25 @@
   }
 
   // Ids of the groups whose members stay off screen: put away or closed
-  // (Store::closed_groups).
-  const closedGroups = () => new Set(activeGroups().filter((g) => !g.open || g.hidden).map((g) => g.id));
+  // (Store::group_hides): its group is closed with ✕, or put away and the
+  // member isn't pinned (putAwayGroup leaves pinned ones out).
+  function groupHides() {
+    const groups = new Map(activeGroups().map((g) => [g.id, g]));
+    return (id, pinned) => {
+      const g = groups.get(id);
+      return Boolean(g && (g.hidden || (!g.open && !pinned)));
+    };
+  }
 
   // On screen at startup: not closed with ✕ and not inside a closed group
   // (Store::visible / visible_boards).
   function visibleNotes() {
-    const closed = closedGroups();
-    return activeNotes().filter((n) => !n.hidden && (!n.groupId || !closed.has(n.groupId)) && !onBoard(n.id));
+    const hides = groupHides();
+    return activeNotes().filter((n) => !n.hidden && !hides(n.groupId, n.pinned) && !onBoard(n.id));
   }
   function visibleBoards() {
-    const closed = closedGroups();
-    return activeBoards().filter((b) => !b.hidden && (!b.groupId || !closed.has(b.groupId)));
+    const hides = groupHides();
+    return activeBoards().filter((b) => !b.hidden && !hides(b.groupId, b.pinned));
   }
 
   function isFirstRun() {
@@ -1866,24 +1873,12 @@
     g.open = false;
     markDirty(false);
     const barWin = wins[`group-${g.id}`];
-    const members = activeNotes().filter((n) => n.groupId === g.id);
-    for (const n of members) {
-      const label = `note-${n.id}`;
-      const w = wins[label];
-      if (!w) continue;
-      if (barWin) {
-        w.el.classList.add('sliding');
-        w.el.style.left = `${barWin.x}px`;
-        w.el.style.top = `${barWin.y}px`;
-        w.el.style.opacity = '0';
-        setTimeout(() => closeWindow(label), 150);
-      } else {
-        closeWindow(label);
-      }
-    }
-    const bMembers = activeBoards().filter((b) => b.groupId === g.id);
-    for (const b of bMembers) {
-      const label = `board-${b.id}`;
+    // Pinned members stay out on screen (as put_in).
+    const labels = [
+      ...activeNotes().filter((n) => n.groupId === g.id && !n.pinned).map((n) => `note-${n.id}`),
+      ...activeBoards().filter((b) => b.groupId === g.id && !b.pinned).map((b) => `board-${b.id}`),
+    ];
+    for (const label of labels) {
       const w = wins[label];
       if (!w) continue;
       if (barWin) {
@@ -3663,12 +3658,7 @@
         const target = findNote(args.id);
         if (!target) return null;
         target.hidden = false;
-        if (target.groupId) {
-          const grp = findGroup(target.groupId);
-          if (grp && (!grp.open || grp.hidden)) {
-            await takeOutGroup(grp);
-          }
-        }
+        // Only this one, even inside a group that is put away or closed.
         await openNoteWindow(target);
         const wKey = `note-${target.id}`;
         const win = wins[wKey];

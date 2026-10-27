@@ -961,30 +961,30 @@ impl Store {
     }
 
     /// Ids of the groups whose members stay off screen: put away or closed.
-    fn closed_groups(&self) -> HashSet<String> {
-        self.active_groups()
-            .into_iter()
-            .filter(|g| !g.open || g.hidden)
-            .map(|g| g.id)
-            .collect()
+    /// Whether its group keeps a member off screen: the group is closed with
+    /// ✕, or put away (a pinned member stays out, as `put_in` leaves it).
+    fn group_hides(&self) -> impl Fn(&str, bool) -> bool {
+        let groups: HashMap<String, (bool, bool)> =
+            self.active_groups().into_iter().map(|g| (g.id, (g.open, g.hidden))).collect();
+        move |id, pinned| groups.get(id).is_some_and(|&(open, hidden)| hidden || (!open && !pinned))
     }
 
-    /// Active notes that are on screen: not closed with ✕ and not inside a
-    /// group that is put away or closed.
+    /// Active notes that are on screen: not closed with ✕, not on a board and
+    /// not kept off screen by their group (`group_hides`).
     pub fn visible(&self) -> Vec<Note> {
-        let closed = self.closed_groups();
+        let hides = self.group_hides();
         self.active()
             .into_iter()
-            .filter(|n| !n.hidden && !closed.contains(&n.group_id) && !self.on_board(&n.id))
+            .filter(|n| !n.hidden && !hides(&n.group_id, n.pinned) && !self.on_board(&n.id))
             .collect()
     }
 
     /// Active boards that are on screen, by the same rule as `visible()`.
     pub fn visible_boards(&self) -> Vec<Board> {
-        let closed = self.closed_groups();
+        let hides = self.group_hides();
         self.active_boards()
             .into_iter()
-            .filter(|b| !b.hidden && !closed.contains(&b.group_id))
+            .filter(|b| !b.hidden && !hides(&b.group_id, b.pinned))
             .collect()
     }
 
@@ -1798,6 +1798,25 @@ mod tests {
         store.update_board(&board.id, |b| b.columns[0].note_ids.push(note.id.clone()));
         assert!(store.on_board(&note.id));
         assert!(!store.is_pristine(&note));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn pinned_members_stay_out_of_a_group_put_away() {
+        let dir = temp_dir("pinned-out");
+        let store = Store::load(dir.join("notes.json"));
+        let group = store.create_group(None);
+        let loose = store.create(None);
+        let pinned = store.create(None);
+        for id in [&loose.id, &pinned.id] {
+            store.update(id, |n| n.group_id = group.id.clone());
+        }
+        store.update(&pinned.id, |n| n.pinned = true);
+        let ids = |notes: Vec<Note>| notes.into_iter().map(|n| n.id).collect::<Vec<_>>();
+        store.update_group(&group.id, |g| g.open = false);
+        assert_eq!(ids(store.visible()), vec![pinned.id.clone()], "put away: only the pinned one is out");
+        store.update_group(&group.id, |g| g.hidden = true);
+        assert!(store.visible().is_empty(), "closed with the bar's ✕: none");
         let _ = fs::remove_dir_all(&dir);
     }
 

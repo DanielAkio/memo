@@ -1514,6 +1514,50 @@ try {
     }
   });
 
+  // ------------------------------------------------ Web: pinned members stay out; the manager opens just one
+  await step('Web version: putting a group away leaves pinned members out; the manager opens only the memory picked', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      const res = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const ids = async (cmd) => (await inv('manager', cmd)).map((x) => x.id);
+        const newOne = async (cmd, list) => {
+          const before = new Set(await ids(list));
+          await inv('manager', cmd);
+          return (await ids(list)).find((x) => !before.has(x));
+        };
+        const open = (id) => Boolean(document.querySelector(`.win[data-label="note-${id}"]`));
+        const a = await newOne('new_note', 'list_notes');
+        const b = await newOne('new_note', 'list_notes');
+        const gid = await newOne('new_group', 'list_groups');
+        for (const id of [a, b]) {
+          await inv(`note-${id}`, 'rename', { name: id });
+          await inv(`note-${id}`, 'set_note_group', { groupId: gid });
+        }
+        await inv(`note-${b}`, 'set_pinned', { pinned: true });
+        await inv(`group-${gid}`, 'toggle_group'); // put away
+        await wait(300);
+        const out = { looseAway: !open(a), pinnedOut: open(b) };
+        await inv(`note-${b}`, 'close_window');
+        await wait(100);
+        await inv('manager', 'open_note', { id: a });
+        await wait(300);
+        out.onlyPicked = open(a) && !open(b);
+        out.groupStillAway = !(await inv('manager', 'list_groups')).find((g) => g.id === gid).open;
+        return out;
+      });
+      assert.equal(res.looseAway, true, 'Putting the group away puts its memories away');
+      assert.equal(res.pinnedOut, true, 'A pinned member stays out on screen');
+      assert.equal(res.onlyPicked, true, 'Opening a memory from the manager opens only that one');
+      assert.equal(res.groupStillAway, true, 'Its group stays put away');
+    } finally {
+      await webPage.close();
+    }
+  });
+
   assert.deepEqual(errors, [], `Unexpected console/page errors: ${errors.join('; ')}`);
   console.log(`\nAll ${passed} UI test suites passed with 0 runtime errors.`);
 } finally {
