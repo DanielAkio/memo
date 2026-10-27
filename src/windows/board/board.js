@@ -280,6 +280,9 @@
       const b = await invoke('load_board');
       if (b) {
         const same = currentBoard && JSON.stringify(currentBoard.columns) === JSON.stringify(b.columns);
+        // Not redrawn: keep the column objects the drawn columns and cards
+        // change (a copy here would leave their next change unsaved).
+        if (same && !force) b.columns = currentBoard.columns;
         currentBoard = b;
         bar.renderPin(b.pinned);
         renderTitle();

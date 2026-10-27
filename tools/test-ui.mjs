@@ -885,6 +885,30 @@ try {
     assert.equal(res.windowBefore, true, 'A memory window above a card shows the skeleton before it');
   });
 
+  // ------------------------------------------------ 7g. Board: changes after a save are saved too
+  await step('Board: removing memories one after another removes each, the last one too', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      for (const id of ['rm-a', 'rm-b']) M.addNote({ id, text: id });
+      M.addBoard({ id: 'rm-board', name: 'Remove', columns: [{ id: 'c1', name: 'One', noteIds: ['rm-a', 'rm-b'] }] });
+      await M.openWin('board-rm-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 420, h: 360 });
+      await new Promise((r) => setTimeout(r, 300));
+      const doc = M.frameDoc('board-rm-board');
+      const remove = async (id) => {
+        doc.querySelector(`.board-card[data-note-id="${id}"] .card-del-btn`).click();
+        await new Promise((r) => setTimeout(r, 200)); // saved, and its echo reloaded
+      };
+      await remove('rm-b');
+      const afterOne = [...M.boards['rm-board'].columns[0].noteIds];
+      await remove('rm-a');
+      const afterTwo = [...M.boards['rm-board'].columns[0].noteIds];
+      M.closeWin('board-rm-board');
+      return { afterOne, afterTwo };
+    });
+    assert.deepEqual(res.afterOne, ['rm-a'], 'The first removal is saved');
+    assert.deepEqual(res.afterTwo, [], 'The next removal is saved too, emptying the column');
+  });
+
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
   await step('Web vs Landing page: landing page is ephemeral, web version persists data', async () => {
     const sitePage = await browser.newPage();
