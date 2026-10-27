@@ -1,4 +1,5 @@
-// Memo — behaviour shared by the frameless windows (note and manager):
+// Memo — behaviour shared by the frameless windows (note, group, board and
+// manager):
 // dragging by the titlebar and resizing by the edges, both snapping to the
 // monitor edges and other windows (and, when dragging, Snap to half, quarter
 // or full screen); double click, middle click (close) and the right-click
@@ -8,8 +9,9 @@
 // Picture-in-Picture window, MemoWeb supplies the Tauri API for each frame.
 (() => {
   if (window.__TAURI__) return;
-  const host = (window.parent && window.parent.MemoWeb) || (window.parent && window.parent.parent && window.parent.parent.MemoWeb) || (window.top && window.top.MemoWeb)
-    || (window.parent && window.parent.MemoWeb)
+  const host = (window.parent && window.parent.MemoWeb)
+    || (window.parent && window.parent.parent && window.parent.parent.MemoWeb)
+    || (window.top && window.top.MemoWeb)
     || (window.opener && window.opener.MemoWeb);
   if (host) window.__TAURI__ = host.createTauri(window);
 })();

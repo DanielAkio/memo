@@ -8,6 +8,13 @@ import { fileURLToPath } from 'url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+// Every page script and page under src/ (subfolders included, vendor excluded).
+const srcFiles = (ext) => fs.readdirSync(path.join(ROOT, 'src'), { recursive: true })
+  .map((f) => `src/${f.split(path.sep).join('/')}`)
+  .filter((f) => f.endsWith(ext) && !f.startsWith('src/vendor/'))
+  .sort();
+const SRC_JS = srcFiles('.js');
+const SRC_HTML = srcFiles('.html');
 
 let failures = 0;
 function fail(msg) {
@@ -21,12 +28,7 @@ function pass(msg) {
 // ----------------------------------------------------------------- 1. JS syntax
 
 const jsFiles = [
-  'src/i18n.js',
-  'src/chrome.js',
-  'src/app.js',
-  'src/group.js',
-  'src/board.js',
-  'src/manager.js',
+  ...SRC_JS,
   'site/prefs.js',
   'tools/demos/mock.js',
   'tools/demos/stage.js',
@@ -58,7 +60,7 @@ if (!handlerMatch) {
 
   const jsCmds = new Set();
   const allJsStrings = new Set();
-  for (const rel of ['src/chrome.js', 'src/app.js', 'src/group.js', 'src/board.js', 'src/manager.js']) {
+  for (const rel of SRC_JS) {
     const src = read(rel);
     for (const m of src.matchAll(/\binvoke\(\s*'([a-z0-9_]+)'/g)) {
       jsCmds.add(m[1]);
@@ -89,7 +91,7 @@ for (const file of fs.readdirSync(path.join(ROOT, 'src-tauri/src'))) {
 }
 
 const jsEvents = new Set();
-for (const rel of ['src/chrome.js', 'src/app.js', 'src/group.js', 'src/board.js', 'src/manager.js', 'src/snap.html']) {
+for (const rel of [...SRC_JS, ...SRC_HTML]) {
   const src = read(rel);
   for (const m of src.matchAll(/\blisten\(\s*'([a-z0-9-]+)'/g)) {
     jsEvents.add(m[1]);
@@ -175,7 +177,7 @@ if (HELP.pt.length !== HELP.en.length) {
 }
 
 // Check HTML data-i18n and data-i18n-attr references
-for (const rel of ['src/index.html', 'src/group.html', 'src/manager.html']) {
+for (const rel of SRC_HTML) {
   const html = read(rel);
   for (const m of html.matchAll(/\bdata-i18n="([^"]+)"/g)) {
     if (!ptKeys.has(m[1])) fail(`${rel}: unknown data-i18n="${m[1]}"`);
@@ -189,12 +191,21 @@ for (const rel of ['src/index.html', 'src/group.html', 'src/manager.html']) {
 }
 
 // Check JS t('key') calls
-for (const rel of ['src/chrome.js', 'src/app.js', 'src/group.js', 'src/manager.js']) {
+for (const rel of SRC_JS) {
   const src = read(rel);
   for (const m of src.matchAll(/\bt\(\s*'([a-zA-Z0-9_]+)'/g)) {
     if (!ptKeys.has(m[1])) fail(`${rel}: unknown i18n key t('${m[1]}')`);
   }
 }
+// Every key is used: quoted, or as an attribute value (data-i18n-attr
+// "title=key"), in a page or script, or in the Help data after STRINGS.
+const usage = [...SRC_JS.filter((f) => f !== 'src/i18n.js'), ...SRC_HTML].map(read).join('\n')
+  + i18nSrc.slice(i18nSrc.indexOf('const PLACEHOLDERS'));
+for (const k of ptKeys) {
+  if (k === 'lavender') continue; // legacy colour: valid in stored notes, not offered
+  if (!new RegExp(`['"\`=]${k}['"\`,]`).test(usage)) fail(`i18n key '${k}' is never used`);
+}
+
 if (!failures) pass(`i18n (${ptKeys.size} keys, ${HELP.pt.length} Help sections in pt & en)`);
 
 // ------------------------------------------------------------------ 5. Colours
@@ -218,6 +229,7 @@ if (!colorsMatch) {
   for (const [rel, id] of [
     ['src/index.html', 'swatches'],
     ['src/group.html', 'swatches'],
+    ['src/board.html', 'swatches'],
     ['src/manager.html', 'mgrSwatches'],
   ]) {
     const html = read(rel);

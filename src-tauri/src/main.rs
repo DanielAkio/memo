@@ -2834,7 +2834,7 @@ fn trash_group_by_id(app: &AppHandle, id: &str) {
             trash(app, &note.id);
         }
         for board in board_members {
-            let _ = trash_board_id(app.clone(), board.id.clone(), store.clone());
+            trash_board_by_id(app, &board.id);
         }
     }
     store.flush();
@@ -3071,19 +3071,23 @@ fn list_boards(store: State<'_, Shared>) -> Result<Vec<Board>, String> {
     Ok(store.boards())
 }
 
+// Async: they destroy windows (see `new_note`).
 #[tauri::command]
-fn trash_board(app: AppHandle, window: WebviewWindow, store: State<'_, Shared>) -> Result<(), String> {
-    trash_board_id(app, board_id_of(&window), store)
+async fn trash_board(app: AppHandle, window: WebviewWindow) {
+    trash_board_by_id(&app, &board_id_of(&window));
 }
 
 #[tauri::command]
-fn trash_board_id(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window(&board_label(&id)) {
+async fn trash_board_id(app: AppHandle, id: String) {
+    trash_board_by_id(&app, &id);
+}
+
+fn trash_board_by_id(app: &AppHandle, id: &str) {
+    if let Some(w) = app.get_webview_window(&board_label(id)) {
         let _ = w.destroy();
     }
-    store.trash_board(&id);
-    boards_changed(&app);
-    Ok(())
+    app.state::<Shared>().trash_board(id);
+    boards_changed(app);
 }
 
 #[tauri::command]
@@ -3094,7 +3098,7 @@ fn restore_board_id(app: AppHandle, id: String, store: State<'_, Shared>) -> Res
 }
 
 #[tauri::command]
-fn delete_board_forever(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
+async fn delete_board_forever(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
     if let Some(w) = app.get_webview_window(&board_label(&id)) {
         let _ = w.destroy();
     }
