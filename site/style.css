@@ -110,14 +110,20 @@ footer {
 .memo-anchor { width: 100%; pointer-events: none; }
 .hero-anchor { min-height: 290px; margin: 12px 0 36px; }
 .write-anchor { min-height: 360px; }
-.group-anchor { min-height: 460px; }
+/* The group bar, a 6px gap and its two memories side by side (web.js,
+   computeSiteHomePositions): 4 + 36 + 6 + 204 = 250px. */
+.group-anchor { min-height: 260px; }
 .manager-anchor { min-height: 460px; }
 @media (max-width: 880px) {
   .hero-anchor { min-height: 520px; }
-  .group-anchor { min-height: 640px; }
 }
 @media (max-width: 600px) {
   .hero-anchor { min-height: 760px; }
+}
+/* Below 572px the slot is narrower than 540px and the two memories stack:
+   4 + 36 + 6 + 190 + 6 + 165 = 407px. */
+@media (max-width: 571px) {
+  .group-anchor { min-height: 420px; }
 }
 
 .benefits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 56px 0; }
