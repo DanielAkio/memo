@@ -695,7 +695,7 @@ textarea.field { resize: vertical; min-height: 84px; }
   .help-list dt:first-child { margin-top: 0; }
 }
 /* Examples under a help item, drawn like the note editor and window chrome
-   (same tokens as styles.css / base.css, at the manager's smaller scale). */
+   (same tokens as note.css / base.css, at the manager's smaller scale). */
 .help-demo {
   margin-top: 6px;
   padding: 8px 10px;
@@ -738,7 +738,7 @@ textarea.field { resize: vertical; min-height: 84px; }
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* Header row with the language, as in the editor (styles.css pre.code). */
+/* Header row with the language, as in the editor (note.css pre.code). */
 .help-demo pre.code[data-lang] { padding-top: 22px; }
 .help-demo pre.code[data-lang]::before {
   content: attr(data-lang);
@@ -751,7 +751,7 @@ textarea.field { resize: vertical; min-height: 84px; }
   text-transform: uppercase;
   color: var(--color-ash);
 }
-/* Lists, as in the editor (styles.css .check / .bullet / .number). */
+/* Lists, as in the editor (note.css .check / .bullet / .number). */
 .help-demo .check,
 .help-demo .bullet,
 .help-demo .number { position: relative; padding-left: 22px; }
@@ -787,7 +787,7 @@ textarea.field { resize: vertical; min-height: 84px; }
   border: solid var(--color-void);
   border-width: 0 1.5px 1.5px 0;
 }
-/* Tables, as in the editor (styles.css .editor table). */
+/* Tables, as in the editor (note.css .editor table). */
 .help-demo table {
   width: 100%;
   border-collapse: separate;
@@ -932,7 +932,7 @@ textarea.field { resize: vertical; min-height: 84px; }
 .demo-field .icon-btn { width: auto; height: auto; }
 /* A note's footer showing its group (bottom left) and word count. */
 /* A pasted image (grey mock picture) with its resize frame and handle,
-   as drawn in a note (styles.css, .image-frame). */
+   as drawn in a note (note.css, .image-frame). */
 .demo-image {
   position: relative;
   display: inline-block;

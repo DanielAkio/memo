@@ -572,7 +572,7 @@ fn anchor(app: &AppHandle) -> Option<(i32, i32)> {
 }
 
 /// A memory's HTML from its plain text: the Rust twin of `fromPlain` in
-/// app.js (lines, checklist items, bullets, numbered items, inline code,
+/// note.js (lines, checklist items, bullets, numbered items, inline code,
 /// links, code blocks, tables).
 fn from_plain(text: &str) -> String {
     if text.is_empty() {
@@ -631,7 +631,7 @@ fn from_plain(text: &str) -> String {
     out
 }
 
-/// A table row, "| a | b |" (as `TABLE_ROW_RE` in app.js).
+/// A table row, "| a | b |" (as `TABLE_ROW_RE` in components/text.js).
 fn is_table_row(line: &str) -> bool {
     let t = line.trim();
     t.len() >= 2 && t.starts_with('|') && t.ends_with('|')
@@ -674,7 +674,7 @@ fn fence_open(line: &str) -> Option<&str> {
         .then_some(lang)
 }
 
-/// A checklist item, bullet or numbered item (as `LIST_RE` in app.js):
+/// A checklist item, bullet or numbered item (as `LIST_RE` in components/text.js):
 /// level, class, text.
 fn list_item(line: &str) -> Option<(usize, &'static str, &str)> {
     let rest = line.trim_start_matches(' ');
@@ -699,7 +699,7 @@ fn list_item(line: &str) -> Option<(usize, &'static str, &str)> {
     Some((level, class, after.strip_prefix(' ').unwrap_or(after)))
 }
 
-/// Escapes a line and turns `x` into inline code (as the regex in app.js:
+/// Escapes a line and turns `x` into inline code (as the regex in note.js:
 /// a backtick opens code only when another one closes it with something in
 /// between).
 fn inline(s: &str) -> String {
@@ -725,7 +725,7 @@ fn inline(s: &str) -> String {
 
 /// Escapes text and turns its links into `<a href>`: "[text](address)" with
 /// a web or mail address, and bare "https://…" / "www.…" addresses (as
-/// `linkHtml` in app.js).
+/// `linkHtml` in note.js).
 fn links(s: &str) -> String {
     let mut out = String::new();
     let (mut last, mut i) = (0, 0);

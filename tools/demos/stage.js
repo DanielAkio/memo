@@ -83,13 +83,13 @@
       case 'save_board_columns': if (b) { b.columns = a.columns; b.updatedAt = Date.now(); M.emit('boards-changed'); } return null;
       case 'new_board': {
         const nb = M.addBoard({ id: `b-${Date.now()}` });
-        M.openWin(`board-${nb.id}`, '/src/board.html', { x: 40, y: 40, w: 760, h: 520 });
+        M.openWin(`board-${nb.id}`, '/src/windows/board/board.html', { x: 40, y: 40, w: 760, h: 520 });
         M.emit('boards-changed');
         return copy(nb);
       }
       case 'open_board': {
         const target = M.boards[a.id];
-        if (target) { target.hidden = false; M.openWin(`board-${target.id}`, '/src/board.html', { x: 40, y: 40, w: 760, h: 520 }); M.emit('boards-changed'); }
+        if (target) { target.hidden = false; M.openWin(`board-${target.id}`, '/src/windows/board/board.html', { x: 40, y: 40, w: 760, h: 520 }); M.emit('boards-changed'); }
         return null;
       }
       case 'trash_board_id': {
@@ -248,15 +248,15 @@
   };
   M.openNote = (id) => {
     const n = M.notes[id];
-    return M.openWin(`note-${id}`, '/src/index.html', { x: n.x, y: n.y, w: n.width, h: n.height });
+    return M.openWin(`note-${id}`, '/src/windows/note/index.html', { x: n.x, y: n.y, w: n.width, h: n.height });
   };
   M.openGroup = (id) => {
     const g = M.groups[id];
-    return M.openWin(`group-${id}`, '/src/group.html', { x: g.x, y: g.y, w: g.width, h: 34 });
+    return M.openWin(`group-${id}`, '/src/windows/group/group.html', { x: g.x, y: g.y, w: g.width, h: 34 });
   };
   M.openManager = () => {
     const m = M.manager;
-    return M.openWin('manager', '/src/manager.html', { x: m.x, y: m.y, w: m.width, h: m.height });
+    return M.openWin('manager', '/src/windows/manager/manager.html', { x: m.x, y: m.y, w: m.width, h: m.height });
   };
   M.move = (label, x, y) => {
     const s = M.wins[label].el.style;

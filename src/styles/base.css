@@ -208,7 +208,7 @@ button { font: inherit; color: inherit; }
 
 /* A popover under the titlebar (colour picker) or over the footer (group
    picker), in every window. Each window places it: left/right, width,
-   z-index (styles.css, group.css, board.css, manager.css). */
+   z-index (note.css, group.css, board.css, manager.css). */
 .menu {
   position: absolute;
   top: calc(var(--titlebar-h) - 2px);

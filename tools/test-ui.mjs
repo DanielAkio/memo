@@ -48,7 +48,7 @@ try {
         await window.Memo.openNote(id);
       }, { id, w, lang });
 
-      // Trigger an input event in the editor so app.js runs sanitize/toPlain and saves
+      // Trigger an input event in the editor so note.js runs sanitize/toPlain and saves
       const saved = await page.evaluate(async (id) => {
         const doc = window.Memo.frameDoc(`note-${id}`);
         const ed = doc.getElementById('editor');

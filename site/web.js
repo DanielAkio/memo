@@ -259,6 +259,13 @@
   const trayMenuBtn = document.getElementById('trayMenuBtn');
 
   let srcBase = '../src';
+  // Each window's page under src/ (the same pages as the desktop app's).
+  const PAGES = {
+    note: 'windows/note/index.html',
+    group: 'windows/group/group.html',
+    board: 'windows/board/board.html',
+    manager: 'windows/manager/manager.html',
+  };
   const wins = {};
   const listeners = [];
   const restoreSizes = {};
@@ -1244,7 +1251,7 @@
       n.y = pos.y;
       markDirty(false);
     }
-    return openWindow(`note-${n.id}`, 'index.html', { x: pos.x, y: pos.y, w, h, pinned: !!n.pinned, autofocus });
+    return openWindow(`note-${n.id}`, PAGES.note, { x: pos.x, y: pos.y, w, h, pinned: !!n.pinned, autofocus });
   }
 
   function openGroupWindow(g, autofocus = !IS_SITE_HOME) {
@@ -1258,7 +1265,7 @@
       g.y = pos.y;
       markDirty(false);
     }
-    return openWindow(`group-${g.id}`, 'group.html', { x: pos.x, y: pos.y, w, h, pinned: !!g.pinned, autofocus });
+    return openWindow(`group-${g.id}`, PAGES.group, { x: pos.x, y: pos.y, w, h, pinned: !!g.pinned, autofocus });
   }
 
   // The web app centres the manager; the landing page never does: it has a
@@ -1292,7 +1299,7 @@
     }
     m.x = cx;
     m.y = cy;
-    return openWindow('manager', 'manager.html', { x: cx, y: cy, w, h, pinned: !!m.pinned, autofocus });
+    return openWindow('manager', PAGES.manager, { x: cx, y: cy, w, h, pinned: !!m.pinned, autofocus });
   }
 
 
@@ -1400,7 +1407,7 @@
       b.y = pos.y;
       markDirty(false);
     }
-    return openWindow(`board-${b.id}`, 'board.html', { x: pos.x, y: pos.y, w, h, pinned: !!b.pinned, autofocus });
+    return openWindow(`board-${b.id}`, PAGES.board, { x: pos.x, y: pos.y, w, h, pinned: !!b.pinned, autofocus });
   }
 
   function createBoard(parentLabel = 'manager') {
@@ -1574,7 +1581,7 @@
         n.y = target.y;
         const startX = barWin ? barWin.x : target.x;
         const startY = barWin ? barWin.y : target.y;
-        const winObj = await openWindow(label, 'index.html', { x: startX, y: startY, w: target.w, h: target.h, pinned: !!n.pinned });
+        const winObj = await openWindow(label, PAGES.note, { x: startX, y: startY, w: target.w, h: target.h, pinned: !!n.pinned });
         requestAnimationFrame(() => {
           winObj.el.classList.add('sliding');
           setWinRect(label, target.x, target.y, target.w, target.h, false);
@@ -1595,7 +1602,7 @@
         b.y = target.y;
         const startX = barWin ? barWin.x : target.x;
         const startY = barWin ? barWin.y : target.y;
-        const winObj = await openWindow(label, 'board.html', { x: startX, y: startY, w: target.w, h: target.h, pinned: !!b.pinned });
+        const winObj = await openWindow(label, PAGES.board, { x: startX, y: startY, w: target.w, h: target.h, pinned: !!b.pinned });
         requestAnimationFrame(() => {
           winObj.el.classList.add('sliding');
           setWinRect(label, target.x, target.y, target.w, target.h, false);
@@ -3586,7 +3593,7 @@
 
   async function resolveSrcBase() {
     try {
-      const r = await fetch('./src/index.html', { method: 'HEAD' });
+      const r = await fetch(`./src/${PAGES.note}`, { method: 'HEAD' });
       if (r.ok) {
         srcBase = './src';
         return;

@@ -89,7 +89,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
    (queryCommandState and toggling Ctrl+B off) from 600 up. */
 .editor b, .editor strong { font-weight: 700; color: var(--color-paper); }
 .editor u { text-decoration-thickness: 1px; text-underline-offset: 2px; }
-/* Links (app.js "links"): the text's own colour, underlined; a click opens
+/* Links (note.js "links"): the text's own colour, underlined; a click opens
    them, so no dragging them around as links. */
 .editor a {
   color: inherit;
@@ -114,7 +114,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   position: relative;
   margin: 6px 0;
   /* The top padding is a header row for the language picker and the copy
-     button (app.js "code"), so they never cover the first line. */
+     button (note.js "code"), so they never cover the first line. */
   padding: 26px 12px 8px;
   border-radius: var(--radius-button);
   background: var(--overlay-subtle);
@@ -127,12 +127,12 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   overflow-wrap: anywhere;
 }
 /* The block's own text is invisible (caret and selection still show): the
-   highlighted copy in .code-layer is drawn exactly over it (app.js). */
+   highlighted copy in .code-layer is drawn exactly over it (note.js). */
 .editor pre.code { color: transparent; }
 .editor pre.code::selection,
 .editor pre.code *::selection { color: transparent; }
 
-/* Tables (app.js, "tables"): hairline grid with rounded corners, columns
+/* Tables (note.js, "tables"): hairline grid with rounded corners, columns
    sharing the width; the optional header row (table.head) is tinted. The
    bottom margin leaves room for the "+" and tools on the bottom edge. */
 .editor table {
@@ -172,7 +172,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 /* Selected, it shows the frame below instead of the selection tint. */
 .editor img::selection { background: transparent; }
-/* The frame drawn around the selected image (app.js, "images"). */
+/* The frame drawn around the selected image (note.js, "images"). */
 .image-layer {
   position: absolute;
   inset: 0;
@@ -188,7 +188,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 .image-frame[hidden] { display: none; }
 
-/* Caret before a list item's box or dot (app.js, "lists"): blinks in the
+/* Caret before a list item's box or dot (note.js, "lists"): blinks in the
    margin left of the marker while the real caret is hidden. */
 .marker-caret {
   position: absolute;
@@ -394,7 +394,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
-/* Sizes for the editor's <font size> (see SIZES in app.js). */
+/* Sizes for the editor's <font size> (see SIZES in note.js). */
 .editor font[size="2"] { font-size: 13px; }
 .editor font[size="3"] { font-size: inherit; }
 .editor font[size="5"] { font-size: 20px; }
@@ -413,7 +413,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   position: relative;
   padding-left: 24px;
 }
-/* Item all in one size (data-size, from app.js): the line takes that size,
+/* Item all in one size (data-size, from note.js): the line takes that size,
    so the box (0.8em) and the strike-through stay centred on the text. Same
    px as .editor font[size]. */
 .check[data-size="2"], .bullet[data-size="2"], .number[data-size="2"] { font-size: 13px; }
@@ -435,7 +435,7 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   background: var(--color-fog);
 }
 
-/* Numbered item ("1. "): its number (data-n, from app.js) right-aligned
+/* Numbered item ("1. "): its number (data-n, from note.js) right-aligned
    in the marker column, so "9." and "10." line up on the dot. */
 .number {
   position: relative;

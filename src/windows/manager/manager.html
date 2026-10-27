@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gerenciador do Memo</title>
-  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="../../styles/base.css">
   <link rel="stylesheet" href="manager.css">
 </head>
 <body>
@@ -189,7 +189,7 @@
             <label class="setting-label" for="defaultTextFrame" data-i18n="text"></label>
             <div class="field-wrap">
               <!-- The note editor itself, in embedded mode: renders exactly like a note. -->
-              <iframe class="field note-frame" id="defaultTextFrame" src="index.html?defaults"
+              <iframe class="field note-frame" id="defaultTextFrame" src="../note/index.html?defaults"
                       data-i18n-attr="title=text"></iframe>
             </div>
           </div>
@@ -369,14 +369,14 @@
     </span>
   </div>
 
-  <script src="i18n.js"></script>
-  <script src="chrome.js"></script>
-  <script src="components/color-menu.js"></script>
-  <script src="components/titlebar.js"></script>
-  <script src="components/pill.js"></script>
-  <script src="components/text.js"></script>
-  <script src="components/card.js"></script>
-  <script src="vendor/prism.js" data-manual></script>
+  <script src="../../lib/i18n.js"></script>
+  <script src="../../lib/chrome.js"></script>
+  <script src="../../components/color-menu.js"></script>
+  <script src="../../components/titlebar.js"></script>
+  <script src="../../components/pill.js"></script>
+  <script src="../../components/text.js"></script>
+  <script src="../../components/card.js"></script>
+  <script src="../../vendor/prism.js" data-manual></script>
   <script src="manager.js"></script>
 </body>
 </html>

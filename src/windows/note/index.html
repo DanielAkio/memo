@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Memo</title>
-  <link rel="stylesheet" href="base.css">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="../../styles/base.css">
+  <link rel="stylesheet" href="note.css">
 </head>
 <body>
   <div class="frame" id="frame">
@@ -59,7 +59,7 @@
       <input type="color" class="custom-color" id="customColor" tabindex="-1" aria-hidden="true">
     </div>
 
-    <!-- Bar shown above the selected text. Shortcuts go in the title (app.js). -->
+    <!-- Bar shown above the selected text. Shortcuts go in the title (note.js). -->
     <div class="format-bar" id="formatBar" role="toolbar" data-i18n-attr="aria-label=formatting" hidden>
       <button type="button" class="fmt-btn" data-cmd="bold" data-key="B" data-i18n-attr="aria-label=bold" aria-pressed="false"><b data-i18n="boldLetter"></b></button>
       <button type="button" class="fmt-btn" data-cmd="italic" data-key="I" data-i18n-attr="aria-label=italic" aria-pressed="false"><i data-i18n="italicLetter"></i></button>
@@ -97,7 +97,7 @@
       </span>
     </div>
 
-    <!-- Address of a link (app.js, "links"): Mod+K, the link button or the
+    <!-- Address of a link (note.js, "links"): Mod+K, the link button or the
          Format menu. Open and remove show only for an existing link. -->
     <div class="link-box" id="linkBox" hidden>
       <input type="text" id="linkInput" spellcheck="false" autocomplete="off"
@@ -115,11 +115,11 @@
            aria-multiline="true" data-i18n-attr="aria-label=noteText"
            data-placeholder=""></div>
       <!-- Highlighted copies of the code blocks, drawn over them, plus their
-           language pickers (app.js, "code highlighting"). -->
+           language pickers (note.js, "code highlighting"). -->
       <div class="code-layer" id="codeLayer"></div>
       <!-- Controls of the table under the mouse: "+" on its left and right
            edges (a column) and bottom edge (a row), header and delete tools
-           (app.js, "tables"). -->
+           (note.js, "tables"). -->
       <div class="table-layer" id="tableLayer" hidden>
         <div class="table-mark" hidden></div>
         <button type="button" class="table-add" data-add="left" data-i18n-attr="aria-label=addColumnLeft,title=addColumnLeft">
@@ -143,22 +143,22 @@
           </button>
         </div>
       </div>
-      <!-- Frame of the selected image, with its resize handle (app.js, "images"). -->
+      <!-- Frame of the selected image, with its resize handle (note.js, "images"). -->
       <div class="image-layer" id="imageLayer">
         <div class="image-frame" id="imageFrame" hidden>
           <span class="image-handle" id="imageHandle" data-i18n-attr="title=resizeImage"></span>
         </div>
       </div>
-      <!-- Caret before a list item's box or dot (app.js, "lists"). -->
+      <!-- Caret before a list item's box or dot (note.js, "lists"). -->
       <span class="marker-caret" id="markerCaret" hidden></span>
     </main>
 
     <!-- Format tray: the format bar's buttons fixed above the footer, shown
-         with the footer's "Aa" (app.js, "format tray"; filled from #formatBar). -->
+         with the footer's "Aa" (note.js, "format tray"; filled from #formatBar). -->
     <div class="format-tray" id="formatTray" role="toolbar" data-i18n-attr="aria-label=formatTray" hidden></div>
 
     <!-- Group picker, opened from the footer: the note's group, "no group" or
-         a new one (app.js, "groups"). -->
+         a new one (note.js, "groups"). -->
     <div class="menu group-menu" id="groupMenu" hidden>
       <div class="menu-label" data-i18n="groupMenuTitle"></div>
       <div class="menu-items" id="groupItems" role="menu"></div>
@@ -180,14 +180,14 @@
     </footer>
   </div>
 
-  <script src="i18n.js"></script>
-  <script src="chrome.js"></script>
-  <script src="components/color-menu.js"></script>
-  <script src="components/titlebar.js"></script>
-  <script src="components/pill.js"></script>
-  <script src="components/text.js"></script>
-  <script src="components/group-picker.js"></script>
-  <script src="vendor/prism.js" data-manual></script>
-  <script src="app.js"></script>
+  <script src="../../lib/i18n.js"></script>
+  <script src="../../lib/chrome.js"></script>
+  <script src="../../components/color-menu.js"></script>
+  <script src="../../components/titlebar.js"></script>
+  <script src="../../components/pill.js"></script>
+  <script src="../../components/text.js"></script>
+  <script src="../../components/group-picker.js"></script>
+  <script src="../../vendor/prism.js" data-manual></script>
+  <script src="note.js"></script>
 </body>
 </html>

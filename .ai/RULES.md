@@ -31,23 +31,28 @@ Always run `npm test` after making changes to catch regressions: `tools/check.mj
 ## Layout
 
 ```
-src/                     frontend: plain HTML/CSS/JS, no bundler (frontendDist = ../src)
-  index.html, app.js     ONE note window (app.js ~3.3k lines: use memo-code-map, don't read it whole)
-  base.css               shared tokens, light/dark themes, label colours, swatches, window chrome,
-                         popovers (.menu), footer group picker, group tint
-  styles.css             note window components
-  chrome.js              window behaviour: drag, resize handles, snapping, title menu (MemoChrome), zoom (MemoZoom)
-  i18n.js                UI strings pt/en (MemoI18n.t), shortcut labels (MemoI18n.keys / isMod), Help guide data (HELP)
+src/                     frontend: plain HTML/CSS/JS, no bundler (frontendDist = ../src); paths
+                         between files are relative (a page in windows/x/ loads ../../lib/…)
+  windows/               one folder per window: its page, script and styles
+    note/                index.html, note.js, note.css — ONE note window (note.js ~3.3k lines:
+                         use memo-code-map, don't read it whole); index.html?defaults is the
+                         manager's embedded defaults editor
+    group/               group.html/.js/.css — a group bar (one window per group)
+    board/               board.html/.js/.css — a board (columns of memories, one per board)
+    manager/             manager.html/.js/.css — the manager window ("Gerenciador do Memo")
+    snap/                snap.html — Snap preview (transparent, click-through)
   components/            bases shared by the windows (plain scripts, loaded with <script>):
-    titlebar.js          TitleBar: pin, rename, buttons, shortcuts, drag/resize, title menu, focus
-    color-menu.js        MemoColor (isCustom, paint, mark), MemoTheme, ColorMenu (swatch popover)
+    titlebar.js          TitleBar: pin, rename, close/trash, buttons, shortcuts, drag/resize, title menu, focus
+    color-menu.js        MemoColor (isCustom, paint, mark, name), MemoTheme, ColorMenu (swatch popover)
     group-picker.js      GroupPicker: the footer group button and its picker (notes, boards)
+    pill.js              MemoPill: where an item is (group / board), shown only (manager cards, note footer)
     text.js              MemoText: the plain-text format (lists, code, tables), fromPlain
     card.js              MemoCard: a note's preview on a card (manager, boards)
-  manager.html/.js/.css  the manager window ("Gerenciador do Memo")
-  group.html/.js/.css    a group bar (one window per group)
-  board.html/.js/.css    a board (columns of memories, one window per board)
-  snap.html              Snap preview (transparent, click-through)
+  lib/
+    chrome.js            window behaviour: drag, resize handles, snapping, title menu (MemoChrome), zoom (MemoZoom)
+    i18n.js              UI strings pt/en (MemoI18n.t), shortcut labels (MemoI18n.keys / isMod), Help guide data (HELP)
+  styles/base.css        shared tokens, light/dark themes, label colours, swatches, window chrome,
+                         popovers (.menu), footer group picker, pills, group tint, titlebar name / rename field
   vendor/prism.js        vendored Prism 1.29 — never read or edit
 src-tauri/
   src/main.rs            shared constants and helpers, setup, lifecycle, generate_handler!
@@ -89,13 +94,13 @@ docs/style.md            visual reference ("Linear"-style dark system); base.css
 Tokens spent on things that don't help understand or change the project are waste. `.claude/settings.json` enforces part of this:
 
 - **Never read** `src/vendor/**`, `src-tauri/icons/**`, `assets/**`, `Cargo.lock`, `package-lock.json`, `src-tauri/target/**`, `src-tauri/gen/**`, `node_modules/**`, `dist/**` (Read is denied). For a dependency version use `cargo tree -i <crate>` or grep `Cargo.toml`.
-- **Big files:** `memo-code-map` lists section maps of the big files (`app.js`, `manager.js`, `store.rs`) and which Rust module holds what, to find symbols and line numbers cheaply.
+- **Big files:** `memo-code-map` lists section maps of the big files (`note.js`, `manager.js`, `store.rs`) and which Rust module holds what, to find symbols and line numbers cheaply.
 - **Command output is capped** (`bashOutputMaxChars`). Filter long output yourself: `cargo check 2>&1 | grep -E '^(warning|error)' -A5 | head -60`, `git diff --stat` before a full diff, `git log --oneline -n 10`.
 - Don't re-read a file you just edited or read; don't paste whole files or logs into replies; load only the skill the task needs.
 
 ## Core architecture
 
-- **One window per note.** Labels: `note-{id}`, `group-{id}`, `board-{id}`, `manager`, plus the hidden `snap-preview`. Rust derives the note id from the calling window's label (`id_of`), so note commands take no id (`invoke('save_text', { text, html })`); manager commands take explicit ids. All note windows load `index.html`, which calls `load_note`. Code that iterates windows tells them apart with `is_note` / `is_group` / `is_board` / `is_app_window` (the last excludes the Snap preview).
+- **One window per note.** Labels: `note-{id}`, `group-{id}`, `board-{id}`, `manager`, plus the hidden `snap-preview`. Rust derives the note id from the calling window's label (`Kind::Note.id_of`), so note commands take no id (`invoke('save_text', { text, html })`); manager commands take explicit ids. All note windows load `index.html`, which calls `load_note`. Code that iterates windows tells them apart with `Kind` (`Kind::of(window)`, `Kind::Group.is(window)`, `Kind::Board.label(id)` — the one place that knows the labels) and `is_app_window` (excludes the Snap preview).
 - **Rust is the source of truth.** `Store` (`store.rs`) holds everything in a `Mutex`, marks it dirty, and a saver thread flushes atomically every 800 ms. Never overwrite user data: unreadable files are backed up, old files are never deleted. Default data folder is `<OS data folder>/memo` — **never** use Tauri's `app_data_dir()` for notes or config.
 - **Tauri commands** live in the module of their area (`notes.rs`, `manager.rs`, `groups.rs`, …; each module does `use crate::*` and its items are `pub(crate)`) and must be registered in `generate_handler!` in `main.rs`; a new JS window API needs its permission in `capabilities/default.json`. Commands that create/destroy windows are `async` on purpose (sync ones can deadlock on Windows). Rust errors returned to JS are English `String`s (logged, not shown).
 - **Events** keep windows in step: `notes-changed`, `groups-changed`, `boards-changed`, `store-replaced`, `theme-changed`, `language-changed`, `zoom-changed`, `drop-hover`, `board-drop-hover`, `cloud-changed`, `ai-control-changed`, `magnet-changed`, `layout-changed`, `update-changed`.
@@ -105,13 +110,15 @@ Tokens spent on things that don't help understand or change the project are wast
 
 ## Conventions
 
+- **Cohesive components, shared code.** Notes, group bars, boards and the manager share as much code as possible, to keep bugs from creeping into one copy: one base per piece of UI (`src/components/`, `styles/base.css`), one command per action for every window (`set_pinned`, `set_color`, `rename`, `close_window`, `trash_window` dispatch on `Kind`), one path per rule (`Kind` for labels; `join_group` / `leave_group` for notes and boards alike; `Store::visible` / `visible_boards` with the same rule). Before adding a second copy of anything, extract it.
+- **Memo Web is practically identical to the desktop app.** `site/web.js` implements the same commands with the same rules (pristine checks, trash, pin layers, which windows open); `check.mjs` fails when a desktop command has no web case, except the desktop-only ones it lists with their reason. A change to a command's behaviour changes both, in the same change, with a UI test that runs the web version when it can.
 - **Every feature works on Windows, macOS and Linux.** Native APIs get an implementation per OS (`#[cfg(windows)]` / `target_os = "macos"` / `"linux"`, crates already in the tree) plus a fallback. Linux runs under X11 (XWayland forced); macOS transparency needs `macos-private-api`. Verify other targets before claiming they work (`memo-checks`).
 - **Consistent usability across components — always.** Notes, group bars and the manager are the same kind of window: same titlebar order (pin far left, colour control, name, action buttons on the right, always visible), same icons for the same action (Help demos included), same gestures (`chrome.js` drag/Snap/resize; titlebar double-click renames notes and groups; middle click = ✕; Mod+Shift+P pins; Mod+N new note; Esc cancels, Enter confirms), same outcomes (names start empty and read "Sem título"/"Untitled"; same colour labels and picker; trash only from the manager; emptying the trash and quitting ask for a second click; reuse existing `i18n.js` keys). A change to one component applies to all where it makes sense, in the same change — or say why not. What the windows share is built once: `src/components/` (`TitleBar`, `ColorMenu`, `GroupPicker`, `MemoText`, `MemoCard`) and the shared rules in `base.css`; change it there and let each window pass options, and extract a new base as soon as a second window needs the same piece. A feature shown in one place shows wherever that object appears (e.g. a group's name and colour in its bar, note footers, pickers and the manager).
 - Keep the Help tab (`HELP` in `i18n.js`, with demos), `welcome.rs`, README, `.ai/RULES.md` and `.ai/skills/` in step with feature changes. The README and `site/` speak to users, not developers: benefits and usage first, technical detail in `docs/development.md`.
 - **Tray menu:** every new feature that makes sense as a command (no window needed: create, open a tab, toggle a setting, run an action) also goes in the tray icon's right-click menu (`build_tray_menu` / `on_tray_menu`, labels in `tray_labels`; see `memo-windows`). The same items fill the bottom of every titlebar menu (… button / right click, `show_title_menu`), so they reach every window; a window's own commands go on top of that menu, and its titlebar keeps only the most used buttons.
-- **Colour labels** stay in sync in three places: `COLORS` in `store.rs`, the `.swatch` buttons in `index.html` / `group.html` / `manager.html`, and `[data-color=...]` rules in `base.css`. `lavender` is legacy (valid, not offered). `""` = no colour; `mono` = `--color-paper` (white in dark, black in light); `#rrggbb` = custom (`is_valid_color`, inline `--note-color`, `data-color="custom"`); new notes start with `DEFAULT_NOTE_COLOR` = `""` (none) unless the default is `"random"`, new groups with a random label from `RANDOM_COLORS` (default group colour `"random"`); `DEFAULT_COLOR` = `iris` is the manager's. The custom swatch is an eyedropper (mask icon in `base.css`).
+- **Colour labels** stay in sync in three places: `COLORS` in `store.rs`, the `.swatch` buttons in the windows' pages (`windows/note/index.html`, `group.html`, `board.html`, `manager.html`), and `[data-color=...]` rules in `styles/base.css`. `lavender` is legacy (valid, not offered). `""` = no colour; `mono` = `--color-paper` (white in dark, black in light); `#rrggbb` = custom (`is_valid_color`, inline `--note-color`, `data-color="custom"`); new notes start with `DEFAULT_NOTE_COLOR` = `""` (none) unless the default is `"random"`, new groups with a random label from `RANDOM_COLORS` (default group colour `"random"`); `DEFAULT_COLOR` = `iris` is the manager's. The custom swatch is an eyedropper (mask icon in `base.css`).
 - **Model:** `#[serde(rename_all = "camelCase", default)]` — new fields need a `Default` and appear camelCase in JS. File format `version: 1`.
-- **Design:** follow the tokens in `base.css`/`styles.css` (from `docs/style.md`): near-black surfaces (Carbon `#0f1011`, also the native window background), system UI font, weights 400 / 500 (titles, labels) / 700 (editor bold, needed for `queryCommandState('bold')`), hairline borders. The only colour on screen is the note's label; the pin is colourless. Light theme redefines the grey tokens: never use raw white/black overlays, use `--overlay-*`, `--selection`, `--shadow-popover`.
+- **Design:** follow the tokens in `base.css`/`note.css` (from `docs/style.md`): near-black surfaces (Carbon `#0f1011`, also the native window background), system UI font, weights 400 / 500 (titles, labels) / 700 (editor bold, needed for `queryCommandState('bold')`), hairline borders. The only colour on screen is the note's label; the pin is colourless. Light theme redefines the grey tokens: never use raw white/black overlays, use `--overlay-*`, `--selection`, `--shadow-popover`.
 - **CSP** is `default-src 'self'`: no CDNs, remote fonts or inline scripts.
 - **Don't bring back collapse** (removed twice): a titlebar double-click renames.
 

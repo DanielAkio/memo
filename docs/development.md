@@ -97,7 +97,7 @@ node tools/demos/record.mjs              # every scene, theme and language (a fe
 node tools/demos/record.mjs write dark en  # just one
 ```
 
-`tools/demos/stage.html` is a fake desktop where each Memo window is an `<iframe>` of `src/index.html`,
+`tools/demos/stage.html` is a fake desktop where each Memo window is an `<iframe>` of `src/windows/note/index.html`,
 `group.html` or `manager.html`; `mock.js` stands in for the Tauri API (the state lives in `stage.js`), and
 `record.mjs` scripts each scene with a real mouse and keyboard, one screenshot per frame. A new Tauri command the
 pages call at startup may need a case in `stage.js`'s `invoke`.

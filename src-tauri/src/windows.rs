@@ -17,7 +17,7 @@ pub(crate) fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<We
 /// Creates a note's window, hidden, at its saved place.
 pub(crate) fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow> {
     let label = Kind::Note.label(&note.id);
-    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("windows/note/index.html".into()))
         .title("Memo")
         .inner_size(note.width, note.height)
         .decorations(false)
@@ -111,7 +111,7 @@ pub(crate) fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     }
     let store = app.state::<Shared>();
     let state = store.manager();
-    let window = WebviewWindowBuilder::new(app, MANAGER, WebviewUrl::App("manager.html".into()))
+    let window = WebviewWindowBuilder::new(app, MANAGER, WebviewUrl::App("windows/manager/manager.html".into()))
         .title(manager_title(store.effective_language()))
         .inner_size(state.width, state.height)
         .decorations(false)

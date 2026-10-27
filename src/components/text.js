@@ -1,4 +1,4 @@
-// Memo — a note's plain-text format, shared by the editor (app.js) and the
+// Memo — a note's plain-text format, shared by the editor (note.js) and the
 // note previews (card.js in the manager and boards): list lines, ``` code
 // blocks and "| a | b |" tables, and how they become the editor's HTML.
 // Parameters are never named "t", which is the translation function.

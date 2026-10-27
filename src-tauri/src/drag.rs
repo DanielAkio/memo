@@ -152,7 +152,7 @@ pub(crate) fn snap_zone(window: &WebviewWindow, cursor: (f64, f64)) -> Option<Re
 /// Creates the (hidden) Snap preview window. Transparent and click-through;
 /// it never takes focus, so the drag keeps its pointer capture.
 pub(crate) fn build_snap_preview(app: &AppHandle) -> tauri::Result<()> {
-    let window = WebviewWindowBuilder::new(app, SNAP_PREVIEW, WebviewUrl::App("snap.html".into()))
+    let window = WebviewWindowBuilder::new(app, SNAP_PREVIEW, WebviewUrl::App("windows/snap/snap.html".into()))
         .title("Memo")
         .decorations(false)
         .transparent(true)

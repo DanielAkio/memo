@@ -2,8 +2,8 @@
 //! the button in the manager's Help tab), in the app's language.
 //!
 //! The content comes in both formats a note stores: `html` (what the editor
-//! shows, using only tags that app.js's `sanitize` keeps) and `text` (the same
-//! content as plain text, as app.js's `toPlain` would produce it).
+//! shows, using only tags that note.js's `sanitize` keeps) and `text` (the same
+//! content as plain text, as note.js's `toPlain` would produce it).
 //! Change one, change the other.
 
 pub struct Welcome {

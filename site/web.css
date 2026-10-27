@@ -1,4 +1,4 @@
-/* Memo Web — browser workspace styling, following src/base.css tokens. */
+/* Memo Web — browser workspace styling, following src/styles/base.css tokens. */
 
 :root {
   --desk-bg: radial-gradient(120% 140% at 15% 0%, #191d2b 0%, #11131c 58%, #0b0c11 100%);
@@ -135,7 +135,7 @@ body.interacting .win:not(.active-gesture) iframe {
   pointer-events: none;
 }
 
-/* Aero Snap preview zone (matches src/snap.html) */
+/* Aero Snap preview zone (matches src/windows/snap/snap.html) */
 .snap-preview {
   position: fixed;
   z-index: 90;

@@ -1,4 +1,4 @@
-// Board window (src/board.js): Trello-like kanban board for memories.
+// Board window (src/windows/board/board.js): Trello-like kanban board for memories.
 
 (() => {
   const { invoke } = window.__TAURI__.core;

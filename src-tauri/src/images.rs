@@ -28,7 +28,7 @@ pub const FOLDER: &str = "images";
 const DATA_PREFIX: &str = "src=\"data:image/";
 const REF_PREFIX: &str = "src=\"images/";
 
-/// (MIME subtype, file extension) of the accepted images (as in app.js).
+/// (MIME subtype, file extension) of the accepted images (as in note.js).
 const KINDS: [(&str, &str); 4] = [("png", "png"), ("jpeg", "jpg"), ("webp", "webp"), ("gif", "gif")];
 
 /// The images folder for a `notes.json` path.

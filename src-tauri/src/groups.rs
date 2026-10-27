@@ -45,7 +45,7 @@ pub(crate) fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result
         let _ = existing.show();
         return Ok(existing);
     }
-    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("group.html".into()))
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("windows/group/group.html".into()))
         .title(window_title(&group.name))
         .inner_size(group.width, TITLEBAR_H * app.state::<Shared>().zoom())
         .min_inner_size(GROUP_MIN_W, TITLEBAR_H * app.state::<Shared>().zoom())

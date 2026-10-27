@@ -5,7 +5,7 @@ use crate::*;
 pub(crate) fn build_board_window(app: &AppHandle, board: &Board) -> tauri::Result<WebviewWindow> {
     let label = Kind::Board.label(&board.id);
     let store = app.state::<Shared>();
-    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("board.html".into()))
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("windows/board/board.html".into()))
         .title(window_title(&board.name))
         .inner_size(board.width, board.height)
         .min_inner_size(BOARD_MIN_W, BOARD_MIN_H)

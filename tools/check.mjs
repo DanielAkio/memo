@@ -107,7 +107,7 @@ if (!failures) pass(`Tauri events (${rustEvents.size} events matched between JS 
 
 // --------------------------------------------------------------------- 4. i18n
 
-const i18nSrc = read('src/i18n.js');
+const i18nSrc = read('src/lib/i18n.js');
 // Expose internal STRINGS, PLACEHOLDERS, HELP for inspection alongside MemoI18n
 const i18nInspection = i18nSrc.replace(
   'return { t, set, apply,',
@@ -118,7 +118,7 @@ const sandbox = {
   navigator: { platform: 'Win32', language: 'pt-BR' },
   document: { documentElement: { lang: 'pt-BR' }, querySelectorAll: () => [] },
 };
-vm.runInNewContext(i18nInspection, sandbox, { filename: 'src/i18n.js' });
+vm.runInNewContext(i18nInspection, sandbox, { filename: 'src/lib/i18n.js' });
 const { STRINGS, PLACEHOLDERS, HELP } = sandbox.window.__I18N_RAW__;
 
 const ptKeys = new Set(Object.keys(STRINGS.pt));
@@ -156,7 +156,7 @@ if (!Array.isArray(PLACEHOLDERS.pt) || !Array.isArray(PLACEHOLDERS.en) || PLACEH
 if (HELP.pt.length !== HELP.en.length) {
   fail(`HELP section count mismatch: pt=${HELP.pt.length} vs en=${HELP.en.length}`);
 } else {
-  const mgrSrc = read('src/manager.js');
+  const mgrSrc = read('src/windows/manager/manager.js');
   const demoIconsBlock = mgrSrc.match(/const DEMO_ICONS = \{([\s\S]*?)\};/);
   const demoIcons = new Set(
     demoIconsBlock ? [...demoIconsBlock[1].matchAll(/(?:'([^']+)'|(\b[a-z]+))\s*:/g)].map((m) => m[1] || m[2]) : []
@@ -199,7 +199,7 @@ for (const rel of SRC_JS) {
 }
 // Every key is used: quoted, or as an attribute value (data-i18n-attr
 // "title=key"), in a page or script, or in the Help data after STRINGS.
-const usage = [...SRC_JS.filter((f) => f !== 'src/i18n.js'), ...SRC_HTML].map(read).join('\n')
+const usage = [...SRC_JS.filter((f) => f !== 'src/lib/i18n.js'), ...SRC_HTML].map(read).join('\n')
   + i18nSrc.slice(i18nSrc.indexOf('const PLACEHOLDERS'));
 for (const k of ptKeys) {
   if (k === 'lavender') continue; // legacy colour: valid in stored notes, not offered
@@ -216,21 +216,21 @@ if (!colorsMatch) {
   fail('could not find COLORS in src-tauri/src/store.rs');
 } else {
   const storeColors = [...colorsMatch[1].matchAll(/"([^"]*)"/g)].map((m) => m[1]);
-  const baseCss = read('src/base.css');
+  const baseCss = read('src/styles/base.css');
 
   for (const c of storeColors) {
     if (!c) continue;
-    if (!baseCss.includes(`[data-color="${c}"]`)) fail(`src/base.css is missing [data-color="${c}"]`);
-    if (!baseCss.includes(`.swatch[data-color="${c}"]`)) fail(`src/base.css is missing .swatch[data-color="${c}"]`);
+    if (!baseCss.includes(`[data-color="${c}"]`)) fail(`src/styles/base.css is missing [data-color="${c}"]`);
+    if (!baseCss.includes(`.swatch[data-color="${c}"]`)) fail(`src/styles/base.css is missing .swatch[data-color="${c}"]`);
   }
 
   // Primary swatch bars in index.html (#swatches), group.html (#swatches), manager.html (#mgrSwatches)
   const expectedSwatches = storeColors.filter((c) => c !== 'lavender' && c !== '').concat(['', 'custom']);
   for (const [rel, id] of [
-    ['src/index.html', 'swatches'],
-    ['src/group.html', 'swatches'],
-    ['src/board.html', 'swatches'],
-    ['src/manager.html', 'mgrSwatches'],
+    ['src/windows/note/index.html', 'swatches'],
+    ['src/windows/group/group.html', 'swatches'],
+    ['src/windows/board/board.html', 'swatches'],
+    ['src/windows/manager/manager.html', 'mgrSwatches'],
   ]) {
     const html = read(rel);
     const block = html.match(new RegExp(`id="${id}"[^>]*>([\\s\\S]*?)<\\/div>`));
