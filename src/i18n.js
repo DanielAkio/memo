@@ -19,7 +19,8 @@ window.MemoI18n = (() => {
       newGroup: 'Novo grupo',
       addToGroup: 'Adicionar a um grupo',
       groupIs: 'Grupo: {name} (clique para mudar)',
-      boardIs: 'Quadro: {name} (clique para abrir)',
+      inGroup: 'Grupo: {name}',
+      onBoard: 'Quadro: {name}',
       moveToGroup: 'Grupo da memória',
       groupName: 'Nome do grupo',
       groupColor: 'Cor do grupo',
@@ -257,7 +258,8 @@ window.MemoI18n = (() => {
       newGroup: 'New group',
       addToGroup: 'Add to a group',
       groupIs: 'Group: {name} (click to change)',
-      boardIs: 'Board: {name} (click to open)',
+      inGroup: 'Group: {name}',
+      onBoard: 'Board: {name}',
       moveToGroup: 'Memory group',
       groupName: 'Group name',
       groupColor: 'Group color',
@@ -609,11 +611,11 @@ window.MemoI18n = (() => {
           ['O que é', 'Uma barrinha que guarda várias memórias. O botão de seta solta todas elas para onde estavam; clicando de novo, elas são recolhidas para dentro do grupo.',
             '<span class="demo-bar"><i data-icon="pin"></i><i data-icon="folder"></i><span class="demo-name">Trabalho</span>'
             + '<i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Criar', 'Botão de pasta com + na barra do Gerenciador, ou "Novo grupo" no menu … (ou clique direito) de qualquer barra, ou no rodapé de uma memória (onde aparece "Sem grupo"): ele começa sem nome, como uma memória nova. Também pela caixa de grupo nos cartões do Gerenciador.'],
+          ['Criar', 'Botão de pasta com + na barra do Gerenciador, ou "Novo grupo" no menu … (ou clique direito) de qualquer barra, ou no rodapé de uma memória (onde aparece "Sem grupo"): ele começa sem nome, como uma memória nova.'],
           ['Nova memória no grupo', 'O botão + da barra (ou {{Mod+N}} com o grupo em foco) cria uma memória já dentro do grupo, ao lado dele.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint"></i>'
             + '<span class="demo-name">Trabalho</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Adicionar memórias', 'Arraste uma memória e solte sobre o grupo, ou escolha o grupo no rodapé da memória ou no Gerenciador. O nome do grupo aparece no rodapé.',
+          ['Adicionar memórias', 'Arraste uma memória e solte sobre o grupo, ou escolha o grupo no rodapé da memória. O nome do grupo aparece no rodapé e no cartão da memória no Gerenciador.',
             '<span class="demo-foot"><i data-icon="folder"></i>Trabalho</span><span class="demo-foot-meta">12 palavras</span>'],
           ['Renomear', 'Clique duplo na barra do grupo; {{Enter}} ou clicar fora salva, {{Esc}} cancela.'],
           ['Trazer para a frente', 'Com as memórias soltas, um clique na barra do grupo traz todas elas para a frente junto com ela, inclusive as fechadas com ✕.'],
@@ -623,7 +625,7 @@ window.MemoI18n = (() => {
           ['Fixar', 'A tachinha do grupo o mantém por cima de tudo, como numa memória ({{Mod+Shift+P}}).',
             '<span class="demo-bar"><i data-icon="pin-on"></i><i data-icon="folder"></i><span class="demo-name">Trabalho</span>'
             + '<i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Tirar do grupo', 'No rodapé da memória ou no Gerenciador, escolha "Sem grupo".'],
+          ['Tirar do grupo', 'No rodapé da memória, escolha "Sem grupo".'],
           ['Fechar e lixeira', 'O ✕ do grupo fecha a barra e as memórias dele; no Gerenciador, em Grupos, clique nele para reabrir. Um grupo fechado sem nenhuma alteração (nome, cor ou memórias) é excluído. O botão de lixeira do cartão manda o grupo e as memórias para a lixeira; em Grupos → Lixeira, restaure (volta com as memórias) ou exclua de vez.',
             '<span class="demo-bar" data-color="sky"><i data-icon="pin"></i><i data-icon="folder"></i>'
             + '<span class="demo-name">Trabalho</span><i data-icon="more"></i><i data-icon="close" class="demo-hot"></i></span>'],
@@ -634,7 +636,7 @@ window.MemoI18n = (() => {
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
           ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema, idioma e a visualização do Gerenciador, ligar ou desligar o ímã das janelas, o início com o sistema e o controle por IA, sincronizar agora, procurar atualizações e sair.'],
-          ['Aba Memórias', 'Cada memória é um cartão com a cor, o título e o começo do texto. Clique num cartão para abrir a memória (as fechadas aparecem esmaecidas); no rodapé ficam a data da última edição, os quadros em que ela está (clique para abrir) e a caixa de grupo; o X no canto superior direito a manda para a lixeira.',
+          ['Aba Memórias', 'Cada memória é um cartão com a cor, o título e o começo do texto. Clique num cartão para abrir a memória (as fechadas aparecem esmaecidas); no rodapé ficam a data da última edição e o grupo e os quadros em que ela está; o X no canto superior direito a manda para a lixeira.',
             '<span class="demo-card"><span class="demo-card-head"><span class="demo-dot" data-color="yellow"></span><span class="demo-name">Compras</span><i data-icon="trash" class="demo-x"></i></span>'
             + '<span class="demo-card-text">Café<br>Pão</span><span class="demo-card-foot"><span class="demo-meta">14:32</span><i data-icon="board"></i><i data-icon="folder"></i></span></span>'],
           ['Aba Grupos', 'Mostra os grupos em cartões, como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele (e as memórias, se estiverem soltas) para a frente; os botões do cartão soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
@@ -743,11 +745,11 @@ window.MemoI18n = (() => {
           ['What it is', 'A small bar that holds several memories. Its arrow button takes them all out where they were; click it again to put them back in.',
             '<span class="demo-bar"><i data-icon="pin"></i><i data-icon="folder"></i><span class="demo-name">Work</span>'
             + '<i data-icon="toggle" class="demo-hot"></i><i data-icon="plus"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Create', 'The folder-with-+ button in the Manager’s bar, "New group" in the … menu (or right click) of any bar, or in a memory’s footer (where it says "No group"): it starts unnamed, like a new memory. Also from the group box on the Manager’s cards.'],
+          ['Create', 'The folder-with-+ button in the Manager’s bar, "New group" in the … menu (or right click) of any bar, or in a memory’s footer (where it says "No group"): it starts unnamed, like a new memory.'],
           ['New memory in the group', 'The bar’s + button (or {{Mod+N}} with the group focused) creates a memory already in the group, next to it.',
             '<span class="demo-bar demo-grouped" data-color="coral"><i data-icon="pin"></i><i data-icon="folder" class="demo-tint"></i>'
             + '<span class="demo-name">Work</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Add memories', 'Drag a memory and drop it on the group, or pick the group in the memory’s footer or in the Manager. The group’s name shows in the footer.',
+          ['Add memories', 'Drag a memory and drop it on the group, or pick the group in the memory’s footer. The group’s name shows in the footer and on the memory’s card in the Manager.',
             '<span class="demo-foot"><i data-icon="folder"></i>Work</span><span class="demo-foot-meta">12 words</span>'],
           ['Rename', 'Double-click the group’s bar; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.'],
           ['Bring to front', 'With its memories out, a click on the group’s bar brings all of them to the front with it, including those closed with ✕.'],
@@ -757,7 +759,7 @@ window.MemoI18n = (() => {
           ['Pin', 'The group’s pin keeps it on top of everything, like a memory’s ({{Mod+Shift+P}}).',
             '<span class="demo-bar"><i data-icon="pin-on"></i><i data-icon="folder"></i><span class="demo-name">Work</span>'
             + '<i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Remove from group', 'In the memory’s footer or in the Manager, choose "No group".'],
+          ['Remove from group', 'In the memory’s footer, choose "No group".'],
           ['Close and trash', 'The group’s ✕ closes its bar and its memories; in the Manager, under Groups, click it to reopen it. A group closed without any change (name, colour or memories) is deleted. The card’s trash button sends the group and its memories to the trash; under Groups → Trash, restore it (it comes back with its memories) or delete it for good.',
             '<span class="demo-bar" data-color="sky"><i data-icon="pin"></i><i data-icon="folder"></i>'
             + '<span class="demo-name">Work</span><i data-icon="more"></i><i data-icon="close" class="demo-hot"></i></span>'],
@@ -768,7 +770,7 @@ window.MemoI18n = (() => {
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
           ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme, language and the Manager’s layout, turn the window magnet, starting with the system and AI control on or off, sync now, check for updates and quit.'],
-          ['Memories tab', 'Each memory is a card with its colour, title and the start of its text. Click a card to open the memory (closed ones look dimmed); its footer has the last edit date, the boards it is on (click to open one) and the group box; the X in the upper right corner sends it to the trash.',
+          ['Memories tab', 'Each memory is a card with its colour, title and the start of its text. Click a card to open the memory (closed ones look dimmed); its footer has the last edit date and the group and boards it is on; the X in the upper right corner sends it to the trash.',
             '<span class="demo-card"><span class="demo-card-head"><span class="demo-dot" data-color="yellow"></span><span class="demo-name">Groceries</span><i data-icon="trash" class="demo-x"></i></span>'
             + '<span class="demo-card-text">Coffee<br>Bread</span><span class="demo-card-foot"><span class="demo-meta">14:32</span><i data-icon="board"></i><i data-icon="folder"></i></span></span>'],
           ['Groups tab', 'Shows the groups as cards, like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar (and its memories, if they are out) to the front; the card’s buttons take its memories out / put them away and move the group to the trash.'],

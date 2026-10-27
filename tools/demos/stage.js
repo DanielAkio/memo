@@ -77,7 +77,6 @@
       case 'get_note_group': return n ? n.groupId : '';
       case 'get_board_group': return b ? (b.groupId || '') : '';
       case 'set_board_group': if (b) { b.groupId = a.groupId; M.emit('groups-changed'); M.emit('boards-changed'); } return null;
-      case 'move_board_to_group': if (M.boards[a.id]) { M.boards[a.id].groupId = a.groupId; M.emit('groups-changed'); M.emit('boards-changed'); } return null;
       case 'list_groups': return Object.values(M.groups).map(copy);
       case 'list_boards': return Object.values(M.boards).map(copy);
       case 'load_board': return b ? copy(b) : null;
@@ -156,7 +155,6 @@
       case 'get_updates': return [true, { checking: false, available: null, progress: null, upToDate: false, error: null }];
       case 'get_ai_control': return [false, 'memo'];
       case 'get_ai_clients': return [];
-      case 'move_note_to_group': M.notes[a.id].groupId = a.groupId; M.emit('groups-changed'); M.emit('notes-changed'); return null;
       case 'move_to_trash': M.notes[a.id].trashedAt = Date.now(); M.closeWin(`note-${a.id}`); M.emit('notes-changed'); return null;
       case 'restore_note': M.notes[a.id].trashedAt = null; M.notes[a.id].hidden = true; M.emit('notes-changed'); return null;
       case 'delete_forever': delete M.notes[a.id]; M.emit('notes-changed'); return null;

@@ -316,7 +316,6 @@ fn main() {
             list_groups,
             get_note_group,
             set_note_group,
-            move_note_to_group,
             load_group,
             rename_group,
             focus_group,
@@ -369,7 +368,6 @@ fn main() {
             update_board_drop_zones,
             get_board_group,
             set_board_group,
-            move_board_to_group
         ])
         .setup(|app| {
             let default_dir = default_data_dir(app.handle())?;

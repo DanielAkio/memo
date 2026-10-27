@@ -255,41 +255,24 @@
   // The boards a memory is on (in one of their columns).
   const boardsOf = (note) => boards.filter((b) => (b.columns || []).some((c) => (c.noteIds || []).includes(note.id)));
 
-  // A board holding the memory, in its actions like the group box: the
-  // board icon in its colour and its name; a click opens the board.
-  function boardChip(board) {
-    const name = board.name || t('untitled');
-    const chip = el('button', 'card-board');
-    chip.type = 'button';
-    chip.dataset.board = board.id;
-    chip.title = t('boardIs', { name });
-    chip.setAttribute('aria-label', chip.title);
-    const mark = icon(BOARD_ICON);
-    MemoColor.paint(mark, board.color);
-    chip.append(mark, el('span', '', name));
-    return chip;
+  // A pill in a card's footer that only shows where the item is: the
+  // group's folder or the board's icon in its colour, and its name. Groups
+  // and boards are changed from the windows (footer pickers, dragging), not
+  // here.
+  function pill(path, item, key) {
+    const name = item.name || t('untitled');
+    const p = el('span', 'card-pill');
+    p.title = t(key, { name });
+    const mark = icon(path);
+    MemoColor.paint(mark, item.color);
+    p.append(mark, el('span', '', name));
+    return p;
   }
-
-  // Group of a memory, changed right in the list: no group, a group or a new
-  // one. Rust moves it (move_note_to_group) and emits "groups-changed".
-  function groupSelect(note) {
-    const select = el('select', 'card-group');
-    select.title = t('moveToGroup');
-    select.setAttribute('aria-label', t('moveToGroup'));
-    const sorted = groups.slice()
-      .sort((a, b) => a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true }));
-    select.append(
-      new Option(t('noGroup'), ''),
-      ...sorted.map((g) => new Option(g.name || t('untitled'), g.id)),
-      new Option(`${t('newGroup')}…`, 'new'),
-    );
-    select.value = note.groupId || '';
-    select.addEventListener('change', () => {
-      invoke('move_note_to_group', { id: note.id, groupId: select.value })
-        .catch((err) => console.error('move_note_to_group', err));
-    });
-    return select;
-  }
+  const groupPill = (groupId) => {
+    const group = groups.find((g) => g.id === groupId);
+    return group ? [pill(FOLDER_ICON, group, 'inGroup')] : [];
+  };
+  const boardPill = (board) => pill(BOARD_ICON, board, 'onBoard');
 
   // -------------------------------------------------------- groups tab
   // Groups shown like memories: same search, same sort box, a card per group
@@ -373,25 +356,6 @@
       purgeLabel(group.trashedAt), actions);
   }
 
-  function boardGroupSelect(board) {
-    const select = el('select', 'card-group');
-    select.title = t('moveToGroup');
-    select.setAttribute('aria-label', t('moveToGroup'));
-    const sorted = groups.slice()
-      .sort((a, b) => a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true }));
-    select.append(
-      new Option(t('noGroup'), ''),
-      ...sorted.map((g) => new Option(g.name || t('untitled'), g.id)),
-      new Option(`${t('newGroup')}…`, 'new'),
-    );
-    select.value = board.groupId || '';
-    select.addEventListener('change', () => {
-      invoke('move_board_to_group', { id: board.id, groupId: select.value })
-        .catch((err) => console.error('move_board_to_group', err));
-    });
-    return select;
-  }
-
   function boardCard(board) {
     const title = board.name ? board.name : t('untitled');
     const named = Boolean(board.name);
@@ -410,7 +374,7 @@
     });
 
     const actions = el('div', 'card-actions');
-    actions.append(boardGroupSelect(board), del);
+    actions.append(...groupPill(board.groupId), del);
 
     const item = card(boardIcon(board), title, named, preview, editedLabel(board.updatedAt), actions);
     item.classList.add('board-card');
@@ -472,15 +436,9 @@
     trashBtn.setAttribute('aria-label', t('moveToTrash'));
     trashBtn.append(icon(TRASH_ICON));
     const actions = el('div', 'card-actions');
-    // Always visible: the boards it is on (if any), the group select (which
-    // shows the group's name), preceded by the group's folder icon in its
-    // colour (grey without a group, as in the note's footer); the trash X
-    // goes to the card's corner (card()).
-    const group = groups.find((g) => g.id === note.groupId);
-    const folder = icon(FOLDER_ICON);
-    folder.classList.add('card-folder');
-    MemoColor.paint(folder, group ? group.color : '');
-    actions.append(...boardsOf(note).map(boardChip), folder, groupSelect(note), trashBtn);
+    // The group and the boards it is on, as pills (only those it has); the
+    // trash X goes to the card's corner (card()).
+    actions.append(...groupPill(note.groupId), ...boardsOf(note).map(boardPill), trashBtn);
     const item = noteBase(note, editedLabel(note.updatedAt), actions);
     // Closed with ✕: dimmed, a click reopens it.
     item.classList.toggle('is-closed', Boolean(note.hidden));
@@ -820,12 +778,7 @@
       if (!inTrash()) invoke('open_board', { id: item.dataset.bid }).catch((err) => console.error(err));
       return;
     }
-    if (!item || e.target.closest('select')) return;
-    const chip = e.target.closest('[data-board]');
-    if (chip) {
-      invoke('open_board', { id: chip.dataset.board }).catch((err) => console.error('open_board', err));
-      return;
-    }
+    if (!item) return;
     const btn = e.target.closest('[data-act]');
     if (btn) act(btn.dataset.act, item.dataset.id);
     else if (!inTrash()) act('open', item.dataset.id);
@@ -845,7 +798,7 @@
   });
   list.addEventListener('auxclick', (e) => {
     const item = e.target.closest('.card');
-    if (e.button !== 1 || !item || e.target.closest('select, [data-board]')) return;
+    if (e.button !== 1 || !item) return;
     e.preventDefault();
     if (item.dataset.gid) {
       const command = inTrash() ? 'delete_group_forever' : 'trash_group_id';

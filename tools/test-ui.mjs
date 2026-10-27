@@ -698,45 +698,49 @@ try {
   });
 
   // ------------------------------------------------ 7b. Manager shows a memory's boards
-  await step('Manager: a memory card shows the boards it is on (name, colour, search, click opens)', async () => {
+  await step('Manager: a memory card shows its group and boards as pills (name, colour, search, no picker)', async () => {
     const res = await page.evaluate(async () => {
       const M = window.Memo;
-      M.addNote({ id: 'chip-note', title: 'Chip test', text: 'Chip test' });
+      M.addGroup({ id: 'chip-group', name: 'Chip group', color: 'teal' });
+      M.addNote({ id: 'chip-note', title: 'Chip test', text: 'Chip test', groupId: 'chip-group' });
       M.addBoard({ id: 'chip-board', name: 'Chip board', color: 'coral' });
       M.boards['chip-board'].columns[0].noteIds.push('chip-note');
       M.closeWin('manager');
       await M.openManager();
       const doc = M.frameDoc('manager');
       const card = doc.querySelector('#list .card[data-id="chip-note"]');
-      const chip = card && card.querySelector('.card-board');
+      const pills = card ? [...card.querySelectorAll('.card-pill')] : [];
+      const chip = pills.find((p) => p.textContent === 'Chip board');
+      const groupChip = pills.find((p) => p.textContent === 'Chip group');
       const search = doc.getElementById('search');
       search.value = 'chip board';
       search.dispatchEvent(new Event('input'));
       const found = [...doc.querySelectorAll('#list .card')].map((c) => c.dataset.id);
       search.value = '';
       search.dispatchEvent(new Event('input'));
-      doc.querySelector('#list .card[data-id="chip-note"] .card-board').click();
-      await new Promise((r) => setTimeout(r, 300));
       const out = {
         name: chip && chip.textContent,
         color: chip && chip.querySelector('svg').dataset.color,
+        groupColor: groupChip && groupChip.querySelector('svg').dataset.color,
+        pickers: doc.querySelectorAll('#list select, #list .card-pill button').length,
         found,
-        boardOpened: Boolean(M.frameDoc('board-chip-board')),
         // A chip exactly on the memories that some board holds.
         chipMismatches: [...doc.querySelectorAll('#list .card')].filter((c) => {
           const onBoard = Object.values(M.boards).some((b) => !b.trashedAt
             && b.columns.some((col) => col.noteIds.includes(c.dataset.id)));
-          return onBoard !== Boolean(c.querySelector('.card-board'));
+          const pillCount = c.querySelectorAll('.card-pill').length;
+          const expected = (onBoard ? 1 : 0) + (M.notes[c.dataset.id] && M.notes[c.dataset.id].groupId ? 1 : 0);
+          return c.dataset.id && pillCount < expected;
         }).length,
       };
-      M.closeWin('board-chip-board');
       return out;
     });
     assert.equal(res.name, 'Chip board', 'The memory card should show the board name');
     assert.equal(res.color, 'coral', 'The board icon should take the board colour');
     assert.deepEqual(res.found, ['chip-note'], 'Searching a board name should find its memories');
-    assert.equal(res.boardOpened, true, 'Clicking the board chip should open the board');
-    assert.equal(res.chipMismatches, 0, 'Only memories on a board should show a board chip');
+    assert.equal(res.groupColor, 'teal', 'The group pill should show the group colour');
+    assert.equal(res.pickers, 0, 'The manager list should not offer a group picker');
+    assert.equal(res.chipMismatches, 0, 'Every memory on a board or in a group should show its pills');
   });
 
   // ------------------------------------------------ 8. Web vs Landing page storage isolation

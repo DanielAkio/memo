@@ -3177,9 +3177,6 @@
       case 'set_board_group':
         if (b) assignBoardGroup(b.id, args.groupId, label);
         return null;
-      case 'move_board_to_group':
-        assignBoardGroup(args.id, args.groupId, 'manager');
-        return null;
       case 'save_board_columns': {
         updateBoard(id, (x) => { x.columns = args.columns; });
         notifyBoards();
@@ -3394,9 +3391,6 @@
         notifyNotes();
         return null;
       }
-      case 'move_note_to_group':
-        assignNoteGroup(args.id, args.groupId, 'manager');
-        return null;
       case 'move_to_trash':
         trashNoteById(args.id);
         return null;

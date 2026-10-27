@@ -346,12 +346,6 @@ pub(crate) async fn set_note_group(app: AppHandle, window: WebviewWindow, group_
     assign_group(&app, &id_of(&window), &group_id, &window);
 }
 
-/// Manager list: moves note `id` to `group_id` ("" = none, "new").
-#[tauri::command]
-pub(crate) async fn move_note_to_group(app: AppHandle, window: WebviewWindow, id: String, group_id: String) {
-    assign_group(&app, &id, &group_id, &window);
-}
-
 /// The calling board's group id ("" = none).
 #[tauri::command]
 pub(crate) fn get_board_group(window: WebviewWindow, store: State<'_, Shared>) -> String {
@@ -365,12 +359,6 @@ pub(crate) fn get_board_group(window: WebviewWindow, store: State<'_, Shared>) -
 #[tauri::command]
 pub(crate) async fn set_board_group(app: AppHandle, window: WebviewWindow, group_id: String) {
     let id = board_id_of(&window);
-    assign_board_group(&app, &id, &group_id, &window);
-}
-
-/// Manager list: moves board `id` to `group_id` ("" = none, "new").
-#[tauri::command]
-pub(crate) async fn move_board_to_group(app: AppHandle, window: WebviewWindow, id: String, group_id: String) {
     assign_board_group(&app, &id, &group_id, &window);
 }
 
