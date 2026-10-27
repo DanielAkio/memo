@@ -1496,11 +1496,14 @@
     return group;
   }
 
+  // As trash() on the desktop: a note nobody touched and a welcome copy are
+  // deleted outright; anything else (even blank, in a group or on a board)
+  // goes to the trash.
   function trashNoteById(id) {
     const n = findNote(id);
     if (!n) return;
     closeWindow(`note-${id}`);
-    if (n.welcomeCopy || isPristineNote(n) || (!n.title.trim() && !n.text.trim())) {
+    if (n.welcomeCopy || isPristineNote(n)) {
       data.notes = data.notes.filter((x) => x.id !== id);
       markDirty(false);
     } else {

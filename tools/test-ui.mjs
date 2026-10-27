@@ -1021,8 +1021,12 @@ try {
         const kept = (await inv('manager', 'list_notes')).some((n) => n.id === id && !n.trashedAt);
         const stillOnBoard = (await inv('manager', 'list_boards')).find((x) => x.id === brd.id)
           .columns.find((c) => c.id === colId).noteIds.includes(id);
-        return { id: Boolean(id), kept, stillOnBoard };
+        // Trashing it sends it to the trash (as on the desktop), not away.
+        await inv('manager', 'move_to_trash', { id });
+        const trashed = (await inv('manager', 'list_notes')).some((n) => n.id === id && n.trashedAt);
+        return { id: Boolean(id), kept, stillOnBoard, trashed };
       });
+      assert.equal(emptyKeptOnBoard.trashed, true, 'An empty memory on a board goes to the trash, not away');
       assert.equal(emptyKeptOnBoard.id, true, 'A new empty memory should be created');
       assert.equal(emptyKeptOnBoard.kept, true, 'An empty memory on a board must not be deleted when it closes');
       assert.equal(emptyKeptOnBoard.stillOnBoard, true, 'An empty memory on a board stays in its column');
