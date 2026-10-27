@@ -16,6 +16,13 @@ window.MemoColor = {
     else el.style.removeProperty('--note-color');
   },
 
+  // A label's name as its swatch shows it ("mono" follows the theme); a
+  // legacy label with no swatch (lavender) by its translated name.
+  name(color) {
+    const sw = document.querySelector(`.swatch[data-color="${color || ''}"]`);
+    return (sw && sw.getAttribute('aria-label')) || window.MemoI18n.t(color || 'noColor');
+  },
+
   // Marks `color` among the .swatch buttons in `root` (a custom one tints
   // the "custom" swatch).
   mark(root, color) {

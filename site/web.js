@@ -643,11 +643,19 @@
     return data.groups.filter((g) => !g.trashedAt);
   }
 
+  // Ids of the groups whose members stay off screen: put away or closed
+  // (Store::closed_groups).
+  const closedGroups = () => new Set(activeGroups().filter((g) => !g.open || g.hidden).map((g) => g.id));
+
+  // On screen at startup: not closed with ✕ and not inside a closed group
+  // (Store::visible / visible_boards).
   function visibleNotes() {
-    const closedOrHiddenGroups = new Set(
-      activeGroups().filter((g) => !g.open || g.hidden).map((g) => g.id),
-    );
-    return activeNotes().filter((n) => !n.hidden && (!n.groupId || !closedOrHiddenGroups.has(n.groupId)));
+    const closed = closedGroups();
+    return activeNotes().filter((n) => !n.hidden && (!n.groupId || !closed.has(n.groupId)));
+  }
+  function visibleBoards() {
+    const closed = closedGroups();
+    return activeBoards().filter((b) => !b.hidden && (!b.groupId || !closed.has(b.groupId)));
   }
 
   function isFirstRun() {
@@ -4192,7 +4200,7 @@
       for (const g of activeGroups().filter((x) => !x.hidden)) {
         await openGroupWindow(g);
       }
-      for (const brd of activeBoards().filter((x) => !x.hidden)) {
+      for (const brd of visibleBoards()) {
         await openBoardWindow(brd);
       }
     }

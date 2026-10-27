@@ -743,6 +743,30 @@ try {
     assert.equal(res.chipMismatches, 0, 'Every memory on a board or in a group should show its pills');
   });
 
+  // ------------------------------------------------ 7c. Legacy colour, board card counts
+  await step('Legacy lavender memory renders; board cards count columns and memories', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      M.addNote({ id: 'lavender-note', title: 'Old', text: 'Old', color: 'lavender', x: 20, y: 20 });
+      await M.openNote('lavender-note');
+      const colorTitle = M.frameDoc('note-lavender-note').getElementById('colorBtn').title;
+      M.closeWin('note-lavender-note');
+      M.addBoard({ id: 'count-board', name: 'Count board' });
+      M.boards['count-board'].columns[0].noteIds.push('lavender-note');
+      M.closeWin('manager');
+      await M.openManager();
+      const doc = M.frameDoc('manager');
+      doc.getElementById('tabBoards').click();
+      await new Promise((r) => setTimeout(r, 100));
+      const card = doc.querySelector('#list .card[data-bid="count-board"]');
+      const preview = card && card.querySelector('.card-preview').textContent;
+      doc.getElementById('tabNotes').click();
+      return { colorTitle, preview };
+    });
+    assert.equal(res.colorTitle, 'Cor: Lavanda', 'A legacy lavender memory names its colour (no swatch for it)');
+    assert.equal(res.preview, '3 colunas · 1 memória', 'Board cards count columns and memories in words');
+  });
+
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
   await step('Web vs Landing page: landing page is ephemeral, web version persists data', async () => {
     const sitePage = await browser.newPage();

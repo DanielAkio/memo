@@ -121,18 +121,21 @@ pub(crate) fn move_data_dir(app: &AppHandle, window: &WebviewWindow, dir: PathBu
     Ok(true)
 }
 
-/// After switching to another notes file: closes the note windows, opens the
-/// active notes of the new file and applies its theme and language. The
-/// manager reloads itself on "store-replaced".
+/// After switching to another notes file: closes the note, group and board
+/// windows, opens those of the new file (as at startup) and applies its theme
+/// and language. The manager reloads itself on "store-replaced".
 pub(crate) fn reload_windows(app: &AppHandle) {
     for window in app.webview_windows().into_values() {
-        if is_note(&window) || is_group(&window) {
+        if is_note(&window) || is_group(&window) || is_board(&window) {
             let _ = window.destroy();
         }
     }
     let store = app.state::<Shared>();
     for group in store.active_groups().iter().filter(|g| !g.hidden) {
         let _ = open_group_window(app, group);
+    }
+    for board in store.visible_boards() {
+        let _ = open_board_window(app, &board);
     }
     for note in store.visible() {
         let _ = open_note_window(app, &note);

@@ -361,7 +361,8 @@
     const named = Boolean(board.name);
     const colCount = (board.columns || []).length;
     const memoryCount = (board.columns || []).reduce((acc, col) => acc + (col.noteIds || []).length, 0);
-    const preview = `${colCount} ${t('columnName').toLowerCase()}s · ${memoryCount} ${t('tabNotes').toLowerCase()}`;
+    const count = (n, one, many) => t(n === 1 ? one : many, { n });
+    const preview = `${count(colCount, 'columnCountOne', 'columnCountMany')} · ${count(memoryCount, 'groupCountOne', 'groupCountMany')}`;
 
     const del = el('button', 'icon-btn trash card-x');
     del.type = 'button';

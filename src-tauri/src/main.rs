@@ -411,8 +411,7 @@ fn main() {
             for group in store.active_groups().iter().filter(|g| !g.hidden) {
                 open_group_window(&handle, group)?;
             }
-            let closed_groups: std::collections::HashSet<String> = store.active_groups().into_iter().filter(|g| !g.open).map(|g| g.id).collect();
-            for board in store.active_boards().iter().filter(|b| !b.hidden && !closed_groups.contains(&b.group_id)) {
+            for board in &store.visible_boards() {
                 let _ = open_board_window(&handle, board);
             }
             if store.is_first_run() {

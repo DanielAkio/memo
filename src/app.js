@@ -33,8 +33,6 @@
 
   // ------------------------------------------------------------ helpers
 
-  const colorName = (color) => document.querySelector(`.swatch[data-color="${color}"]`).getAttribute('aria-label');
-
   // The plain-text format (lists, code, tables): components/text.js.
   const { esc, plain, LIST_RE, MAX_LEVEL, TABLE_ROW_RE, TABLE_SEP_RE, rowCells } = MemoText;
   // In the plain text (toPlain) an image is "[imagem]" / "[image]", in the
@@ -56,7 +54,7 @@
     bar.renderPin(note.pinned);
     colorBtn.title = MemoColor.isCustom(note.color)
       ? t('colorCustomIs', { hex: note.color })
-      : t('colorIs', { name: colorName(note.color || '') });
+      : t('colorIs', { name: MemoColor.name(note.color) });
     renderMeta();
   }
 

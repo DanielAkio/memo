@@ -951,18 +951,31 @@ impl Store {
             .collect()
     }
 
-    /// Active notes that are on screen: not closed with ✕ and not inside a
-    /// group that is put away or closed.
-    pub fn visible(&self) -> Vec<Note> {
-        let closed: HashSet<String> = self
-            .active_groups()
+    /// Ids of the groups whose members stay off screen: put away or closed.
+    fn closed_groups(&self) -> HashSet<String> {
+        self.active_groups()
             .into_iter()
             .filter(|g| !g.open || g.hidden)
             .map(|g| g.id)
-            .collect();
+            .collect()
+    }
+
+    /// Active notes that are on screen: not closed with ✕ and not inside a
+    /// group that is put away or closed.
+    pub fn visible(&self) -> Vec<Note> {
+        let closed = self.closed_groups();
         self.active()
             .into_iter()
             .filter(|n| !n.hidden && !closed.contains(&n.group_id))
+            .collect()
+    }
+
+    /// Active boards that are on screen, by the same rule as `visible()`.
+    pub fn visible_boards(&self) -> Vec<Board> {
+        let closed = self.closed_groups();
+        self.active_boards()
+            .into_iter()
+            .filter(|b| !b.hidden && !closed.contains(&b.group_id))
             .collect()
     }
 
@@ -1776,6 +1789,27 @@ mod tests {
         store.update_board(&board.id, |b| b.columns[0].note_ids.push(note.id.clone()));
         assert!(store.on_board(&note.id));
         assert!(!store.is_pristine(&note));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn visible_boards_follow_their_group_like_notes() {
+        let dir = temp_dir("board-visible");
+        let store = Store::load(dir.join("notes.json"));
+        let board = store.create_board(None, vec!["To Do".into()], None);
+        assert_eq!(store.visible_boards().len(), 1);
+        let group = store.create_group(None);
+        store.update_board(&board.id, |b| b.group_id = group.id.clone());
+        assert_eq!(store.visible_boards().len(), 1);
+        // A group closed with ✕ or put away keeps its boards off screen, as
+        // it does its notes.
+        store.update_group(&group.id, |g| g.hidden = true);
+        assert!(store.visible_boards().is_empty());
+        store.update_group(&group.id, |g| { g.hidden = false; g.open = false; });
+        assert!(store.visible_boards().is_empty());
+        store.update_board(&board.id, |b| b.hidden = true);
+        store.update_group(&group.id, |g| g.open = true);
+        assert!(store.visible_boards().is_empty());
         let _ = fs::remove_dir_all(&dir);
     }
 
