@@ -778,7 +778,7 @@ try {
   });
 
   // ------------------------------------------------ 7d. Board: add a column at either end, "+" adds a memory
-  await step('Board: "add column" sits at both ends; the titlebar "+" adds a memory to the first column', async () => {
+  await step('Board: "add column" sits at both ends; the titlebar "+" opens a new memory off the board', async () => {
     const res = await page.evaluate(async () => {
       const M = window.Memo;
       M.addBoard({ id: 'edge-board', name: 'Edges' });
@@ -798,7 +798,7 @@ try {
       await new Promise((r) => setTimeout(r, 300));
       const added = Object.keys(M.notes).filter((id) => !before.includes(id));
       out.added = added.length;
-      out.inFirst = M.boards['edge-board'].columns[0].noteIds.includes(added[0]);
+      out.onBoard = M.boards['edge-board'].columns.some((c) => c.noteIds.includes(added[0]));
       out.opened = Boolean(added[0] && M.wins[`note-${added[0]}`]);
       if (added[0]) M.closeWin(`note-${added[0]}`);
       M.closeWin('board-edge-board');
@@ -809,7 +809,7 @@ try {
       'Clicking adds a column at that side');
     assert.equal(res.editing, true, 'The new column opens its name for editing');
     assert.equal(res.added, 1, 'The "+" creates one memory');
-    assert.equal(res.inFirst, true, 'The new memory goes in the first column');
+    assert.equal(res.onBoard, false, 'The new memory is not put on the board');
     assert.equal(res.opened, true, 'The new memory opens');
   });
 

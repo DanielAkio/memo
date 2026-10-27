@@ -202,8 +202,8 @@
     onOpen: () => groups.close(),
   });
 
-  // "+" and Mod+N: a new memory in the board's first column, as in a group.
-  const newNote = () => invoke('new_note_in_board').catch((err) => console.error('new_note_in_board', err));
+  // "+" and Mod+N: a new memory beside the board, not on it.
+  const newNote = () => invoke('new_note').catch((err) => console.error('new_note', err));
 
   // Titlebar (components/titlebar.js): pin, double-click renames, drag,
   // resize, middle click closes, and the right-click / "…" menu with the
@@ -232,7 +232,7 @@
       { label: t('rename'), run: () => bar.startRename() },
       { label: t('pin'), checked: !!(currentBoard && currentBoard.pinned), run: () => bar.togglePin() },
       { label: t('boardColor'), run: () => colors.open() },
-      { label: t('newNoteInBoard'), run: newNote },
+      { label: t('newNote'), run: newNote },
       { label: t('addColumn'), run: () => onAddColumn('right') },
       { label: t('groupMenuTitle'), run: () => groups.toggle() },
       { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error(err)) },
@@ -288,7 +288,7 @@
     const name = currentBoard.name || '';
     boardName.textContent = name || t('untitled');
     boardName.classList.toggle('is-empty', !name);
-    $('newBtn').title = `${t('newNoteInBoard')} (${I18n.keys('Mod', 'N')})`;
+    $('newBtn').title = `${t('newNote')} (${I18n.keys('Mod', 'N')})`;
   }
 
   // ------------------------------------------------------------- Board Data & Render

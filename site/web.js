@@ -1410,18 +1410,15 @@
     return openWindow(`board-${b.id}`, PAGES.board, { x: pos.x, y: pos.y, w, h, pinned: !!b.pinned, autofocus });
   }
 
-  // A new board's columns, in the app's language.
-  function defaultBoardColumns() {
-    return effectiveLanguage() === 'en'
-      ? ['To Do', 'In Progress', 'Done']
-      : ['A Fazer', 'Em Andamento', 'Concluído'];
-  }
-
   function createBoard(parentLabel = 'manager') {
     const z = data.zoom || 1;
     const pos = beside(parentLabel, Math.round(BOARD_DEFAULT_W * z), Math.round(BOARD_DEFAULT_H * z));
     const now = nowMs();
-    const columns = defaultBoardColumns().map((name) => ({
+    const lang = effectiveLanguage();
+    const defaultCols = lang === 'en'
+      ? ['To Do', 'In Progress', 'Done']
+      : ['A Fazer', 'Em Andamento', 'Concluído'];
+    const columns = defaultCols.map((name) => ({
       id: genId(),
       name,
       noteIds: [],
@@ -3298,16 +3295,6 @@
       case 'update_board_drop_zones': {
         const bid = (b && b.id) || (args && args.id) || idOf(label);
         boardDropZones[bid] = args.zones || [];
-        return null;
-      }
-      // Board "+": a new memory at the end of the first column, opened.
-      case 'new_note_in_board': {
-        if (!b) return null;
-        if (!b.columns.length) b.columns.push({ id: genId(), name: defaultBoardColumns()[0], noteIds: [] });
-        const note = createNote({ parentLabel: label });
-        b.columns[0].noteIds.push(note.id);
-        markDirty(true);
-        notifyBoards();
         return null;
       }
       case 'take_note_out_of_board': {
