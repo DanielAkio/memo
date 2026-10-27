@@ -165,6 +165,51 @@ try {
     assert.equal(trayAndUndo.openAfterClick, true, '#trayBtn should open #formatTray');
     assert.equal(trayAndUndo.closedAfterEsc, true, 'Escape should close #formatTray');
 
+    // The tray's button for what the caret's line already is takes it away
+    const trayToggle = await page.evaluate(async () => {
+      const doc = window.Memo.frameDoc('note-ed1');
+      const ed = doc.getElementById('editor');
+      const win = doc.defaultView;
+      const caretAt = (node) => {
+        const r = doc.createRange();
+        r.selectNodeContents(node);
+        r.collapse(false);
+        win.getSelection().removeAllRanges();
+        win.getSelection().addRange(r);
+      };
+      const tray = (cmd) => {
+        doc.getElementById('trayBtn').click();
+        doc.querySelector(`#formatTray [data-cmd="${cmd}"]`).click();
+      };
+      ed.focus();
+      const out = {};
+      for (const type of ['check', 'bullet', 'number']) {
+        const line = doc.createElement('div');
+        line.className = type;
+        line.textContent = `item ${type}`;
+        ed.append(line);
+        const count = ed.children.length;
+        caretAt(line);
+        tray(type);
+        out[type] = !line.classList.contains(type) && line.isConnected && ed.children.length === count;
+      }
+      const plain = doc.createElement('div');
+      plain.textContent = 'plain';
+      ed.append(plain);
+      const pres = () => ed.querySelectorAll('pre.code').length;
+      const before = pres();
+      caretAt(plain);
+      tray('codeBlock'); // a new, empty block below
+      const pre = plain.nextElementSibling;
+      const made = pre && pre.matches('pre.code') && pres() === before + 1;
+      caretAt(pre);
+      tray('codeBlock'); // and back to a plain line
+      out.codeBlock = made && pres() === before;
+      return out;
+    });
+    assert.deepEqual(trayToggle, { check: true, bullet: true, number: true, codeBlock: true },
+      'With the caret in a checklist item, list item or code block, its tray button turns it back into a plain line');
+
     // Test pasting multiline text inside a code block stays in one code block
     const pasteCodeTest = await page.evaluate(async () => {
       const doc = window.Memo.frameDoc('note-ed1');

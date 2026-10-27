@@ -2821,9 +2821,20 @@
   // empty element instead of formatting what is there: a list item or code
   // block on a new line below (or on the caret's line, if it is an empty
   // plain line), an empty inline code at the caret, and bold, italic,
-  // underline, highlight or size for what is typed next.
+  // underline, highlight or size for what is typed next. With the caret
+  // already in that kind of element (a checklist item for the checklist,
+  // a code block, a table, an inline code), it takes it away instead, as
+  // with a selection.
   function insertEmpty(cmd) {
     editor.focus();
+    const block = currentBlock();
+    if ((LIST_TYPES.includes(cmd) && block && block.classList.contains(cmd))
+      || (cmd === 'codeBlock' && currentPre())
+      || (cmd === 'table' && currentCell())
+      || (cmd === 'code' && currentCode())) {
+      FORMAT_COMMANDS[cmd]();
+      return;
+    }
     if (LIST_TYPES.includes(cmd) || cmd === 'codeBlock' || cmd === 'table') {
       const line = currentPre() || currentCell()?.closest('table') || currentBlock() || editor.lastElementChild;
       let target = line;
@@ -2848,7 +2859,7 @@
       }
     } else if (cmd === 'code') {
       const sel = getSelection();
-      if (!sel.rangeCount || currentPre() || currentCode()) return;
+      if (!sel.rangeCount || currentPre()) return;
       // Caret inside, after the invisible character that keeps it open.
       const code = insertCode(sel.getRangeAt(0), '\u200b');
       const r = document.createRange();
