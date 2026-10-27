@@ -1152,6 +1152,54 @@ try {
     }
   });
 
+  // ------------------------------------------------ Web: a group leaves its board memories on the board
+  await step('Web version: a group click opens its memories, but not those on a board', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name^="note-"]');
+      const res = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const noteIds = async () => (await inv('manager', 'list_notes')).map((n) => n.id);
+        const newNote = async () => {
+          const before = new Set(await noteIds());
+          await inv('manager', 'new_note');
+          return (await noteIds()).find((x) => !before.has(x));
+        };
+        const loose = await newNote();
+        const carded = await newNote();
+        const groupsBefore = new Set((await inv('manager', 'list_groups')).map((g) => g.id));
+        await inv(`note-${loose}`, 'new_group');
+        const gid = (await inv('manager', 'list_groups')).map((g) => g.id).find((x) => !groupsBefore.has(x));
+        for (const id of [loose, carded]) await inv(`note-${id}`, 'set_note_group', { groupId: gid });
+        const boardsBefore = new Set((await inv('manager', 'list_boards')).map((b) => b.id));
+        await inv('manager', 'new_board');
+        const bid = (await inv('manager', 'list_boards')).map((b) => b.id).find((x) => !boardsBefore.has(x));
+        const board = await inv(`board-${bid}`, 'load_board');
+        board.columns[0].noteIds.push(carded);
+        await inv(`board-${bid}`, 'save_board_columns', { columns: board.columns });
+        for (const id of [loose, carded]) await inv(`note-${id}`, 'close_window');
+        await wait(100);
+        const open = (id) => Boolean(document.querySelector(`.win[data-label="note-${id}"]`));
+        await inv(`group-${gid}`, 'show_group_notes');
+        await wait(300);
+        const out = { looseOpened: open(loose), cardedOpened: open(carded) };
+        await inv(`group-${gid}`, 'toggle_group'); // put away
+        await wait(300);
+        await inv(`group-${gid}`, 'toggle_group'); // take out
+        await wait(300);
+        out.cardedAfterTakeOut = open(carded);
+        return out;
+      });
+      assert.equal(res.looseOpened, true, 'A click on the group bar opens its memories');
+      assert.equal(res.cardedOpened, false, 'A memory on a board stays a card when the group bar is clicked');
+      assert.equal(res.cardedAfterTakeOut, false, 'Taking the memories out leaves the ones on a board in it');
+    } finally {
+      await webPage.close();
+    }
+  });
+
   assert.deepEqual(errors, [], `Unexpected console/page errors: ${errors.join('; ')}`);
   console.log(`\nAll ${passed} UI test suites passed with 0 runtime errors.`);
 } finally {

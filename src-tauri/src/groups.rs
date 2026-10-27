@@ -101,7 +101,7 @@ pub(crate) fn take_out(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
     store.update_group(id, |g| g.open = true);
     let anchor = group_anchor(app, id);
-    for note in store.members(id) {
+    for note in store.loose_members(id) {
         // Taking out shows all of them, those closed with ✕ too.
         let note = store.update(&note.id, |n| n.hidden = false).unwrap_or(note);
         let label = Kind::Note.label(&note.id);
@@ -454,7 +454,7 @@ pub(crate) fn raise_group(app: &AppHandle, id: &str) {
     };
     if group.open {
         let closed = store
-            .members(id)
+            .loose_members(id)
             .iter()
             .any(|n| app.get_webview_window(&Kind::Note.label(&n.id)).is_none())
             || store
@@ -464,7 +464,7 @@ pub(crate) fn raise_group(app: &AppHandle, id: &str) {
         if closed {
             take_out(app, id);
         }
-        for note in store.members(id) {
+        for note in store.loose_members(id) {
             if let Some(window) = app.get_webview_window(&Kind::Note.label(&note.id)) {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
@@ -491,7 +491,7 @@ pub(crate) fn show_group(app: &AppHandle, id: &str) {
     };
     let _ = open_group_window(app, &group);
     if group.open {
-        for note in store.members(id).iter().filter(|n| !n.hidden) {
+        for note in store.loose_members(id).iter().filter(|n| !n.hidden) {
             let _ = open_note_window(app, note);
         }
         for board in store.board_members(id).iter().filter(|b| !b.hidden) {

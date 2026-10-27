@@ -658,7 +658,7 @@
   // (Store::visible / visible_boards).
   function visibleNotes() {
     const closed = closedGroups();
-    return activeNotes().filter((n) => !n.hidden && (!n.groupId || !closed.has(n.groupId)));
+    return activeNotes().filter((n) => !n.hidden && (!n.groupId || !closed.has(n.groupId)) && !onBoard(n.id));
   }
   function visibleBoards() {
     const closed = closedGroups();
@@ -1562,13 +1562,19 @@
     notifyNotes();
   }
 
+  // The group's memories that open as windows with it: those on a board
+  // stay cards in their board (Store::loose_members).
+  function looseMembers(gid) {
+    return activeNotes().filter((n) => n.groupId === gid && !onBoard(n.id));
+  }
+
   async function takeOutGroup(g) {
     g.open = true;
     g.hidden = false;
     markDirty(false);
     if (!wins[`group-${g.id}`]) await openGroupWindow(g);
     const barWin = wins[`group-${g.id}`];
-    const members = activeNotes().filter((n) => n.groupId === g.id);
+    const members = looseMembers(g.id);
     for (const n of members) {
       n.hidden = false;
       const label = `note-${n.id}`;
@@ -1668,7 +1674,7 @@
     g.hidden = false;
     if (!wins[`group-${gid}`]) openGroupWindow(g);
     if (g.open) {
-      for (const n of activeNotes().filter((x) => x.groupId === gid)) {
+      for (const n of looseMembers(gid)) {
         n.hidden = false;
         if (!wins[`note-${n.id}`]) openNoteWindow(n);
         raiseWindow(`note-${n.id}`);

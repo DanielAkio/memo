@@ -943,6 +943,15 @@ impl Store {
             .collect()
     }
 
+    /// The group's notes that open as windows with it: those on a board stay
+    /// cards in their board.
+    pub fn loose_members(&self, id: &str) -> Vec<Note> {
+        self.members(id)
+            .into_iter()
+            .filter(|n| !self.on_board(&n.id))
+            .collect()
+    }
+
     /// The group's boards that are not in the trash.
     pub fn board_members(&self, id: &str) -> Vec<Board> {
         self.active_boards()
@@ -966,7 +975,7 @@ impl Store {
         let closed = self.closed_groups();
         self.active()
             .into_iter()
-            .filter(|n| !n.hidden && !closed.contains(&n.group_id))
+            .filter(|n| !n.hidden && !closed.contains(&n.group_id) && !self.on_board(&n.id))
             .collect()
     }
 
@@ -1789,6 +1798,26 @@ mod tests {
         store.update_board(&board.id, |b| b.columns[0].note_ids.push(note.id.clone()));
         assert!(store.on_board(&note.id));
         assert!(!store.is_pristine(&note));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn notes_on_a_board_stay_in_it() {
+        let dir = temp_dir("board-loose");
+        let store = Store::load(dir.join("notes.json"));
+        // A note in a group and on a board doesn't open with the group nor
+        // at startup: it is a card in its board.
+        let group = store.create_group(None);
+        let loose = store.create(None);
+        let carded = store.create(None);
+        for id in [&loose.id, &carded.id] {
+            store.update(id, |n| n.group_id = group.id.clone());
+        }
+        let board = store.create_board(None, vec!["To Do".into()], None);
+        store.update_board(&board.id, |b| b.columns[0].note_ids.push(carded.id.clone()));
+        let ids = |notes: Vec<Note>| notes.into_iter().map(|n| n.id).collect::<Vec<_>>();
+        assert_eq!(ids(store.loose_members(&group.id)), vec![loose.id.clone()]);
+        assert!(!ids(store.visible()).contains(&carded.id));
         let _ = fs::remove_dir_all(&dir);
     }
 
