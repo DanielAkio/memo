@@ -752,6 +752,20 @@ try {
       await sitePage.goto(`http://127.0.0.1:${port}/site/index.html`);
       await sitePage.waitForSelector('iframe[name="note-demo-wifi"]');
 
+      // The manager sits in its slot beside the text, not centred over it.
+      await sitePage.waitForSelector('.win[data-label="manager"] iframe');
+      const mgrPlacement = await sitePage.evaluate(() => {
+        const rect = (el) => el.getBoundingClientRect();
+        const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+        const mgr = rect(document.querySelector('.win[data-label="manager"]'));
+        const anchor = rect(document.getElementById('anchorManager'));
+        const covered = [...document.querySelectorAll('h1, h2, h3, p')]
+          .filter((el) => !el.closest('.win') && el.offsetParent && hit(mgr, rect(el)));
+        return { inSlot: Math.abs(mgr.left - anchor.left) < 2 && Math.abs(mgr.top - anchor.top) < 8, covered: covered.length };
+      });
+      assert.equal(mgrPlacement.inSlot, true, 'Landing page: the manager opens in its slot (#anchorManager)');
+      assert.equal(mgrPlacement.covered, 0, 'Landing page: the manager covers no text');
+
       // Check that localStorage has no data written by initial landing page boot
       let siteStorage = await sitePage.evaluate(() => localStorage.getItem('memo.web.data.v1'));
       assert.equal(siteStorage, null, 'Landing page must not write to localStorage on boot');

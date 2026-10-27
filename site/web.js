@@ -1253,15 +1253,19 @@
     return openWindow(`group-${g.id}`, 'group.html', { x: pos.x, y: pos.y, w, h, pinned: !!g.pinned, autofocus });
   }
 
-  function openManagerWindow(targetView = null, autofocus = !IS_SITE_HOME, center = true) {
+  // The web app centres the manager; the landing page never does: it has a
+  // slot beside the text (#anchorManager, computeSiteHomePositions), so it
+  // never covers the page's text.
+  function openManagerWindow(targetView = null, autofocus = !IS_SITE_HOME, center = !IS_SITE_HOME) {
     if (targetView) pendingManagerView = targetView;
     const z = data.zoom || 1;
     const m = data.manager;
     const w = Math.round((m.width || 560) * z);
     const h = Math.round((m.height || 480) * z);
     const wa = workArea();
-    const cx = Math.max(wa.left, Math.round(wa.left + (wa.right - wa.left - w) / 2));
-    const cy = Math.max(wa.top, Math.round(wa.top + (wa.bottom - wa.top - h) / 2));
+    const placed = !center && m.x != null && m.y != null;
+    const cx = placed ? m.x : Math.max(wa.left, Math.round(wa.left + (wa.right - wa.left - w) / 2));
+    const cy = placed ? m.y : Math.max(wa.top, Math.round(wa.top + (wa.bottom - wa.top - h) / 2));
 
     if (wins.manager) {
       if (center) {
