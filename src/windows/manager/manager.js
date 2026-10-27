@@ -1473,5 +1473,8 @@
     }
   }
 
+  // Sharing (components/share.js): offers to import.
+  MemoShare.attach({ invoke, listen });
+
   init().catch((err) => console.error('init', err));
 })();

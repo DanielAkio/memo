@@ -47,16 +47,16 @@ if (!failures) pass(`JS syntax (${jsFiles.length} files)`);
 
 const mainRs = read('src-tauri/src/main.rs');
 const handlerMatch = mainRs.match(/generate_handler!\[([\s\S]*?)\]/);
+// The commands in generate_handler!, by name (share::copy_share is copy_share).
+const handlerCommands = () => handlerMatch[1]
+  .replace(/\/\/.*$/gm, '')
+  .split(',')
+  .map((s) => s.trim().split('::').pop())
+  .filter(Boolean);
 if (!handlerMatch) {
   fail('could not find generate_handler![...] in src-tauri/src/main.rs');
 } else {
-  const rustCmds = new Set(
-    handlerMatch[1]
-      .replace(/\/\/.*$/gm, '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-  );
+  const rustCmds = new Set(handlerCommands());
 
   const jsCmds = new Set();
   const allJsStrings = new Set();
@@ -261,8 +261,7 @@ const DESKTOP_ONLY = {
   install_update: 'same',
 };
 {
-  const handler = mainRs.match(/generate_handler!\[([\s\S]*?)\]/);
-  const rustCmds = handler[1].replace(/\/\/.*$/gm, '').split(',').map((s) => s.trim()).filter(Boolean);
+  const rustCmds = handlerCommands();
   const webCases = new Set([...read('site/web.js').matchAll(/case '([a-z0-9_]+)'/g)].map((m) => m[1]));
   const before = failures;
   for (const cmd of rustCmds) {

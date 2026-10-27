@@ -3178,6 +3178,7 @@
       { label: t('rename'), run: () => bar.startRename() },
       { label: t('pin'), checked: !!note.pinned, run: () => bar.togglePin() },
       { label: t('noteColor'), run: () => colors.open() },
+      { label: t('share'), run: () => MemoShare.copy() },
       { label: t('moveToTrash'), run: () => bar.trash() },
       { label: t('closeNote'), run: () => bar.close() },
     ] : []),
@@ -3191,6 +3192,9 @@
       flushText();
     },
   });
+
+  // Sharing (components/share.js): "Copied", and offers to import.
+  if (!EMBED) MemoShare.attach({ invoke, listen: TAURI.event.listen });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { hideFormatBar(); showTray(false); }

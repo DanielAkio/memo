@@ -125,6 +125,9 @@
 
   // ------------------------------------------------------------- Setup & Init
 
+  // Sharing (components/share.js): "Copied", and offers to import.
+  MemoShare.attach({ invoke, listen });
+
   async function init() {
     const [, lang] = await invoke('get_language').catch(() => ['', 'en']);
     if (lang) I18n.set(lang);
@@ -205,6 +208,7 @@
       { label: t('newNote'), run: newNote },
       { label: t('addColumn'), run: () => onAddColumn('right') },
       { label: t('groupMenuTitle'), run: () => groups.toggle() },
+      { label: t('share'), run: () => MemoShare.copy() },
       { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error(err)) },
       { label: t('moveToTrash'), run: () => bar.trash() },
       { label: t('close'), run: () => bar.close() },

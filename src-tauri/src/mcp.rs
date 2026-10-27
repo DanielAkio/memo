@@ -212,6 +212,23 @@ fn tools() -> Value {
             &["id"],
             false,
         ),
+        tool(
+            "share_item",
+            "Text to share a memory, a board or a group (with its memories and boards) with someone: readable, ending in a code Memo imports. Images are not shared.",
+            json!({
+                "kind": { "type": "string", "enum": ["note", "board", "group"], "description": "What to share." },
+                "id": { "type": "string", "description": "Its id." },
+            }),
+            &["kind", "id"],
+            true,
+        ),
+        tool(
+            "import_shared",
+            "Import what someone shared (a text with a memo:v1: code) as new memories, boards or groups; the shared item opens on screen.",
+            json!({ "text": { "type": "string", "description": "The shared text, or just its code." } }),
+            &["text"],
+            false,
+        ),
     ])
 }
 
@@ -450,6 +467,21 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
             tauri::async_runtime::block_on(restore_group(app.clone(), id.clone()))?;
             let group = store.group(&id).ok_or("group not found")?;
             Ok(group_json(&store, &group))
+        }
+        "share_item" => {
+            let kind = match req_str(args, "kind")? {
+                "note" => Kind::Note,
+                "board" => Kind::Board,
+                "group" => Kind::Group,
+                other => return Err(format!("unknown kind: {other}")),
+            };
+            let text = crate::share::share_text(&store, kind, req_str(args, "id")?)?;
+            Ok(json!({ "text": text }))
+        }
+        "import_shared" => {
+            let payload = crate::share::decode(req_str(args, "text")?).ok_or("no valid memo:v1: code in the text")?;
+            crate::share::import(app, &payload, None);
+            Ok(json!({ "imported": crate::share::summary(&payload) }))
         }
         _ => Err(format!("unknown tool: {name}")),
     }

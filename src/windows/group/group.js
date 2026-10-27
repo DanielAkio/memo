@@ -112,6 +112,7 @@
       { label: t('groupColor'), run: () => colors.open() },
       { label: t(group.open ? 'groupHideHint' : 'groupShowHint'), run: toggle },
       { label: t('newNoteInGroup'), run: newNote },
+      { label: t('share'), run: () => MemoShare.copy() },
       { label: t('groupToTrash'), run: () => bar.trash() },
       { label: t('close'), run: () => bar.close() },
     ] : []),
@@ -155,5 +156,12 @@
   }
 
   window.MemoZoom.attach(invoke);
+  // Sharing (components/share.js): the bar grows to hold its toast.
+  MemoShare.attach({
+    invoke,
+    listen,
+    onResize: (height) => setHeight(titlebar.offsetHeight + (height || 0)),
+  });
+
   init().catch((err) => console.error('init', err));
 })();

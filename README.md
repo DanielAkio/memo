@@ -32,6 +32,8 @@ digging through windows to find what you wrote down.
   matters. Prefer the mouse? The selection bar and the Aa toolbar do it all in a click.
 - **Find things at a glance.** Give each memory a title and a colour (any colour, with the eyedropper), and gather
   related ones in a group you can put away and bring back in one click.
+- **Share in a message.** "Share (copy)" turns a memory, a board or a whole group into a text you can paste in any
+  chat or email; whoever gets it opens Memo and imports a copy with one click.
 - **Yours, and only yours.** No sign-up, no ads, no tracking, and it works offline. Your memories live on your
   computer, and if you want them on several computers, they sync through your own Google Drive
   ([privacy policy](https://danielakio.github.io/memo/privacy.html)).

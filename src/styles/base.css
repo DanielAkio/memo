@@ -806,3 +806,71 @@ html, body {
 .card-snippet font[size="2"] { font-size: 11px; }
 .card-preview font[size="5"],
 .card-snippet font[size="5"] { font-size: 13px; font-weight: 600; }
+
+/* ------------------------------------------------ share toast (components/share.js) */
+
+/* "Copied", or the offer to import a shared item, at the bottom of any
+   window; a group bar grows to hold it. */
+.share-toast {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 6px 6px 12px;
+  background: var(--color-obsidian);
+  border-radius: 8px;
+  box-shadow: var(--shadow-popover);
+  color: var(--color-fog);
+  font-size: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.share-toast[hidden] { display: none; }
+.share-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.share-import {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--overlay-strong);
+  color: var(--color-paper);
+  font: inherit;
+  font-weight: 500;
+  cursor: default;
+}
+.share-import:hover { background: var(--overlay-active); }
+.share-close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ash);
+  cursor: default;
+}
+.share-close:hover { background: var(--overlay-hover); color: var(--color-paper); }
+.share-close svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}

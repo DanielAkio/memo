@@ -73,6 +73,12 @@ pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec
         item("new-group", l.new_group)?.kind(),
         item("new-board", l.new_board)?.kind(),
         item("show", l.show)?.kind(),
+    ];
+    // While a shared item is in the clipboard (share.rs).
+    if share::pending() {
+        items.push(item("import-share", l.import_share)?.kind());
+    }
+    items.extend([
         separator()?,
         item("manager", l.manager)?.kind(),
         item("trash", l.trash)?.kind(),
@@ -85,7 +91,7 @@ pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec
         autostart_item.kind(),
         check("magnet", l.magnet, store.magnet())?.kind(),
         check("ai-control", l.ai_control, ai_control)?.kind(),
-    ];
+    ]);
     // "Sync now" only with a Google account connected on this computer.
     if cloud_account(app).is_some() {
         items.push(item("sync", l.sync)?.kind());
@@ -282,6 +288,7 @@ pub(crate) fn on_tray_menu(app: &AppHandle, id: &str) {
             boards_changed(app);
         }
         "show" => show_all(app),
+        "import-share" => share::import_pending(app, None),
         "manager" => {
             let _ = open_manager(app);
         }

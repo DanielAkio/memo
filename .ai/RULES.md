@@ -26,7 +26,7 @@ npm run build    # installers in src-tauri/target/release/bundle/
 cd src-tauri && cargo check && cargo clippy   # Rust-only checks
 ```
 
-Always run `npm test` after making changes to catch regressions: `tools/check.mjs` verifies JS syntax, Tauri commands/events, `i18n.js` keys/demos and colour parity; `tools/test-ui.mjs` runs the real pages in headless Chromium/Edge via `tools/demos/stage.html`; `cargo test` runs unit tests in `store.rs`, `mcp.rs`, `clients.rs`, `images.rs` and `sync.rs`. Windows installer without a toolchain: `docker compose -f docker/compose.yml run --build --rm windows` (NSIS `*-setup.exe` in `dist/`). More in `memo-checks`.
+Always run `npm test` after making changes to catch regressions: `tools/check.mjs` verifies JS syntax, Tauri commands/events, `i18n.js` keys/demos and colour parity; `tools/test-ui.mjs` runs the real pages in headless Chromium/Edge via `tools/demos/stage.html`; `cargo test` runs unit tests in `store.rs`, `mcp.rs`, `clients.rs`, `images.rs`, `sync.rs` and `share.rs`. Windows installer without a toolchain: `docker compose -f docker/compose.yml run --build --rm windows` (NSIS `*-setup.exe` in `dist/`). More in `memo-checks`.
 
 ## Layout
 
@@ -48,6 +48,8 @@ src/                     frontend: plain HTML/CSS/JS, no bundler (frontendDist =
     pill.js              MemoPill: where an item is (group / board), shown only (manager cards, note footer)
     text.js              MemoText: the plain-text format (lists, code, tables), fromPlain
     card.js              MemoCard: a note's preview on a card (manager, boards)
+    share.js             MemoShare: the toast for "Copied" and the offer to import a shared item (every window)
+  assets/                no-image-pt/en.png: what an image becomes in an imported shared memory
   lib/
     chrome.js            window behaviour: drag, resize handles, snapping, title menu (MemoChrome), zoom (MemoZoom)
     i18n.js              UI strings pt/en (MemoI18n.t), shortcut labels (MemoI18n.keys / isMod), Help guide data (HELP)
@@ -73,6 +75,8 @@ src-tauri/
   src/clients.rs         AI control setup: finds MCP clients here and adds/removes Memo in their config files
   src/updater.rs         in-app updates (tauri-plugin-updater): checks, download + install, status for Settings/tray
   src/sync.rs            Drive sync engine: pull (changes API), apply, push; conflicts; fake-Drive test
+  src/share.rs           sharing through the clipboard: readable text + `memo:v1:` code (deflate + base64url, same in
+                         site/web.js), import as new copies, the offer shown when a window gets the focus
   src/welcome.rs         first-run welcome note (HTML + matching plain text)
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
   capabilities/default.json  permissions for note-*, group-*, board-* and manager windows
@@ -103,7 +107,7 @@ Tokens spent on things that don't help understand or change the project are wast
 - **One window per note.** Labels: `note-{id}`, `group-{id}`, `board-{id}`, `manager`, plus the hidden `snap-preview`. Rust derives the note id from the calling window's label (`Kind::Note.id_of`), so note commands take no id (`invoke('save_text', { text, html })`); manager commands take explicit ids. All note windows load `index.html`, which calls `load_note`. Code that iterates windows tells them apart with `Kind` (`Kind::of(window)`, `Kind::Group.is(window)`, `Kind::Board.label(id)` — the one place that knows the labels) and `is_app_window` (excludes the Snap preview).
 - **Rust is the source of truth.** `Store` (`store.rs`) holds everything in a `Mutex`, marks it dirty, and a saver thread flushes atomically every 800 ms. Never overwrite user data: unreadable files are backed up, old files are never deleted. Default data folder is `<OS data folder>/memo` — **never** use Tauri's `app_data_dir()` for notes or config.
 - **Tauri commands** live in the module of their area (`notes.rs`, `manager.rs`, `groups.rs`, …; each module does `use crate::*` and its items are `pub(crate)`) and must be registered in `generate_handler!` in `main.rs`; a new JS window API needs its permission in `capabilities/default.json`. Commands that create/destroy windows are `async` on purpose (sync ones can deadlock on Windows). Rust errors returned to JS are English `String`s (logged, not shown).
-- **Events** keep windows in step: `notes-changed`, `groups-changed`, `boards-changed`, `store-replaced`, `theme-changed`, `language-changed`, `zoom-changed`, `drop-hover`, `board-drop-hover`, `cloud-changed`, `ai-control-changed`, `magnet-changed`, `layout-changed`, `update-changed`.
+- **Events** keep windows in step: `notes-changed`, `groups-changed`, `boards-changed`, `store-replaced`, `theme-changed`, `language-changed`, `zoom-changed`, `drop-hover`, `board-drop-hover`, `cloud-changed`, `ai-control-changed`, `magnet-changed`, `layout-changed`, `update-changed`, `share-available` (to the focused window only).
 - **Content vs layout (sync groundwork):** `Note::content` / `Group::content` hold what is the same on every device; position, size, pin, `hidden`, `open` are local layout. Keep new content fields inside `content()` and route mutations through `Store::update` / `update_group` (they bump `updatedAt` only on content changes); permanent removals leave tombstones. Details in `memo-storage`.
 - **AI control (MCP)** (`mcp.rs`): tools are the outside view of the same features; a new user-facing feature that an assistant could use (create, edit, organise) gets a tool or a field there, calling the same functions as the windows. Off by default (`Config.ai_control`); `memo --mcp` must stay a plain stdio process (no Tauri).
 - **Close ≠ trash.** ✕ / middle click only close (`Note.hidden`); only the manager's trash buttons trash. Details in `memo-windows`.

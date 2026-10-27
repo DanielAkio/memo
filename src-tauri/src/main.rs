@@ -13,6 +13,7 @@ mod images;
 mod manager;
 mod mcp;
 mod notes;
+mod share;
 mod store;
 mod sync;
 mod tray;
@@ -261,6 +262,7 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         // In-app updates from the GitHub releases (updater.rs).
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Start with the system: same name and argument as the Windows
@@ -355,6 +357,9 @@ fn main() {
             set_group_height,
             toggle_group,
             new_note_in_group,
+            share::copy_share,
+            share::import_share,
+            share::dismiss_share,
             new_group,
             new_board,
             open_board,

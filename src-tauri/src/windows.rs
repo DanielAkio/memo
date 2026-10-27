@@ -148,6 +148,7 @@ pub(crate) struct TrayLabels {
     pub(crate) new_group: &'static str,
     pub(crate) new_board: &'static str,
     pub(crate) show: &'static str,
+    pub(crate) import_share: &'static str,
     pub(crate) manager: &'static str,
     pub(crate) trash: &'static str,
     pub(crate) settings: &'static str,
@@ -176,6 +177,7 @@ pub(crate) fn tray_labels(lang: &str) -> TrayLabels {
             new_group: "New group",
             new_board: "New board",
             show: "Show all memories",
+            import_share: "Import shared item",
             manager: "Memo Manager",
             trash: "Trash",
             settings: "Settings",
@@ -202,6 +204,7 @@ pub(crate) fn tray_labels(lang: &str) -> TrayLabels {
             new_group: "Novo grupo",
             new_board: "Novo quadro",
             show: "Mostrar todas as memórias",
+            import_share: "Importar item compartilhado",
             manager: "Gerenciador do Memo",
             trash: "Lixeira",
             settings: "Configurações",
@@ -388,7 +391,11 @@ pub(crate) fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
             }
             WindowEvent::ThemeChanged(_) => apply_background(&win, &store.theme()),
             // Coming back to Memo: fetch what changed on other computers.
-            WindowEvent::Focused(true) => sync::on_focus(),
+            WindowEvent::Focused(true) => {
+                sync::on_focus();
+                // A shared memory, board or group in the clipboard is offered.
+                share::on_focus(&app, &win);
+            }
             WindowEvent::Focused(false) => {
                 if Kind::Note.is(&win) {
                     let note_id = Kind::Note.id_of(&win);

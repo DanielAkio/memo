@@ -1205,6 +1205,13 @@
             closeContextMenu();
             raiseWindow(label);
           }, true);
+          // A shared item pasted (outside a text field) or, with clipboard
+          // access granted, in the clipboard when the window gets the focus.
+          f.contentWindow.addEventListener('focus', () => checkClipboard(label));
+          f.contentDocument.addEventListener('paste', (e) => {
+            if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
+            offerShared(e.clipboardData && e.clipboardData.getData('text/plain'), label);
+          });
           const sub = f.contentDocument.getElementById('defaultTextFrame');
           if (sub) {
             sub.addEventListener('load', () => applyZoomToFrame(f));
@@ -1306,7 +1313,7 @@
   }
 
 
-  function createNote({ parentLabel = null, groupId = '' } = {}) {
+  function createNote({ parentLabel = null, groupId = '', open = true } = {}) {
     const z = data.zoom || 1;
     const w = Math.round(DEFAULT_W * z);
     const h = Math.round(DEFAULT_H * z);
@@ -1335,7 +1342,7 @@
     };
     data.notes.push(note);
     markDirty(true);
-    openNoteWindow(note, true);
+    if (open) openNoteWindow(note, true);
     notifyNotes();
     if (groupId) notifyGroups();
     return note;
@@ -1413,7 +1420,7 @@
     return openWindow(`board-${b.id}`, PAGES.board, { x: pos.x, y: pos.y, w, h, pinned: !!b.pinned, autofocus });
   }
 
-  function createBoard(parentLabel = 'manager') {
+  function createBoard(parentLabel = 'manager', { open = true } = {}) {
     const z = data.zoom || 1;
     const pos = beside(parentLabel, Math.round(BOARD_DEFAULT_W * z), Math.round(BOARD_DEFAULT_H * z));
     const now = nowMs();
@@ -1444,7 +1451,7 @@
     };
     data.boards.push(board);
     markDirty(true);
-    openBoardWindow(board);
+    if (open) openBoardWindow(board);
     notifyBoards();
     return board;
   }
@@ -1508,7 +1515,7 @@
     notifyBoards();
   }
 
-  function createGroup(parentLabel = 'manager') {
+  function createGroup(parentLabel = 'manager', { open = true } = {}) {
     const z = data.zoom || 1;
     const pos = beside(parentLabel, Math.round(GROUP_W * z), Math.round(TITLEBAR_H * z));
     const now = nowMs();
@@ -1528,9 +1535,250 @@
     };
     data.groups.push(group);
     markDirty(true);
-    openGroupWindow(group);
+    if (open) openGroupWindow(group);
     notifyGroups();
     return group;
+  }
+
+  // ------------------------------------------------------------- sharing
+  // As share.rs: the same text and `memo:v1:` code (JSON, raw deflate,
+  // base64url), so codes go both ways between Memo Web and the desktop.
+
+  const SHARE_PREFIX = 'memo:v1:';
+  const SHARE_MAX = 60000;
+  const NO_IMAGE = '<img src="memo:no-image">';
+  const SHARE_CODE_RE = /memo:v1:[A-Za-z0-9_-]+/;
+  let sharePending = null; // { code, payload }
+  const shareDone = new Set();
+
+  const sharedNote = (n) => ({
+    title: n.title || '',
+    html: (n.html || '').replace(/<img[^>]*>/g, NO_IMAGE),
+    text: n.text || '',
+    color: n.color || '',
+  });
+
+  function sharedBoard(b, addNote) {
+    return {
+      name: b.name || '',
+      color: b.color || '',
+      columns: (b.columns || []).map((c) => ({
+        name: c.name || '',
+        color: c.color || '',
+        notes: (c.noteIds || []).map(addNote).filter((i) => i != null),
+      })),
+    };
+  }
+
+  function buildShare(kind, id) {
+    const payload = { v: 1, kind, notes: [], boards: [], groups: [] };
+    const index = new Map();
+    const addNote = (noteId) => {
+      if (index.has(noteId)) return index.get(noteId);
+      const n = findNote(noteId);
+      if (!n || n.trashedAt) return null;
+      payload.notes.push(sharedNote(n));
+      index.set(noteId, payload.notes.length - 1);
+      return payload.notes.length - 1;
+    };
+    if (kind === 'note') {
+      if (addNote(id) == null) return null;
+    } else if (kind === 'board') {
+      const b = findBoard(id);
+      if (!b || b.trashedAt) return null;
+      payload.boards.push(sharedBoard(b, addNote));
+    } else {
+      const g = findGroup(id);
+      if (!g || g.trashedAt) return null;
+      const boards = activeBoards().filter((b) => b.groupId === id).map((b) => {
+        payload.boards.push(sharedBoard(b, addNote));
+        return payload.boards.length - 1;
+      });
+      const notes = activeNotes().filter((n) => n.groupId === id).map((n) => addNote(n.id)).filter((i) => i != null);
+      payload.groups.push({ name: g.name || '', color: g.color || '', notes, boards });
+    }
+    return payload;
+  }
+
+  const noteName = (n) => (n.title || '').trim() || ((n.text || '').split('\n').map((l) => l.trim()).find(Boolean) || '');
+  const orUntitled = (name, lang) => (name || '').trim() || (lang === 'en' ? 'Untitled' : 'Sem título');
+
+  function sharedName(p) {
+    if (p.kind === 'board') return (p.boards[0] && p.boards[0].name) || '';
+    if (p.kind === 'group') return (p.groups[0] && p.groups[0].name) || '';
+    return p.notes[0] ? noteName(p.notes[0]) : '';
+  }
+
+  function readableShare(p, lang) {
+    const image = lang === 'en' ? '[image not shared]' : '[imagem não compartilhada]';
+    const boardText = (b) => b.columns.map((c) => `\n## ${orUntitled(c.name, lang)}\n`
+      + c.notes.map((i) => (p.notes[i] ? `- ${orUntitled(noteName(p.notes[i]), lang)}\n` : '')).join('')).join('');
+    let out = '';
+    if (p.kind === 'board' && p.boards[0]) {
+      out = `${orUntitled(p.boards[0].name, lang)}\n${boardText(p.boards[0])}`;
+    } else if (p.kind === 'group' && p.groups[0]) {
+      const g = p.groups[0];
+      out = `${orUntitled(g.name, lang)}\n`
+        + g.notes.map((i) => (p.notes[i] ? `- ${orUntitled(noteName(p.notes[i]), lang)}\n` : '')).join('')
+        + g.boards.map((i) => (p.boards[i] ? `\n# ${orUntitled(p.boards[i].name, lang)}\n${boardText(p.boards[i])}` : '')).join('');
+    } else if (p.notes[0]) {
+      const n = p.notes[0];
+      out = `${n.title.trim() ? `${n.title.trim()}\n` : ''}${n.text.replace(/\[imagem\]|\[image\]/g, image)}\n`;
+    }
+    return out.trimEnd();
+  }
+
+  async function encodeShare(payload) {
+    const json = new TextEncoder().encode(JSON.stringify(payload));
+    const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return SHARE_PREFIX + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  async function decodeShare(text) {
+    const m = SHARE_CODE_RE.exec(text || '');
+    if (!m || m[0].length > SHARE_MAX * 2) return null;
+    try {
+      const b64 = m[0].slice(SHARE_PREFIX.length).replace(/-/g, '+').replace(/_/g, '/');
+      const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+      const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      const p = JSON.parse(await new Response(stream).text());
+      const list = (x) => (Array.isArray(x) ? x : []);
+      const payload = { v: p.v, kind: p.kind, notes: list(p.notes), boards: list(p.boards), groups: list(p.groups) };
+      const hasItem = { note: payload.notes, board: payload.boards, group: payload.groups }[payload.kind];
+      return payload.v === 1 && hasItem && hasItem.length ? payload : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function shareText(kind, id) {
+    const payload = buildShare(kind, id);
+    if (!payload) throw new Error('item not found');
+    const code = await encodeShare(payload);
+    if (code.length > SHARE_MAX) throw new Error('too big to share');
+    const lang = effectiveLanguage();
+    const footer = lang === 'en'
+      ? '— Shared from Memo: copy this whole message and open Memo to import it —'
+      : '— Compartilhado pelo Memo: copie esta mensagem inteira e abra o Memo para importar —';
+    shareDone.add(code); // our own code: never offered back to us
+    return `${readableShare(payload, lang)}\n\n${footer}\n${code}`;
+  }
+
+  // The picture an image becomes, in the importing Memo's language.
+  async function noImageHtml() {
+    try {
+      const blob = await (await fetch(`${srcBase}/assets/no-image-${effectiveLanguage() === 'en' ? 'en' : 'pt'}.png`)).blob();
+      const url = await new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.readAsDataURL(blob);
+      });
+      return `<img src="${url}" width="271">`;
+    } catch {
+      return '';
+    }
+  }
+
+  // New copies of everything shared (Store side of share.rs `create`), the
+  // shared item opened beside `anchor`.
+  async function importShare(payload, anchor) {
+    const picture = await noImageHtml();
+    const valid = (c) => !c || isValidColor(c);
+    const notes = payload.notes.map((s, i) => {
+      const n = createNote({ parentLabel: anchor, open: false });
+      updateNote(n.id, (x) => {
+        x.title = String(s.title || '').slice(0, 80);
+        x.html = String(s.html || '').split(NO_IMAGE).join(picture);
+        x.text = String(s.text || '');
+        if (valid(s.color)) x.color = s.color || '';
+      });
+      if (!(payload.kind === 'note' && i === 0)) { n.x = null; n.y = null; }
+      return n;
+    });
+    const at = (i) => (notes[i] ? notes[i].id : null);
+    const boards = payload.boards.map((s) => {
+      const b = createBoard(anchor, { open: false });
+      updateBoard(b.id, (x) => {
+        x.name = String(s.name || '');
+        if (valid(s.color)) x.color = s.color || '';
+        x.columns = list(s.columns).map((c) => ({
+          id: genId(),
+          name: String(c.name || ''),
+          color: valid(c.color) ? c.color || '' : '',
+          noteIds: list(c.notes).map(at).filter(Boolean),
+        }));
+      });
+      for (const c of b.columns) for (const id of c.noteIds) updateNote(id, (x) => { x.hidden = true; });
+      return b;
+    });
+    const groups = payload.groups.map((s) => {
+      const g = createGroup(anchor, { open: false });
+      updateGroup(g.id, (x) => {
+        x.name = String(s.name || '');
+        x.open = true;
+        if (s.color && isValidColor(s.color)) x.color = s.color;
+      });
+      for (const id of list(s.notes).map(at).filter(Boolean)) updateNote(id, (x) => { x.groupId = g.id; });
+      for (const b of list(s.boards).map((i) => boards[i]).filter(Boolean)) updateBoard(b.id, (x) => { x.groupId = g.id; });
+      return g;
+    });
+    markDirty(true);
+    if (payload.kind === 'board' && boards[0]) openBoardWindow(boards[0]);
+    else if (payload.kind === 'group' && groups[0]) raiseGroup(groups[0].id);
+    else if (notes[0]) openNoteWindow(notes[0]);
+    notifyNotes();
+    notifyBoards();
+    notifyGroups();
+  }
+
+  function list(x) {
+    return Array.isArray(x) ? x : [];
+  }
+
+  // A shared code in `text`, seen in window `label` (paste, or focus with
+  // clipboard access granted): offered there unless already handled.
+  async function offerShared(text, label) {
+    const m = SHARE_CODE_RE.exec(text || '');
+    const had = Boolean(sharePending);
+    if (!m || shareDone.has(m[0])) {
+      sharePending = null;
+      if (had) emit('share-available', null);
+      return;
+    }
+    if (!sharePending || sharePending.code !== m[0]) {
+      const payload = await decodeShare(m[0]);
+      sharePending = payload ? { code: m[0], payload } : null;
+    }
+    if (sharePending) {
+      const p = sharePending.payload;
+      emitToWindow(label, 'share-available', {
+        kind: p.kind, name: sharedName(p), notes: p.notes.length, boards: p.boards.length,
+      });
+    } else if (had) {
+      emit('share-available', null);
+    }
+  }
+
+  // Browsers ask before a page reads the clipboard: on focus only once the
+  // person allowed it; a paste always works.
+  async function checkClipboard(label) {
+    try {
+      const perm = await navigator.permissions.query({ name: 'clipboard-read' });
+      if (perm.state !== 'granted') return;
+      offerShared(await navigator.clipboard.readText(), label);
+    } catch {}
+  }
+
+  function takeShare() {
+    const pending = sharePending;
+    sharePending = null;
+    if (pending) shareDone.add(pending.code);
+    emit('share-available', null);
+    return pending && pending.payload;
   }
 
   // As trash() on the desktop: a note nobody touched and a welcome copy are
@@ -3304,6 +3552,22 @@
         boardDropZones[bid] = args.zones || [];
         return null;
       }
+      case 'copy_share': {
+        const kind = args.kind || (isNote(label) ? 'note' : isBoard(label) ? 'board' : isGroup(label) ? 'group' : '');
+        const id = args.id || idOf(label);
+        if (!kind) throw new Error('nothing to share here');
+        const text = await shareText(kind, id);
+        await navigator.clipboard.writeText(text);
+        return text;
+      }
+      case 'import_share': {
+        const payload = takeShare();
+        if (payload) await importShare(payload, label);
+        return null;
+      }
+      case 'dismiss_share':
+        takeShare();
+        return null;
       case 'take_note_out_of_board': {
         for (const brd of data.boards) {
           for (const col of brd.columns) {

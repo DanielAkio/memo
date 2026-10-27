@@ -968,6 +968,45 @@ try {
     assert.deepEqual(res.afterTwo, [], 'The next removal is saved too, emptying the column');
   });
 
+  // ------------------------------------------------ 7h. Share: the toast in every window
+  await step('Share: "Copied" and the import offer show in a memory, a board and a group bar', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const calls = [];
+      M.hooks.import_share = (label) => { calls.push(['import', label]); };
+      M.hooks.set_group_height = (label, a) => { calls.push(['height', a.height]); return null; };
+      M.addNote({ id: 'sh-note', text: 'x' });
+      M.addBoard({ id: 'sh-board', name: 'B' });
+      M.addGroup({ id: 'sh-group', name: 'G' });
+      await M.openWin('note-sh-note', '/src/windows/note/index.html', { x: 40, y: 40, w: 300, h: 260 });
+      await M.openWin('board-sh-board', '/src/windows/board/board.html', { x: 360, y: 40, w: 420, h: 300 });
+      await M.openWin('group-sh-group', '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 40 });
+      await new Promise((r) => setTimeout(r, 300));
+      const toast = (label) => M.frameDoc(label).querySelector('.share-toast');
+      const out = {};
+      const doc = M.frameDoc('note-sh-note');
+      await doc.defaultView.MemoShare.copy();
+      out.copied = toast('note-sh-note').textContent;
+      M.emit('share-available', { kind: 'board', name: 'Plano', notes: 3, boards: 1 });
+      out.offer = toast('board-sh-board').textContent;
+      out.groupGrew = calls.some(([k, h]) => k === 'height' && h > 40);
+      toast('board-sh-board').querySelector('.share-import').click();
+      await new Promise((r) => setTimeout(r, 50));
+      out.imported = calls.some(([k, l]) => k === 'import' && l === 'board-sh-board');
+      out.hidden = ['note-sh-note', 'board-sh-board', 'group-sh-group'].every((l) => !toast(l) || toast(l).hidden);
+      for (const l of ['note-sh-note', 'board-sh-board', 'group-sh-group']) M.closeWin(l);
+      delete M.hooks.import_share;
+      delete M.hooks.set_group_height;
+      return out;
+    });
+    assert.ok(res.copied.startsWith('Copiado'), `"Share" says it copied (${res.copied})`);
+    assert.ok(res.offer.includes('Quadro compartilhado: “Plano” · 3 memórias') && res.offer.includes('Importar'),
+      `The offer names the shared board, with Import (${res.offer})`);
+    assert.equal(res.groupGrew, true, 'A group bar grows to show the offer');
+    assert.equal(res.imported, true, 'Import asks the app to import it into that window');
+    assert.equal(res.hidden, true, 'The offer goes away once used');
+  });
+
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
   await step('Web vs Landing page: landing page is ephemeral, web version persists data', async () => {
     const sitePage = await browser.newPage();
@@ -1376,6 +1415,93 @@ try {
       assert.equal(res.cardedAfterTakeOut, false, 'Taking the memories out leaves the ones on a board in it');
     } finally {
       await webPage.close();
+    }
+  });
+
+  // ------------------------------------------------ Web: share a board and a group, import them elsewhere
+  await step('Web version: a shared board and group are imported as new copies from a pasted code', async () => {
+    const sender = await browser.newPage();
+    const receiver = await browser.newPage();
+    try {
+      await sender.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: `http://127.0.0.1:${port}` });
+      await sender.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await sender.waitForSelector('iframe[name="manager"]');
+      const shared = await sender.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const ids = async (cmd) => (await inv('manager', cmd)).map((x) => x.id);
+        const newOne = async (cmd, list, from = 'manager') => {
+          const before = new Set(await ids(list));
+          await inv(from, cmd);
+          return (await ids(list)).find((x) => !before.has(x));
+        };
+        const a = await newOne('new_note', 'list_notes');
+        const b = await newOne('new_note', 'list_notes');
+        await inv(`note-${a}`, 'rename', { name: 'Pão' });
+        await inv(`note-${b}`, 'rename', { name: 'Leite' });
+        const bid = await newOne('new_board', 'list_boards');
+        await inv(`board-${bid}`, 'rename', { name: 'Mercado' });
+        const board = await inv(`board-${bid}`, 'load_board');
+        board.columns[0].noteIds = [a, b];
+        await inv(`board-${bid}`, 'save_board_columns', { columns: board.columns });
+        const boardText = await inv(`board-${bid}`, 'copy_share');
+        const gid = await newOne('new_group', 'list_groups', `note-${a}`);
+        await inv(`group-${gid}`, 'rename', { name: 'Casa' });
+        const c = await newOne('new_note', 'list_notes');
+        await inv(`note-${c}`, 'rename', { name: 'Contas' });
+        for (const id of [a, c]) await inv(`note-${id}`, 'set_note_group', { groupId: gid });
+        const groupText = await inv(`group-${gid}`, 'copy_share');
+        return { boardText, groupText, bid, gid };
+      });
+      assert.ok(shared.boardText.startsWith('Mercado\n') && shared.boardText.includes('- Pão\n- Leite'),
+        `The board's text reads in a chat (${shared.boardText.slice(0, 80)})`);
+      assert.ok(/\nmemo:v1:[A-Za-z0-9_-]+$/.test(shared.boardText), 'The text ends with the code');
+
+      await receiver.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await receiver.waitForSelector('iframe[name="manager"]');
+      await receiver.waitForTimeout(400);
+      const imported = await receiver.evaluate(async ({ boardText, groupText, bid, gid }) => {
+        const inv = window.MemoWeb.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const frame = document.querySelector('iframe[name="manager"]');
+        const paste = (text) => {
+          const dt = new DataTransfer();
+          dt.setData('text/plain', text);
+          frame.contentDocument.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
+        };
+        const toast = () => frame.contentDocument.querySelector('.share-toast');
+        const out = {};
+        paste(boardText);
+        await wait(300);
+        out.offer = toast() && !toast().hidden ? toast().textContent : '';
+        toast().querySelector('.share-import').click();
+        await wait(400);
+        const boards = await inv('manager', 'list_boards');
+        const copy = boards.find((b) => b.name === 'Mercado' && b.id !== bid);
+        const notes = await inv('manager', 'list_notes');
+        const title = (id) => (notes.find((n) => n.id === id) || {}).title;
+        out.board = copy ? copy.columns[0].noteIds.map(title) : null;
+        out.boardOpen = Boolean(copy && document.querySelector(`.win[data-label="board-${copy.id}"]`));
+        paste(groupText);
+        await wait(300);
+        toast().querySelector('.share-import').click();
+        await wait(400);
+        const group = (await inv('manager', 'list_groups')).find((g) => g.name === 'Casa' && g.id !== gid);
+        const notesAfter = await inv('manager', 'list_notes');
+        out.group = group ? notesAfter.filter((n) => n.groupId === group.id).map((n) => n.title).sort() : null;
+        // The same code again is not offered twice.
+        paste(groupText);
+        await wait(300);
+        out.offeredAgain = Boolean(toast() && !toast().hidden);
+        return out;
+      }, shared);
+      assert.ok(imported.offer.includes('Quadro compartilhado: “Mercado”'), `A pasted code is offered (${imported.offer})`);
+      assert.deepEqual(imported.board, ['Pão', 'Leite'], 'Import makes a new board with the same column of memories');
+      assert.equal(imported.boardOpen, true, 'The imported board opens');
+      assert.deepEqual(imported.group, ['Contas', 'Pão'], 'A group comes with its memories');
+      assert.equal(imported.offeredAgain, false, 'An imported code is not offered again');
+    } finally {
+      await sender.close();
+      await receiver.close();
     }
   });
 
