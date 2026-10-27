@@ -812,6 +812,24 @@ try {
     assert.equal(res.opened, true, 'The new memory opens');
   });
 
+  // ------------------------------------------------ 7e. Card preview: long lines don't overlap
+  await step('Card preview: long checklist lines wrap without overlapping the next', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const long = 'x'.repeat(90);
+      M.addNote({ id: 'long-note', text: [1, 2, 3, 4, 5].map((i) => `[ ] ${long}${i}`).join(String.fromCharCode(10)) });
+      M.addBoard({ id: 'long-board', name: 'Long', columns: [{ id: 'c1', name: '', noteIds: ['long-note'] }] });
+      await M.openWin('board-long-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 420, h: 360 });
+      await new Promise((r) => setTimeout(r, 300));
+      const lines = [...M.frameDoc('board-long-board').querySelectorAll('.card-snippet > *')];
+      const overlap = lines.some((el, i) => i > 0 && el.getBoundingClientRect().top < lines[i - 1].getBoundingClientRect().bottom - 0.5);
+      M.closeWin('board-long-board');
+      return { count: lines.length, overlap };
+    });
+    assert.ok(res.count > 1, 'The card shows the checklist lines');
+    assert.equal(res.overlap, false, 'Each line starts below the previous one');
+  });
+
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
   await step('Web vs Landing page: landing page is ephemeral, web version persists data', async () => {
     const sitePage = await browser.newPage();

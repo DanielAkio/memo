@@ -609,6 +609,9 @@ html, body {
 
 .card-preview > *,
 .card-snippet > * {
+  /* Lines keep their full height (a long one wraps instead of shrinking
+     under the next); the box's max-height cuts off what doesn't fit. */
+  flex-shrink: 0;
   min-height: 1.45em;
   margin: 0;
 }
