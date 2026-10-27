@@ -329,7 +329,7 @@
   }
 
   // A new column at the end ("right", the menu's "Add column") or at the
-  // start ("left"), with its name open for editing.
+  // start ("left"), scrolled into view.
   function onAddColumn(side = 'right') {
     if (!currentBoard) return;
     const count = currentBoard.columns.length + 1;
@@ -343,11 +343,8 @@
     else currentBoard.columns.push(newCol);
     renderColumns();
     saveColumns();
-    const title = columnsTrack.querySelector(`.board-column[data-col-id="${newCol.id}"] .col-title`);
-    if (title) {
-      title.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      title.click();
-    }
+    const added = columnsTrack.querySelector(`.board-column[data-col-id="${newCol.id}"]`);
+    if (added) added.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
   // A column to create, always at the far left and right of the columns.

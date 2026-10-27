@@ -81,24 +81,28 @@
 /* ------------------------------------------------------------------ Column */
 
 /* A column to create, always at the far left and right (board.js addGhost):
-   a slim strip with a dashed outline and "+". */
+   the edge of a column cut off by the board's side, flush against it (the
+   negative margin eats .board-body's side padding), with a "+". */
 .col-add {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 18px;
   padding: 0;
-  border: 1px dashed var(--color-smoke);
-  border-radius: 10px;
-  background: transparent;
+  border: 0;
+  background: var(--color-obsidian);
+  box-shadow: var(--hairline);
   color: var(--color-ash);
   cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
 }
+.col-add[data-side="left"] { margin-left: -16px; border-radius: 0 10px 10px 0; }
+.col-add[data-side="right"] { margin-right: -16px; border-radius: 10px 0 0 10px; }
 .col-add:hover { background: var(--overlay-hover); color: var(--color-paper); }
 .col-add svg {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.35;

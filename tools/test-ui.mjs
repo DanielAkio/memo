@@ -792,7 +792,6 @@ try {
       await new Promise((r) => setTimeout(r, 100));
       out.names = M.boards['edge-board'].columns.map((c) => c.name);
       out.editing = Boolean(doc.activeElement && doc.activeElement.classList.contains('col-input'));
-      doc.activeElement.blur();
       const before = Object.keys(M.notes);
       doc.getElementById('newBtn').click();
       await new Promise((r) => setTimeout(r, 300));
@@ -807,7 +806,7 @@ try {
     assert.equal(res.left && res.right, true, 'Both "add column" strips are always shown');
     assert.deepEqual(res.names, ['Nome da coluna 5', 'To Do', 'In Progress', 'Done', 'Nome da coluna 4'],
       'Clicking adds a column at that side');
-    assert.equal(res.editing, true, 'The new column opens its name for editing');
+    assert.equal(res.editing, false, 'The new column is just added, its name not opened for editing');
     assert.equal(res.added, 1, 'The "+" creates one memory');
     assert.equal(res.onBoard, false, 'The new memory is not put on the board');
     assert.equal(res.opened, true, 'The new memory opens');
