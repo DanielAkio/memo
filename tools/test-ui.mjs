@@ -709,7 +709,7 @@ try {
       await M.openManager();
       const doc = M.frameDoc('manager');
       const card = doc.querySelector('#list .card[data-id="chip-note"]');
-      const pills = card ? [...card.querySelectorAll('.card-pill')] : [];
+      const pills = card ? [...card.querySelectorAll('.pill')] : [];
       const chip = pills.find((p) => p.textContent === 'Chip board');
       const groupChip = pills.find((p) => p.textContent === 'Chip group');
       const search = doc.getElementById('search');
@@ -722,13 +722,13 @@ try {
         name: chip && chip.textContent,
         color: chip && chip.querySelector('svg').dataset.color,
         groupColor: groupChip && groupChip.querySelector('svg').dataset.color,
-        pickers: doc.querySelectorAll('#list select, #list .card-pill button').length,
+        pickers: doc.querySelectorAll('#list select, #list .pill button').length,
         found,
         // A chip exactly on the memories that some board holds.
         chipMismatches: [...doc.querySelectorAll('#list .card')].filter((c) => {
           const onBoard = Object.values(M.boards).some((b) => !b.trashedAt
             && b.columns.some((col) => col.noteIds.includes(c.dataset.id)));
-          const pillCount = c.querySelectorAll('.card-pill').length;
+          const pillCount = c.querySelectorAll('.pill').length;
           const expected = (onBoard ? 1 : 0) + (M.notes[c.dataset.id] && M.notes[c.dataset.id].groupId ? 1 : 0);
           return c.dataset.id && pillCount < expected;
         }).length,
@@ -738,6 +738,16 @@ try {
     assert.equal(res.name, 'Chip board', 'The memory card should show the board name');
     assert.equal(res.color, 'coral', 'The board icon should take the board colour');
     assert.deepEqual(res.found, ['chip-note'], 'Searching a board name should find its memories');
+    // The memory's own footer shows the board too (same pill).
+    const foot = await page.evaluate(async () => {
+      await window.Memo.openNote('chip-note');
+      await new Promise((r) => setTimeout(r, 200));
+      const doc = window.Memo.frameDoc('note-chip-note');
+      const pills = [...doc.querySelectorAll('#footBoards .pill')].map((p) => p.textContent);
+      window.Memo.closeWin('note-chip-note');
+      return pills;
+    });
+    assert.deepEqual(foot, ['Chip board'], 'A memory on a board shows it as a pill in its footer');
     assert.equal(res.groupColor, 'teal', 'The group pill should show the group colour');
     assert.equal(res.pickers, 0, 'The manager list should not offer a group picker');
     assert.equal(res.chipMismatches, 0, 'Every memory on a board or in a group should show its pills');

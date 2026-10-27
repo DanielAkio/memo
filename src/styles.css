@@ -527,6 +527,19 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   overflow: hidden;
 }
 #count.is-alert { color: var(--color-mist); }
+/* The boards the note is on (base.css .pill), after its group and drawn
+   like it: icon and name in the footer's type, no chip. */
+.foot-boards { display: flex; gap: 10px; min-width: 0; flex: 0 4 auto; }
+.foot-boards .pill {
+  max-width: 120px;
+  height: auto;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.foot-boards:empty { display: none; }
 .foot-aa {
   flex: none;
   height: 20px;

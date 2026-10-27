@@ -61,8 +61,10 @@
   function renderMeta() {
     const n = wordCount(note.text);
     $('count').textContent = t(n === 1 ? 'wordOne' : 'wordMany', { n });
-    // Bottom left, always: the note's group, or "No group".
+    // Bottom left, always: the note's group, or "No group"; then the boards
+    // it is on, if any.
     groups.render();
+    $('footBoards').replaceChildren(...MemoPill.boardsOf(boards, note.id).map((b) => MemoPill.create('board', b)));
     editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check, img'));
     renderName();
   }
@@ -3135,11 +3137,17 @@
     onOpen: () => { colors.close(); hideFormatBar(); },
   });
 
+  // The boards, for the pills of those the note is on (renderMeta).
+  let boards = [];
+
   async function loadGroups() {
     if (EMBED || !note) return;
     try {
-      const [list, groupId] = await Promise.all([invoke('list_groups'), invoke('get_note_group')]);
+      const [list, groupId, boardList] = await Promise.all([
+        invoke('list_groups'), invoke('get_note_group'), invoke('list_boards'),
+      ]);
       note.groupId = groupId;
+      boards = boardList;
       groups.setGroups(list);
     } catch (err) {
       console.error('list_groups', err);
@@ -3265,6 +3273,7 @@
     render();
     if (!EMBED) {
       TAURI.event.listen('groups-changed', loadGroups);
+      TAURI.event.listen('boards-changed', loadGroups);
       await loadGroups();
     }
     if (!EMBED && !new URLSearchParams(location.search).has('nofocus')) {

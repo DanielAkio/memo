@@ -267,7 +267,9 @@ button { font: inherit; color: inherit; }
   max-width: calc(100% - 16px);
 }
 .foot-btn {
-  flex: 1;
+  /* Its own width first: whatever sits beside it (a note's board pills)
+     gives way before the group's name does. */
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -377,6 +379,38 @@ button { font: inherit; color: inherit; }
   color: var(--color-mist);
 }
 .card-title.is-empty { color: var(--color-ash); font-weight: 400; }
+
+/* Where an item is, shown only (components/pill.js): its group's folder or
+   a board's icon in that colour, and the name (manager cards, a note's
+   footer). */
+.pill {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 120px;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: 9999px;
+  background: var(--overlay-hover);
+  box-shadow: var(--hairline);
+  color: var(--color-mist);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: normal;
+}
+.pill svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: var(--color-ash);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+.pill svg[data-color]:not([data-color=""]) { stroke: var(--note-color); }
+.pill span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* A note's colour dot on a card (manager, board). */
 .card-dot {

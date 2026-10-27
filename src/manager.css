@@ -305,34 +305,6 @@ body {
   stroke-linejoin: round;
 }
 .card-folder[data-color]:not([data-color=""]) { stroke: var(--note-color); }
-/* The group or a board an item is on, shown only (not a control): its
-   folder or board icon in its colour, and its name, in a pill. */
-.card-pill {
-  flex: 0 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  max-width: 120px;
-  height: 22px;
-  padding: 0 9px 0 7px;
-  border-radius: 9999px;
-  background: var(--overlay-hover);
-  box-shadow: var(--hairline);
-  color: var(--color-mist);
-  font-size: 12px;
-}
-.card-pill svg {
-  flex: none;
-  width: 13px;
-  height: 13px;
-  fill: none;
-  stroke: var(--color-ash);
-  stroke-width: 1.3;
-  stroke-linejoin: round;
-}
-.card-pill svg[data-color]:not([data-color=""]) { stroke: var(--note-color); }
-.card-pill span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* List layout (Settings → Appearance): the same cards as rows, one per
    item: colour dot or folder and title, the text on one line below, and the
@@ -383,7 +355,7 @@ body {
    smaller group box. */
 @media (max-width: 420px) {
   .as-list .card-meta { display: none; }
-  .as-list .card-pill { max-width: 90px; }
+  .as-list .pill { max-width: 90px; }
 }
 
 /* Groups tab: the folder takes the place of a memory's colour dot. */

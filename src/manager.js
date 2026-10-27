@@ -94,8 +94,8 @@
   }
 
   // Same folder as a group bar and a note's footer.
-  const FOLDER_ICON = '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>';
-  const BOARD_ICON = '<rect x="2" y="2.5" width="3.5" height="11" rx="1" stroke-width="1.3"/><rect x="6.25" y="2.5" width="3.5" height="7.5" rx="1" stroke-width="1.3"/><rect x="10.5" y="2.5" width="3.5" height="9.5" rx="1" stroke-width="1.3"/>';
+  const FOLDER_ICON = MemoPill.ICONS.group;
+  const BOARD_ICON = MemoPill.ICONS.board;
   // Trash: an X, the same as the trash button in the titlebars.
   const TRASH_ICON = '<path d="M4.25 4.25l7.5 7.5M11.75 4.25l-7.5 7.5"/>';
 
@@ -253,26 +253,15 @@
 
   const groupName = (note) => ([...groups, ...trashedGroups].find((g) => g.id === note.groupId) || {}).name || '';
   // The boards a memory is on (in one of their columns).
-  const boardsOf = (note) => boards.filter((b) => (b.columns || []).some((c) => (c.noteIds || []).includes(note.id)));
+  const boardsOf = (note) => MemoPill.boardsOf(boards, note.id);
 
-  // A pill in a card's footer that only shows where the item is: the
-  // group's folder or the board's icon in its colour, and its name. Groups
-  // and boards are changed from the windows (footer pickers, dragging), not
-  // here.
-  function pill(path, item, key) {
-    const name = item.name || t('untitled');
-    const p = el('span', 'card-pill');
-    p.title = t(key, { name });
-    const mark = icon(path);
-    MemoColor.paint(mark, item.color);
-    p.append(mark, el('span', '', name));
-    return p;
-  }
+  // Pills in a card's footer that only show where the item is
+  // (components/pill.js, as in a note's footer).
   const groupPill = (groupId) => {
     const group = groups.find((g) => g.id === groupId);
-    return group ? [pill(FOLDER_ICON, group, 'inGroup')] : [];
+    return group ? [MemoPill.create('group', group)] : [];
   };
-  const boardPill = (board) => pill(BOARD_ICON, board, 'onBoard');
+  const boardPill = (board) => MemoPill.create('board', board);
 
   // -------------------------------------------------------- groups tab
   // Groups shown like memories: same search, same sort box, a card per group
