@@ -160,6 +160,7 @@
   padding: 2px 4px;
   border-radius: 4px;
 }
+.col-title.is-empty { color: var(--color-ash); font-weight: 400; }
 .col-title:hover {
   background: var(--overlay-hover);
 }

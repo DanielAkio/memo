@@ -335,7 +335,7 @@
     const count = currentBoard.columns.length + 1;
     const newCol = {
       id: `col-${Date.now()}-${count}`,
-      name: `${t('columnName')} ${count}`,
+      name: '',
       color: '',
       noteIds: [],
     };
@@ -400,12 +400,18 @@
 
       const title = document.createElement('span');
       title.className = 'col-title';
-      title.textContent = col.name || t('columnName');
+      // An empty name reads "Untitled", dimmed, as a window's name.
+      const renderColTitle = () => {
+        title.textContent = col.name || t('untitled');
+        title.classList.toggle('is-empty', !col.name);
+      };
+      renderColTitle();
 
       const titleInput = document.createElement('input');
       titleInput.type = 'text';
       titleInput.className = 'col-input';
       titleInput.maxLength = 50;
+      titleInput.placeholder = t('columnName');
       titleInput.hidden = true;
 
       title.addEventListener('click', () => {
@@ -418,9 +424,8 @@
 
       const commitColTitle = () => {
         if (titleInput.hidden) return;
-        const clean = titleInput.value.trim() || t('columnName');
-        col.name = clean;
-        title.textContent = clean;
+        col.name = titleInput.value.trim();
+        renderColTitle();
         titleInput.hidden = true;
         title.hidden = false;
         saveColumns();
