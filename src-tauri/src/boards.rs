@@ -43,15 +43,47 @@ pub(crate) fn open_board_window(app: &AppHandle, board: &Board) -> tauri::Result
     Ok(window)
 }
 
-#[tauri::command]
-pub(crate) async fn new_board(app: AppHandle, store: State<'_, Shared>) -> Result<Board, String> {
-    let lang = store.effective_language();
-    let default_cols = if lang == "en" {
+/// A new board's columns, in the app's language.
+fn default_columns(store: &Shared) -> Vec<String> {
+    if store.effective_language() == "en" {
         vec!["To Do".into(), "In Progress".into(), "Done".into()]
     } else {
         vec!["A Fazer".into(), "Em Andamento".into(), "Concluído".into()]
-    };
-    let board = store.create_board(None, default_cols, None);
+    }
+}
+
+/// Board titlebar "+": a new memory at the end of the board's first column
+/// (a board with no column gets one), opened beside the board as a clicked
+/// card is: it goes back to the board when it loses focus.
+#[tauri::command]
+pub(crate) async fn new_note_in_board(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    let id = Kind::Board.id_of(&window);
+    let store = app.state::<Shared>();
+    store.board(&id).ok_or("board not found")?;
+    let note = store.create(beside(&window));
+    let first = default_columns(&store).swap_remove(0);
+    store.update_board(&id, |b| {
+        if b.columns.is_empty() {
+            b.columns.push(BoardColumn {
+                id: format!("col-{}", store::now_ms()),
+                name: first,
+                color: String::new(),
+                note_ids: Vec::new(),
+            });
+        }
+        b.columns[0].note_ids.push(note.id.clone());
+    });
+    mark_board_transient(&note.id);
+    let note_window = open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    let _ = note_window.set_focus();
+    boards_changed(&app);
+    notify(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn new_board(app: AppHandle, store: State<'_, Shared>) -> Result<Board, String> {
+    let board = store.create_board(None, default_columns(&store), None);
     open_board_window(&app, &board).map_err(|e| e.to_string())?;
     boards_changed(&app);
     Ok(board)

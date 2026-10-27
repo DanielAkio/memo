@@ -777,40 +777,40 @@ try {
     assert.equal(res.preview, '3 colunas · 1 memória', 'Board cards count columns and memories in words');
   });
 
-  // ------------------------------------------------ 7d. Board: add a column from either edge
-  await step('Board: a column to create appears near the far left or right; a click adds it there', async () => {
+  // ------------------------------------------------ 7d. Board: add a column at either end, "+" adds a memory
+  await step('Board: "add column" sits at both ends; the titlebar "+" adds a memory to the first column', async () => {
     const res = await page.evaluate(async () => {
       const M = window.Memo;
       M.addBoard({ id: 'edge-board', name: 'Edges' });
       await M.openWin('board-edge-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 820, h: 360 });
       const doc = M.frameDoc('board-edge-board');
-      const body = doc.getElementById('boardBody');
-      const r = body.getBoundingClientRect();
-      const move = (x) => body.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: r.top + 100, bubbles: true }));
-      const out = {};
-      move(r.left + 10);
-      out.left = body.dataset.addSide;
-      move(r.left + r.width / 2);
-      out.middle = body.dataset.addSide;
-      move(r.right - 10);
-      out.right = body.dataset.addSide;
+      const shown = (side) => doc.querySelector(`.col-add[data-side="${side}"]`).getBoundingClientRect().width > 0;
+      const out = { left: shown('left'), right: shown('right') };
       doc.querySelector('.col-add[data-side="right"]').click();
-      await new Promise((r2) => setTimeout(r2, 200)); // saved and reloaded
-      doc.getElementById('boardBody').scrollLeft = 0;
-      move(r.left + 10);
+      await new Promise((r) => setTimeout(r, 200)); // saved and reloaded
       doc.querySelector('.col-add[data-side="left"]').click();
-      await new Promise((r2) => setTimeout(r2, 100));
+      await new Promise((r) => setTimeout(r, 100));
       out.names = M.boards['edge-board'].columns.map((c) => c.name);
       out.editing = Boolean(doc.activeElement && doc.activeElement.classList.contains('col-input'));
+      doc.activeElement.blur();
+      const before = Object.keys(M.notes);
+      doc.getElementById('newBtn').click();
+      await new Promise((r) => setTimeout(r, 300));
+      const added = Object.keys(M.notes).filter((id) => !before.includes(id));
+      out.added = added.length;
+      out.inFirst = M.boards['edge-board'].columns[0].noteIds.includes(added[0]);
+      out.opened = Boolean(added[0] && M.wins[`note-${added[0]}`]);
+      if (added[0]) M.closeWin(`note-${added[0]}`);
       M.closeWin('board-edge-board');
       return out;
     });
-    assert.equal(res.left, 'left', 'Near the left edge the left "add column" shows');
-    assert.equal(res.middle, '', 'Away from the edges none shows');
-    assert.equal(res.right, 'right', 'Near the right edge the right "add column" shows');
+    assert.equal(res.left && res.right, true, 'Both "add column" strips are always shown');
     assert.deepEqual(res.names, ['Nome da coluna 5', 'To Do', 'In Progress', 'Done', 'Nome da coluna 4'],
       'Clicking adds a column at that side');
     assert.equal(res.editing, true, 'The new column opens its name for editing');
+    assert.equal(res.added, 1, 'The "+" creates one memory');
+    assert.equal(res.inFirst, true, 'The new memory goes in the first column');
+    assert.equal(res.opened, true, 'The new memory opens');
   });
 
   // ------------------------------------------------ 8. Web vs Landing page storage isolation

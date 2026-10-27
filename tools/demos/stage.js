@@ -193,6 +193,13 @@
         }
         return null;
       }
+      case 'new_note_in_board': {
+        const x = M.addNote({ id: `n${Date.now()}`, text: '' });
+        b.columns[0].noteIds.push(x.id);
+        M.openNote(x.id);
+        M.emit('boards-changed');
+        return null;
+      }
       case 'open_board_note':
       case 'open_note': {
         const x = M.notes[a.id];

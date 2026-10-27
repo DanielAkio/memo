@@ -359,6 +359,7 @@ fn main() {
             new_board,
             open_board,
             open_board_note,
+            new_note_in_board,
             take_note_out_of_board,
             load_board,
             save_board_columns,
