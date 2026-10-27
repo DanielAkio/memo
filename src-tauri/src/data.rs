@@ -126,7 +126,7 @@ pub(crate) fn move_data_dir(app: &AppHandle, window: &WebviewWindow, dir: PathBu
 /// and language. The manager reloads itself on "store-replaced".
 pub(crate) fn reload_windows(app: &AppHandle) {
     for window in app.webview_windows().into_values() {
-        if is_note(&window) || is_group(&window) || is_board(&window) {
+        if Kind::Note.is(&window) || Kind::Group.is(&window) || Kind::Board.is(&window) {
             let _ = window.destroy();
         }
     }
@@ -445,7 +445,7 @@ pub(crate) async fn import_notes(app: AppHandle, window: WebviewWindow) -> Resul
     store.flush();
     for id in &ids {
         let note = store.get(id);
-        let open = app.get_webview_window(&label_for(id));
+        let open = app.get_webview_window(&Kind::Note.label(id));
         match (note, open) {
             // Window already open: reload it with the imported content.
             (Some(note), Some(w)) if note.trashed_at.is_none() => {

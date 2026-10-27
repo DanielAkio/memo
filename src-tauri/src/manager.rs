@@ -221,8 +221,8 @@ pub(crate) fn change_zoom(app: AppHandle, step: i32) -> f64 {
     let zoom = store.zoom();
     for window in app.webview_windows().values().filter(|w| is_app_window(w)) {
         let _ = window.set_zoom(zoom);
-        if is_group(window) {
-            if let Some(group) = store.group(&group_id_of(window)) {
+        if Kind::Group.is(window) {
+            if let Some(group) = store.group(&Kind::Group.id_of(window)) {
                 let _ = window.set_min_size(Some(tauri::LogicalSize::new(
                     GROUP_MIN_W,
                     TITLEBAR_H * zoom,

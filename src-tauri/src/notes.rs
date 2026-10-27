@@ -9,7 +9,7 @@ pub(crate) fn get_theme(store: State<'_, Shared>) -> String {
 
 #[tauri::command]
 pub(crate) fn load_note(window: WebviewWindow, store: State<'_, Shared>) -> Option<Note> {
-    let mut note = store.get(&id_of(&window))?;
+    let mut note = store.get(&Kind::Note.id_of(&window))?;
     note.html = store.inline_images(&note.html);
     Some(note)
 }
@@ -23,7 +23,7 @@ pub(crate) fn set_title(
     store: State<'_, Shared>,
 ) -> String {
     let title: String = title.trim().chars().take(TITLE_MAX).collect();
-    store.update(&id_of(&window), |n| n.title = title.clone());
+    store.update(&Kind::Note.id_of(&window), |n| n.title = title.clone());
     notify(&app);
     title
 }
@@ -39,7 +39,7 @@ pub(crate) fn save_text(
     // Images are kept as files; the note refers to them (images.rs).
     let html = store.store_images(&html);
     let mut changed = false;
-    store.update(&id_of(&window), |n| {
+    store.update(&Kind::Note.id_of(&window), |n| {
         if n.text != text || n.html != html {
             n.text = text;
             n.html = html;
@@ -74,12 +74,12 @@ pub(crate) fn set_pinned(
     window
         .set_always_on_top(pinned)
         .map_err(|e| e.to_string())?;
-    if is_note(&window) {
-        store.update(&id_of(&window), |n| n.pinned = pinned);
-    } else if is_group(&window) {
-        store.update_group(&group_id_of(&window), |g| g.pinned = pinned);
-    } else if is_board(&window) {
-        store.update_board(&board_id_of(&window), |b| b.pinned = pinned);
+    if Kind::Note.is(&window) {
+        store.update(&Kind::Note.id_of(&window), |n| n.pinned = pinned);
+    } else if Kind::Group.is(&window) {
+        store.update_group(&Kind::Group.id_of(&window), |g| g.pinned = pinned);
+    } else if Kind::Board.is(&window) {
+        store.update_board(&Kind::Board.id_of(&window), |b| b.pinned = pinned);
     } else {
         store.update_manager(|m| m.pinned = pinned);
     }
@@ -94,7 +94,7 @@ pub(crate) fn set_color(
     store: State<'_, Shared>,
 ) -> Result<(), String> {
     check_color(&color)?;
-    store.update(&id_of(&window), |n| n.color = color);
+    store.update(&Kind::Note.id_of(&window), |n| n.color = color);
     notify(&app);
     Ok(())
 }
@@ -175,7 +175,7 @@ pub(crate) fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
 /// Sends the calling note window directly to the trash.
 #[tauri::command]
 pub(crate) async fn trash_note(app: AppHandle, window: WebviewWindow) {
-    trash(&app, &id_of(&window));
+    trash(&app, &Kind::Note.id_of(&window));
 }
 
 /// Closes the note (✕ button or middle click): it stays among the current
@@ -183,7 +183,7 @@ pub(crate) async fn trash_note(app: AppHandle, window: WebviewWindow) {
 /// goes the way `trash` sends it: deleted outright.
 #[tauri::command]
 pub(crate) async fn close_note(app: AppHandle, window: WebviewWindow) {
-    close_note_by_id(&app, &id_of(&window));
+    close_note_by_id(&app, &Kind::Note.id_of(&window));
 }
 
 pub(crate) fn close_note_by_id(app: &AppHandle, id: &str) {
@@ -193,7 +193,7 @@ pub(crate) fn close_note_by_id(app: &AppHandle, id: &str) {
         Some(_) => {
             store.update(id, |n| n.hidden = true);
             store.flush();
-            destroy_window(app, &label_for(id));
+            destroy_window(app, &Kind::Note.label(id));
             notify(app);
         }
         None => {}

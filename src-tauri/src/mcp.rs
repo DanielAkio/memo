@@ -32,8 +32,8 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
 
 use crate::{
-    beside, close_note_by_id, group_label, groups_changed, is_app_window, is_note, join_group,
-    label_for, leave_group, notify, open_group_window, open_note, put_in, rename_group_by_id,
+    beside, close_note_by_id, groups_changed, is_app_window, join_group, leave_group, notify,
+    open_group_window, open_note, put_in, rename_group_by_id, Kind,
     restore_group, restore_note, show_group, take_out, trash, trash_group_by_id, Shared,
     AUTOSTART_ARG, CONFIG, DATA_FOLDER, MANAGER,
 };
@@ -324,7 +324,7 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
             store.flush();
             // An open window shows the new content after a reload, as when
             // sync brings a change.
-            if let Some(window) = app.get_webview_window(&label_for(&note.id)) {
+            if let Some(window) = app.get_webview_window(&Kind::Note.label(&note.id)) {
                 if let Some(pinned) = pinned {
                     let _ = window.set_always_on_top(pinned);
                 }
@@ -341,13 +341,13 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
         "close_memory" => {
             let note = note_arg(&store, args)?;
             close_note_by_id(app, &note.id);
-            wait_closed(app, &label_for(&note.id));
+            wait_closed(app, &Kind::Note.label(&note.id));
             Ok(json!({ "closed": note.id, "deleted": store.get(&note.id).is_none() }))
         }
         "trash_memory" => {
             let note = note_arg(&store, args)?;
             trash(app, &note.id);
-            wait_closed(app, &label_for(&note.id));
+            wait_closed(app, &Kind::Note.label(&note.id));
             Ok(json!({ "trashed": note.id, "deleted": store.get(&note.id).is_none() }))
         }
         "restore_memory" => {
@@ -405,7 +405,7 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
                     g.pinned = pinned;
                 }
             });
-            if let (Some(pinned), Some(window)) = (pinned, app.get_webview_window(&group_label(id))) {
+            if let (Some(pinned), Some(window)) = (pinned, app.get_webview_window(&Kind::Group.label(id))) {
                 let _ = window.set_always_on_top(pinned);
             }
             match bool_arg(args, "memories_out") {
@@ -442,7 +442,7 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
         "trash_group" => {
             let group = active_group(&store, req_str(args, "id")?)?;
             trash_group_by_id(app, &group.id);
-            wait_closed(app, &group_label(&group.id));
+            wait_closed(app, &Kind::Group.label(&group.id));
             Ok(json!({ "trashed": group.id, "deleted": store.group(&group.id).is_none() }))
         }
         "restore_group" => {
@@ -480,7 +480,7 @@ fn memory(app: &AppHandle, store: &Store, n: &Note, full: bool) -> Value {
         "text": text,
         "color": n.color,
         "pinned": n.pinned,
-        "onScreen": app.get_webview_window(&label_for(&n.id)).is_some(),
+        "onScreen": app.get_webview_window(&Kind::Note.label(&n.id)).is_some(),
         "group": group,
         "inTrash": n.trashed_at.is_some(),
         "createdAt": iso(n.created_at),
@@ -567,7 +567,7 @@ fn anchor(app: &AppHandle) -> Option<(i32, i32)> {
         .filter(visible)
         .find(|w| is_app_window(w) && w.is_focused().unwrap_or(false))
         .or_else(|| windows.get(MANAGER).filter(visible))
-        .or_else(|| windows.values().filter(visible).find(|w| is_note(w)))?;
+        .or_else(|| windows.values().filter(visible).find(|w| Kind::Note.is(w)))?;
     beside(parent)
 }
 

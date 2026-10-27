@@ -78,12 +78,12 @@ pub(crate) struct Resize {
 /// after a drag.
 pub(crate) fn pinned(window: &WebviewWindow) -> bool {
     let store = window.state::<Shared>();
-    if is_group(window) {
-        store.group(&group_id_of(window)).is_some_and(|g| g.pinned)
-    } else if is_note(window) {
-        store.get(&id_of(window)).is_some_and(|n| n.pinned)
-    } else if is_board(window) {
-        store.board(&board_id_of(window)).is_some_and(|b| b.pinned)
+    if Kind::Group.is(window) {
+        store.group(&Kind::Group.id_of(window)).is_some_and(|g| g.pinned)
+    } else if Kind::Note.is(window) {
+        store.get(&Kind::Note.id_of(window)).is_some_and(|n| n.pinned)
+    } else if Kind::Board.is(window) {
+        store.board(&Kind::Board.id_of(window)).is_some_and(|b| b.pinned)
     } else {
         store.manager().pinned
     }
@@ -270,10 +270,10 @@ pub(crate) fn drag_move(window: &WebviewWindow, drags: &Drags) {
     // a board over a group bar can be dropped into it;
     // group bars themselves don't Snap.
     let app = window.app_handle();
-    if is_note(window) || is_board(window) {
+    if Kind::Note.is(window) || Kind::Board.is(window) {
         let target = if let Some(gid) = group_under(window, cursor) {
             Some(DropTarget::Group(gid))
-        } else if is_note(window) {
+        } else if Kind::Note.is(window) {
             if let Some((bid, cid)) = board_col_under(app, cursor) {
                 Some(DropTarget::BoardColumn(bid, cid))
             } else {
@@ -305,7 +305,7 @@ pub(crate) fn drag_move(window: &WebviewWindow, drags: &Drags) {
         }
     }
     // Group bars don't Snap (a half-screen titlebar).
-    drag.zone = if is_group(window) || drag.drop.is_some() {
+    drag.zone = if Kind::Group.is(window) || drag.drop.is_some() {
         None
     } else {
         snap_zone(window, cursor)
@@ -315,16 +315,16 @@ pub(crate) fn drag_move(window: &WebviewWindow, drags: &Drags) {
 
 /// The group bar under `cursor` (not the note or board's own group), by id.
 pub(crate) fn group_under(window: &WebviewWindow, cursor: (f64, f64)) -> Option<String> {
-    let own = if is_note(window) {
+    let own = if Kind::Note.is(window) {
         window
             .state::<Shared>()
-            .get(&id_of(window))
+            .get(&Kind::Note.id_of(window))
             .map(|n| n.group_id)
             .unwrap_or_default()
-    } else if is_board(window) {
+    } else if Kind::Board.is(window) {
         window
             .state::<Shared>()
-            .board(&board_id_of(window))
+            .board(&Kind::Board.id_of(window))
             .map(|b| b.group_id)
             .unwrap_or_default()
     } else {
@@ -334,7 +334,7 @@ pub(crate) fn group_under(window: &WebviewWindow, cursor: (f64, f64)) -> Option<
         .webview_windows()
         .into_values()
         .filter(|w| {
-            is_group(w) && w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false)
+            Kind::Group.is(w) && w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false)
         })
         .find(|w| {
             let (Some((x, y)), Some((bw, bh))) = (desk::inner_position(w), desk::inner_size(w))
@@ -346,7 +346,7 @@ pub(crate) fn group_under(window: &WebviewWindow, cursor: (f64, f64)) -> Option<
                 && cursor.1 >= y as f64
                 && cursor.1 < (y + bh) as f64
         })
-        .map(|w| group_id_of(&w))
+        .map(|w| Kind::Group.id_of(&w))
         .filter(|id| *id != own)
 }
 
@@ -355,7 +355,7 @@ pub(crate) fn board_col_under(app: &AppHandle, cursor: (f64, f64)) -> Option<(St
     let board_windows: Vec<WebviewWindow> = app
         .webview_windows()
         .into_values()
-        .filter(|w| is_board(w) && w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false))
+        .filter(|w| Kind::Board.is(w) && w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false))
         .collect();
 
     for w in board_windows {
@@ -365,7 +365,7 @@ pub(crate) fn board_col_under(app: &AppHandle, cursor: (f64, f64)) -> Option<(St
         if cursor.0 >= bx as f64 && cursor.0 < (bx + bw) as f64 && cursor.1 >= by as f64 && cursor.1 < (by + bh) as f64 {
             let rel_x = cursor.0 - bx as f64;
             let rel_y = cursor.1 - by as f64;
-            let bid = board_id_of(&w);
+            let bid = Kind::Board.id_of(&w);
             let drags = app.state::<Drags>();
             let cols = drags.board_columns.lock().unwrap().get(&bid).cloned().unwrap_or_default();
             for col in cols {
@@ -395,16 +395,16 @@ pub(crate) fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
         match target {
             DropTarget::Group(group) => {
                 let _ = app.emit("drop-hover", (&group, false));
-                if is_board(&window) {
-                    join_board_to_group(app, &board_id_of(&window), &group, Some(drag.start));
+                if Kind::Board.is(&window) {
+                    join_board_to_group(app, &Kind::Board.id_of(&window), &group, Some(drag.start));
                 } else {
-                    join_group(app, &id_of(&window), &group, Some(drag.start));
+                    join_group(app, &Kind::Note.id_of(&window), &group, Some(drag.start));
                 }
                 return;
             }
             DropTarget::BoardColumn(bid, cid) => {
                 let _ = app.emit("board-drop-hover", (&bid, &cid, false));
-                let note_id = id_of(&window);
+                let note_id = Kind::Note.id_of(&window);
                 let store = app.state::<Shared>();
                 store.update_board(&bid, |b| {
                     for col in &mut b.columns {
@@ -513,9 +513,9 @@ pub(crate) fn resize_to(window: WebviewWindow, edges: String, drags: State<'_, D
     }
 
     // Minimum size (the same as when the window was resizable).
-    let min_w = if is_note(&window) {
+    let min_w = if Kind::Note.is(&window) {
         MIN_W
-    } else if is_group(&window) {
+    } else if Kind::Group.is(&window) {
         GROUP_MIN_W
     } else {
         MANAGER_MIN_W
@@ -533,7 +533,7 @@ pub(crate) fn resize_to(window: WebviewWindow, edges: String, drags: State<'_, D
     // Titlebar magnet: a note with almost no text left closes onto its
     // titlebar, like the other magnets; pulling the edge past it opens it.
     let shut = (TITLEBAR_SNAP * zoom * targets.scale).round() as i32;
-    if is_note(&window)
+    if Kind::Note.is(&window)
         && window.state::<Shared>().magnet()
         && (edges.contains('n') || edges.contains('s'))
         && b - t < min_h + shut
@@ -581,10 +581,10 @@ pub(crate) fn raise_notes(app: &AppHandle) -> bool {
     let mut windows: Vec<WebviewWindow> = app
         .webview_windows()
         .into_values()
-        .filter(|w| is_note(w) || is_group(w) || is_board(w))
+        .filter(|w| Kind::Note.is(w) || Kind::Group.is(w) || Kind::Board.is(w))
         .collect();
     // Each focused window goes on top of the previous ones.
-    windows.sort_by_key(is_group);
+    windows.sort_by_key(|w| Kind::Group.is(w));
     for window in &windows {
         reveal(window);
     }
@@ -604,6 +604,6 @@ pub(crate) fn trash(app: &AppHandle, id: &str) {
         None => {}
     }
     store.flush();
-    destroy_window(app, &label_for(id));
+    destroy_window(app, &Kind::Note.label(id));
     notify(app);
 }

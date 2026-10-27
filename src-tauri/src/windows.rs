@@ -5,7 +5,7 @@ use crate::*;
 
 /// Opens a note's window (or brings it to the front if it is already open).
 pub(crate) fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow> {
-    if let Some(existing) = app.get_webview_window(&label_for(&note.id)) {
+    if let Some(existing) = app.get_webview_window(&Kind::Note.label(&note.id)) {
         reveal(&existing);
         return Ok(existing);
     }
@@ -16,7 +16,7 @@ pub(crate) fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<We
 
 /// Creates a note's window, hidden, at its saved place.
 pub(crate) fn build_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow> {
-    let label = label_for(&note.id);
+    let label = Kind::Note.label(&note.id);
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("Memo")
         .inner_size(note.width, note.height)
@@ -316,29 +316,14 @@ pub(crate) fn is_on_screen(window: &WebviewWindow, x: i32, y: i32) -> bool {
             .any(|m| m.contains(((x + 48) as f64, (y + 12) as f64)))
 }
 
-/// Which saved object a window's geometry belongs to.
-pub(crate) enum Kind {
-    Note(String),
-    Group(String),
-    Board(String),
-    Manager,
-}
-
 /// Saves position and size whenever the user moves or resizes a window
 /// (note, group, board or manager). Moves made by a group animation are skipped,
 /// so a note keeps its own place.
 pub(crate) fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
     let app = app.clone();
     let win = window.clone();
-    let kind = if is_note(window) {
-        Kind::Note(id_of(window))
-    } else if is_group(window) {
-        Kind::Group(group_id_of(window))
-    } else if is_board(window) {
-        Kind::Board(board_id_of(window))
-    } else {
-        Kind::Manager
-    };
+    // The saved object the geometry belongs to; `None` = the manager.
+    let kind = Kind::of(window);
     window.on_window_event(move |event| {
         let store = app.state::<Shared>();
         match event {
@@ -361,16 +346,16 @@ pub(crate) fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 let (x, y) = desk::point(&win, *pos);
                 let (x, y) = (Some(x), Some(y));
                 match &kind {
-                    Kind::Note(id) => {
+                    Some((Kind::Note, id)) => {
                         store.update(id, |n| (n.x, n.y) = (x, y));
                     }
-                    Kind::Group(id) => {
+                    Some((Kind::Group, id)) => {
                         store.update_group(id, |g| (g.x, g.y) = (x, y));
                     }
-                    Kind::Board(id) => {
+                    Some((Kind::Board, id)) => {
                         store.update_board(id, |b| (b.x, b.y) = (x, y));
                     }
-                    Kind::Manager => {
+                    None => {
                         store.update_manager(|m| (m.x, m.y) = (x, y));
                     }
                 }
@@ -381,20 +366,20 @@ pub(crate) fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
                 }
                 let logical = size.to_logical::<f64>(scale_of(&win));
                 match &kind {
-                    Kind::Note(id) => {
+                    Some((Kind::Note, id)) => {
                         store.update(id, |n| {
                             (n.width, n.height) = (logical.width, logical.height)
                         });
                     }
-                    Kind::Group(id) => {
+                    Some((Kind::Group, id)) => {
                         store.update_group(id, |g| g.width = logical.width);
                     }
-                    Kind::Board(id) => {
+                    Some((Kind::Board, id)) => {
                         store.update_board(id, |b| {
                             (b.width, b.height) = (logical.width, logical.height)
                         });
                     }
-                    Kind::Manager => {
+                    None => {
                         store.update_manager(|m| {
                             (m.width, m.height) = (logical.width, logical.height)
                         });
@@ -405,13 +390,13 @@ pub(crate) fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
             // Coming back to Memo: fetch what changed on other computers.
             WindowEvent::Focused(true) => sync::on_focus(),
             WindowEvent::Focused(false) => {
-                if is_note(&win) {
-                    let note_id = id_of(&win);
+                if Kind::Note.is(&win) {
+                    let note_id = Kind::Note.id_of(&win);
                     if is_board_transient(&note_id) {
                         let app = app.clone();
                         tauri::async_runtime::spawn(async move {
                             tokio::time::sleep(Duration::from_millis(150)).await;
-                            let label = label_for(&note_id);
+                            let label = Kind::Note.label(&note_id);
                             if let Some(w) = app.get_webview_window(&label) {
                                 if !w.is_focused().unwrap_or(false) {
                                     take_board_transient(&note_id);
@@ -425,8 +410,8 @@ pub(crate) fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
             }
             WindowEvent::Destroyed => {
                 app.state::<Sliding>().0.lock().unwrap().remove(win.label());
-                if is_note(&win) {
-                    take_board_transient(&id_of(&win));
+                if Kind::Note.is(&win) {
+                    take_board_transient(&Kind::Note.id_of(&win));
                 }
             }
             _ => {}

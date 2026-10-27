@@ -102,40 +102,51 @@ const DATA_FOLDER: &str = "memo";
 /// and, before that, Taxinha's (the app's former name).
 const OLD_DATA_FOLDERS: [&str; 2] = ["br.memo.notas", "br.taxinha.notas"];
 
-fn label_for(id: &str) -> String {
-    format!("note-{id}")
+/// The objects that have a window of their own, one per object, labelled
+/// `note-{id}`, `group-{id}` or `board-{id}` (the manager and the Snap
+/// preview have fixed labels). The one place that knows these labels.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Kind {
+    Note,
+    Group,
+    Board,
 }
 
-fn id_of(window: &WebviewWindow) -> String {
-    window.label().trim_start_matches("note-").to_string()
-}
+impl Kind {
+    const ALL: [Kind; 3] = [Kind::Note, Kind::Group, Kind::Board];
 
-fn is_note(window: &WebviewWindow) -> bool {
-    window.label().starts_with("note-")
-}
+    fn prefix(self) -> &'static str {
+        match self {
+            Kind::Note => "note-",
+            Kind::Group => "group-",
+            Kind::Board => "board-",
+        }
+    }
 
-fn group_label(id: &str) -> String {
-    format!("group-{id}")
-}
+    /// The window label of object `id`.
+    pub(crate) fn label(self, id: &str) -> String {
+        format!("{}{id}", self.prefix())
+    }
 
-fn group_id_of(window: &WebviewWindow) -> String {
-    window.label().trim_start_matches("group-").to_string()
-}
+    /// Whether `window` shows an object of this kind.
+    pub(crate) fn is(self, window: &WebviewWindow) -> bool {
+        window.label().starts_with(self.prefix())
+    }
 
-fn is_group(window: &WebviewWindow) -> bool {
-    window.label().starts_with("group-")
-}
+    /// The id of the object `window` shows (called by its own commands).
+    pub(crate) fn id_of(self, window: &WebviewWindow) -> String {
+        window.label().trim_start_matches(self.prefix()).to_string()
+    }
 
-fn is_board(window: &WebviewWindow) -> bool {
-    window.label().starts_with("board-")
-}
-
-fn board_label(id: &str) -> String {
-    format!("board-{id}")
-}
-
-fn board_id_of(window: &WebviewWindow) -> String {
-    window.label().trim_start_matches("board-").to_string()
+    /// The kind and id of the object `window` shows; `None` for the manager
+    /// and the Snap preview.
+    pub(crate) fn of(window: &WebviewWindow) -> Option<(Kind, String)> {
+        let label = window.label();
+        Kind::ALL
+            .into_iter()
+            .find(|k| label.starts_with(k.prefix()))
+            .map(|k| (k, label[k.prefix().len()..].to_string()))
+    }
 }
 
 /// The app's real windows (notes, groups, boards and manager), i.e. not the Snap

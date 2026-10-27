@@ -27,7 +27,7 @@
 //! and on "Sync now". Errors are `cloud::ERR_*` codes shown by the manager.
 
 use crate::{
-    cloud, group_label, images, label_for, notify,
+    cloud, images, notify, Kind,
     store::{Applied, GroupDoc, Note, NoteDoc, SettingsDoc, SyncState, SyncedFile},
     welcome, Config, Shared, CONFIG,
 };
@@ -306,24 +306,24 @@ trait Ui {
 
 impl Ui for AppHandle {
     fn focused(&self, note_id: &str) -> bool {
-        self.get_webview_window(&label_for(note_id))
+        self.get_webview_window(&Kind::Note.label(note_id))
             .is_some_and(|w| w.is_focused().unwrap_or(false))
     }
 
     fn reload_note(&self, note_id: &str) {
-        if let Some(w) = self.get_webview_window(&label_for(note_id)) {
+        if let Some(w) = self.get_webview_window(&Kind::Note.label(note_id)) {
             let _ = w.reload();
         }
     }
 
     fn close_note(&self, note_id: &str) {
-        if let Some(w) = self.get_webview_window(&label_for(note_id)) {
+        if let Some(w) = self.get_webview_window(&Kind::Note.label(note_id)) {
             let _ = w.destroy();
         }
     }
 
     fn close_group(&self, group_id: &str) {
-        if let Some(w) = self.get_webview_window(&group_label(group_id)) {
+        if let Some(w) = self.get_webview_window(&Kind::Group.label(group_id)) {
             let _ = w.destroy();
         }
     }
