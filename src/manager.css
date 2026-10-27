@@ -258,6 +258,14 @@ body {
   cursor: default;
 }
 .card:hover { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+/* Trash: the X in the card's upper right corner (as in the titlebars). */
+.card.has-x { position: relative; }
+.card.has-x .card-head { padding-right: 24px; }
+.card-x {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
 .notes-view .card:active { background: var(--overlay-active); }
 
 .card-head {
@@ -391,6 +399,13 @@ body {
   background: none;
   box-shadow: none;
 }
+/* In a row, the trash X ends it, after the actions. */
+.as-list .card.has-x {
+  grid-template-columns: minmax(72px, 1fr) auto auto;
+  grid-template-areas: "head foot x" "preview foot x";
+}
+.as-list .card.has-x .card-head { padding-right: 0; }
+.as-list .card-x { position: static; grid-area: x; }
 .as-list .card + .card { margin-top: 2px; }
 .as-list .card:hover { background: var(--overlay-hover); box-shadow: none; }
 .notes-view .as-list .card:active { background: var(--overlay-active); }
@@ -932,6 +947,7 @@ textarea.field { resize: vertical; min-height: 84px; }
 .demo-card-text { font-size: 12px; line-height: 1.45; color: var(--color-fog); }
 .demo-card-foot { gap: 4px; }
 .demo-card-foot .demo-meta { margin: 0 auto 0 0; }
+.demo-card-head .demo-x { margin: -4px -4px -4px auto; }
 .demo-name {
   min-width: 0;
   overflow: hidden;

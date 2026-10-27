@@ -96,7 +96,8 @@
   // Same folder as a group bar and a note's footer.
   const FOLDER_ICON = '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>';
   const BOARD_ICON = '<rect x="2" y="2.5" width="3.5" height="11" rx="1" stroke-width="1.3"/><rect x="6.25" y="2.5" width="3.5" height="7.5" rx="1" stroke-width="1.3"/><rect x="10.5" y="2.5" width="3.5" height="9.5" rx="1" stroke-width="1.3"/>';
-  const TRASH_ICON = '<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/>';
+  // Trash: an X, the same as the trash button in the titlebars.
+  const TRASH_ICON = '<path d="M4.25 4.25l7.5 7.5M11.75 4.25l-7.5 7.5"/>';
 
   // ------------------------------------------------------------- render
 
@@ -228,6 +229,13 @@
     const foot = el('div', 'card-foot');
     foot.append(el('span', 'card-meta', meta), actions);
     item.append(foot);
+    // The trash X goes to the card's upper right corner (the end of the
+    // row in the list layout), out of the actions.
+    const x = actions.querySelector(':scope > .card-x');
+    if (x) {
+      item.append(x);
+      item.classList.add('has-x');
+    }
     return item;
   }
 
@@ -317,7 +325,7 @@
     toggle.title = toggleLabel;
     toggle.setAttribute('aria-label', toggleLabel);
     toggle.append(icon(OUT_IN_ICON));
-    const del = el('button', 'icon-btn');
+    const del = el('button', 'icon-btn trash card-x');
     del.type = 'button';
     del.dataset.gact = 'trash';
     del.title = t('groupToTrash');
@@ -391,9 +399,10 @@
     const memoryCount = (board.columns || []).reduce((acc, col) => acc + (col.noteIds || []).length, 0);
     const preview = `${colCount} ${t('columnName').toLowerCase()}s · ${memoryCount} ${t('tabNotes').toLowerCase()}`;
 
-    const del = el('button', 'icon-btn');
+    const del = el('button', 'icon-btn trash card-x');
     del.type = 'button';
     del.title = t('moveToTrash');
+    del.setAttribute('aria-label', t('moveToTrash'));
     del.append(icon(TRASH_ICON));
     del.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -456,7 +465,7 @@
   const showGroup = (id) => invoke('focus_group', { id }).catch((err) => console.error('focus_group', err));
 
   function noteCard(note) {
-    const trashBtn = el('button', 'icon-btn');
+    const trashBtn = el('button', 'icon-btn trash card-x');
     trashBtn.type = 'button';
     trashBtn.dataset.act = 'trash';
     trashBtn.title = t('moveToTrash');
@@ -465,8 +474,8 @@
     const actions = el('div', 'card-actions');
     // Always visible: the boards it is on (if any), the group select (which
     // shows the group's name), preceded by the group's folder icon in its
-    // colour (grey without a group, as in the note's footer), and the trash
-    // button.
+    // colour (grey without a group, as in the note's footer); the trash X
+    // goes to the card's corner (card()).
     const group = groups.find((g) => g.id === note.groupId);
     const folder = icon(FOLDER_ICON);
     folder.classList.add('card-folder');
