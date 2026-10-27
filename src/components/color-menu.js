@@ -74,8 +74,10 @@ window.MemoTheme = (() => {
 //   button       the titlebar control that opens and closes it
 //   menu         the popover holding the .swatch buttons
 //   input        the hidden <input type="color"> behind the "custom" swatch
-//   current()    the window's colour now
-//   onPick(c)    a swatch was chosen, or a custom colour confirmed
+//   current()    the window's colour now (null while it isn't loaded)
+//   onPick(c)    a swatch was chosen, or a custom colour confirmed: the
+//                window shows it; the menu saves it (set_color, the same
+//                command for every window)
 //   customStart() the colour the system picker opens on when the current one
 //                isn't custom (default: yellow)
 //   onOpen()     before opening: close the window's other popovers
@@ -84,6 +86,13 @@ window.MemoTheme = (() => {
 //                system picker itself takes the focus on some platforms)
 class ColorMenu {
   constructor({ frame, button, menu, input, current, onPick, customStart, onOpen, onChange, closeOnBlur = true }) {
+    const { invoke } = (window.__TAURI__ || window.parent.__TAURI__).core;
+    // Immediate feedback, then saved.
+    const pick = (color) => {
+      if (current() == null) return;
+      onPick(color);
+      invoke('set_color', { color }).catch((err) => console.error('set_color', err));
+    };
     Object.assign(this, { frame, button, menu, onOpen, onChange });
     this.customSwatch = menu.querySelector('.swatch[data-color="custom"]');
 
@@ -102,12 +111,12 @@ class ColorMenu {
         window.MemoColorPicker.open(input, sw);
         return;
       }
-      onPick(sw.dataset.color);
+      pick(sw.dataset.color);
       this.close();
     });
     // Only applied when confirmed in the picker; cancelling changes nothing.
     input.addEventListener('change', () => {
-      onPick(input.value.toLowerCase());
+      pick(input.value.toLowerCase());
       this.close();
     });
     document.addEventListener('mousedown', (e) => {

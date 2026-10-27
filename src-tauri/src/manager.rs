@@ -15,12 +15,6 @@ pub(crate) async fn bring_notes_to_front(app: AppHandle) {
     raise_notes(&app);
 }
 
-/// Closes the manager window (✕ or middle click on the titlebar).
-#[tauri::command]
-pub(crate) async fn close_manager(window: WebviewWindow) -> Result<(), String> {
-    window.destroy().map_err(|e| e.to_string())
-}
-
 /// All notes, active and trashed, without the HTML (the manager only shows
 /// title, text preview, colour and dates).
 #[tauri::command]

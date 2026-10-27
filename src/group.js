@@ -73,12 +73,7 @@
     menu: colorMenu,
     input: $('customColor'),
     current: () => group && group.color,
-    onPick(color) {
-      if (!group) return;
-      group.color = color;
-      render();
-      invoke('set_group_color', { color }).catch((err) => console.error('set_group_color', err));
-    },
+    onPick: (color) => { group.color = color; render(); },
     onOpen: () => bar.finishRename(true),
     onChange: (open) => setHeight(open ? colorMenu.offsetTop + colorMenu.offsetHeight + 6 : titlebar.offsetHeight),
   });
@@ -88,12 +83,6 @@
   // Like a note's ✕: closes the bar and its memories' windows; the group stays
   // among the current ones and the manager reopens it. An empty unnamed group
   // is just removed.
-  function closeGroup() {
-    invoke('close_group').catch((err) => console.error('close_group', err));
-  }
-  function trashGroup() {
-    invoke('trash_group').catch((err) => console.error('trash_group', err));
-  }
 
   // ------------------------------------------------------------- window
 
@@ -112,19 +101,10 @@
       name: $('groupName'),
       input: $('nameInput'),
       get: () => group && group.name,
-      async save(name) {
-        group.name = name;
-        render();
-        try {
-          group.name = await invoke('rename_group', { name });
-        } catch (err) {
-          console.error('rename_group', err);
-        }
-      },
+      set: (name) => { group.name = name; render(); },
       onEnd: render,
     },
-    buttons: { toggleBtn: toggle, newBtn: newNote, trashBtn: trashGroup, closeBtn: closeGroup },
-    onClose: closeGroup,
+    buttons: { toggleBtn: toggle, newBtn: newNote },
     onNew: newNote,
     menuItems: () => (group ? [
       { label: t('rename'), run: () => bar.startRename() },
@@ -132,8 +112,8 @@
       { label: t('groupColor'), run: () => colors.open() },
       { label: t(group.open ? 'groupHideHint' : 'groupShowHint'), run: toggle },
       { label: t('newNoteInGroup'), run: newNote },
-      { label: t('groupToTrash'), run: trashGroup },
-      { label: t('close'), run: closeGroup },
+      { label: t('groupToTrash'), run: () => bar.trash() },
+      { label: t('close'), run: () => bar.close() },
     ] : []),
     onMenuOpen: () => colors.close(),
   });

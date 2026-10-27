@@ -1448,11 +1448,38 @@
     return b;
   }
 
+  // As created: no name, no colour, empty columns (Store::is_pristine_board).
+  function isPristineBoard(b) {
+    return Boolean(b) && !(b.name || '').trim() && !b.color
+      && (b.columns || []).every((c) => !(c.noteIds || []).length);
+  }
+
+  // Closed with ✕: stays among the current ones; one nobody touched is
+  // removed (close_board_by_id).
+  function closeBoardById(id) {
+    const b = findBoard(id);
+    if (!b) return;
+    closeWindow(`board-${id}`);
+    if (isPristineBoard(b)) {
+      data.boards = data.boards.filter((x) => x.id !== id);
+      markDirty(false);
+    } else {
+      updateBoard(id, (x) => { x.hidden = true; });
+    }
+    notifyBoards();
+  }
+
+  // To the trash; one nobody touched is removed outright (trash_board_by_id).
   function trashBoardById(id) {
     const b = findBoard(id);
     if (!b) return;
     closeWindow(`board-${id}`);
-    updateBoard(id, (x) => { x.trashedAt = nowMs(); });
+    if (isPristineBoard(b)) {
+      data.boards = data.boards.filter((x) => x.id !== id);
+      markDirty(false);
+    } else {
+      updateBoard(id, (x) => { x.trashedAt = nowMs(); });
+    }
     notifyBoards();
   }
 
@@ -3122,18 +3149,49 @@
         notifyNotes();
         return null;
       }
-      case 'set_title': {
-        if (!n) return '';
-        const clean = String(args.title || '').trim().slice(0, TITLE_MAX);
-        updateNote(n.id, (x) => { x.title = clean; });
-        notifyNotes();
-        return clean;
+      // One command for every window, as on the desktop (rename in
+      // notes.rs): the note's title, the group's or the board's name.
+      case 'rename': {
+        const raw = String(args.name || '').trim();
+        if (n) {
+          const clean = raw.slice(0, TITLE_MAX);
+          updateNote(n.id, (x) => { x.title = clean; });
+          notifyNotes();
+          return clean;
+        }
+        if (g) {
+          const clean = raw.slice(0, GROUP_NAME_MAX);
+          updateGroup(g.id, (x) => { x.name = clean; });
+          notifyGroups();
+          notifyNotes();
+          return clean;
+        }
+        if (b) {
+          const clean = raw.slice(0, GROUP_NAME_MAX);
+          updateBoard(b.id, (x) => { x.name = clean; });
+          notifyBoards();
+          return clean;
+        }
+        return '';
       }
+      // One command for every window, as on the desktop (set_color in
+      // notes.rs): its note, group or board, or the manager.
       case 'set_color': {
-        if (!n) return null;
-        const color = isValidColor(args.color) ? args.color : '';
-        updateNote(n.id, (x) => { x.color = color; });
-        notifyNotes();
+        if (!isValidColor(args.color)) return null;
+        const color = args.color;
+        if (n) {
+          updateNote(n.id, (x) => { x.color = color; });
+          notifyNotes();
+        } else if (g) {
+          updateGroup(g.id, (x) => { x.color = color; });
+          notifyGroups();
+        } else if (b) {
+          updateBoard(b.id, (x) => { x.color = color; });
+          notifyBoards();
+        } else {
+          data.manager.color = color;
+          markDirty(false);
+        }
         return null;
       }
       case 'set_pinned': {
@@ -3165,14 +3223,19 @@
       case 'new_note':
         createNote({ parentLabel: label });
         return null;
-      case 'close_note':
+      // ✕ / middle click and the titlebar's trash button, in every window,
+      // as on the desktop (close_window / trash_window in notes.rs).
+      case 'close_window':
         if (n) closeNoteById(n.id);
+        else if (g) closeGroupById(g.id);
+        else if (b) closeBoardById(b.id);
+        else if (label === 'manager' && !isMobile()) closeWindow('manager');
         return null;
-      case 'trash_note': {
-        const noteId = (args && args.id) || (n && n.id) || idOf(label);
-        if (noteId) trashNoteById(noteId);
+      case 'trash_window':
+        if (n) trashNoteById(n.id);
+        else if (g) trashGroupById(g.id);
+        else if (b) trashBoardById(b.id);
         return null;
-      }
       case 'open_link':
         if (args.url && /^(https?:|mailto:)/i.test(args.url)) {
           window.open(args.url, '_blank', 'noopener,noreferrer');
@@ -3199,31 +3262,6 @@
       case 'save_board_columns': {
         updateBoard(id, (x) => { x.columns = args.columns; });
         notifyBoards();
-        return null;
-      }
-      case 'rename_board': {
-        const brd = updateBoard(id, (x) => { x.name = String(args.name || '').trim().slice(0, 60); });
-        notifyBoards();
-        return brd ? brd.name : '';
-      }
-      case 'set_board_color': {
-        const color = isValidColor(args.color) ? args.color : '';
-        updateBoard(id, (x) => { x.color = color; });
-        notifyBoards();
-        return null;
-      }
-      case 'close_board': {
-        const brd = b || findBoard(id);
-        if (brd) {
-          brd.hidden = true;
-          closeWindow(label);
-          notifyBoards();
-        }
-        return null;
-      }
-      case 'trash_board': {
-        const brd = b || findBoard(id) || (args && findBoard(args.id));
-        if (brd) trashBoardById(brd.id);
         return null;
       }
       case 'new_board':
@@ -3275,23 +3313,6 @@
       case 'load_group':
         if (!g) return null;
         return [copy(g), activeNotes().filter((x) => x.groupId === g.id).length + activeBoards().filter((x) => x.groupId === g.id).length];
-      case 'rename_group': {
-        const grp = g || findGroup(args.id);
-        if (!grp) return '';
-        const clean = String(args.name || '').trim().slice(0, GROUP_NAME_MAX);
-        updateGroup(grp.id, (x) => { x.name = clean; });
-        notifyGroups();
-        notifyNotes();
-        return clean;
-      }
-      case 'set_group_color': {
-        if (!g) return null;
-        const color = isValidColor(args.color) ? args.color : 'iris';
-        updateGroup(g.id, (x) => { x.color = color; });
-        notifyGroups();
-        notifyNotes();
-        return null;
-      }
       case 'set_group_height': {
         const w = wins[label];
         if (w && typeof args.height === 'number') {
@@ -3320,12 +3341,6 @@
         return null;
       case 'new_group':
         createGroup(label);
-        return null;
-      case 'close_group':
-        if (g) closeGroupById(g.id);
-        return null;
-      case 'trash_group':
-        if (g) trashGroupById(g.id);
         return null;
       case 'trash_group_id':
         trashGroupById(args.id);
@@ -3365,15 +3380,6 @@
         pendingManagerView = null;
         return v;
       }
-      case 'close_manager':
-        if (!isMobile()) closeWindow('manager');
-        return null;
-      case 'set_manager_color':
-        if (isValidColor(args.color)) {
-          data.manager.color = args.color;
-          markDirty(false);
-        }
-        return null;
       case 'set_manager_layout':
         setManagerLayout(args.layout);
         return null;

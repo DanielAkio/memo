@@ -84,50 +84,19 @@ pub(crate) fn save_board_columns(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn rename_board(
-    app: AppHandle,
-    window: WebviewWindow,
-    name: String,
-    store: State<'_, Shared>,
-) -> Result<String, String> {
-    let id = Kind::Board.id_of(&window);
-    let clean = name.trim().chars().take(BOARD_NAME_MAX).collect::<String>();
-    store.update_board(&id, |b| b.name = clean.clone());
-    let _ = window.set_title(window_title(&clean));
-    boards_changed(&app);
-    Ok(clean)
-}
 
-#[tauri::command]
-pub(crate) fn set_board_color(
-    app: AppHandle,
-    window: WebviewWindow,
-    color: String,
-    store: State<'_, Shared>,
-) -> Result<(), String> {
-    check_color(&color)?;
-    let id = Kind::Board.id_of(&window);
-    store.update_board(&id, |b| b.color = color);
-    boards_changed(&app);
-    Ok(())
-}
 
-#[tauri::command]
-pub(crate) async fn close_board(
-    app: AppHandle,
-    window: WebviewWindow,
-    store: State<'_, Shared>,
-) -> Result<(), String> {
-    let id = Kind::Board.id_of(&window);
-    if store.is_pristine_board(&id) {
-        store.remove_board(&id);
+/// Closes board `id` (✕ or middle click): it stays among the current ones;
+/// a board nobody touched (`Store::is_pristine_board`) is removed, as a group.
+pub(crate) fn close_board_by_id(app: &AppHandle, id: &str) {
+    let store = app.state::<Shared>();
+    if store.is_pristine_board(id) {
+        store.remove_board(id);
     } else {
-        store.update_board(&id, |b| b.hidden = true);
+        store.update_board(id, |b| b.hidden = true);
     }
-    let _ = window.destroy();
-    boards_changed(&app);
-    Ok(())
+    destroy_window(app, &Kind::Board.label(id));
+    boards_changed(app);
 }
 
 #[tauri::command]
@@ -135,20 +104,22 @@ pub(crate) fn list_boards(store: State<'_, Shared>) -> Result<Vec<Board>, String
     Ok(store.boards())
 }
 
-// Async: they destroy windows (see `new_note`).
-#[tauri::command]
-pub(crate) async fn trash_board(app: AppHandle, window: WebviewWindow) {
-    trash_board_by_id(&app, &Kind::Board.id_of(&window));
-}
-
+// Async: it destroys a window (see `new_note`).
 #[tauri::command]
 pub(crate) async fn trash_board_id(app: AppHandle, id: String) {
     trash_board_by_id(&app, &id);
 }
 
+/// Sends board `id` to the trash; one nobody touched is removed outright, as
+/// a note or a group.
 pub(crate) fn trash_board_by_id(app: &AppHandle, id: &str) {
     destroy_window(app, &Kind::Board.label(id));
-    app.state::<Shared>().trash_board(id);
+    let store = app.state::<Shared>();
+    if store.is_pristine_board(id) {
+        store.remove_board(id);
+    } else {
+        store.trash_board(id);
+    }
     boards_changed(app);
 }
 

@@ -220,17 +220,49 @@ pub(crate) fn slide_in(app: &AppHandle, window: WebviewWindow, anchor: Option<(i
     }
 }
 
-/// Puts a note in a group. With the group open the note stays out (sliding
-/// back to `back_to`, where a drag onto the bar started); with it closed the
-/// note slides into the bar.
-pub(crate) fn join_group(app: &AppHandle, note_id: &str, group_id: &str, back_to: Option<(i32, i32)>) {
+// A group's members are notes and boards (`member` is Kind::Note or
+// Kind::Board): one set of functions moves either in and out.
+
+/// Sets the group of member `id`; `leaving` also brings it back on screen
+/// (`hidden` cleared). Returns whether it is in the trash, `None` if gone.
+fn set_member_group(store: &Store, member: Kind, id: &str, group_id: &str, leaving: bool) -> Option<bool> {
+    if member == Kind::Board {
+        store
+            .update_board(id, |b| {
+                b.group_id = group_id.to_string();
+                b.hidden &= !leaving;
+            })
+            .map(|b| b.trashed_at.is_some())
+    } else {
+        store
+            .update(id, |n| {
+                n.group_id = group_id.to_string();
+                n.hidden &= !leaving;
+            })
+            .map(|n| n.trashed_at.is_some())
+    }
+}
+
+/// Tells the windows a member of kind `member` changed group.
+fn members_changed(app: &AppHandle, member: Kind) {
+    if member == Kind::Board {
+        boards_changed(app);
+    }
+    groups_changed(app);
+    notify(app);
+}
+
+/// Puts a member in a group. With the group open it stays out (sliding
+/// back to `back_to`, where a drag onto the bar started); with it closed it
+/// slides into the bar.
+pub(crate) fn join_group(app: &AppHandle, member: Kind, id: &str, group_id: &str, back_to: Option<(i32, i32)>) {
     let store = app.state::<Shared>();
     let Some(group) = store.group(group_id) else {
         return;
     };
-    store.update(note_id, |n| n.group_id = group_id.to_string());
+    set_member_group(&store, member, id, group_id, false);
     store.flush();
-    if let Some(window) = app.get_webview_window(&Kind::Note.label(note_id)) {
+    if let Some(window) = app.get_webview_window(&member.label(id)) {
         if group.hidden {
             let _ = window.destroy();
         } else if !group.open {
@@ -239,89 +271,40 @@ pub(crate) fn join_group(app: &AppHandle, note_id: &str, group_id: &str, back_to
             slide(window, from, to, |_| {});
         }
     }
-    groups_changed(app);
-    notify(app);
+    members_changed(app, member);
 }
 
-/// Takes a note out of its group; a note that was inside a closed group
+/// Takes a member out of its group; one that was inside a closed group
 /// comes out on screen.
-pub(crate) fn leave_group(app: &AppHandle, note_id: &str) {
+pub(crate) fn leave_group(app: &AppHandle, member: Kind, id: &str) {
     let store = app.state::<Shared>();
-    let Some(note) = store.update(note_id, |n| {
-        n.group_id.clear();
-        n.hidden = false;
-    }) else {
+    let Some(trashed) = set_member_group(&store, member, id, "", true) else {
         return;
     };
     store.flush();
-    if note.trashed_at.is_none() && app.get_webview_window(&Kind::Note.label(note_id)).is_none() {
-        let _ = open_note_window(app, &note);
+    if !trashed && app.get_webview_window(&member.label(id)).is_none() {
+        if member == Kind::Board {
+            if let Some(board) = store.board(id) {
+                let _ = open_board_window(app, &board);
+            }
+        } else if let Some(note) = store.get(id) {
+            let _ = open_note_window(app, &note);
+        }
     }
-    groups_changed(app);
-    notify(app);
+    members_changed(app, member);
 }
 
-/// Moves a note to `group_id`: "" = no group, "new" = a new group whose bar
-/// opens beside `anchor` (the note's window, or the manager).
-pub(crate) fn assign_group(app: &AppHandle, note_id: &str, group_id: &str, anchor: &WebviewWindow) {
+/// Moves a member to `group_id` (the footer pickers): "" = no group, "new"
+/// = a new group whose bar opens beside `anchor` (the member's window).
+pub(crate) fn assign_group(app: &AppHandle, member: Kind, id: &str, group_id: &str, anchor: &WebviewWindow) {
     match group_id {
-        "" => leave_group(app, note_id),
+        "" => leave_group(app, member, id),
         "new" => {
             let group = app.state::<Shared>().create_group(beside(anchor));
             let _ = open_group_window(app, &group);
-            join_group(app, note_id, &group.id, None);
+            join_group(app, member, id, &group.id, None);
         }
-        id => join_group(app, note_id, id, None),
-    }
-}
-
-pub(crate) fn join_board_to_group(app: &AppHandle, board_id: &str, group_id: &str, back_to: Option<(i32, i32)>) {
-    let store = app.state::<Shared>();
-    let Some(group) = store.group(group_id) else {
-        return;
-    };
-    store.update_board(board_id, |b| b.group_id = group_id.to_string());
-    store.flush();
-    if let Some(window) = app.get_webview_window(&Kind::Board.label(board_id)) {
-        if group.hidden {
-            let _ = window.destroy();
-        } else if !group.open {
-            slide_in(app, window, group_anchor(app, group_id));
-        } else if let (Some(to), Some(from)) = (back_to, desk::outer_position(&window)) {
-            slide(window, from, to, |_| {});
-        }
-    }
-    boards_changed(app);
-    groups_changed(app);
-    notify(app);
-}
-
-pub(crate) fn leave_board_group(app: &AppHandle, board_id: &str) {
-    let store = app.state::<Shared>();
-    let Some(board) = store.update_board(board_id, |b| {
-        b.group_id.clear();
-        b.hidden = false;
-    }) else {
-        return;
-    };
-    store.flush();
-    if board.trashed_at.is_none() && app.get_webview_window(&Kind::Board.label(board_id)).is_none() {
-        let _ = open_board_window(app, &board);
-    }
-    boards_changed(app);
-    groups_changed(app);
-    notify(app);
-}
-
-pub(crate) fn assign_board_group(app: &AppHandle, board_id: &str, group_id: &str, anchor: &WebviewWindow) {
-    match group_id {
-        "" => leave_board_group(app, board_id),
-        "new" => {
-            let group = app.state::<Shared>().create_group(beside(anchor));
-            let _ = open_group_window(app, &group);
-            join_board_to_group(app, board_id, &group.id, None);
-        }
-        id => join_board_to_group(app, board_id, id, None),
+        group_id => join_group(app, member, id, group_id, None),
     }
 }
 
@@ -343,7 +326,7 @@ pub(crate) fn get_note_group(window: WebviewWindow, store: State<'_, Shared>) ->
 /// Footer picker of a note: moves it to `group_id` ("" = none, "new").
 #[tauri::command]
 pub(crate) async fn set_note_group(app: AppHandle, window: WebviewWindow, group_id: String) {
-    assign_group(&app, &Kind::Note.id_of(&window), &group_id, &window);
+    assign_group(&app, Kind::Note, &Kind::Note.id_of(&window), &group_id, &window);
 }
 
 /// The calling board's group id ("" = none).
@@ -359,7 +342,7 @@ pub(crate) fn get_board_group(window: WebviewWindow, store: State<'_, Shared>) -
 #[tauri::command]
 pub(crate) async fn set_board_group(app: AppHandle, window: WebviewWindow, group_id: String) {
     let id = Kind::Board.id_of(&window);
-    assign_board_group(&app, &id, &group_id, &window);
+    assign_group(&app, Kind::Board, &id, &group_id, &window);
 }
 
 /// The calling group bar's data and how many notes & boards it holds.
@@ -372,30 +355,28 @@ pub(crate) fn load_group(window: WebviewWindow, store: State<'_, Shared>) -> Opt
 
 /// Renames the calling group (empty = unnamed, as for notes). Returns the
 /// name as saved.
-#[tauri::command]
-pub(crate) fn rename_group(app: AppHandle, window: WebviewWindow, name: String) -> String {
-    rename_group_by_id(&app, &Kind::Group.id_of(&window), &name)
-}
-
-pub(crate) fn rename_group_by_id(app: &AppHandle, id: &str, name: &str) -> String {
+/// Renames group or board `id` (empty = unnamed, as for notes), retitling
+/// its window. Returns the name as saved.
+pub(crate) fn rename_by_id(app: &AppHandle, kind: Kind, id: &str, name: &str) -> String {
     let store = app.state::<Shared>();
-    let name: String = name.trim().chars().take(GROUP_NAME_MAX).collect();
-    let group = store.update_group(id, |g| g.name = name.clone());
-    let saved = group.map(|g| g.name).unwrap_or_default();
-    if let Some(window) = app.get_webview_window(&Kind::Group.label(id)) {
+    let saved = if kind == Kind::Board {
+        let name: String = name.trim().chars().take(BOARD_NAME_MAX).collect();
+        store.update_board(id, |b| b.name = name.clone()).map(|b| b.name)
+    } else {
+        let name: String = name.trim().chars().take(GROUP_NAME_MAX).collect();
+        store.update_group(id, |g| g.name = name.clone()).map(|g| g.name)
+    }
+    .unwrap_or_default();
+    if let Some(window) = app.get_webview_window(&kind.label(id)) {
         let _ = window.set_title(window_title(&saved));
     }
-    groups_changed(app);
-    notify(app);
+    if kind == Kind::Board {
+        boards_changed(app);
+    } else {
+        groups_changed(app);
+        notify(app);
+    }
     saved
-}
-
-/// Colour of the manager window (same labels as notes and groups).
-#[tauri::command]
-pub(crate) fn set_manager_color(color: String, store: State<'_, Shared>) -> Result<(), String> {
-    check_color(&color)?;
-    store.update_manager(|m| m.color = color);
-    Ok(())
 }
 
 /// Settings → Appearance → Layout: the Memories and Groups tabs as cards or
@@ -419,15 +400,6 @@ pub(crate) fn set_layout(app: &AppHandle, layout: &str) {
 }
 
 /// Colour of the calling group (same labels as notes).
-#[tauri::command]
-pub(crate) fn set_group_color(app: AppHandle, window: WebviewWindow, color: String) -> Result<(), String> {
-    check_color(&color)?;
-    app.state::<Shared>()
-        .update_group(&Kind::Group.id_of(&window), |g| g.color = color);
-    groups_changed(&app);
-    Ok(())
-}
-
 /// The bar is only a titlebar tall: while its colour picker is open the
 /// window grows to `height` (CSS pixels, scaled by the zoom), then shrinks
 /// back. Not saved — a group's height is always a titlebar.
@@ -535,26 +507,24 @@ pub(crate) fn show_group(app: &AppHandle, id: &str) {
 /// ✕ or middle click on a group bar: closes the bar and its notes' windows.
 /// The group stays among the current ones and the manager reopens it; a
 /// group nobody touched is just removed (`Store::is_pristine_group`).
-#[tauri::command]
-pub(crate) async fn close_group(app: AppHandle, window: WebviewWindow) {
-    let id = Kind::Group.id_of(&window);
+pub(crate) fn close_group_by_id(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
-    if store.is_pristine_group(&id) {
-        store.remove_group(&id);
+    if store.is_pristine_group(id) {
+        store.remove_group(id);
     } else {
-        store.update_group(&id, |g| g.hidden = true);
-        for note in store.members(&id) {
-            destroy_window(&app, &Kind::Note.label(&note.id));
+        store.update_group(id, |g| g.hidden = true);
+        for note in store.members(id) {
+            destroy_window(app, &Kind::Note.label(&note.id));
         }
-        for board in store.board_members(&id) {
-            destroy_window(&app, &Kind::Board.label(&board.id));
+        for board in store.board_members(id) {
+            destroy_window(app, &Kind::Board.label(&board.id));
         }
     }
     store.flush();
-    let _ = window.destroy();
-    groups_changed(&app);
-    boards_changed(&app);
-    notify(&app);
+    destroy_window(app, &Kind::Group.label(id));
+    groups_changed(app);
+    boards_changed(app);
+    notify(app);
 }
 
 /// Manager's Groups tab: takes group `id`'s notes out, or puts them in.
@@ -601,12 +571,6 @@ pub(crate) async fn new_note_in_group(app: AppHandle, window: WebviewWindow) -> 
     groups_changed(&app);
     notify(&app);
     Ok(())
-}
-
-/// Group bar window: sends the group and its notes to the trash.
-#[tauri::command]
-pub(crate) async fn trash_group(app: AppHandle, window: WebviewWindow) {
-    trash_group_by_id(&app, &Kind::Group.id_of(&window));
 }
 
 /// Manager's Groups tab: sends group `id` to the trash, with its notes.

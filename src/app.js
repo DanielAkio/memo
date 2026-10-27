@@ -2922,27 +2922,9 @@
     invoke('new_note').catch((err) => console.error('new_note', err));
   }
 
-  async function setColor(color) {
-    note.color = color;
-    render();
-    invoke('set_color', { color }).catch((err) => console.error('set_color', err));
-  }
 
   // Closing only closes the window: the note stays among the current ones
   // and the manager reopens it (the trash is the manager's trash button).
-  async function closeNote() {
-    colors.close();
-    await bar.finishRename(true);
-    await flushText();
-    invoke('close_note').catch((err) => console.error('close_note', err));
-  }
-
-  async function trashNote() {
-    colors.close();
-    await bar.finishRename(true);
-    await flushText();
-    invoke('trash_note').catch((err) => console.error('trash_note', err));
-  }
 
   // ------------------------------------------------------------- events
 
@@ -3106,7 +3088,7 @@
     menu: colorMenu,
     input: $('customColor'),
     current: () => note && note.color,
-    onPick: setColor,
+    onPick: (color) => { note.color = color; render(); },
     // The system picker opens on the colour the note shows now.
     customStart: () => (getComputedStyle(frame).getPropertyValue('--note-color').trim().match(/^#[0-9a-f]{6}$/i) || [])[0],
     onOpen: hideFormatBar,
@@ -3173,19 +3155,13 @@
       input: titleInput,
       get: () => note && note.title,
       onStart: () => colors.close(),
-      async save(title) {
-        note.title = title;
-        renderName();
-        try {
-          note.title = await invoke('set_title', { title });
-        } catch (err) {
-          console.error('set_title', err);
-        }
-      },
+      set: (title) => { note.title = title; renderName(); },
       onEnd: () => { renderName(); editor.focus(); },
     },
-    buttons: { newBtn: newNote, trashBtn: trashNote, closeBtn: closeNote },
-    onClose: closeNote,
+    buttons: { newBtn: newNote },
+    // Closing only closes the window: the note stays among the current ones
+    // and the manager reopens it. Pending text is saved first.
+    beforeLeave: async () => { colors.close(); await flushText(); },
     onNew: newNote,
     menuItems: () => (note ? [
       { label: t('format'), items: formatMenuItems() },
@@ -3193,8 +3169,8 @@
       { label: t('rename'), run: () => bar.startRename() },
       { label: t('pin'), checked: !!note.pinned, run: () => bar.togglePin() },
       { label: t('noteColor'), run: () => colors.open() },
-      { label: t('moveToTrash'), run: trashNote },
-      { label: t('closeNote'), run: closeNote },
+      { label: t('moveToTrash'), run: () => bar.trash() },
+      { label: t('closeNote'), run: () => bar.close() },
     ] : []),
     onMenuOpen: () => { saveMenuSelection(); colors.close(); groups.close(); hideFormatBar(); },
     // Native context menu only in the text and the title field (copy,

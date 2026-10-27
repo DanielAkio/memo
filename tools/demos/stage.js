@@ -81,10 +81,6 @@
       case 'list_boards': return Object.values(M.boards).map(copy);
       case 'load_board': return b ? copy(b) : null;
       case 'save_board_columns': if (b) { b.columns = a.columns; b.updatedAt = Date.now(); M.emit('boards-changed'); } return null;
-      case 'rename_board': if (b) { b.name = a.name.trim(); b.updatedAt = Date.now(); M.emit('boards-changed'); return b.name; } return '';
-      case 'set_board_color': if (b) { b.color = a.color; M.emit('boards-changed'); } return null;
-      case 'close_board': if (b) { b.hidden = true; M.closeWin(label); M.emit('boards-changed'); } return null;
-      case 'trash_board': if (b) { b.trashedAt = Date.now(); M.closeWin(label); M.emit('boards-changed'); } return null;
       case 'new_board': {
         const nb = M.addBoard({ id: `b-${Date.now()}` });
         M.openWin(`board-${nb.id}`, '/src/board.html', { x: 40, y: 40, w: 760, h: 520 });
@@ -113,8 +109,17 @@
       case 'list_notes_including_trash':
       case 'list_notes': return Object.values(M.notes).map((x) => Object.assign(copy(x), { html: '' }));
       case 'save_text': Object.assign(n, { text: a.text, html: a.html, updatedAt: Date.now() }); M.emit('notes-changed'); return null;
-      case 'set_title': n.title = a.title.trim(); n.updatedAt = Date.now(); M.emit('notes-changed'); return n.title;
-      case 'set_color': n.color = a.color; M.emit('notes-changed'); return null;
+      case 'rename':
+        if (n) { n.title = a.name.trim(); n.updatedAt = Date.now(); M.emit('notes-changed'); return n.title; }
+        if (g) { g.name = a.name.trim(); M.emit('groups-changed'); return g.name; }
+        if (b) { b.name = a.name.trim(); b.updatedAt = Date.now(); M.emit('boards-changed'); return b.name; }
+        return '';
+      case 'set_color':
+        if (n) { n.color = a.color; M.emit('notes-changed'); }
+        else if (g) { g.color = a.color; M.emit('groups-changed'); }
+        else if (b) { b.color = a.color; M.emit('boards-changed'); }
+        else M.manager.color = a.color;
+        return null;
       case 'set_pinned': {
         const o = n || g || b || M.manager;
         o.pinned = a.pinned;
@@ -124,11 +129,8 @@
       }
       case 'set_note_group': n.groupId = a.groupId; M.emit('groups-changed'); return null;
       case 'load_group': return g ? [copy(g), allMembersCount(g.id)] : null;
-      case 'rename_group': g.name = a.name.trim(); M.emit('groups-changed'); return g.name;
-      case 'set_group_color': g.color = a.color; M.emit('groups-changed'); return null;
       case 'toggle_group': g.open = !g.open; M.emit('groups-changed'); return g.open;
-      case 'close_group': g.hidden = true; M.closeWin(label); M.emit('groups-changed'); return null;
-      case 'trash_group':
+      case 'trash_group_window':
         if (g) {
           g.trashedAt = Date.now();
           for (const m of members(g.id)) m.trashedAt = Date.now();
@@ -140,7 +142,6 @@
         }
         return null;
       case 'load_manager': return copy(M.manager);
-      case 'set_manager_color': M.manager.color = a.color; return null;
       case 'set_manager_layout': M.manager.layout = a.layout; M.emit('layout-changed', a.layout); return null;
       case 'take_manager_view': { const v = M.view; M.view = null; return v; }
       case 'change_theme': M.theme = a.theme; M.emit('theme-changed', a.theme); return null;
@@ -200,8 +201,18 @@
         M.emit('notes-changed');
         return null;
       }
-      case 'close_note': n.hidden = true; M.closeWin(label); M.emit('notes-changed'); return null;
-      case 'trash_note': if (n) { n.trashedAt = Date.now(); M.closeWin(label); M.emit('notes-changed'); } return null;
+      // One command for every window (close_window / trash_window).
+      case 'close_window':
+        if (n) { n.hidden = true; M.closeWin(label); M.emit('notes-changed'); }
+        else if (g) { g.hidden = true; M.closeWin(label); M.emit('groups-changed'); }
+        else if (b) { b.hidden = true; M.closeWin(label); M.emit('boards-changed'); }
+        else M.closeWin(label);
+        return null;
+      case 'trash_window':
+        if (n) { n.trashedAt = Date.now(); M.closeWin(label); M.emit('notes-changed'); }
+        else if (g) return M.invoke(label, 'trash_group_window', a);
+        else if (b) { b.trashedAt = Date.now(); M.closeWin(label); M.emit('boards-changed'); }
+        return null;
       default: return null;
     }
   };

@@ -14,18 +14,21 @@ pub(crate) fn load_note(window: WebviewWindow, store: State<'_, Shared>) -> Opti
     Some(note)
 }
 
-/// Names the note; returns the name as saved.
+/// Names the calling window's note (its title), group or board; empty =
+/// unnamed. Returns the name as saved. One command for every window, like
+/// `set_color` (the manager has a fixed name).
 #[tauri::command]
-pub(crate) fn set_title(
-    app: AppHandle,
-    window: WebviewWindow,
-    title: String,
-    store: State<'_, Shared>,
-) -> String {
-    let title: String = title.trim().chars().take(TITLE_MAX).collect();
-    store.update(&Kind::Note.id_of(&window), |n| n.title = title.clone());
-    notify(&app);
-    title
+pub(crate) fn rename(app: AppHandle, window: WebviewWindow, name: String) -> Result<String, String> {
+    match Kind::of(&window) {
+        Some((Kind::Note, id)) => {
+            let title: String = name.trim().chars().take(TITLE_MAX).collect();
+            app.state::<Shared>().update(&id, |n| n.title = title.clone());
+            notify(&app);
+            Ok(title)
+        }
+        Some((kind, id)) => Ok(rename_by_id(&app, kind, &id, &name)),
+        None => Err("this window has no name".into()),
+    }
 }
 
 #[tauri::command]
@@ -86,6 +89,9 @@ pub(crate) fn set_pinned(
     Ok(pinned)
 }
 
+/// Colour of the calling window: its note, group or board, or the manager
+/// (a label, "" = none, or "#rrggbb"). One command for every window, like
+/// `set_pinned`.
 #[tauri::command]
 pub(crate) fn set_color(
     app: AppHandle,
@@ -94,8 +100,23 @@ pub(crate) fn set_color(
     store: State<'_, Shared>,
 ) -> Result<(), String> {
     check_color(&color)?;
-    store.update(&Kind::Note.id_of(&window), |n| n.color = color);
-    notify(&app);
+    match Kind::of(&window) {
+        Some((Kind::Note, id)) => {
+            store.update(&id, |n| n.color = color);
+            notify(&app);
+        }
+        Some((Kind::Group, id)) => {
+            store.update_group(&id, |g| g.color = color);
+            groups_changed(&app);
+        }
+        Some((Kind::Board, id)) => {
+            store.update_board(&id, |b| b.color = color);
+            boards_changed(&app);
+        }
+        None => {
+            store.update_manager(|m| m.color = color);
+        }
+    }
     Ok(())
 }
 
@@ -172,20 +193,35 @@ pub(crate) fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     Some((x, y))
 }
 
-/// Sends the calling note window directly to the trash.
+/// ✕ or middle click on any window: closes it. Its note, group or board
+/// stays among the current ones and the manager reopens it; one nobody
+/// touched is removed. One command for every window, like `set_color`.
 #[tauri::command]
-pub(crate) async fn trash_note(app: AppHandle, window: WebviewWindow) {
-    trash(&app, &Kind::Note.id_of(&window));
+pub(crate) async fn close_window(app: AppHandle, window: WebviewWindow) {
+    match Kind::of(&window) {
+        Some((Kind::Note, id)) => close_note_by_id(&app, &id),
+        Some((Kind::Group, id)) => close_group_by_id(&app, &id),
+        Some((Kind::Board, id)) => close_board_by_id(&app, &id),
+        None => {
+            let _ = window.destroy();
+        }
+    }
 }
 
-/// Closes the note (✕ button or middle click): it stays among the current
-/// ones and the manager reopens it. A note nobody touched (or a welcome copy)
-/// goes the way `trash` sends it: deleted outright.
+/// The trash button in a window's titlebar: its note, group (with its
+/// notes) or board goes to the trash.
 #[tauri::command]
-pub(crate) async fn close_note(app: AppHandle, window: WebviewWindow) {
-    close_note_by_id(&app, &Kind::Note.id_of(&window));
+pub(crate) async fn trash_window(app: AppHandle, window: WebviewWindow) {
+    match Kind::of(&window) {
+        Some((Kind::Note, id)) => trash(&app, &id),
+        Some((Kind::Group, id)) => trash_group_by_id(&app, &id),
+        Some((Kind::Board, id)) => trash_board_by_id(&app, &id),
+        None => {}
+    }
 }
 
+/// Closes note `id`: it stays among the current ones. A note nobody touched
+/// (or a welcome copy) goes the way `trash` sends it: deleted outright.
 pub(crate) fn close_note_by_id(app: &AppHandle, id: &str) {
     let store = app.state::<Shared>();
     match store.get(id) {

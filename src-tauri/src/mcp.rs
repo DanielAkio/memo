@@ -33,7 +33,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::{
     beside, close_note_by_id, groups_changed, is_app_window, join_group, leave_group, notify,
-    open_group_window, open_note, put_in, rename_group_by_id, Kind,
+    open_group_window, open_note, put_in, rename_by_id, Kind,
     restore_group, restore_note, show_group, take_out, trash, trash_group_by_id, Shared,
     AUTOSTART_ARG, CONFIG, DATA_FOLDER, MANAGER,
 };
@@ -394,7 +394,7 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
             let id = group.id.as_str();
             let color = color_arg(args)?;
             if let Some(name) = str_arg(args, "name") {
-                rename_group_by_id(app, id, name);
+                rename_by_id(app, Kind::Group, id, name);
             }
             let pinned = bool_arg(args, "pinned");
             store.update_group(id, |g| {
@@ -431,10 +431,10 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
                 return Err("this memory is in the trash: restore it first".into());
             }
             match req_str(args, "group_id")? {
-                "" => leave_group(app, &note.id),
+                "" => leave_group(app, Kind::Note, &note.id),
                 id => {
                     active_group(&store, id)?;
-                    join_group(app, &note.id, id, None);
+                    join_group(app, Kind::Note, &note.id, id, None);
                 }
             }
             Ok(memory(app, &store, &store.get(&note.id).unwrap_or(note), false))

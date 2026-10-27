@@ -10,12 +10,15 @@
 //   pin: { get(), set(pinned) }  the window's pinned state (null = not
 //                loaded yet); set() stores it and re-renders, which calls
 //                renderPin()
-//   rename: { name, input, get(), save(value), onStart(), onEnd() }
+//   rename: { name, input, get(), set(name), onStart(), onEnd() }
 //                optional: the name element, its field, the saved name (null
-//                = can't rename yet), how to save a changed one, and hooks
-//                around the editing (onEnd runs after save, saved or not)
-//   buttons      { elementId: onClick }
-//   onClose      ✕ and middle click
+//                = can't rename yet), how to show a new one (the bar saves it
+//                with `rename`, the same command for every window), and hooks
+//                around the editing (onEnd runs after, saved or not)
+//   buttons      { elementId: onClick } (✕ #closeBtn and #trashBtn are
+//                wired by the bar: close() / trash())
+//   beforeLeave() before closing or trashing (save pending text…); false
+//                keeps the window open
 //   onNew        Mod+N (ignored while renaming)
 //   menuItems()  the window's own commands on top of the titlebar menu
 //   onMenuOpen() before the menu opens: close the window's popovers
@@ -35,6 +38,10 @@ class TitleBar {
     for (const [id, onClick] of Object.entries(o.buttons)) {
       document.getElementById(id).addEventListener('click', onClick);
     }
+    const closeBtn = o.titlebar.querySelector('#closeBtn');
+    const trashBtn = o.titlebar.querySelector('#trashBtn');
+    if (closeBtn) closeBtn.addEventListener('click', () => this.close());
+    if (trashBtn) trashBtn.addEventListener('click', () => this.trash());
     if (o.rename) {
       o.rename.input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); this.finishRename(true); }
@@ -61,7 +68,7 @@ class TitleBar {
       grip: o.grip,
       resizeEdges: o.resizeEdges,
       onDoubleClick: o.rename ? () => this.startRename() : undefined,
-      onClose: o.onClose,
+      onClose: () => this.close(),
     });
     if (o.menuItems) {
       window.MemoChrome.titleMenu({ titlebar: o.titlebar, items: o.menuItems, onOpen: o.onMenuOpen });
@@ -77,6 +84,23 @@ class TitleBar {
         o.onNew();
       }
     });
+  }
+
+  // ✕ / middle click, and the trash button: the same commands for every
+  // window (close_window / trash_window), after the name being edited is
+  // saved and the window's own `beforeLeave`.
+  close() {
+    return this.leave('close_window');
+  }
+
+  trash() {
+    return this.leave('trash_window');
+  }
+
+  async leave(command) {
+    await this.finishRename(true);
+    if (this.o.beforeLeave && (await this.o.beforeLeave()) === false) return;
+    this.invoke(command).catch((err) => console.error(command, err));
   }
 
   // Immediate feedback; reverts if the OS refuses.
@@ -124,7 +148,15 @@ class TitleBar {
     const value = r.input.value.trim();
     r.input.hidden = true;
     r.name.hidden = false;
-    if (save && value !== r.get()) await r.save(value);
+    if (save && value !== r.get()) {
+      // Immediate feedback, then the name as saved.
+      r.set(value);
+      try {
+        r.set(await this.invoke('rename', { name: value }));
+      } catch (err) {
+        console.error('rename', err);
+      }
+    }
     if (r.onEnd) r.onEnd();
   }
 }

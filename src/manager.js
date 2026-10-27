@@ -885,11 +885,7 @@
     menu: $('mgrColorMenu'),
     input: $('mgrCustomColor'),
     current: () => win.color,
-    onPick(color) {
-      win.color = color;
-      renderWindow();
-      invoke('set_manager_color', { color }).catch((err) => console.error('set_manager_color', err));
-    },
+    onPick: (color) => { win.color = color; renderWindow(); },
   });
 
 
@@ -907,10 +903,6 @@
   }
 
   const newNote = () => invoke('new_note').catch((err) => console.error('new_note', err));
-  const closeWindow = () => {
-    if (isMobileWeb()) return;
-    invoke('close_manager').catch((err) => console.error('close_manager', err));
-  };
 
   // Titlebar (components/titlebar.js), as in a note: pin, drag, resize,
   // middle click closes, and the right-click / "…" menu with the manager's
@@ -927,9 +919,9 @@
       newBtn: newNote,
       newGroupBtn: () => invoke('new_group').catch((err) => console.error('new_group', err)),
       newBoardBtn: () => invoke('new_board').catch((err) => console.error('new_board', err)),
-      closeBtn: closeWindow,
     },
-    onClose: closeWindow,
+    // In Memo Web on a phone the manager is the main view: it never closes.
+    beforeLeave: () => !isMobileWeb(),
     onNew: newNote,
     menuItems: () => {
       const items = [
@@ -938,7 +930,7 @@
         { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err)) },
       ];
       if (!isMobileWeb()) {
-        items.push({ label: t('close'), run: closeWindow });
+        items.push({ label: t('close'), run: () => bar.close() });
       }
       return items;
     },

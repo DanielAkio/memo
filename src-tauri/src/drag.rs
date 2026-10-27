@@ -396,9 +396,9 @@ pub(crate) fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
             DropTarget::Group(group) => {
                 let _ = app.emit("drop-hover", (&group, false));
                 if Kind::Board.is(&window) {
-                    join_board_to_group(app, &Kind::Board.id_of(&window), &group, Some(drag.start));
+                    join_group(app, Kind::Board, &Kind::Board.id_of(&window), &group, Some(drag.start));
                 } else {
-                    join_group(app, &Kind::Note.id_of(&window), &group, Some(drag.start));
+                    join_group(app, Kind::Note, &Kind::Note.id_of(&window), &group, Some(drag.start));
                 }
                 return;
             }

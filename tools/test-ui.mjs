@@ -1027,7 +1027,7 @@ try {
         await inv(`note-${id}`, 'drag_to', { cx: br.left + 50 - nr.left, cy: br.top + 50 - nr.top });
         await inv(`note-${id}`, 'drag_end');
         await inv('manager', 'open_board_note', { id });
-        await inv(`note-${id}`, 'close_note');
+        await inv(`note-${id}`, 'close_window');
         const kept = (await inv('manager', 'list_notes')).some((n) => n.id === id && !n.trashedAt);
         const stillOnBoard = (await inv('manager', 'list_boards')).find((x) => x.id === brd.id)
           .columns.find((c) => c.id === colId).noteIds.includes(id);
@@ -1092,6 +1092,26 @@ try {
       assert.equal(res.pinnedBoardAbove, true, 'A pinned board stays above an unpinned memory that is clicked');
       assert.equal(res.managerStaysUnpinned, true, 'Pinning a board must not pin the manager');
       assert.equal(res.boardSavedPinned, true, 'Pinning a board saves it as pinned');
+
+      // A board nobody touched is removed when closed (as on the desktop);
+      // one with a name stays among the current ones, hidden.
+      const closing = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const ids = async () => (await inv('manager', 'list_boards')).map((b) => b.id);
+        const before = new Set(await ids());
+        await inv('manager', 'new_board');
+        const fresh = (await ids()).find((x) => !before.has(x));
+        await inv(`board-${fresh}`, 'close_window');
+        const freshGone = !(await ids()).includes(fresh);
+        await inv('manager', 'new_board');
+        const named = (await ids()).find((x) => !before.has(x));
+        await inv(`board-${named}`, 'rename', { name: 'Kept' });
+        await inv(`board-${named}`, 'close_window');
+        const kept = (await inv('manager', 'list_boards')).find((b) => b.id === named);
+        return { freshGone, namedKept: Boolean(kept && kept.hidden && !kept.trashedAt && kept.name === 'Kept') };
+      });
+      assert.equal(closing.freshGone, true, 'Closing a board nobody touched removes it');
+      assert.equal(closing.namedKept, true, 'Closing a named board keeps it, hidden');
     } finally {
       await webPage.close();
     }

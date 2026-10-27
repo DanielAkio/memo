@@ -192,29 +192,13 @@
 
   // ------------------------------------------------------------- Window Chrome
 
-  async function trashBoard() {
-    try {
-      await invoke('trash_board');
-    } catch (err) {
-      console.error('trash_board', err);
-    }
-  }
-
-  async function closeBoard() {
-    try {
-      await invoke('close_board');
-    } catch (err) {
-      console.error('close_board', err);
-    }
-  }
-
   const colors = new ColorMenu({
     frame,
     button: colorBtn,
     menu: colorMenu,
     input: $('customColor'),
     current: () => currentBoard && currentBoard.color,
-    onPick: (color) => setBoardColor(color || ''),
+    onPick: (color) => { currentBoard.color = color; renderColor(); },
     onOpen: () => groups.close(),
   });
 
@@ -236,17 +220,9 @@
       name: boardName,
       input: nameInput,
       get: () => currentBoard && currentBoard.name,
-      async save(name) {
-        try {
-          currentBoard.name = await invoke('rename_board', { name });
-          renderTitle();
-        } catch (err) {
-          console.error('rename_board', err);
-        }
-      },
+      set: (name) => { currentBoard.name = name; renderTitle(); },
     },
-    buttons: { trashBtn: trashBoard, closeBtn: closeBoard },
-    onClose: closeBoard,
+
     onNew: () => invoke('new_note').catch((err) => console.error('new_note', err)),
     menuItems: () => [
       { label: t('rename'), run: () => bar.startRename() },
@@ -255,8 +231,8 @@
       { label: t('addColumn'), run: onAddColumn },
       { label: t('groupMenuTitle'), run: () => groups.toggle() },
       { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error(err)) },
-      { label: t('moveToTrash'), run: trashBoard },
-      { label: t('close'), run: closeBoard },
+      { label: t('moveToTrash'), run: () => bar.trash() },
+      { label: t('close'), run: () => bar.close() },
     ],
     onMenuOpen: () => {
       colors.close();
@@ -295,17 +271,6 @@
     }
   }
 
-
-  async function setBoardColor(color) {
-    if (!currentBoard) return;
-    try {
-      await invoke('set_board_color', { color });
-      currentBoard.color = color;
-      renderColor();
-    } catch (err) {
-      console.error('set_board_color', err);
-    }
-  }
 
   function renderColor() {
     if (!currentBoard) return;
