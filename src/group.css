@@ -64,12 +64,6 @@
   pointer-events: none;
 }
 
-.identity {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-}
 .group-name {
   min-width: 0;
   overflow: hidden;
@@ -104,26 +98,10 @@
 .toggle-btn svg { transition: transform 160ms ease; }
 .frame:not(.is-open) .toggle-btn svg { transform: rotate(180deg); }
 
-/* Colour picker under the bar, as in a note (styles.css .menu). */
+/* Colour picker under the bar (base.css .menu). */
 .menu {
-  position: absolute;
-  top: calc(var(--titlebar-h) - 2px);
   left: 6px;
-  z-index: 10;
   max-width: calc(100% - 12px);
-  padding: 6px;
-  background: var(--color-obsidian);
-  border-radius: 8px;
-  box-shadow: var(--shadow-popover);
-  user-select: none;
-  -webkit-user-select: none;
-}
-.menu[hidden] { display: none; }
-.menu-label {
-  padding: 4px 8px 6px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--color-ash);
 }
 
 /* A note being dragged over the bar: dropping it adds it to the group. */

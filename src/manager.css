@@ -37,24 +37,8 @@ body {
   stroke-linejoin: round;
 }
 
-/* Colour picker under the titlebar (as styles.css .menu in a note). */
-.color-menu {
-  position: absolute;
-  top: calc(var(--titlebar-h) - 2px);
-  left: 6px;
-  z-index: 10;
-  padding: 6px;
-  background: var(--color-obsidian);
-  border-radius: 8px;
-  box-shadow: var(--shadow-popover);
-}
-.color-menu[hidden] { display: none; }
-.color-menu .menu-label {
-  padding: 4px 8px 6px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--color-ash);
-}
+/* Colour picker under the titlebar (base.css .menu), as in a note. */
+.color-menu { left: 6px; }
 
 /* Fixed title in the titlebar (the manager has no editable title). */
 .mgr-title {
@@ -282,14 +266,6 @@ body {
   gap: 8px;
   min-width: 0;
 }
-.card-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background: var(--note-color);
-}
-.card-dot[data-color=""] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-smoke); }
 .card-title {
   min-width: 0;
   overflow: hidden;

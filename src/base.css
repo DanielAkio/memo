@@ -204,6 +204,142 @@ button { font: inherit; color: inherit; }
 .swatch:hover { background: var(--overlay-hover); }
 .swatch[aria-checked="true"] { box-shadow: inset 0 0 0 1px var(--color-fog); }
 
+/* ------------------------------------------------------------- popovers */
+
+/* A popover under the titlebar (colour picker) or over the footer (group
+   picker), in every window. Each window places it: left/right, width,
+   z-index (styles.css, group.css, board.css, manager.css). */
+.menu {
+  position: absolute;
+  top: calc(var(--titlebar-h) - 2px);
+  z-index: 10;
+  padding: 6px;
+  background: var(--color-obsidian);
+  border-radius: 8px;
+  box-shadow: var(--shadow-popover);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.menu[hidden] { display: none; }
+.menu-label {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-ash);
+}
+.menu-items {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-mist);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  text-align: left;
+  cursor: default;
+}
+.menu-item span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.menu-item:hover { background: var(--overlay-hover); color: var(--color-paper); }
+.menu-item[aria-checked="true"] { color: var(--color-paper); }
+.menu-item[aria-checked="true"]::after { content: "✓"; margin-left: auto; color: var(--color-fog); }
+.menu-item.muted { color: var(--color-fog); }
+.menu-sep { height: 1px; margin: 4px 2px; background: var(--color-graphite); }
+
+/* ------------------------------------------- footer group (note, board) */
+
+/* Group picker (components/group-picker.js): opens above the footer, on
+   the left. */
+.menu.group-menu {
+  top: auto;
+  bottom: 30px;
+  left: 8px;
+  right: auto;
+  width: 200px;
+  max-width: calc(100% - 16px);
+}
+.foot-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  height: 22px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-badge);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.foot-btn:hover,
+.foot-btn[aria-expanded="true"] { background: var(--overlay-hover); color: var(--color-mist); }
+#edited { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* In a group: its name instead of "No group". */
+.foot-folder {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+.foot-btn.has-group { color: var(--color-mist); }
+.foot-folder[data-color]:not([data-color=""]) { stroke: var(--note-color); }
+
+/* Group tint: a member's titlebar has a top stripe and fades from a wash of
+   its group's colour (its own --note-color scope via data-color) into the
+   window. No group or a colourless group: nothing. Sits under the
+   titlebar, above the frame. */
+.group-tint {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--titlebar-h);
+  pointer-events: none;
+  z-index: 0;
+}
+.group-tint[data-color]:not([data-color=""]) {
+  /* 2px top stripe in the group colour, as on the group's own bar. */
+  box-shadow: inset 0 2px 0 var(--note-color);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--note-color) 20%, transparent),
+    color-mix(in srgb, var(--note-color) 6%, transparent)
+  );
+}
+
+/* ------------------------------------------------------ titlebar identity */
+
+/* The name and its rename field, after the colour control. */
+.identity {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+/* A note's colour dot on a card (manager, board). */
+.card-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--note-color, var(--color-paper));
+}
+.card-dot[data-color=""] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-smoke); }
+
 /* ------------------------------------------------- shared page and frame */
 
 html, body {
