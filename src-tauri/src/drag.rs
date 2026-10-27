@@ -28,7 +28,8 @@ pub(crate) struct Rect {
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) enum DropTarget {
     Group(String),
-    BoardColumn(String, String),
+    /// Board, column, and the note it goes before (`None`: at the end).
+    BoardColumn(String, String, Option<String>),
 }
 
 #[derive(Clone, serde::Deserialize, serde::Serialize, Debug)]
@@ -39,6 +40,17 @@ pub struct ColumnBounds {
     pub right: f64,
     pub top: f64,
     pub bottom: f64,
+    /// The column's cards, top to bottom: a note dropped above a card's
+    /// middle goes before it.
+    #[serde(default)]
+    pub cards: Vec<CardBounds>,
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CardBounds {
+    pub id: String,
+    pub mid: f64,
 }
 
 pub(crate) struct Drag {
@@ -274,8 +286,8 @@ pub(crate) fn drag_move(window: &WebviewWindow, drags: &Drags) {
         let target = if let Some(gid) = group_under(window, cursor) {
             Some(DropTarget::Group(gid))
         } else if Kind::Note.is(window) {
-            if let Some((bid, cid)) = board_col_under(app, cursor) {
-                Some(DropTarget::BoardColumn(bid, cid))
+            if let Some((bid, cid, before)) = board_col_under(app, cursor) {
+                Some(DropTarget::BoardColumn(bid, cid, before))
             } else {
                 None
             }
@@ -287,8 +299,8 @@ pub(crate) fn drag_move(window: &WebviewWindow, drags: &Drags) {
                 Some(DropTarget::Group(old)) => {
                     let _ = app.emit("drop-hover", (old, false));
                 }
-                Some(DropTarget::BoardColumn(bid, cid)) => {
-                    let _ = app.emit("board-drop-hover", (bid, cid, false));
+                Some(DropTarget::BoardColumn(bid, cid, before)) => {
+                    let _ = app.emit("board-drop-hover", (bid, cid, false, before));
                 }
                 None => {}
             }
@@ -296,8 +308,8 @@ pub(crate) fn drag_move(window: &WebviewWindow, drags: &Drags) {
                 Some(DropTarget::Group(new)) => {
                     let _ = app.emit("drop-hover", (new, true));
                 }
-                Some(DropTarget::BoardColumn(bid, cid)) => {
-                    let _ = app.emit("board-drop-hover", (bid, cid, true));
+                Some(DropTarget::BoardColumn(bid, cid, before)) => {
+                    let _ = app.emit("board-drop-hover", (bid, cid, true, before));
                 }
                 None => {}
             }
@@ -350,8 +362,9 @@ pub(crate) fn group_under(window: &WebviewWindow, cursor: (f64, f64)) -> Option<
         .filter(|id| *id != own)
 }
 
-/// The board column under `cursor`, if any.
-pub(crate) fn board_col_under(app: &AppHandle, cursor: (f64, f64)) -> Option<(String, String)> {
+/// The board column under `cursor`, if any, and the note a drop there goes
+/// before (the first card whose middle is below the cursor; `None`: the end).
+pub(crate) fn board_col_under(app: &AppHandle, cursor: (f64, f64)) -> Option<(String, String, Option<String>)> {
     let board_windows: Vec<WebviewWindow> = app
         .webview_windows()
         .into_values()
@@ -370,7 +383,8 @@ pub(crate) fn board_col_under(app: &AppHandle, cursor: (f64, f64)) -> Option<(St
             let cols = drags.board_columns.lock().unwrap().get(&bid).cloned().unwrap_or_default();
             for col in cols {
                 if rel_x >= col.left && rel_x < col.right && rel_y >= col.top && rel_y < col.bottom {
-                    return Some((bid, col.id));
+                    let before = col.cards.iter().find(|c| rel_y < c.mid).map(|c| c.id.clone());
+                    return Some((bid, col.id, before));
                 }
             }
         }
@@ -402,8 +416,8 @@ pub(crate) fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
                 }
                 return;
             }
-            DropTarget::BoardColumn(bid, cid) => {
-                let _ = app.emit("board-drop-hover", (&bid, &cid, false));
+            DropTarget::BoardColumn(bid, cid, before) => {
+                let _ = app.emit("board-drop-hover", (&bid, &cid, false, &before));
                 let note_id = Kind::Note.id_of(&window);
                 let store = app.state::<Shared>();
                 store.update_board(&bid, |b| {
@@ -411,7 +425,10 @@ pub(crate) fn drag_end(window: WebviewWindow, drags: State<'_, Drags>) {
                         col.note_ids.retain(|id| id != &note_id);
                     }
                     if let Some(col) = b.columns.iter_mut().find(|c| c.id == cid) {
-                        col.note_ids.push(note_id.clone());
+                        match before.as_ref().and_then(|id| col.note_ids.iter().position(|n| n == id)) {
+                            Some(at) => col.note_ids.insert(at, note_id.clone()),
+                            None => col.note_ids.push(note_id.clone()),
+                        }
                     }
                 });
                 store.flush();

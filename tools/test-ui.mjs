@@ -870,13 +870,19 @@ try {
       out.windowAtEnd = Boolean(sk2 && sk2.closest('.board-column').dataset.colId === 'c1' && !sk2.nextElementSibling);
       M.emit('board-drop-hover', ['sk-board', 'c1', false]);
       out.windowGone = !doc.querySelector('.card-skeleton');
+      // Above a card's middle: before that card.
+      M.emit('board-drop-hover', ['sk-board', 'c2', true, 'sk-a']);
+      const sk3 = doc.querySelector('.card-skeleton');
+      out.windowBefore = Boolean(sk3 && sk3.nextElementSibling === card('sk-a'));
+      M.emit('board-drop-hover', ['sk-board', 'c2', false, 'sk-a']);
       M.closeWin('board-sk-board');
       return out;
     });
     assert.equal(res.inTwo && res.beforeC, true, 'The skeleton sits in the hovered column, between the cards around the pointer');
     assert.equal(res.gone, true, 'The skeleton goes away on drop');
     assert.deepEqual(res.order, [[], ['sk-b', 'sk-a', 'sk-c']], 'The memory lands where the skeleton was');
-    assert.equal(res.windowAtEnd && res.windowGone, true, 'A memory window over a column shows the skeleton at its end, gone when it leaves');
+    assert.equal(res.windowAtEnd && res.windowGone, true, 'A memory window below the cards shows the skeleton at the column end, gone when it leaves');
+    assert.equal(res.windowBefore, true, 'A memory window above a card shows the skeleton before it');
   });
 
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
@@ -1109,6 +1115,29 @@ try {
         return col.noteIds.includes(id) && updatedNote.hidden;
       }, noteId);
       assert.equal(noteDroppedInBoard, true, 'Dropping note into board column moves note to column and hides window');
+
+      // 5b. Dropped above a card's middle, a memory goes before it: first
+      //     in a column that already has memories.
+      const droppedFirst = await webPage.evaluate(async (firstId) => {
+        const inv = window.MemoWeb.invoke;
+        const before = new Set((await inv('manager', 'list_notes')).map((n) => n.id));
+        await inv('manager', 'new_note');
+        const id = (await inv('manager', 'list_notes')).map((n) => n.id).find((x) => !before.has(x));
+        const boards = await inv('manager', 'list_boards');
+        const brd = boards[boards.length - 1];
+        const colId = brd.columns[0].id;
+        await inv(`board-${brd.id}`, 'update_board_drop_zones', {
+          zones: [{ id: colId, left: 0, right: 300, top: 0, bottom: 500, cards: [{ id: firstId, mid: 200 }] }],
+        });
+        const br = document.querySelector(`.win[data-label="board-${brd.id}"]`).getBoundingClientRect();
+        const nr = document.querySelector(`.win[data-label="note-${id}"]`).getBoundingClientRect();
+        await inv(`note-${id}`, 'drag_start', { cx: 50, cy: 10 });
+        await inv(`note-${id}`, 'drag_to', { cx: br.left + 50 - nr.left, cy: br.top + 50 - nr.top });
+        await inv(`note-${id}`, 'drag_end');
+        const col = (await inv('manager', 'list_boards')).find((x) => x.id === brd.id).columns.find((c) => c.id === colId);
+        return col.noteIds.slice(0, 2).join() === [id, firstId].join();
+      }, noteId);
+      assert.equal(droppedFirst, true, 'A memory dropped above the first card goes first in the column');
 
       // 6. An empty memory put on a board is kept, as in a group: closing it
       //    after opening it from the board must not delete it.

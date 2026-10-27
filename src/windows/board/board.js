@@ -61,7 +61,7 @@
         targetColEl = els.find((el) => el.classList.contains('board-column'));
       }
 
-      showSkeleton(targetColEl, e.clientY, activeDrag.noteId, activeDrag.height);
+      showSkeleton(targetColEl, targetColEl && cardBelow(targetColEl, e.clientY, activeDrag.noteId), activeDrag.height);
     }
   });
 
@@ -145,10 +145,11 @@
     listen('groups-changed', () => loadGroups());
 
     listen('board-drop-hover', (e) => {
-      const [bid, cid, on] = e.payload;
+      const [bid, cid, on, before] = e.payload;
       if (!currentBoard || bid !== currentBoard.id) return;
       const colEl = columnsTrack.querySelector(`.board-column[data-col-id="${cid}"]`);
-      if (on) showSkeleton(colEl, null);
+      const card = colEl && before && colEl.querySelector(`.board-card[data-note-id="${before}"]`);
+      if (on) showSkeleton(colEl, card || null);
       else if (colEl && skeleton.closest('.board-column') === colEl) hideSkeleton();
     });
 
@@ -333,23 +334,27 @@
   // ------------------------------------------------------------- Drop skeleton
 
   // Where a dragged memory will land: a card-sized placeholder in the column
-  // under the pointer. A card dragged inside the board goes between the cards
-  // around the pointer; a memory window dragged in from the desktop goes at
-  // the end (`y` null), where drag.rs / web.js put it.
+  // under the pointer, before the first card whose middle is below it (the
+  // same rule drag.rs / web.js apply to a memory window dragged in from the
+  // desktop, with the cards sent in updateDropZones).
   const skeleton = document.createElement('div');
   skeleton.className = 'card-skeleton';
 
-  function showSkeleton(colEl, y, skipId, height) {
+  // The card a drop at `y` in `colEl` goes before (null: the end).
+  function cardBelow(colEl, y, skipId) {
+    return [...colEl.querySelectorAll('.board-card')].find((c) => {
+      if (c.dataset.noteId === skipId) return false;
+      const r = c.getBoundingClientRect();
+      return y < r.top + r.height / 2;
+    }) || null;
+  }
+
+  function showSkeleton(colEl, before, height) {
     if (!colEl) {
       hideSkeleton();
       return;
     }
     const list = colEl.querySelector('.col-cards');
-    const cards = [...list.querySelectorAll('.board-card')].filter((c) => c.dataset.noteId !== skipId);
-    const before = y == null ? null : cards.find((c) => {
-      const r = c.getBoundingClientRect();
-      return y < r.top + r.height / 2;
-    }) || null;
     skeleton.style.height = `${Math.round(height || 64)}px`;
     if (skeleton.parentNode !== list || skeleton.nextElementSibling !== before) {
       list.insertBefore(skeleton, before);
@@ -387,6 +392,10 @@
         right: r.right,
         top: r.top,
         bottom: r.bottom,
+        cards: [...colEl.querySelectorAll('.board-card')].map((c) => {
+          const cr = c.getBoundingClientRect();
+          return { id: c.dataset.noteId, mid: (cr.top + cr.bottom) / 2 };
+        }),
       });
     }
     invoke('update_board_drop_zones', { zones }).catch(() => {});

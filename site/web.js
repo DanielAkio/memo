@@ -982,7 +982,10 @@
         const relY = docY - by;
         for (const col of zones) {
           if (relX >= col.left && relX < col.right && relY >= col.top && relY < col.bottom) {
-            return { bid, cid: col.id };
+            // Before the first card whose middle is below the pointer
+            // (null: the end), as drag.rs board_col_under.
+            const card = (col.cards || []).find((c) => relY < c.mid);
+            return { bid, cid: col.id, before: card ? card.id : null };
           }
         }
       }
@@ -1886,16 +1889,12 @@
 
     if (isNote(label)) {
       const colTarget = boardColumnUnderCursor(px, py, label);
-      const colKey = colTarget ? `${colTarget.bid}:${colTarget.cid}` : null;
-      const prevKey = activeDrag.hoverBoardCol ? `${activeDrag.hoverBoardCol.bid}:${activeDrag.hoverBoardCol.cid}` : null;
-      if (colKey !== prevKey) {
-        if (activeDrag.hoverBoardCol) {
-          emit('board-drop-hover', [activeDrag.hoverBoardCol.bid, activeDrag.hoverBoardCol.cid, false]);
-        }
+      const key = (t) => (t ? `${t.bid}:${t.cid}:${t.before}` : null);
+      if (key(colTarget) !== key(activeDrag.hoverBoardCol)) {
+        const prev = activeDrag.hoverBoardCol;
+        if (prev) emit('board-drop-hover', [prev.bid, prev.cid, false, prev.before]);
         activeDrag.hoverBoardCol = colTarget;
-        if (colTarget) {
-          emit('board-drop-hover', [colTarget.bid, colTarget.cid, true]);
-        }
+        if (colTarget) emit('board-drop-hover', [colTarget.bid, colTarget.cid, true, colTarget.before]);
       }
       if (colTarget) {
         if (activeDrag.hoverGroup) {
@@ -1953,7 +1952,9 @@
           const targetCol = brd.columns.find((c) => c.id === d.hoverBoardCol.cid);
           if (targetCol) {
             if (!targetCol.noteIds) targetCol.noteIds = [];
-            targetCol.noteIds.push(noteId);
+            const at = d.hoverBoardCol.before ? targetCol.noteIds.indexOf(d.hoverBoardCol.before) : -1;
+            if (at === -1) targetCol.noteIds.push(noteId);
+            else targetCol.noteIds.splice(at, 0, noteId);
           }
         });
       }
