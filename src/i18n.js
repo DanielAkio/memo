@@ -846,5 +846,13 @@ window.MemoI18n = (() => {
 
   const help = () => HELP[lang];
 
-  return { t, set, apply, locale, placeholder, help, get lang() { return lang; } };
+  // Shortcut labels: keys('Mod', 'Shift', 'P') → "⌘⇧P" on a Mac,
+  // "Ctrl+Shift+P" elsewhere. `isMod(e)`: the event has ⌘ (Mac) or Ctrl.
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const keys = (...parts) => (isMac
+    ? parts.map((p) => ({ Mod: '⌘', Shift: '⇧' }[p] || p)).join('')
+    : parts.map((p) => ({ Mod: 'Ctrl' }[p] || p)).join('+'));
+  const isMod = (e) => (isMac ? e.metaKey : e.ctrlKey);
+
+  return { t, set, apply, locale, placeholder, help, keys, isMod, isMac, get lang() { return lang; } };
 })();

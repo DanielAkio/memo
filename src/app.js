@@ -14,18 +14,12 @@
   window.MemoZoom.attach(invoke);
   const appWindow = TAURI.window.getCurrentWindow();
 
-  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-  const keys = (...parts) => (isMac
-    ? parts.map((p) => ({ Mod: '⌘', Shift: '⇧' }[p] || p)).join('')
-    : parts.map((p) => ({ Mod: 'Ctrl' }[p] || p)).join('+'));
-
   const $ = (id) => document.getElementById(id);
   const I18n = window.MemoI18n;
-  const { t } = I18n;
+  const { t, keys, isMod } = I18n;
   const frame = $('frame');
   const titlebar = $('titlebar');
   const editor = $('editor');
-  const pinBtn = $('pinBtn');
   const colorMenu = $('colorMenu');
   const formatBar = $('formatBar');
   const colorBtn = $('colorBtn');
@@ -38,13 +32,8 @@
   let saveTimer = null;
   let textDirty = false;
   let titleTimer = null;
-  let renaming = false;
 
   // ------------------------------------------------------------ helpers
-
-  const customSwatch = document.querySelector('.swatch[data-color="custom"]');
-  const customColor = $('customColor');
-  const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
 
   const colorName = (color) => document.querySelector(`.swatch[data-color="${color}"]`).getAttribute('aria-label');
 
@@ -74,24 +63,10 @@
   // ------------------------------------------------------------- render
 
   function render() {
-    // A custom colour (#rrggbb) goes straight into the --note-color variable.
-    const custom = isCustomColor(note.color);
-    frame.dataset.color = custom ? 'custom' : note.color || '';
-    if (custom) frame.style.setProperty('--note-color', note.color);
-    else frame.style.removeProperty('--note-color');
-    customSwatch.style.setProperty('--sw', custom ? note.color : '');
-    if (!custom) customSwatch.style.removeProperty('--sw');
-
-    pinBtn.setAttribute('aria-pressed', String(note.pinned));
-    const pinLabel = t(note.pinned ? 'unpin' : 'pin');
-    pinBtn.setAttribute('aria-label', pinLabel);
-    pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
-
-    for (const sw of document.querySelectorAll('.swatch')) {
-      const checked = sw === customSwatch ? custom : sw.dataset.color === (note.color || '');
-      sw.setAttribute('aria-checked', String(checked));
-    }
-    colorBtn.title = custom
+    MemoColor.paint(frame, note.color);
+    colors.render(note.color);
+    bar.renderPin(note.pinned);
+    colorBtn.title = MemoColor.isCustom(note.color)
       ? t('colorCustomIs', { hex: note.color })
       : t('colorIs', { name: colorName(note.color || '') });
     renderMeta();
@@ -106,14 +81,9 @@
     // The footer's folder takes the group's colour.
     const folder = footBtn.querySelector('.foot-folder');
     const groupColor = (group && group.color) || '';
-    folder.dataset.color = isCustomColor(groupColor) ? 'custom' : groupColor;
-    if (isCustomColor(groupColor)) folder.style.setProperty('--note-color', groupColor);
-    else folder.style.removeProperty('--note-color');
+    MemoColor.paint(folder, groupColor);
     // The top of the window takes a soft wash of the same colour.
-    const tint = $('groupTint');
-    tint.dataset.color = isCustomColor(groupColor) ? 'custom' : groupColor;
-    if (isCustomColor(groupColor)) tint.style.setProperty('--note-color', groupColor);
-    else tint.style.removeProperty('--note-color');
+    MemoColor.paint($('groupTint'), groupColor);
     footBtn.title = group ? t('groupIs', { name: groupLabel(group) }) : t('addToGroup');
     $('edited').textContent = group ? groupLabel(group) : t('noGroup');
     editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check, img'));
@@ -1403,7 +1373,7 @@
 
   function onEditorKeydown(e) {
     if (e.isComposing) return;
-    const mod = isMac ? e.metaKey : e.ctrlKey;
+    const mod = isMod(e);
     const key = e.key.toLowerCase();
     // Any key but a modifier leaves "before the marker" (see "lists").
     const wasBeforeMarker = beforeMarker;
@@ -3017,21 +2987,8 @@
 
   // ------------------------------------------------------------ actions
 
-  async function togglePin() {
-    const next = !note.pinned;
-    note.pinned = next; // immediate feedback; reverts if the OS refuses
-    render();
-    try {
-      note.pinned = await invoke('set_pinned', { pinned: next });
-    } catch (err) {
-      note.pinned = !next;
-      console.error('set_pinned', err);
-    }
-    render();
-  }
-
   async function newNote() {
-    closeColors();
+    colors.close();
     await flushText();
     invoke('new_note').catch((err) => console.error('new_note', err));
   }
@@ -3045,66 +3002,17 @@
   // Closing only closes the window: the note stays among the current ones
   // and the manager reopens it (the trash is the manager's trash button).
   async function closeNote() {
-    closeColors();
-    if (renaming) await finishRename(true);
+    colors.close();
+    await bar.finishRename(true);
     await flushText();
     invoke('close_note').catch((err) => console.error('close_note', err));
   }
 
   async function trashNote() {
-    closeColors();
-    if (renaming) await finishRename(true);
+    colors.close();
+    await bar.finishRename(true);
     await flushText();
     invoke('trash_note').catch((err) => console.error('trash_note', err));
-  }
-
-  // ------------------------------------------------------------- title
-
-  // Double-click on the titlebar opens the title field.
-  function startRename() {
-    if (renaming) return;
-    renaming = true;
-    closeColors();
-    titleInput.value = note.title;
-    nameEl.hidden = true;
-    titleInput.hidden = false;
-    titleInput.focus();
-    titleInput.select();
-  }
-
-  async function finishRename(save) {
-    if (!renaming) return;
-    renaming = false;
-    const value = titleInput.value.trim();
-    titleInput.hidden = true;
-    nameEl.hidden = false;
-    if (save && value !== note.title) {
-      note.title = value;
-      renderName();
-      try {
-        note.title = await invoke('set_title', { title: value });
-      } catch (err) {
-        console.error('set_title', err);
-      }
-    }
-    renderName();
-    editor.focus();
-  }
-
-  // ------------------------------------------------------- colour picker
-
-  function openColors() {
-    hideFormatBar();
-    colorMenu.hidden = false;
-    frame.classList.add('menu-open');
-    colorBtn.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeColors() {
-    if (colorMenu.hidden) return;
-    colorMenu.hidden = true;
-    frame.classList.remove('menu-open');
-    colorBtn.setAttribute('aria-expanded', 'false');
   }
 
   // ------------------------------------------------------------- events
@@ -3261,42 +3169,22 @@
   trayBtn.addEventListener('mousedown', (e) => e.preventDefault());
   trayBtn.addEventListener('click', toggleTray);
 
-  pinBtn.addEventListener('click', togglePin);
-  $('newBtn').addEventListener('click', newNote);
-  $('trashBtn').addEventListener('click', trashNote);
-  $('closeBtn').addEventListener('click', closeNote);
+  // Colour picker under the titlebar (components/color-menu.js). It stays
+  // open when the window loses focus: the system picker takes it.
+  const colors = new ColorMenu({
+    frame,
+    button: colorBtn,
+    menu: colorMenu,
+    input: $('customColor'),
+    current: () => note && note.color,
+    onPick: setColor,
+    // The system picker opens on the colour the note shows now.
+    customStart: () => (getComputedStyle(frame).getPropertyValue('--note-color').trim().match(/^#[0-9a-f]{6}$/i) || [])[0],
+    onOpen: hideFormatBar,
+    closeOnBlur: false,
+  });
 
-  titleInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); finishRename(true); }
-    else if (e.key === 'Escape') { e.preventDefault(); finishRename(false); }
-  });
-  titleInput.addEventListener('blur', () => finishRename(true));
-
-  colorBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    colorMenu.hidden ? openColors() : closeColors();
-  });
-  $('swatches').addEventListener('click', (e) => {
-    const sw = e.target.closest('.swatch');
-    if (!sw) return;
-    if (sw === customSwatch) {
-      // Open the system picker on the note's current colour.
-      customColor.value = isCustomColor(note.color)
-        ? note.color
-        : (getComputedStyle(frame).getPropertyValue('--note-color').trim().match(/^#[0-9a-f]{6}$/i) || ['#f2c94c'])[0];
-      MemoColorPicker.open(customColor, sw);
-      return;
-    }
-    setColor(sw.dataset.color);
-    closeColors();
-  });
-  // Only applied when confirmed in the picker; cancelling changes nothing.
-  customColor.addEventListener('change', () => {
-    setColor(customColor.value.toLowerCase());
-    closeColors();
-  });
   document.addEventListener('mousedown', (e) => {
-    if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) closeColors();
     if (!groupMenu.hidden && !groupMenu.contains(e.target) && !footBtn.contains(e.target)) closeGroupMenu();
     if (!formatTray.hidden && !formatTray.contains(e.target) && !trayBtn.contains(e.target)) showTray(false);
   });
@@ -3333,7 +3221,7 @@
   }
 
   function openGroupMenu() {
-    closeColors();
+    colors.close();
     hideFormatBar();
     const items = groups
       .slice()
@@ -3370,57 +3258,60 @@
       .catch((err) => console.error('set_note_group', err));
   });
 
-  // Titlebar (chrome.js): drag with snapping, double-click edits the title,
-  // middle click closes; resize grip in the corner.
-  if (!EMBED) {
-    window.MemoChrome.attach({
-      frame,
-      titlebar,
-      grip: $('grip'),
-      onDoubleClick: startRename,
-      onClose: closeNote,
-    });
-    // Right click on the titlebar or its "…" button: the note's commands,
-    // then all the app's (chrome.js).
-    window.MemoChrome.titleMenu({
-      titlebar,
-
-      items: () => (note ? [
-        { label: t('format'), items: formatMenuItems() },
-        null,
-        { label: t('rename'), run: startRename },
-        { label: t('pin'), checked: !!note.pinned, run: togglePin },
-        { label: t('noteColor'), run: openColors },
-        { label: t('moveToTrash'), run: trashNote },
-        { label: t('closeNote'), run: closeNote },
-      ] : []),
-      onOpen: () => { saveMenuSelection(); closeColors(); closeGroupMenu(); hideFormatBar(); },
-    });
-  }
+  // Titlebar (components/titlebar.js): pin, double-click edits the title,
+  // drag with snapping, middle click closes, resize grip in the corner, and
+  // the right-click / "…" menu with the note's commands, then all the app's.
+  const bar = new TitleBar({
+    frame,
+    titlebar,
+    grip: $('grip'),
+    embedded: EMBED,
+    pin: {
+      get: () => note && note.pinned,
+      set: (pinned) => { note.pinned = pinned; render(); },
+    },
+    rename: {
+      name: nameEl,
+      input: titleInput,
+      get: () => note && note.title,
+      onStart: () => colors.close(),
+      async save(title) {
+        note.title = title;
+        renderName();
+        try {
+          note.title = await invoke('set_title', { title });
+        } catch (err) {
+          console.error('set_title', err);
+        }
+      },
+      onEnd: () => { renderName(); editor.focus(); },
+    },
+    buttons: { newBtn: newNote, trashBtn: trashNote, closeBtn: closeNote },
+    onClose: closeNote,
+    onNew: newNote,
+    menuItems: () => (note ? [
+      { label: t('format'), items: formatMenuItems() },
+      null,
+      { label: t('rename'), run: () => bar.startRename() },
+      { label: t('pin'), checked: !!note.pinned, run: () => bar.togglePin() },
+      { label: t('noteColor'), run: () => colors.open() },
+      { label: t('moveToTrash'), run: trashNote },
+      { label: t('closeNote'), run: closeNote },
+    ] : []),
+    onMenuOpen: () => { saveMenuSelection(); colors.close(); closeGroupMenu(); hideFormatBar(); },
+    // Native context menu only in the text and the title field (copy,
+    // paste, spellcheck); elsewhere in the note it makes no sense.
+    nativeMenuIn: 'input, #editor',
+    onBlur: () => {
+      hideFormatBar();
+      showTray(false);
+      closeGroupMenu();
+      flushText();
+    },
+  });
 
   document.addEventListener('keydown', (e) => {
-    const mod = isMac ? e.metaKey : e.ctrlKey;
-    const key = e.key.toLowerCase();
-    if (e.key === 'Escape') { closeColors(); closeGroupMenu(); hideFormatBar(); showTray(false); return; }
-    if (EMBED) return;
-    if (mod && e.shiftKey && key === 'p') { e.preventDefault(); togglePin(); }
-    else if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); }
-  });
-
-  // Native context menu only in the text and the title field (copy, paste,
-  // spellcheck); elsewhere in the note it makes no sense.
-  document.addEventListener('contextmenu', (e) => {
-    if (!e.target.closest('input, #editor')) e.preventDefault();
-  });
-
-  window.addEventListener('focus', () => frame.classList.add('is-focused'));
-  window.addEventListener('blur', () => {
-    frame.classList.remove('is-focused');
-    finishRename(true);
-    hideFormatBar();
-    showTray(false);
-    closeGroupMenu();
-    flushText();
+    if (e.key === 'Escape') { closeGroupMenu(); hideFormatBar(); showTray(false); }
   });
   window.addEventListener('beforeunload', () => {
     if (textDirty) invoke(EMBED ? 'set_default_content' : 'save_text', { text: note.text, html: note.html });
@@ -3429,24 +3320,9 @@
 
   // --------------------------------------------------------------- init
 
-  function applyTheme(theme) {
-    if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
-    else delete document.documentElement.dataset.theme;
-    renderMonoName();
-  }
-
-  // The "mono" colour is white in the dark theme and black in the light one; its name follows.
-  const systemLight = matchMedia('(prefers-color-scheme: light)');
-  function renderMonoName() {
-    const theme = document.documentElement.dataset.theme;
-    const light = theme ? theme === 'light' : systemLight.matches;
-    const name = t(light ? 'black' : 'white');
-    const sw = document.querySelector('.swatch[data-color="mono"]');
-    sw.setAttribute('aria-label', name);
-    sw.title = name;
-    if (note) render();
-  }
-  systemLight.addEventListener('change', renderMonoName);
+  // The colour button's tooltip names the colour, and "mono" is named after
+  // the theme (white or black).
+  MemoTheme.onChange(() => { if (note) render(); });
 
   // Language-dependent text that isn't just in the HTML (tooltips with
   // shortcuts, placeholder, spellcheck). Called on load and on language change.
@@ -3472,7 +3348,7 @@
     for (const btn of bars.flatMap((bar) => [...bar.querySelectorAll('[data-size]')])) {
       btn.title = btn.getAttribute('aria-label') + (sizeKeys[btn.dataset.size] || '');
     }
-    renderMonoName();
+    MemoTheme.renderMono();
     renderCode();
   }
 
@@ -3486,8 +3362,8 @@
     document.execCommand('defaultParagraphSeparator', false, 'div');
 
     // Theme chosen in the manager ("system" = follow the OS, via CSS).
-    applyTheme(await invoke('get_theme'));
-    TAURI.event.listen('theme-changed', (e) => applyTheme(e.payload));
+    MemoTheme.apply(await invoke('get_theme'));
+    TAURI.event.listen('theme-changed', (e) => MemoTheme.apply(e.payload));
 
     if (EMBED) {
       const [, text, html] = await invoke('get_new_note_defaults');
@@ -3502,7 +3378,6 @@
       TAURI.event.listen('groups-changed', loadGroups);
       await loadGroups();
     }
-    if (document.hasFocus()) frame.classList.add('is-focused');
     if (!EMBED && !new URLSearchParams(location.search).has('nofocus')) {
       editor.focus({ preventScroll: true });
       const r = document.createRange();

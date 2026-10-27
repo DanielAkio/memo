@@ -5,24 +5,14 @@
   const { listen } = window.__TAURI__.event;
   const I18n = window.MemoI18n;
   const t = (k, v) => I18n.t(k, v);
-  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-  const keys = (...parts) => (isMac
-    ? parts.map((p) => ({ Mod: '⌘', Shift: '⇧' }[p] || p)).join('')
-    : parts.map((p) => ({ Mod: 'Ctrl' }[p] || p)).join('+'));
-
   const $ = (id) => document.getElementById(id);
   const frame = $('frame');
   const titlebar = $('titlebar');
-  const pinBtn = $('pinBtn');
   const colorBtn = $('colorBtn');
   const colorMenu = $('colorMenu');
-  const customColorInput = $('customColor');
-  const customSwatch = colorMenu.querySelector('.swatch[data-color="custom"]');
   const boardName = $('boardName');
   const nameInput = $('nameInput');
 
-  const trashBtn = $('trashBtn');
-  const closeBtn = $('closeBtn');
   const columnsTrack = $('columnsTrack');
   const boardBody = $('boardBody');
   const groupTint = $('groupTint');
@@ -165,83 +155,27 @@
   window.addEventListener('pointerup', endPointerDrag);
   window.addEventListener('pointercancel', endPointerDrag);
 
-  function isCustomColor(c) {
-    return typeof c === 'string' && c.startsWith('#');
-  }
-
   // ------------------------------------------------------------- Setup & Init
 
   async function init() {
     const [, lang] = await invoke('get_language').catch(() => ['', 'en']);
     if (lang) I18n.set(lang);
     I18n.apply(document);
+    MemoTheme.renderMono();
 
-    MemoChrome.attach({
-      frame,
-      titlebar,
-      grip,
-      resizeEdges: ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
-      onDoubleClick: startRename,
-      onClose: closeBoard,
-    });
-
-    MemoChrome.titleMenu({
-      titlebar,
-      items: () => [
-        { label: t('rename'), run: startRename },
-        { label: t('pin'), checked: !!(currentBoard && currentBoard.pinned), run: togglePin },
-        { label: t('boardColor'), run: openColors },
-        { label: t('addColumn'), run: onAddColumn },
-        { label: t('groupMenuTitle'), run: () => (groupMenu.hidden ? openGroupMenu() : closeGroupMenu()) },
-        { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error(err)) },
-        { label: t('moveToTrash'), run: trashBoard },
-        { label: t('close'), run: closeBoard },
-      ],
-      onOpen: () => {
-        closeColors();
-        closeGroupMenu();
-      },
-    });
-
-    pinBtn.addEventListener('click', togglePin);
-    trashBtn.addEventListener('click', trashBoard);
-    closeBtn.addEventListener('click', closeBoard);
-
-    setupRename();
-    setupColorMenu();
     setupGroupMenu();
-
-    window.addEventListener('focus', () => frame.classList.add('is-focused'));
-    window.addEventListener('blur', () => {
-      frame.classList.remove('is-focused');
-      closeColors();
-      closeGroupMenu();
-    });
     window.addEventListener('resize', updateDropZones);
     boardBody.addEventListener('scroll', updateDropZones);
-
-    window.addEventListener('keydown', (e) => {
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      const key = e.key.toLowerCase();
-      if (e.key === 'Escape') {
-        closeColors();
-        closeGroupMenu();
-      }
-      if (mod && e.shiftKey && key === 'p') {
-        e.preventDefault();
-        togglePin();
-      }
-      if (mod && !e.shiftKey && key === 'n' && nameInput.hidden) {
-        e.preventDefault();
-        invoke('new_note').catch((err) => console.error(err));
-      }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeGroupMenu();
     });
 
-    document.addEventListener('contextmenu', (e) => {
-      if (!e.target.closest('input, textarea')) e.preventDefault();
+    listen('theme-changed', (e) => MemoTheme.apply(e.payload));
+    listen('language-changed', (e) => {
+      I18n.set(e.payload);
+      MemoTheme.renderMono();
+      reloadBoard();
     });
-
-    listen('theme-changed', (e) => applyTheme(e.payload));
     listen('boards-changed', () => reloadBoard());
     listen('notes-changed', () => reloadNotes());
     listen('groups-changed', () => loadGroups());
@@ -260,36 +194,13 @@
     });
 
     const theme = await invoke('get_theme').catch(() => '');
-    if (theme) applyTheme(theme);
+    if (theme) MemoTheme.apply(theme);
 
     await reloadNotes();
     await reloadBoard();
   }
 
-  function applyTheme(theme) {
-    if (theme && theme !== 'system') {
-      document.documentElement.dataset.theme = theme;
-    } else {
-      delete document.documentElement.dataset.theme;
-    }
-  }
-
   // ------------------------------------------------------------- Window Chrome
-
-  async function togglePin() {
-    if (!currentBoard) return;
-    const next = !currentBoard.pinned;
-    try {
-      await invoke('set_pinned', { pinned: next });
-      currentBoard.pinned = next;
-      pinBtn.classList.toggle('is-pinned', !!next);
-      pinBtn.setAttribute('aria-pressed', String(next));
-      const pinLabel = t(next ? 'unpin' : 'pin');
-      pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
-    } catch (err) {
-      console.error('set_pinned', err);
-    }
-  }
 
   async function trashBoard() {
     try {
@@ -307,64 +218,63 @@
     }
   }
 
-  function openColors() {
-    closeGroupMenu();
-    colorMenu.hidden = false;
-    colorBtn.setAttribute('aria-expanded', 'true');
-    renderMonoName();
-  }
+  const colors = new ColorMenu({
+    frame,
+    button: colorBtn,
+    menu: colorMenu,
+    input: $('customColor'),
+    current: () => currentBoard && currentBoard.color,
+    onPick: (color) => setBoardColor(color || ''),
+    onOpen: () => closeGroupMenu(),
+  });
 
-  function closeColors() {
-    colorMenu.hidden = true;
-    colorBtn.setAttribute('aria-expanded', 'false');
-  }
-
-  const systemLight = matchMedia('(prefers-color-scheme: light)');
-  function renderMonoName() {
-    const theme = document.documentElement.dataset.theme;
-    const light = theme ? theme === 'light' : systemLight.matches;
-    const sw = document.querySelector('.swatch[data-color="mono"]');
-    if (sw) {
-      const name = t(light ? 'black' : 'white');
-      sw.setAttribute('aria-label', name);
-      sw.title = name;
-    }
-  }
-
-  function setupColorMenu() {
-    colorBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      colorMenu.hidden ? openColors() : closeColors();
-    });
-
-    $('swatches').addEventListener('click', async (e) => {
-      const sw = e.target.closest('.swatch');
-      if (!sw || !currentBoard) return;
-      if (sw === customSwatch) {
-        customColorInput.value = isCustomColor(currentBoard.color) ? currentBoard.color : '#f2c94c';
-        MemoColorPicker.open(customColorInput, sw);
-        return;
-      }
-      await setBoardColor(sw.dataset.color || '');
-      closeColors();
-    });
-
-    customColorInput.addEventListener('change', async () => {
-      await setBoardColor(customColorInput.value.toLowerCase());
-      closeColors();
-    });
-
-    document.addEventListener('mousedown', (e) => {
-      if (!colorMenu.hidden && !colorMenu.contains(e.target) && !colorBtn.contains(e.target)) {
-        closeColors();
-      }
-      if (!groupMenu.hidden && !groupMenu.contains(e.target) && (!footBtn || !footBtn.contains(e.target))) {
-        closeGroupMenu();
-      }
-    });
-
-    systemLight.addEventListener('change', renderMonoName);
-  }
+  // Titlebar (components/titlebar.js): pin, double-click renames, drag,
+  // resize, middle click closes, and the right-click / "…" menu with the
+  // board's commands, then all the app's.
+  const bar = new TitleBar({
+    frame,
+    titlebar,
+    grip,
+    pin: {
+      get: () => currentBoard && currentBoard.pinned,
+      set: (pinned) => {
+        currentBoard.pinned = pinned;
+        bar.renderPin(pinned);
+      },
+    },
+    rename: {
+      name: boardName,
+      input: nameInput,
+      get: () => currentBoard && currentBoard.name,
+      async save(name) {
+        try {
+          currentBoard.name = await invoke('rename_board', { name });
+          renderTitle();
+        } catch (err) {
+          console.error('rename_board', err);
+        }
+      },
+    },
+    buttons: { trashBtn: trashBoard, closeBtn: closeBoard },
+    onClose: closeBoard,
+    onNew: () => invoke('new_note').catch((err) => console.error('new_note', err)),
+    menuItems: () => [
+      { label: t('rename'), run: () => bar.startRename() },
+      { label: t('pin'), checked: !!(currentBoard && currentBoard.pinned), run: () => bar.togglePin() },
+      { label: t('boardColor'), run: () => colors.open() },
+      { label: t('addColumn'), run: onAddColumn },
+      { label: t('groupMenuTitle'), run: () => (groupMenu.hidden ? openGroupMenu() : closeGroupMenu()) },
+      { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error(err)) },
+      { label: t('moveToTrash'), run: trashBoard },
+      { label: t('close'), run: closeBoard },
+    ],
+    onMenuOpen: () => {
+      colors.close();
+      closeGroupMenu();
+    },
+    nativeMenuIn: 'input, textarea',
+    onBlur: () => closeGroupMenu(),
+  });
 
   // ------------------------------------------------------------- Group Menu
 
@@ -388,17 +298,13 @@
     if (!currentBoard) return;
     const group = currentBoard.groupId ? groups.find((g) => g.id === currentBoard.groupId) : null;
     const groupColor = group ? group.color || '' : '';
-    groupTint.dataset.color = isCustomColor(groupColor) ? 'custom' : groupColor;
-    if (isCustomColor(groupColor)) groupTint.style.setProperty('--note-color', groupColor);
-    else groupTint.style.removeProperty('--note-color');
+    MemoColor.paint(groupTint, groupColor);
 
     if (footBtn) {
       footBtn.classList.toggle('has-group', Boolean(group));
       const folder = footBtn.querySelector('.foot-folder');
       if (folder) {
-        folder.dataset.color = isCustomColor(groupColor) ? 'custom' : groupColor;
-        if (isCustomColor(groupColor)) folder.style.setProperty('--note-color', groupColor);
-        else folder.style.removeProperty('--note-color');
+        MemoColor.paint(folder, groupColor);
       }
       footBtn.title = group ? t('groupIs', { name: groupLabel(group) }) : t('addToGroup');
     }
@@ -421,7 +327,7 @@
   }
 
   function openGroupMenu() {
-    closeColors();
+    colors.close();
     const items = groups
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true }))
@@ -474,57 +380,8 @@
 
   function renderColor() {
     if (!currentBoard) return;
-    const color = currentBoard.color || '';
-    const custom = isCustomColor(color);
-    frame.dataset.color = custom ? 'custom' : color;
-    if (custom) frame.style.setProperty('--note-color', color);
-    else frame.style.removeProperty('--note-color');
-
-    if (custom && customSwatch) customSwatch.style.setProperty('--sw', color);
-    else if (customSwatch) customSwatch.style.removeProperty('--sw');
-
-    for (const sw of colorMenu.querySelectorAll('.swatch')) {
-      const active = sw === customSwatch ? custom : sw.dataset.color === color;
-      sw.setAttribute('aria-checked', String(active));
-    }
-  }
-
-  function setupRename() {
-    boardName.addEventListener('dblclick', startRename);
-    nameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') commitRename();
-      else if (e.key === 'Escape') cancelRename();
-    });
-    nameInput.addEventListener('blur', commitRename);
-  }
-
-  function startRename() {
-    nameInput.value = currentBoard ? currentBoard.name : '';
-    boardName.hidden = true;
-    nameInput.hidden = false;
-    nameInput.focus();
-    nameInput.select();
-  }
-
-  async function commitRename() {
-    if (nameInput.hidden) return;
-    const clean = nameInput.value.trim();
-    nameInput.hidden = true;
-    boardName.hidden = false;
-    if (currentBoard && clean !== currentBoard.name) {
-      try {
-        const saved = await invoke('rename_board', { name: clean });
-        currentBoard.name = saved;
-        renderTitle();
-      } catch (err) {
-        console.error('rename_board', err);
-      }
-    }
-  }
-
-  function cancelRename() {
-    nameInput.hidden = true;
-    boardName.hidden = false;
+    MemoColor.paint(frame, currentBoard.color);
+    colors.render(currentBoard.color);
   }
 
   function renderTitle() {
@@ -550,10 +407,7 @@
       const b = await invoke('load_board');
       if (b) {
         currentBoard = b;
-        pinBtn.classList.toggle('is-pinned', !!b.pinned);
-        pinBtn.setAttribute('aria-pressed', String(b.pinned));
-        const pinLabel = t(b.pinned ? 'unpin' : 'pin');
-        pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
+        bar.renderPin(b.pinned);
         renderTitle();
         renderColor();
         renderColumns();
@@ -807,8 +661,7 @@
 
         const cardDot = document.createElement('span');
         cardDot.className = 'card-dot';
-        cardDot.dataset.color = isCustomColor(note.color) ? 'custom' : note.color || '';
-        if (isCustomColor(note.color)) cardDot.style.setProperty('--note-color', note.color);
+        MemoColor.paint(cardDot, note.color);
 
         const cardTitle = document.createElement('span');
         cardTitle.className = 'card-title';

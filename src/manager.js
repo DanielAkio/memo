@@ -8,16 +8,10 @@
   const { invoke } = window.__TAURI__.core;
   const { listen } = window.__TAURI__.event;
 
-  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-  const keys = (...parts) => (isMac
-    ? parts.map((p) => ({ Mod: '⌘', Shift: '⇧' }[p] || p)).join('')
-    : parts.map((p) => ({ Mod: 'Ctrl' }[p] || p)).join('+'));
-
   const $ = (id) => document.getElementById(id);
   const I18n = window.MemoI18n;
-  const { t } = I18n;
+  const { t, keys, isMod } = I18n;
   const frame = $('frame');
-  const pinBtn = $('pinBtn');
   const list = $('list');
   const empty = $('empty');
   const search = $('search');
@@ -49,7 +43,6 @@
 
   // ------------------------------------------------------------ helpers
 
-  const isCustomColor = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
   // Plain text without the list markers ("[ ] " / "[x] " / "- ").
   const plain = (text) => (text || '').replace(/^(\s*)(?:\[[ xX]?\]|-|\d+\.)(?= |$) ?/gm, '$1');
   // For search: lower case, without accents.
@@ -240,8 +233,7 @@
 
   function noteBase(note, meta, actions) {
     const dot = el('span', 'card-dot');
-    dot.dataset.color = isCustomColor(note.color) ? 'custom' : note.color || '';
-    if (isCustomColor(note.color)) dot.style.setProperty('--note-color', note.color);
+    MemoColor.paint(dot, note.color);
     const { title, preview, named } = titleAndPreview(note);
     const prev = layout === 'cards' && window.MemoCard
       ? (window.MemoCard.render(note, { skipFirst: !named, className: 'card-preview' }) || '')
@@ -327,16 +319,14 @@
   function groupFolder(group) {
     const folder = icon(FOLDER_ICON);
     folder.classList.add('card-folder', 'group-card-folder');
-    folder.dataset.color = isCustomColor(group.color) ? 'custom' : group.color || '';
-    if (isCustomColor(group.color)) folder.style.setProperty('--note-color', group.color);
+    MemoColor.paint(folder, group.color);
     return folder;
   }
 
   function boardIcon(board) {
     const bIcon = icon(BOARD_ICON);
     bIcon.classList.add('card-board-icon');
-    bIcon.dataset.color = isCustomColor(board.color) ? 'custom' : board.color || '';
-    if (isCustomColor(board.color)) bIcon.style.setProperty('--note-color', board.color);
+    MemoColor.paint(bIcon, board.color);
     return bIcon;
   }
 
@@ -462,9 +452,7 @@
     const group = groups.find((g) => g.id === note.groupId);
     const folder = icon(FOLDER_ICON);
     folder.classList.add('card-folder');
-    const color = group ? group.color || '' : '';
-    folder.dataset.color = isCustomColor(color) ? 'custom' : color;
-    if (isCustomColor(color)) folder.style.setProperty('--note-color', color);
+    MemoColor.paint(folder, group ? group.color : '');
     actions.append(folder, groupSelect(note), trashBtn);
     const item = noteBase(note, editedLabel(note.updatedAt), actions);
     // Closed with ✕: dimmed, a click reopens it.
@@ -489,13 +477,7 @@
   // ---------------------------------------------------- default colour
 
   function renderDefaultColor() {
-    const custom = isCustomColor(defaultColor);
-    for (const sw of document.querySelectorAll('#defaultSwatches .swatch')) {
-      const checked = sw === customSwatch ? custom : sw.dataset.color === defaultColor;
-      sw.setAttribute('aria-checked', String(checked));
-    }
-    if (custom) customSwatch.style.setProperty('--sw', defaultColor);
-    else customSwatch.style.removeProperty('--sw');
+    MemoColor.mark($('defaultSwatches'), defaultColor);
   }
 
   async function setDefaultColor(color) {
@@ -543,13 +525,7 @@
   let groupTitleTimer = null;
 
   function renderGroupDefaultColor() {
-    const custom = isCustomColor(groupDefaultColor);
-    for (const sw of groupSwatches.querySelectorAll('.swatch')) {
-      const checked = sw === groupCustomSwatch ? custom : sw.dataset.color === groupDefaultColor;
-      sw.setAttribute('aria-checked', String(checked));
-    }
-    if (custom) groupCustomSwatch.style.setProperty('--sw', groupDefaultColor);
-    else groupCustomSwatch.style.removeProperty('--sw');
+    MemoColor.mark(groupSwatches, groupDefaultColor);
   }
 
   function setGroupDefaultColor(color) {
@@ -577,7 +553,7 @@
     const sw = e.target.closest('.swatch');
     if (!sw) return;
     if (sw === groupCustomSwatch) {
-      groupCustomColor.value = isCustomColor(groupDefaultColor) ? groupDefaultColor : '#f2c94c';
+      groupCustomColor.value = MemoColor.isCustom(groupDefaultColor) ? groupDefaultColor : '#f2c94c';
       MemoColorPicker.open(groupCustomColor, sw);
       return;
     }
@@ -656,28 +632,12 @@
 
   // -------------------------------------------------------------- theme
 
-  const systemLight = matchMedia('(prefers-color-scheme: light)');
-
   function applyTheme(theme) {
-    if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
-    else delete document.documentElement.dataset.theme;
+    MemoTheme.apply(theme);
     for (const seg of document.querySelectorAll('#themeSwitch .seg')) {
       seg.setAttribute('aria-checked', String(seg.dataset.theme === (theme || 'system')));
     }
-    renderMonoName();
   }
-
-  // The "mono" colour is white in the dark theme and black in the light one; its name follows.
-  function renderMonoName() {
-    const theme = document.documentElement.dataset.theme;
-    const light = theme ? theme === 'light' : systemLight.matches;
-    const name = t(light ? 'black' : 'white');
-    for (const sw of document.querySelectorAll('.settings .swatch[data-color="mono"], #mgrSwatches .swatch[data-color="mono"]')) {
-      sw.setAttribute('aria-label', name);
-      sw.title = name;
-    }
-  }
-  systemLight.addEventListener('change', renderMonoName);
 
   // -------------------------------------------------------------- events
 
@@ -880,7 +840,7 @@
     const sw = e.target.closest('.swatch');
     if (!sw) return;
     if (sw === customSwatch) {
-      customColor.value = isCustomColor(defaultColor) ? defaultColor : '#f2c94c';
+      customColor.value = MemoColor.isCustom(defaultColor) ? defaultColor : '#f2c94c';
       MemoColorPicker.open(customColor, sw);
       return;
     }
@@ -923,11 +883,7 @@
   });
 
   document.addEventListener('keydown', (e) => {
-    const mod = isMac ? e.metaKey : e.ctrlKey;
-    const key = e.key.toLowerCase();
-    if (mod && e.shiftKey && key === 'p') { e.preventDefault(); togglePin(); return; }
-    if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newNote(); return; }
-    if (mod && key === 'f') {
+    if (isMod(e) && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       search.focus({ preventScroll: true });
       search.select();
@@ -937,97 +893,30 @@
     }
   });
 
-  // Native context menu only in text fields.
-  document.addEventListener('contextmenu', (e) => {
-    if (!e.target.closest('input, textarea')) e.preventDefault();
-  });
-
   // ------------------------------------------- window (like a note)
 
   function renderWindow() {
     // Colour: stripe and manager icon, as in a note or group.
-    const color = win.color || '';
-    const custom = isCustomColor(color);
-    frame.dataset.color = custom ? 'custom' : color;
-    if (custom) frame.style.setProperty('--note-color', color);
-    else frame.style.removeProperty('--note-color');
-    if (custom) mgrCustomSwatch.style.setProperty('--sw', color);
-    else mgrCustomSwatch.style.removeProperty('--sw');
-    for (const sw of mgrColorMenu.querySelectorAll('.swatch')) {
-      const checked = sw === mgrCustomSwatch ? custom : sw.dataset.color === color;
-      sw.setAttribute('aria-checked', String(checked));
-    }
-    pinBtn.setAttribute('aria-pressed', String(win.pinned));
-    const pinLabel = t(win.pinned ? 'unpin' : 'pin');
-    pinBtn.setAttribute('aria-label', pinLabel);
-    pinBtn.title = `${pinLabel} (${keys('Mod', 'Shift', 'P')})`;
+    MemoColor.paint(frame, win.color);
+    colors.render(win.color);
+    bar.renderPin(win.pinned);
   }
 
   // ------------------------------------------------- window colour picker
 
-  const mgrColorBtn = $('mgrColorBtn');
-  const mgrColorMenu = $('mgrColorMenu');
-  const mgrCustomColor = $('mgrCustomColor');
-  const mgrCustomSwatch = mgrColorMenu.querySelector('.swatch[data-color="custom"]');
-
-  function openMgrColors() {
-    mgrColorMenu.hidden = false;
-    frame.classList.add('menu-open');
-    mgrColorBtn.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeMgrColors() {
-    if (mgrColorMenu.hidden) return;
-    mgrColorMenu.hidden = true;
-    frame.classList.remove('menu-open');
-    mgrColorBtn.setAttribute('aria-expanded', 'false');
-  }
-
-  function setMgrColor(color) {
-    win.color = color;
-    renderWindow();
-    invoke('set_manager_color', { color }).catch((err) => console.error('set_manager_color', err));
-  }
-
-  mgrColorBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    mgrColorMenu.hidden ? openMgrColors() : closeMgrColors();
+  const colors = new ColorMenu({
+    frame,
+    button: $('mgrColorBtn'),
+    menu: $('mgrColorMenu'),
+    input: $('mgrCustomColor'),
+    current: () => win.color,
+    onPick(color) {
+      win.color = color;
+      renderWindow();
+      invoke('set_manager_color', { color }).catch((err) => console.error('set_manager_color', err));
+    },
   });
-  $('mgrSwatches').addEventListener('click', (e) => {
-    const sw = e.target.closest('.swatch');
-    if (!sw) return;
-    if (sw === mgrCustomSwatch) {
-      mgrCustomColor.value = isCustomColor(win.color) ? win.color : '#f2c94c';
-      MemoColorPicker.open(mgrCustomColor, sw);
-      return;
-    }
-    setMgrColor(sw.dataset.color);
-    closeMgrColors();
-  });
-  mgrCustomColor.addEventListener('change', () => {
-    setMgrColor(mgrCustomColor.value.toLowerCase());
-    closeMgrColors();
-  });
-  document.addEventListener('mousedown', (e) => {
-    if (!mgrColorMenu.hidden && !mgrColorMenu.contains(e.target) && !mgrColorBtn.contains(e.target)) closeMgrColors();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeMgrColors();
-  });
-  window.addEventListener('blur', closeMgrColors);
 
-  async function togglePin() {
-    const next = !win.pinned;
-    win.pinned = next; // immediate feedback; reverts if the OS refuses
-    renderWindow();
-    try {
-      win.pinned = await invoke('set_pinned', { pinned: next });
-    } catch (err) {
-      win.pinned = !next;
-      console.error('set_pinned', err);
-    }
-    renderWindow();
-  }
 
   function isMobileWeb() {
     const host = (window.top && window.top.MemoWeb) || (window.opener && window.opener.MemoWeb);
@@ -1048,21 +937,29 @@
     invoke('close_manager').catch((err) => console.error('close_manager', err));
   };
 
-  window.MemoChrome.attach({
+  // Titlebar (components/titlebar.js), as in a note: pin, drag, resize,
+  // middle click closes, and the right-click / "…" menu with the manager's
+  // commands, then all the app's. No rename: its title is fixed.
+  const bar = new TitleBar({
     frame,
     titlebar: $('titlebar'),
     grip: $('grip'),
+    pin: {
+      get: () => win.pinned,
+      set: (pinned) => { win.pinned = pinned; renderWindow(); },
+    },
+    buttons: {
+      newBtn: newNote,
+      newGroupBtn: () => invoke('new_group').catch((err) => console.error('new_group', err)),
+      newBoardBtn: () => invoke('new_board').catch((err) => console.error('new_board', err)),
+      closeBtn: closeWindow,
+    },
     onClose: closeWindow,
-  });
-  // Right click on the titlebar or its "…" button: the manager's commands,
-  // then all the app's (chrome.js), as in a note.
-  window.MemoChrome.titleMenu({
-    titlebar: $('titlebar'),
-
-    items: () => {
+    onNew: newNote,
+    menuItems: () => {
       const items = [
-        { label: t('pin'), checked: !!win.pinned, run: togglePin },
-        { label: t('managerColor'), run: openMgrColors },
+        { label: t('pin'), checked: !!win.pinned, run: () => bar.togglePin() },
+        { label: t('managerColor'), run: () => colors.open() },
         { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err)) },
       ];
       if (!isMobileWeb()) {
@@ -1070,27 +967,18 @@
       }
       return items;
     },
-    onOpen: closeMgrColors,
-  });
-  pinBtn.addEventListener('click', togglePin);
-  $('newBtn').addEventListener('click', newNote);
-  $('newGroupBtn').addEventListener('click', () => {
-    invoke('new_group').catch((err) => console.error('new_group', err));
-  });
-  $('newBoardBtn').addEventListener('click', () => {
-    invoke('new_board').catch((err) => console.error('new_board', err));
+    onMenuOpen: () => colors.close(),
+    // Native context menu only in text fields.
+    nativeMenuIn: 'input, textarea',
   });
   document.querySelector('.mgr-head').addEventListener('contextmenu', (e) => {
     e.preventDefault();
     invoke('new_board').catch((err) => console.error('new_board', err));
   });
-  $('closeBtn').addEventListener('click', closeWindow);
   syncMobileState();
   window.addEventListener('resize', syncMobileState);
   window.addEventListener('memo-mobile-changed', syncMobileState);
 
-  window.addEventListener('focus', () => frame.classList.add('is-focused'));
-  window.addEventListener('blur', () => frame.classList.remove('is-focused'));
 
   // --------------------------------------------------------- data folder
   // The folder picker and the "folder already has notes" question are native
@@ -1320,7 +1208,7 @@
     $('newBtn').title = `${t('newNote')} (${keys('Mod', 'N')})`;
     $('languageSelect').value = setting;
     renderWindow();
-    renderMonoName();
+    MemoTheme.renderMono();
     renderHelp();
     renderCloud();
     renderUpdate();
@@ -1601,7 +1489,6 @@
     applyLanguage(languageSetting, lang);
     listen('language-changed', (e) => applyLanguage(languageSetting, e.payload));
     renderWindow();
-    if (document.hasFocus()) frame.classList.add('is-focused');
     applyTheme(await invoke('get_theme'));
     listen('theme-changed', (e) => applyTheme(e.payload));
     loadCloud();
