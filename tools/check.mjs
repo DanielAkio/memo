@@ -246,6 +246,34 @@ if (!colorsMatch) {
   if (!failures) pass(`Colours (${storeColors.length} store colours synced across Rust, CSS and HTML)`);
 }
 
+// ------------------------------------------------------- 6. Memo Web parity
+
+// Memo Web (site/web.js) must answer every command the desktop app has, so
+// both versions behave the same. Desktop-only features are listed here, each
+// with the reason; the web version hides their settings.
+const DESKTOP_ONLY = {
+  choose_data_dir: 'the data folder is a desktop folder (the web keeps data in the browser)',
+  reset_data_dir: 'same',
+  set_ai_control: 'AI control (MCP) runs a local process',
+  connect_ai_client: 'same',
+  set_auto_update: 'in-app updates are for installed builds',
+  check_update: 'same',
+  install_update: 'same',
+};
+{
+  const handler = mainRs.match(/generate_handler!\[([\s\S]*?)\]/);
+  const rustCmds = handler[1].replace(/\/\/.*$/gm, '').split(',').map((s) => s.trim()).filter(Boolean);
+  const webCases = new Set([...read('site/web.js').matchAll(/case '([a-z0-9_]+)'/g)].map((m) => m[1]));
+  const before = failures;
+  for (const cmd of rustCmds) {
+    if (!webCases.has(cmd) && !DESKTOP_ONLY[cmd]) fail(`Memo Web (site/web.js) has no case for command '${cmd}'`);
+  }
+  for (const cmd of Object.keys(DESKTOP_ONLY)) {
+    if (!rustCmds.includes(cmd)) fail(`check.mjs DESKTOP_ONLY lists '${cmd}', which is no longer a command`);
+  }
+  if (failures === before) pass(`Memo Web parity (${rustCmds.length - Object.keys(DESKTOP_ONLY).length} commands, ${Object.keys(DESKTOP_ONLY).length} desktop-only)`);
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed.`);
   process.exit(1);
