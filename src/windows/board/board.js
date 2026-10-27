@@ -159,12 +159,14 @@
 
     window.addEventListener('resize', updateDropZones);
     boardBody.addEventListener('scroll', updateDropZones);
+    boardBody.addEventListener('pointermove', onBoardPointer);
+    boardBody.addEventListener('pointerleave', () => setAddSide(null));
 
     listen('theme-changed', (e) => MemoTheme.apply(e.payload));
     listen('language-changed', (e) => {
       I18n.set(e.payload);
       MemoTheme.renderMono();
-      reloadBoard();
+      reloadBoard(true);
     });
     listen('boards-changed', () => reloadBoard());
     listen('notes-changed', () => reloadNotes());
@@ -228,7 +230,7 @@
       { label: t('rename'), run: () => bar.startRename() },
       { label: t('pin'), checked: !!(currentBoard && currentBoard.pinned), run: () => bar.togglePin() },
       { label: t('boardColor'), run: () => colors.open() },
-      { label: t('addColumn'), run: onAddColumn },
+      { label: t('addColumn'), run: () => onAddColumn('right') },
       { label: t('groupMenuTitle'), run: () => groups.toggle() },
       { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error(err)) },
       { label: t('moveToTrash'), run: () => bar.trash() },
@@ -296,15 +298,19 @@
     }
   }
 
-  async function reloadBoard() {
+  // `force`: redraw the columns even if they didn't change (language). The
+  // echo of this window's own save leaves them alone, so a column name being
+  // edited stays open.
+  async function reloadBoard(force = false) {
     try {
       const b = await invoke('load_board');
       if (b) {
+        const same = currentBoard && JSON.stringify(currentBoard.columns) === JSON.stringify(b.columns);
         currentBoard = b;
         bar.renderPin(b.pinned);
         renderTitle();
         renderColor();
-        renderColumns();
+        if (force || !same) renderColumns();
         await loadGroups();
       }
     } catch (err) {
@@ -318,7 +324,9 @@
       .catch((err) => console.error('save_board_columns', err));
   }
 
-  function onAddColumn() {
+  // A new column at the end ("right", the menu's "Add column") or at the
+  // start ("left"), with its name open for editing.
+  function onAddColumn(side = 'right') {
     if (!currentBoard) return;
     const count = currentBoard.columns.length + 1;
     const newCol = {
@@ -327,9 +335,57 @@
       color: '',
       noteIds: [],
     };
-    currentBoard.columns.push(newCol);
+    if (side === 'left') currentBoard.columns.unshift(newCol);
+    else currentBoard.columns.push(newCol);
+    setAddSide(null);
     renderColumns();
     saveColumns();
+    const title = columnsTrack.querySelector(`.board-column[data-col-id="${newCol.id}"] .col-title`);
+    if (title) {
+      title.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      title.click();
+    }
+  }
+
+  // A column to create appears at the far left or right while the pointer
+  // is near that edge of the board (and the columns are scrolled to it).
+  const ADD_EDGE = 56;
+  let addSide = null;
+
+  function addGhost(side) {
+    const ghost = document.createElement('button');
+    ghost.type = 'button';
+    ghost.className = 'col-add';
+    ghost.dataset.side = side;
+    const label = t(side === 'left' ? 'addColumnLeft' : 'addColumnRight');
+    ghost.title = label;
+    ghost.setAttribute('aria-label', label);
+    ghost.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>';
+    const text = document.createElement('span');
+    text.textContent = t('addColumn');
+    ghost.append(text);
+    ghost.addEventListener('click', () => onAddColumn(side));
+    return ghost;
+  }
+
+  function setAddSide(side) {
+    if (side === addSide) return;
+    addSide = side;
+    boardBody.dataset.addSide = side || '';
+    // The right one widens the track: keep the board scrolled to its end.
+    if (side === 'right') boardBody.scrollLeft = boardBody.scrollWidth;
+    updateDropZones();
+  }
+
+  function onBoardPointer(e) {
+    if (activeDrag || !currentBoard) return;
+    if (e.target.closest('.col-add')) return; // on a shown one: keep it
+    const r = boardBody.getBoundingClientRect();
+    const atStart = boardBody.scrollLeft <= 1;
+    const atEnd = boardBody.scrollLeft + boardBody.clientWidth >= boardBody.scrollWidth - 1;
+    if (e.clientX - r.left < ADD_EDGE && atStart) setAddSide('left');
+    else if (r.right - e.clientX < ADD_EDGE && atEnd) setAddSide('right');
+    else setAddSide(null);
   }
 
   function updateDropZones() {
@@ -602,6 +658,8 @@
       columnsTrack.append(colEl);
     }
 
+    columnsTrack.prepend(addGhost('left'));
+    columnsTrack.append(addGhost('right'));
     setTimeout(updateDropZones, 50);
   }
 

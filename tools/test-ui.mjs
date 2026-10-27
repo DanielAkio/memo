@@ -777,6 +777,42 @@ try {
     assert.equal(res.preview, '3 colunas · 1 memória', 'Board cards count columns and memories in words');
   });
 
+  // ------------------------------------------------ 7d. Board: add a column from either edge
+  await step('Board: a column to create appears near the far left or right; a click adds it there', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      M.addBoard({ id: 'edge-board', name: 'Edges' });
+      await M.openWin('board-edge-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 820, h: 360 });
+      const doc = M.frameDoc('board-edge-board');
+      const body = doc.getElementById('boardBody');
+      const r = body.getBoundingClientRect();
+      const move = (x) => body.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: r.top + 100, bubbles: true }));
+      const out = {};
+      move(r.left + 10);
+      out.left = body.dataset.addSide;
+      move(r.left + r.width / 2);
+      out.middle = body.dataset.addSide;
+      move(r.right - 10);
+      out.right = body.dataset.addSide;
+      doc.querySelector('.col-add[data-side="right"]').click();
+      await new Promise((r2) => setTimeout(r2, 200)); // saved and reloaded
+      doc.getElementById('boardBody').scrollLeft = 0;
+      move(r.left + 10);
+      doc.querySelector('.col-add[data-side="left"]').click();
+      await new Promise((r2) => setTimeout(r2, 100));
+      out.names = M.boards['edge-board'].columns.map((c) => c.name);
+      out.editing = Boolean(doc.activeElement && doc.activeElement.classList.contains('col-input'));
+      M.closeWin('board-edge-board');
+      return out;
+    });
+    assert.equal(res.left, 'left', 'Near the left edge the left "add column" shows');
+    assert.equal(res.middle, '', 'Away from the edges none shows');
+    assert.equal(res.right, 'right', 'Near the right edge the right "add column" shows');
+    assert.deepEqual(res.names, ['Nome da coluna 5', 'To Do', 'In Progress', 'Done', 'Nome da coluna 4'],
+      'Clicking adds a column at that side');
+    assert.equal(res.editing, true, 'The new column opens its name for editing');
+  });
+
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
   await step('Web vs Landing page: landing page is ephemeral, web version persists data', async () => {
     const sitePage = await browser.newPage();
