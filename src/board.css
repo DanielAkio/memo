@@ -96,7 +96,10 @@
   overflow-y: hidden;
   padding: 12px 16px 8px;
   user-select: none;
-  background: var(--color-carbon);
+  /* No background, and 1px in from the sides: the frame's hairline border
+     (base.css, an inset shadow under the content) stays visible beside
+     columns that scroll off the edge, as in a note. */
+  margin: 0 1px;
   border-top: 1px solid var(--color-graphite);
 }
 
