@@ -47,42 +47,10 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
 }
 .frame[data-color=""] .dot { box-shadow: inset 0 0 0 1px var(--color-smoke); }
 
-.note-name {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 13px;
-  line-height: 1.2;
-  font-weight: 500;
-  letter-spacing: -0.010em;
-  color: var(--color-mist);
-}
-.note-name.is-empty { color: var(--color-ash); font-weight: 400; }
 
 
 
-/* Field shown on double click to name the note. */
-.title-input {
-  flex: 1;
-  min-width: 0;
-  height: 24px;
-  margin: 0 0 0 -6px;
-  padding: 0 6px;
-  border: 0;
-  outline: 0;
-  border-radius: var(--radius-badge);
-  background: var(--overlay-subtle);
-  box-shadow: var(--hairline);
-  color: var(--color-paper);
-  caret-color: var(--color-paper);
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.010em;
-}
-.title-input::placeholder { color: var(--color-ash); font-weight: 400; }
-.note-name[hidden], .title-input[hidden] { display: none; }
+/* The name and its rename field (.win-name, .title-input): base.css. */
 
 /* ------------------------------------------------------------------- body */
 

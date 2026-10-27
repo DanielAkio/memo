@@ -330,6 +330,54 @@ button { font: inherit; color: inherit; }
   min-width: 0;
 }
 
+/* The window's name in its titlebar (note, group, board; the manager's fixed
+   title), and the field that renames it on double click (TitleBar). */
+.win-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.010em;
+  color: var(--color-mist);
+}
+.win-name.is-empty { color: var(--color-ash); font-weight: 400; }
+.title-input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  margin: 0 0 0 -6px;
+  padding: 0 6px;
+  border: 0;
+  outline: 0;
+  border-radius: var(--radius-badge);
+  background: var(--overlay-subtle);
+  box-shadow: var(--hairline);
+  color: var(--color-paper);
+  caret-color: var(--color-paper);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.010em;
+}
+.title-input::placeholder { color: var(--color-ash); font-weight: 400; }
+.win-name[hidden], .title-input[hidden] { display: none; }
+
+/* A note's title on a card (manager, board). */
+.card-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.010em;
+  color: var(--color-mist);
+}
+.card-title.is-empty { color: var(--color-ash); font-weight: 400; }
+
 /* A note's colour dot on a card (manager, board). */
 .card-dot {
   flex: none;

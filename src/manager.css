@@ -40,18 +40,11 @@ body {
 /* Colour picker under the titlebar (base.css .menu), as in a note. */
 .color-menu { left: 6px; }
 
-/* Fixed title in the titlebar (the manager has no editable title). */
+/* Fixed title in the titlebar (base.css .win-name; the manager has no
+   editable title): it takes the room of a note's name and field. */
 .mgr-title {
   flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   padding-left: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.010em;
-  color: var(--color-mist);
 }
 
 /* On mobile web, the manager is the primary view and cannot be closed. */
@@ -274,17 +267,6 @@ body {
   gap: 8px;
   min-width: 0;
 }
-.card-title {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.010em;
-  color: var(--color-mist);
-}
-.card-title.is-empty { color: var(--color-ash); font-weight: 400; }
 /* The preview under the title (styles in base.css) */
 /* The foot stays at the bottom: date (or days left), then the actions on the
    right; when they don't fit, the actions go below, still on the right. */
