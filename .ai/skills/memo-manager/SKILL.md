@@ -5,7 +5,7 @@ description: The Memo manager window ("Gerenciador do Memo") and app-wide settin
 
 # Manager window and settings
 
-Code: "Manager commands" in `main.rs`, `src/manager.html` / `manager.js` / `manager.css`, `src/i18n.js`. Find sections with `memo-code-map`.
+Code: `src-tauri/src/manager.rs`, `src/manager.html` / `manager.js` / `manager.css`, `src/i18n.js`. Find sections with `memo-code-map`.
 
 ## Window
 

@@ -1,11 +1,11 @@
 ---
 name: memo-groups
-description: Memo's groups of memories (group bars). Use when changing group.html/group.js, the "Groups" section of main.rs, Note.group_id, taking notes out / putting them away, joining or leaving a group, or group trash.
+description: Memo's groups of memories (group bars). Use when changing group.html/group.js, groups.rs, Note.group_id, taking notes out / putting them away, joining or leaving a group, or group trash.
 ---
 
 # Groups
 
-Code: `main.rs` section "Groups", `src/group.html` / `group.js` / `group.css`, the footer picker in `app.js` (section "groups"), the Grupos tab in `manager.js`.
+Code: `src-tauri/src/groups.rs`, `src/group.html` / `group.js` / `group.css`, the footer picker (`src/components/group-picker.js`, `GroupPicker`, used by `app.js` section "groups" and by boards), the Grupos tab in `manager.js`.
 
 **Model.** `Group` (`FileData.groups`): id, name, outer x/y, logical width, `open`, `pinned`, `color`, `hidden`, `trashed_at`. Notes point to it with `Note.group_id`; `normalize` clears links to missing groups. Windows, `visible()`, the pickers and export only use `active_groups()`.
 
@@ -25,4 +25,3 @@ Code: `main.rs` section "Groups", `src/group.html` / `group.js` / `group.css`, t
 
 **Events.** Changes emit `groups-changed`; group bars, note footers and the manager reload on it.
 
-Note: the comment above the "Groups" section in `main.rs` still says double-click takes notes out and deleting a group trashes its notes — both are outdated (it's the arrow button, and trashing/closing work as above).

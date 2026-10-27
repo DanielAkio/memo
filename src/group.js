@@ -1,5 +1,5 @@
 // Memo — group bar: a compact window that holds notes (label group-{id};
-// Rust has the logic, main.rs "Groups"). The arrow button takes all the
+// Rust has the logic, groups.rs). The arrow button takes all the
 // notes out (back where they were) or puts them all back in; double-click
 // on the titlebar renames; a click brings an open group's notes to the
 // front; ✕ closes the bar and its notes' windows (the trash button trashes

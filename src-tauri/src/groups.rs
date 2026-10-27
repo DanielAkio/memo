@@ -2,13 +2,13 @@
 
 use crate::*;
 
-//
-// A group is a compact bar (`group.html`, label `group-{id}`). Double-click
-// takes its notes out — each window slides from the bar to the note's saved
-// place — or puts them back in: they slide into the bar and their windows
-// close. Notes join a group by being dropped on its bar, from the picker in
-// their footer or from the manager's list. Deleting a group sends its notes
-// to the trash.
+// A group is a compact bar (`group.html`, label `group-{id}`). Its arrow
+// button takes its notes out — each window slides from the bar to the
+// note's saved place — or puts them back in: they slide into the bar and
+// their windows close. Notes join a group by being dropped on its bar, from
+// the picker in their footer or from the manager's list. ✕ closes the bar
+// and its notes' windows; trashing a group sends its notes to the trash
+// with it.
 
 /// Windows being moved by a group animation: their `Moved` events are not
 /// saved, so a note keeps its own place. A label is removed when its window

@@ -75,7 +75,7 @@ window.MemoChrome = {
 
     // Dragging is done here (not by the OS, with startDragging) so the window
     // snaps to monitor edges and other windows during the move. Rust follows
-    // the cursor itself (main.rs, "Dragging and Snap"): drag_start once the
+    // the cursor itself (drag.rs): drag_start once the
     // pointer moves past the click threshold, drag_to on each move, drag_end
     // on release, which also applies Snap if the cursor is in a Snap zone.
     let drag = null;
