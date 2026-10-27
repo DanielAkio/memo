@@ -193,22 +193,36 @@ try {
         tray(type);
         out[type] = !line.classList.contains(type) && line.isConnected && ed.children.length === count;
       }
+      // A plain line with text becomes the item itself, no new line.
+      for (const type of ['check', 'bullet', 'number']) {
+        const line = doc.createElement('div');
+        line.textContent = `plain ${type}`;
+        ed.append(line);
+        const count = ed.children.length;
+        caretAt(line);
+        tray(type);
+        out[`${type}Wraps`] = line.classList.contains(type) && line.textContent === `plain ${type}` && ed.children.length === count;
+      }
       const plain = doc.createElement('div');
       plain.textContent = 'plain';
       ed.append(plain);
       const pres = () => ed.querySelectorAll('pre.code').length;
       const before = pres();
       caretAt(plain);
-      tray('codeBlock'); // a new, empty block below
-      const pre = plain.nextElementSibling;
-      const made = pre && pre.matches('pre.code') && pres() === before + 1;
-      caretAt(pre);
-      tray('codeBlock'); // and back to a plain line
-      out.codeBlock = made && pres() === before;
+      tray('codeBlock'); // the line becomes a block with its text
+      const pre = [...ed.querySelectorAll('pre.code')].find((p) => p.textContent.includes('plain'));
+      const made = Boolean(pre) && pres() === before + 1;
+      if (pre) {
+        caretAt(pre);
+        tray('codeBlock'); // and back to a plain line
+      }
+      out.codeBlock = made && pres() === before && [...ed.children].some((c) => c.nodeName === 'DIV' && c.textContent === 'plain');
       return out;
     });
-    assert.deepEqual(trayToggle, { check: true, bullet: true, number: true, codeBlock: true },
-      'With the caret in a checklist item, list item or code block, its tray button turns it back into a plain line');
+    assert.deepEqual(trayToggle, {
+      check: true, bullet: true, number: true, checkWraps: true, bulletWraps: true, numberWraps: true, codeBlock: true,
+    },
+      'With just the caret, a tray list / code block button makes the caret line that element, or a plain line again when it already is one');
 
     // Test pasting multiline text inside a code block stays in one code block
     const pasteCodeTest = await page.evaluate(async () => {

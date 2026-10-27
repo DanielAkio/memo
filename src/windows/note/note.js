@@ -2817,18 +2817,16 @@
 
   const toggleTray = () => showTray(formatTray.hidden);
 
-  // With just the caret (nothing selected), the tray's buttons add a new,
-  // empty element instead of formatting what is there: a list item or code
-  // block on a new line below (or on the caret's line, if it is an empty
-  // plain line), an empty inline code at the caret, and bold, italic,
-  // underline, highlight or size for what is typed next. With the caret
-  // already in that kind of element (a checklist item for the checklist,
-  // a code block, a table, an inline code), it takes it away instead, as
-  // with a selection.
+  // With just the caret (nothing selected), the tray's list and code block
+  // buttons act on the caret's line as on a selection: it becomes that
+  // element, or a plain line again when it already is one. Elsewhere (in a
+  // code block or a table) they add a new, empty one on a line below; the
+  // table button adds an empty table (inside one: back to lines), the code
+  // button an empty inline code at the caret (inside one: plain text), and
+  // bold, italic, underline, highlight or size apply to what is typed next.
   function insertEmpty(cmd) {
     editor.focus();
-    const block = currentBlock();
-    if ((LIST_TYPES.includes(cmd) && block && block.classList.contains(cmd))
+    if (((LIST_TYPES.includes(cmd) || cmd === 'codeBlock') && currentBlock())
       || (cmd === 'codeBlock' && currentPre())
       || (cmd === 'table' && currentCell())
       || (cmd === 'code' && currentCode())) {
