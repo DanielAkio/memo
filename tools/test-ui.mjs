@@ -959,6 +959,35 @@ try {
         return col.noteIds.includes(id) && updatedNote.hidden;
       }, noteId);
       assert.equal(noteDroppedInBoard, true, 'Dropping note into board column moves note to column and hides window');
+
+      // 6. An empty memory put on a board is kept, as in a group: closing it
+      //    after opening it from the board must not delete it.
+      const emptyKeptOnBoard = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const before = new Set((await inv('manager', 'list_notes')).map((n) => n.id));
+        await inv('manager', 'new_note');
+        const id = (await inv('manager', 'list_notes')).map((n) => n.id).find((x) => !before.has(x));
+        const boards = await inv('manager', 'list_boards');
+        const brd = boards[boards.length - 1];
+        const colId = brd.columns[0].id;
+        await inv(`board-${brd.id}`, 'update_board_drop_zones', {
+          zones: [{ id: colId, left: 0, right: 300, top: 0, bottom: 500 }],
+        });
+        const br = document.querySelector(`.win[data-label="board-${brd.id}"]`).getBoundingClientRect();
+        const nr = document.querySelector(`.win[data-label="note-${id}"]`).getBoundingClientRect();
+        await inv(`note-${id}`, 'drag_start', { cx: 50, cy: 10 });
+        await inv(`note-${id}`, 'drag_to', { cx: br.left + 50 - nr.left, cy: br.top + 50 - nr.top });
+        await inv(`note-${id}`, 'drag_end');
+        await inv('manager', 'open_board_note', { id });
+        await inv(`note-${id}`, 'close_note');
+        const kept = (await inv('manager', 'list_notes')).some((n) => n.id === id && !n.trashedAt);
+        const stillOnBoard = (await inv('manager', 'list_boards')).find((x) => x.id === brd.id)
+          .columns.find((c) => c.id === colId).noteIds.includes(id);
+        return { id: Boolean(id), kept, stillOnBoard };
+      });
+      assert.equal(emptyKeptOnBoard.id, true, 'A new empty memory should be created');
+      assert.equal(emptyKeptOnBoard.kept, true, 'An empty memory on a board must not be deleted when it closes');
+      assert.equal(emptyKeptOnBoard.stillOnBoard, true, 'An empty memory on a board stays in its column');
     } finally {
       await webPage.close();
     }

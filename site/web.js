@@ -659,8 +659,12 @@
       || (title === WELCOME.en.title && html === WELCOME.en.html);
   }
 
+  // Whether a board (current or in the trash) holds note `id` in a column.
+  const onBoard = (id) => (data.boards || []).some((b) => (b.columns || []).some((c) => (c.noteIds || []).includes(id)));
+
+  // As created, and in no group and on no board (joining one is a change).
   function isPristineNote(n) {
-    if (!n || n.groupId) return false;
+    if (!n || n.groupId || onBoard(n.id)) return false;
     const defTitle = (data.defaultTitle || '').trim();
     const defText = data.defaultText || '';
     const defHtml = data.defaultHtml || plainFromDefault(defText);

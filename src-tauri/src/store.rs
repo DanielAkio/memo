@@ -1173,7 +1173,8 @@ impl Store {
 
     /// The note is as it was created: nothing beyond the default title and
     /// text, the default colour (with random colours: the one it was given,
-    /// i.e. never edited), and in no group (joining one is a change).
+    /// i.e. never edited), and in no group and on no board (joining one is a
+    /// change).
     pub fn is_pristine(&self, note: &Note) -> bool {
         let color = self.default_color();
         let default_color = if color == RANDOM_COLOR {
@@ -1181,7 +1182,7 @@ impl Store {
         } else {
             note.color == color
         };
-        if !note.group_id.is_empty() || !default_color {
+        if !note.group_id.is_empty() || !default_color || self.on_board(&note.id) {
             return false;
         }
         if note.is_blank() {
@@ -1189,6 +1190,14 @@ impl Store {
         }
         let (title, text, _) = self.new_note_defaults();
         note.title == title && note.text == text
+    }
+
+    /// Whether a board (current or in the trash) holds note `id` in a column.
+    pub fn on_board(&self, id: &str) -> bool {
+        let data = self.data.lock().unwrap();
+        data.boards
+            .iter()
+            .any(|b| b.columns.iter().any(|c| c.note_ids.iter().any(|n| n == id)))
     }
 
     /// The group is as it was created: no name beyond the default one, the
@@ -1752,6 +1761,21 @@ mod tests {
             .unwrap();
         assert!(g.updated_at > 1000);
 
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn note_on_a_board_is_not_pristine() {
+        let dir = temp_dir("board-pristine");
+        let store = Store::load(dir.join("notes.json"));
+        // Like joining a group, being put on a board is a change: an empty
+        // note there is kept when its window closes.
+        let note = store.create(None);
+        assert!(store.is_pristine(&note));
+        let board = store.create_board(None, vec!["To Do".into()], None);
+        store.update_board(&board.id, |b| b.columns[0].note_ids.push(note.id.clone()));
+        assert!(store.on_board(&note.id));
+        assert!(!store.is_pristine(&note));
         let _ = fs::remove_dir_all(&dir);
     }
 
