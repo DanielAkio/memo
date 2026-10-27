@@ -627,10 +627,14 @@ try {
 
         targetCol = boardDoc.querySelectorAll('.board-column')[1];
         if (card && targetCol) {
-          const dt = new DataTransfer();
-          card.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true }));
-          targetCol.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true }));
-          targetCol.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true }));
+          const bwin = boardDoc.defaultView;
+          const ev = (type, target, x, y) => target.dispatchEvent(new bwin.PointerEvent(type, { clientX: x, clientY: y, button: 0, pointerId: 1, bubbles: true }));
+          const from = card.getBoundingClientRect();
+          const to = targetCol.querySelector('.col-cards').getBoundingClientRect();
+          ev('pointerdown', card, from.left + 10, from.top + 10);
+          ev('pointermove', bwin, from.left + 30, from.top + 30);
+          ev('pointermove', bwin, to.left + 20, to.top + 20);
+          ev('pointerup', bwin, to.left + 20, to.top + 20);
           await new Promise((r) => setTimeout(r, 250));
           cardMovedToCol1 = targetBoard.columns[1].noteIds.includes(testNoteId) &&
                             !targetBoard.columns[0].noteIds.includes(testNoteId);
@@ -828,6 +832,51 @@ try {
     });
     assert.ok(res.count > 1, 'The card shows the checklist lines');
     assert.equal(res.overlap, false, 'Each line starts below the previous one');
+  });
+
+  // ------------------------------------------------ 7f. Board: a skeleton shows where a dragged memory lands
+  await step('Board: dragging a memory shows a skeleton where it will land, and it lands there', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      for (const id of ['sk-a', 'sk-b', 'sk-c']) M.addNote({ id, text: id });
+      M.addBoard({ id: 'sk-board', name: 'Skeleton', columns: [
+        { id: 'c1', name: 'One', noteIds: ['sk-a'] },
+        { id: 'c2', name: 'Two', noteIds: ['sk-b', 'sk-c'] },
+      ] });
+      await M.openWin('board-sk-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 640, h: 420 });
+      await new Promise((r) => setTimeout(r, 300));
+      const doc = M.frameDoc('board-sk-board');
+      const win = doc.defaultView;
+      const card = (id) => doc.querySelector(`.board-card[data-note-id="${id}"]`);
+      const ev = (type, target, x, y) => target.dispatchEvent(new win.PointerEvent(type, { clientX: x, clientY: y, button: 0, pointerId: 1, bubbles: true }));
+      const a = card('sk-a').getBoundingClientRect();
+      const c = card('sk-c').getBoundingClientRect();
+      ev('pointerdown', card('sk-a'), a.left + 10, a.top + 10);
+      ev('pointermove', win, a.left + 30, a.top + 30);
+      // Over the top half of sk-c: between sk-b and sk-c.
+      ev('pointermove', win, c.left + 20, c.top + 4);
+      const sk = doc.querySelector('.card-skeleton');
+      const out = {
+        inTwo: Boolean(sk && sk.closest('.board-column').dataset.colId === 'c2'),
+        beforeC: Boolean(sk && sk.nextElementSibling === card('sk-c')),
+      };
+      ev('pointerup', win, c.left + 20, c.top + 4);
+      await new Promise((r) => setTimeout(r, 100));
+      out.gone = !doc.querySelector('.card-skeleton');
+      out.order = M.boards['sk-board'].columns.map((col) => col.noteIds);
+      // A memory window dragged over a column from the desktop: at the end.
+      M.emit('board-drop-hover', ['sk-board', 'c1', true]);
+      const sk2 = doc.querySelector('.card-skeleton');
+      out.windowAtEnd = Boolean(sk2 && sk2.closest('.board-column').dataset.colId === 'c1' && !sk2.nextElementSibling);
+      M.emit('board-drop-hover', ['sk-board', 'c1', false]);
+      out.windowGone = !doc.querySelector('.card-skeleton');
+      M.closeWin('board-sk-board');
+      return out;
+    });
+    assert.equal(res.inTwo && res.beforeC, true, 'The skeleton sits in the hovered column, between the cards around the pointer');
+    assert.equal(res.gone, true, 'The skeleton goes away on drop');
+    assert.deepEqual(res.order, [[], ['sk-b', 'sk-a', 'sk-c']], 'The memory lands where the skeleton was');
+    assert.equal(res.windowAtEnd && res.windowGone, true, 'A memory window over a column shows the skeleton at its end, gone when it leaves');
   });
 
   // ------------------------------------------------ 8. Web vs Landing page storage isolation

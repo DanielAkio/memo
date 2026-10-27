@@ -246,6 +246,25 @@
   display: none !important;
 }
 
+/* Where a dragged memory will land (board.js showSkeleton): a card-sized
+   placeholder with a slow shimmer, in the place a drop puts it. */
+.card-skeleton {
+  flex: none;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--overlay-hover) 0%, var(--overlay-strong) 50%, var(--overlay-hover) 100%);
+  background-size: 200% 100%;
+  box-shadow: var(--hairline);
+  animation: card-skeleton 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes card-skeleton {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-skeleton { animation: none; background: var(--overlay-active); }
+}
+
 .card-top {
   display: flex;
   align-items: center;

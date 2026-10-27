@@ -19,7 +19,6 @@
 
   let currentBoard = null;
   let allNotes = [];
-  let draggedCard = null;
   let dragJustEnded = false;
   let activeDrag = null;
 
@@ -45,6 +44,7 @@
       document.body.appendChild(avatar);
       activeDrag.avatar = avatar;
 
+      activeDrag.height = rect.height;
       activeDrag.cardEl.classList.add('is-dragging');
       document.body.classList.add('is-card-dragging');
     }
@@ -61,9 +61,7 @@
         targetColEl = els.find((el) => el.classList.contains('board-column'));
       }
 
-      for (const c of columnsTrack.querySelectorAll('.board-column')) {
-        c.classList.toggle('drag-over', c === targetColEl);
-      }
+      showSkeleton(targetColEl, e.clientY, activeDrag.noteId, activeDrag.height);
     }
   });
 
@@ -79,9 +77,9 @@
       drag.cardEl.classList.remove('is-dragging');
       document.body.classList.remove('is-card-dragging');
 
-      for (const c of columnsTrack.querySelectorAll('.board-column.drag-over')) {
-        c.classList.remove('drag-over');
-      }
+      // It lands where the skeleton shows it (none: dragged out of the board).
+      const landing = skeletonSpot(drag.noteId);
+      hideSkeleton();
 
       if (e.type === 'pointercancel') {
         renderColumns();
@@ -89,41 +87,17 @@
         return;
       }
 
-      const isOutsideWindow = e.clientX < 0 || e.clientX > window.innerWidth ||
-                              e.clientY < 0 || e.clientY > window.innerHeight;
-      let targetColEl = null;
-      if (!isOutsideWindow) {
-        const els = document.elementsFromPoint(e.clientX, e.clientY);
-        targetColEl = els.find((el) => el.classList.contains('board-column'));
-      }
-
-      if (targetColEl) {
-        const targetColId = targetColEl.dataset.colId;
-        const sourceCol = currentBoard.columns.find((c) => c.id === drag.sourceColId);
-        const targetCol = currentBoard.columns.find((c) => c.id === targetColId);
-        if (targetCol) {
-          if (sourceCol) {
-            sourceCol.noteIds = sourceCol.noteIds.filter((id) => id !== drag.noteId);
-          }
-          const els = document.elementsFromPoint(e.clientX, e.clientY);
-          const targetCardEl = els.find((el) => el.classList.contains('board-card') && el !== drag.cardEl);
-          if (targetCardEl && targetCardEl.dataset.noteId && targetCardEl.dataset.noteId !== drag.noteId) {
-            const r = targetCardEl.getBoundingClientRect();
-            const idx = targetCol.noteIds.indexOf(targetCardEl.dataset.noteId);
-            if (idx !== -1) {
-              const at = e.clientY > (r.top + r.height / 2) ? idx + 1 : idx;
-              targetCol.noteIds.splice(at, 0, drag.noteId);
-            } else {
-              targetCol.noteIds.push(drag.noteId);
-            }
-          } else {
-            targetCol.noteIds.push(drag.noteId);
-          }
-          targetCol.noteIds = Array.from(new Set(targetCol.noteIds));
-          renderColumns();
-          saveColumns();
+      const targetCol = landing && currentBoard.columns.find((c) => c.id === landing.colId);
+      if (targetCol) {
+        for (const c of currentBoard.columns) {
+          c.noteIds = c.noteIds.filter((id) => id !== drag.noteId);
         }
-      } else {
+        const at = landing.before ? targetCol.noteIds.indexOf(landing.before) : -1;
+        if (at === -1) targetCol.noteIds.push(drag.noteId);
+        else targetCol.noteIds.splice(at, 0, drag.noteId);
+        renderColumns();
+        saveColumns();
+      } else if (!landing) {
         // Dragged OUT of the board: immediately remove from board and open where placed on desktop
         const sourceCol = currentBoard.columns.find((c) => c.id === drag.sourceColId);
         if (sourceCol) {
@@ -172,15 +146,10 @@
 
     listen('board-drop-hover', (e) => {
       const [bid, cid, on] = e.payload;
-      if (currentBoard && bid === currentBoard.id) {
-        for (const colEl of columnsTrack.querySelectorAll('.board-column')) {
-          if (colEl.dataset.colId === cid) {
-            colEl.classList.toggle('drag-over', on);
-          } else if (on) {
-            colEl.classList.remove('drag-over');
-          }
-        }
-      }
+      if (!currentBoard || bid !== currentBoard.id) return;
+      const colEl = columnsTrack.querySelector(`.board-column[data-col-id="${cid}"]`);
+      if (on) showSkeleton(colEl, null);
+      else if (colEl && skeleton.closest('.board-column') === colEl) hideSkeleton();
     });
 
     const theme = await invoke('get_theme').catch(() => '');
@@ -361,6 +330,51 @@
     return ghost;
   }
 
+  // ------------------------------------------------------------- Drop skeleton
+
+  // Where a dragged memory will land: a card-sized placeholder in the column
+  // under the pointer. A card dragged inside the board goes between the cards
+  // around the pointer; a memory window dragged in from the desktop goes at
+  // the end (`y` null), where drag.rs / web.js put it.
+  const skeleton = document.createElement('div');
+  skeleton.className = 'card-skeleton';
+
+  function showSkeleton(colEl, y, skipId, height) {
+    if (!colEl) {
+      hideSkeleton();
+      return;
+    }
+    const list = colEl.querySelector('.col-cards');
+    const cards = [...list.querySelectorAll('.board-card')].filter((c) => c.dataset.noteId !== skipId);
+    const before = y == null ? null : cards.find((c) => {
+      const r = c.getBoundingClientRect();
+      return y < r.top + r.height / 2;
+    }) || null;
+    skeleton.style.height = `${Math.round(height || 64)}px`;
+    if (skeleton.parentNode !== list || skeleton.nextElementSibling !== before) {
+      list.insertBefore(skeleton, before);
+    }
+    for (const c of columnsTrack.querySelectorAll('.board-column')) {
+      c.classList.toggle('drag-over', c === colEl);
+    }
+  }
+
+  function hideSkeleton() {
+    skeleton.remove();
+    for (const c of columnsTrack.querySelectorAll('.board-column.drag-over')) {
+      c.classList.remove('drag-over');
+    }
+  }
+
+  // The skeleton's place: its column and the memory after it (null = end).
+  function skeletonSpot(skipId) {
+    const colEl = skeleton.isConnected && skeleton.closest('.board-column');
+    if (!colEl) return null;
+    let next = skeleton.nextElementSibling;
+    while (next && next.dataset.noteId === skipId) next = next.nextElementSibling;
+    return { colId: colEl.dataset.colId, before: next ? next.dataset.noteId : null };
+  }
+
   function updateDropZones() {
     if (!currentBoard) return;
     const cols = columnsTrack.querySelectorAll('.board-column');
@@ -459,69 +473,6 @@
 
       head.append(dot, titleWrap, count, deleteBtn);
 
-      // Column drop handling for dragging cards between columns
-      colEl.addEventListener('dragover', (e) => {
-        if (draggedCard || e.dataTransfer.types.includes('text/plain') || e.dataTransfer.types.includes('application/x-memo-card')) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          colEl.classList.add('drag-over');
-        }
-      });
-
-      colEl.addEventListener('dragleave', (e) => {
-        if (!colEl.contains(e.relatedTarget)) {
-          colEl.classList.remove('drag-over');
-        }
-      });
-
-      colEl.addEventListener('drop', (e) => {
-        e.preventDefault();
-        colEl.classList.remove('drag-over');
-
-        let payload = draggedCard;
-        if (!payload) {
-          try {
-            const raw = e.dataTransfer.getData('text/plain');
-            if (raw) payload = JSON.parse(raw);
-          } catch (_) {}
-        }
-        if (!payload || !payload.noteId) return;
-
-        const { noteId, sourceColId } = payload;
-        const targetColId = col.id;
-
-        const sourceCol = currentBoard.columns.find((c) => c.id === sourceColId);
-        const targetCol = currentBoard.columns.find((c) => c.id === targetColId);
-        if (!targetCol) return;
-
-        if (sourceCol) {
-          sourceCol.noteIds = sourceCol.noteIds.filter((id) => id !== noteId);
-        }
-
-        const targetCardEl = e.target.closest('.board-card');
-        if (targetCardEl && targetCardEl.dataset.noteId && targetCardEl.dataset.noteId !== noteId) {
-          const rect = targetCardEl.getBoundingClientRect();
-          const relY = e.clientY - rect.top;
-          const targetNoteId = targetCardEl.dataset.noteId;
-          const insertIdx = targetCol.noteIds.indexOf(targetNoteId);
-          if (insertIdx !== -1) {
-            const at = relY > rect.height / 2 ? insertIdx + 1 : insertIdx;
-            targetCol.noteIds.splice(at, 0, noteId);
-          } else {
-            targetCol.noteIds.push(noteId);
-          }
-        } else {
-          if (!targetCol.noteIds.includes(noteId)) {
-            targetCol.noteIds.push(noteId);
-          }
-        }
-
-        targetCol.noteIds = Array.from(new Set(targetCol.noteIds));
-
-        renderColumns();
-        saveColumns();
-      });
-
       // Cards list
       const cardsList = document.createElement('div');
       cardsList.className = 'col-cards';
@@ -551,29 +502,6 @@
             avatar: null,
             isDragging: false,
           };
-        });
-
-        card.addEventListener('dragstart', (e) => {
-          draggedCard = { noteId: note.id, sourceColId: col.id };
-          dragJustEnded = true;
-          if (e.dataTransfer) {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', JSON.stringify({
-              noteId: note.id,
-              sourceColId: col.id,
-            }));
-            e.dataTransfer.setData('application/x-memo-card', note.id);
-          }
-        });
-
-        card.addEventListener('dragend', () => {
-          for (const c of columnsTrack.querySelectorAll('.board-column.drag-over')) {
-            c.classList.remove('drag-over');
-          }
-          setTimeout(() => {
-            draggedCard = null;
-            dragJustEnded = false;
-          }, 120);
         });
 
         // Left click opens the note; clicking outside note returns it to the board
