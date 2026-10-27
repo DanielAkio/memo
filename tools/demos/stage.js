@@ -85,6 +85,7 @@
       case 'rename_board': if (b) { b.name = a.name.trim(); b.updatedAt = Date.now(); M.emit('boards-changed'); return b.name; } return '';
       case 'set_board_color': if (b) { b.color = a.color; M.emit('boards-changed'); } return null;
       case 'close_board': if (b) { b.hidden = true; M.closeWin(label); M.emit('boards-changed'); } return null;
+      case 'trash_board': if (b) { b.trashedAt = Date.now(); M.closeWin(label); M.emit('boards-changed'); } return null;
       case 'new_board': {
         const nb = M.addBoard({ id: `b-${Date.now()}` });
         M.openWin(`board-${nb.id}`, '/src/board.html', { x: 40, y: 40, w: 760, h: 520 });
@@ -116,7 +117,7 @@
       case 'set_title': n.title = a.title.trim(); n.updatedAt = Date.now(); M.emit('notes-changed'); return n.title;
       case 'set_color': n.color = a.color; M.emit('notes-changed'); return null;
       case 'set_pinned': {
-        const o = n || g || M.manager;
+        const o = n || g || b || M.manager;
         o.pinned = a.pinned;
         const w = M.wins[label];
         if (w) { w.el.classList.toggle('pinned', a.pinned); M.raise(label); }
@@ -128,6 +129,17 @@
       case 'set_group_color': g.color = a.color; M.emit('groups-changed'); return null;
       case 'toggle_group': g.open = !g.open; M.emit('groups-changed'); return g.open;
       case 'close_group': g.hidden = true; M.closeWin(label); M.emit('groups-changed'); return null;
+      case 'trash_group':
+        if (g) {
+          g.trashedAt = Date.now();
+          for (const m of members(g.id)) m.trashedAt = Date.now();
+          for (const bm of boardMembers(g.id)) { bm.trashedAt = Date.now(); M.closeWin(`board-${bm.id}`); }
+          M.closeWin(label);
+          M.emit('groups-changed');
+          M.emit('notes-changed');
+          M.emit('boards-changed');
+        }
+        return null;
       case 'load_manager': return copy(M.manager);
       case 'set_manager_color': M.manager.color = a.color; return null;
       case 'set_manager_layout': M.manager.layout = a.layout; M.emit('layout-changed', a.layout); return null;
@@ -191,6 +203,7 @@
         return null;
       }
       case 'close_note': n.hidden = true; M.closeWin(label); M.emit('notes-changed'); return null;
+      case 'trash_note': if (n) { n.trashedAt = Date.now(); M.closeWin(label); M.emit('notes-changed'); } return null;
       default: return null;
     }
   };

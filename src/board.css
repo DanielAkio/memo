@@ -1,13 +1,6 @@
 /* Board window styles: Consistent with Note, Group, and Manager */
 
 .board-frame {
-  display: flex;
-  flex-direction: column;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  position: relative;
-  background: var(--color-carbon);
   color: var(--color-paper);
 }
 
@@ -132,7 +125,6 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  margin-left: 2px;
 }
 
 .board-name {
@@ -167,15 +159,6 @@
   outline-offset: -1px;
 }
 
-/* <hr> separating the upper tab from content below */
-.titlebar-sep {
-  border: 0;
-  height: 1px;
-  background: var(--color-graphite);
-  margin: 0;
-  flex: none;
-}
-
 /* ------------------------------------------------------------- Board Canvas */
 
 .board-body {
@@ -187,6 +170,7 @@
   padding: 12px 16px 8px;
   user-select: none;
   background: var(--color-carbon);
+  border-top: 1px solid var(--color-graphite);
 }
 
 .columns-track {

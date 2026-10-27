@@ -35,17 +35,14 @@
       </div>
 
       <div class="actions">
-        <button class="icon-btn" id="moreBtn" type="button" data-i18n-attr="aria-label=moreCommands,title=moreCommands" aria-haspopup="menu">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path class="dots" d="M3.75 8h0M8 8h0M12.25 8h0"/></svg>
+        <button class="icon-btn close" id="closeBtn" type="button" data-i18n-attr="aria-label=minimize,title=minimize">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.75 8.5h8.5"/></svg>
         </button>
-        <button class="icon-btn close" id="closeBtn" type="button" data-i18n-attr="aria-label=close,title=close">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+        <button class="icon-btn trash" id="trashBtn" type="button" data-i18n-attr="aria-label=moveToTrash,title=moveToTrash">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.25 4.25l7.5 7.5M11.75 4.25l-7.5 7.5"/></svg>
         </button>
       </div>
     </header>
-
-    <!-- <hr> hairline border separating the upper tab from the content below -->
-    <hr class="titlebar-sep">
 
     <!-- Colour picker under the titlebar -->
     <div class="menu color-menu" id="colorMenu" hidden>

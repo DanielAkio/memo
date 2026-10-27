@@ -1722,11 +1722,31 @@
       }
     }
     if (!text) return;
+    const pre = currentPre();
+    if (pre) {
+      const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const sel = getSelection();
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      if (pre.childNodes.length === 1 && pre.firstChild.nodeName === 'BR') {
+        pre.removeChild(pre.firstChild);
+      }
+      const node = document.createTextNode(clean);
+      range.insertNode(node);
+      range.setStartAfter(node);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      onContentChanged();
+      return;
+    }
     pasting = true;
     pasteFrom = currentCell() || currentBlock();
     try {
       // A cell holds one line: line breaks become spaces.
-      document.execCommand('insertText', false, currentCell() ? text.replace(/\s*\n\s*/g, ' ') : text);
+      const oneLine = currentCell() || currentCode();
+      document.execCommand('insertText', false, oneLine ? text.replace(/\s*\n\s*/g, ' ') : text);
     } finally {
       pasting = false;
       pasteFrom = null;
@@ -3031,6 +3051,13 @@
     invoke('close_note').catch((err) => console.error('close_note', err));
   }
 
+  async function trashNote() {
+    closeColors();
+    if (renaming) await finishRename(true);
+    await flushText();
+    invoke('trash_note').catch((err) => console.error('trash_note', err));
+  }
+
   // ------------------------------------------------------------- title
 
   // Double-click on the titlebar opens the title field.
@@ -3236,6 +3263,7 @@
 
   pinBtn.addEventListener('click', togglePin);
   $('newBtn').addEventListener('click', newNote);
+  $('trashBtn').addEventListener('click', trashNote);
   $('closeBtn').addEventListener('click', closeNote);
 
   titleInput.addEventListener('keydown', (e) => {
@@ -3356,13 +3384,14 @@
     // then all the app's (chrome.js).
     window.MemoChrome.titleMenu({
       titlebar,
-      more: $('moreBtn'),
+
       items: () => (note ? [
         { label: t('format'), items: formatMenuItems() },
         null,
         { label: t('rename'), run: startRename },
         { label: t('pin'), checked: !!note.pinned, run: togglePin },
         { label: t('noteColor'), run: openColors },
+        { label: t('moveToTrash'), run: trashNote },
         { label: t('closeNote'), run: closeNote },
       ] : []),
       onOpen: () => { saveMenuSelection(); closeColors(); closeGroupMenu(); hideFormatBar(); },
@@ -3426,7 +3455,8 @@
     editor.lang = I18n.locale();
     editor.dataset.placeholder = EMBED ? t('defaultTextPlaceholder') : I18n.placeholder();
     $('newBtn').title = `${t('newNote')} (${keys('Mod', 'N')})`;
-    $('closeBtn').title = t('close');
+    $('trashBtn').title = t('moveToTrash');
+    $('closeBtn').title = t('minimizeNote');
     const bars = [formatBar, formatTray];
     for (const btn of bars.flatMap((bar) => [...bar.querySelectorAll('[data-key]')])) {
       const combo = btn.dataset.shift ? keys('Mod', 'Shift', btn.dataset.key) : keys('Mod', btn.dataset.key);

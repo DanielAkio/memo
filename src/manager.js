@@ -1058,7 +1058,7 @@
   // then all the app's (chrome.js), as in a note.
   window.MemoChrome.titleMenu({
     titlebar: $('titlebar'),
-    more: $('moreBtn'),
+
     items: () => {
       const items = [
         { label: t('pin'), checked: !!win.pinned, run: togglePin },
@@ -1253,7 +1253,7 @@
     'folder-plus': '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/>',
     folder: '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>',
     more: '<path class="dots" d="M3.75 8h0M8 8h0M12.25 8h0"/>',
-    close: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',
+    close: '<path d="M3.5 8h9"/>',
     search: '<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>',
     sort: '<path d="M5 3v10M2.75 10.75 5 13l2.25-2.25M11 13V3M8.75 5.25 11 3l2.25 2.25"/>',
     trash: TRASH_ICON,

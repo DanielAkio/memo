@@ -165,6 +165,30 @@ try {
     assert.equal(trayAndUndo.openAfterClick, true, '#trayBtn should open #formatTray');
     assert.equal(trayAndUndo.closedAfterEsc, true, 'Escape should close #formatTray');
 
+    // Test pasting multiline text inside a code block stays in one code block
+    const pasteCodeTest = await page.evaluate(async () => {
+      const doc = window.Memo.frameDoc('note-ed1');
+      const ed = doc.getElementById('editor');
+      const pre = ed.querySelector('pre.code');
+      const sel = doc.defaultView.getSelection();
+      const range = doc.createRange();
+      range.selectNodeContents(pre);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'line 1\nline 2\nline 3');
+      ed.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+      await new Promise((r) => setTimeout(r, 40));
+
+      const preCount = ed.querySelectorAll('pre.code').length;
+      const preContent = pre.textContent;
+      return { preCount, preContent };
+    });
+
+    assert.equal(pasteCodeTest.preCount, 1, 'Pasting multiline text in a code block must NOT create multiple code blocks');
+    assert.equal(pasteCodeTest.preContent, 'line 1\nline 2\nline 3', 'Code block content should contain all pasted lines');
+
     // Test HTML sanitizer (strips <script> and unsafe javascript: links, keeps https:// and mailto:)
     const sanitized = await page.evaluate(async () => {
       window.Memo.addNote({
@@ -233,12 +257,23 @@ try {
       delete window.Memo.hooks.drag_to;
       delete window.Memo.hooks.drag_end;
 
-      // 5. Close button (✕) closes (hidden=true) and does NOT trash (trashedAt=null)
+      // 5. Minimize/close button closes (hidden=true) and does NOT trash (trashedAt=null)
+      const hasTrashBtn = !!doc.getElementById('trashBtn');
       doc.getElementById('closeBtn').click();
       await new Promise((r) => setTimeout(r, 30));
       const { hidden, trashedAt } = window.Memo.notes.ed1;
 
-      return { pinned, title, shownName, color, frameColor, hidden, trashedAt, titlebarTouchAction, gripTouchAction, rsTouchAction, calls };
+      // 6. Trash button sends to trash
+      window.Memo.notes.ed1.hidden = false;
+      await window.Memo.openNote('ed1');
+      const doc2 = window.Memo.frameDoc('note-ed1');
+      doc2.getElementById('trashBtn').click();
+      await new Promise((r) => setTimeout(r, 30));
+      const trashedAfterTrashBtn = !!window.Memo.notes.ed1.trashedAt;
+      window.Memo.notes.ed1.trashedAt = null;
+      window.Memo.notes.ed1.hidden = true;
+
+      return { pinned, title, shownName, color, frameColor, hidden, trashedAt, hasTrashBtn, trashedAfterTrashBtn, titlebarTouchAction, gripTouchAction, rsTouchAction, calls };
     });
 
     assert.equal(res.pinned, true);
@@ -254,6 +289,8 @@ try {
     assert.ok(res.calls.some((c) => c[0] === 'drag_end'), 'Touch drag must call drag_end');
     assert.equal(res.hidden, true, 'Closing with ✕ must set hidden=true');
     assert.equal(res.trashedAt, null, 'Closing with ✕ must NOT trash the note');
+    assert.equal(res.hasTrashBtn, true, 'Note must have #trashBtn');
+    assert.equal(res.trashedAfterTrashBtn, true, 'Clicking #trashBtn must send note to trash');
   });
 
   // ------------------------------------------------ 4. Group bar window
@@ -297,6 +334,7 @@ try {
         frameColor: doc.getElementById('frame').dataset.color,
         open: g.open,
         pinned: g.pinned,
+        hasTrashBtn: !!doc.getElementById('trashBtn'),
       };
     });
 
@@ -307,6 +345,7 @@ try {
     assert.equal(gRes.frameColor, 'yellow');
     assert.equal(gRes.open, false);
     assert.equal(gRes.pinned, true);
+    assert.equal(gRes.hasTrashBtn, true, 'Group must have #trashBtn');
   });
 
   // ------------------------------------------------ 5. Manager window
@@ -482,7 +521,7 @@ try {
         return null;
       };
 
-      doc.getElementById('moreBtn').click();
+      doc.getElementById('titlebar').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
       await new Promise((r) => setTimeout(r, 30));
       delete window.Memo.hooks.show_title_menu;
 
@@ -535,9 +574,11 @@ try {
       let noAddColBtn = false;
       let hasFooterStatusbar = false;
       let hasFootBtn = false;
+      let hasTrashBtn = false;
       let footBtnOpensMenu = false;
       if (boardDoc) {
         columnsCount = boardDoc.querySelectorAll('.board-column').length;
+        hasTrashBtn = Boolean(boardDoc.getElementById('trashBtn'));
         noAddColBtn = !boardDoc.getElementById('addColumnBtn') && !boardDoc.getElementById('addColBtn');
         const foot = boardDoc.querySelector('footer.statusbar');
         const fBtn = boardDoc.getElementById('footBtn');
@@ -594,35 +635,64 @@ try {
         }
       }
 
-      return {
-        initialBoardCount,
-        countAfterBtn,
-        countAfterRightClick,
-        hasBoardDoc: Boolean(boardDoc),
-        columnsCount,
-        noAddColBtn,
-        hasFooterStatusbar,
-        hasFootBtn,
-        footBtnOpensMenu,
-        cardMovedToCol1,
-        noteWindowOpenedOnClick,
-        boardCardSnippetHasCheck,
-        boardCardSnippetLimitedHeight,
-      };
-    });
+        let boardRenameOnDblClick = false;
+        let boardPinnedViaShortcut = false;
+        let boardClosedOnMiddleClick = false;
+        const bTitlebar = boardDoc.getElementById('titlebar');
+        const bNameInput = boardDoc.getElementById('nameInput');
+        if (bTitlebar && bNameInput) {
+          bTitlebar.dispatchEvent(new MouseEvent('mousedown', { button: 0, detail: 2, bubbles: true }));
+          boardRenameOnDblClick = !bNameInput.hidden;
+          bNameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        }
 
-    assert.equal(res.countAfterBtn, res.initialBoardCount + 1, 'Clicking new board button should create a board');
-    assert.equal(res.countAfterRightClick, res.initialBoardCount + 2, 'Right-clicking upper tab should create a board');
-    assert.equal(res.hasBoardDoc, true, 'Board window should be opened in stage');
-    assert.ok(res.columnsCount >= 3, 'Board window should render default columns');
-    assert.equal(res.noAddColBtn, true, 'Add column buttons should be removed from board');
-    assert.equal(res.hasFooterStatusbar, true, 'Board window should have a statusbar footer at the bottom');
-    assert.equal(res.hasFootBtn, true, 'Board statusbar should contain a footBtn group selector');
-    assert.equal(res.footBtnOpensMenu, true, 'Clicking board footBtn should open group picker menu');
-    assert.equal(res.cardMovedToCol1, true, 'Dragging a memory card from one column to another should move it');
-    assert.equal(res.noteWindowOpenedOnClick, true, 'One left click on a memory card should open its note window');
-    assert.equal(res.boardCardSnippetHasCheck, true, 'Board cards should render text components like .check');
-    assert.equal(res.boardCardSnippetLimitedHeight, true, 'Board card snippet should have limited height');
+        boardDoc.defaultView.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, shiftKey: true, bubbles: true }));
+        await new Promise((r) => setTimeout(r, 60));
+        boardPinnedViaShortcut = Boolean(targetBoard && targetBoard.pinned);
+
+        if (bTitlebar) {
+          bTitlebar.dispatchEvent(new MouseEvent('auxclick', { button: 1, bubbles: true }));
+          await new Promise((r) => setTimeout(r, 60));
+          boardClosedOnMiddleClick = Boolean(targetBoard && targetBoard.hidden);
+        }
+
+        return {
+          initialBoardCount,
+          countAfterBtn,
+          countAfterRightClick,
+          hasBoardDoc: Boolean(boardDoc),
+          columnsCount,
+          noAddColBtn,
+          hasFooterStatusbar,
+          hasFootBtn,
+          hasTrashBtn,
+          footBtnOpensMenu,
+          cardMovedToCol1,
+          noteWindowOpenedOnClick,
+          boardCardSnippetHasCheck,
+          boardCardSnippetLimitedHeight,
+          boardRenameOnDblClick,
+          boardPinnedViaShortcut,
+          boardClosedOnMiddleClick,
+        };
+      });
+
+      assert.equal(res.countAfterBtn, res.initialBoardCount + 1, 'Clicking new board button should create a board');
+      assert.equal(res.countAfterRightClick, res.initialBoardCount + 2, 'Right-clicking upper tab should create a board');
+      assert.equal(res.hasBoardDoc, true, 'Board window should be opened in stage');
+      assert.equal(res.hasTrashBtn, true, 'Board must have #trashBtn');
+      assert.ok(res.columnsCount >= 3, 'Board window should render default columns');
+      assert.equal(res.noAddColBtn, true, 'Add column buttons should be removed from board');
+      assert.equal(res.hasFooterStatusbar, true, 'Board window should have a statusbar footer at the bottom');
+      assert.equal(res.hasFootBtn, true, 'Board statusbar should contain a footBtn group selector');
+      assert.equal(res.footBtnOpensMenu, true, 'Clicking board footBtn should open group picker menu');
+      assert.equal(res.cardMovedToCol1, true, 'Dragging a memory card from one column to another should move it');
+      assert.equal(res.noteWindowOpenedOnClick, true, 'One left click on a memory card should open its note window');
+      assert.equal(res.boardCardSnippetHasCheck, true, 'Board cards should render text components like .check');
+      assert.equal(res.boardCardSnippetLimitedHeight, true, 'Board card snippet should have limited height');
+      assert.equal(res.boardRenameOnDblClick, true, 'Double-clicking board titlebar should enter rename mode');
+      assert.equal(res.boardPinnedViaShortcut, true, 'Ctrl+Shift+P should toggle pin on board window');
+      assert.equal(res.boardClosedOnMiddleClick, true, 'Scroll click (middle click) on board titlebar should minimize/close board');
   });
 
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
@@ -720,6 +790,122 @@ try {
       assert.ok(!siteNotes.includes(webNoteLabel), 'Landing page must not load notes from web version');
     } finally {
       await sitePage.close();
+      await webPage.close();
+    }
+  });
+
+  // ------------------------------------------------ 9. Web version bug fixes
+  await step('Web version: trash button, board column drop, board-to-group drop, manager note position, manager center', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name^="note-"]');
+
+      // 1. Trash button in note titlebar sends note to trash
+      const noteLabel = await webPage.evaluate(() => {
+        const frame = document.querySelector('iframe[name^="note-"]');
+        return frame ? frame.name : null;
+      });
+      assert.ok(noteLabel, 'Note window exists');
+      const noteId = noteLabel.replace('note-', '');
+
+      await webPage.evaluate((lbl) => {
+        const frame = document.querySelector(`iframe[name="${lbl}"]`);
+        frame.contentDocument.getElementById('trashBtn').click();
+      }, noteLabel);
+
+      await webPage.waitForFunction((lbl) => !document.querySelector(`iframe[name="${lbl}"]`), noteLabel);
+
+      const isTrashed = await webPage.evaluate(async (id) => {
+        const notes = await window.MemoWeb.invoke('manager', 'list_notes');
+        const note = notes.find((n) => n.id === id);
+        return Boolean(note && note.trashedAt);
+      }, noteId);
+      assert.equal(isTrashed, true, 'Titlebar trash button sends note to trash');
+
+      // 2. Clicking manager tray icon centers manager
+      const centered = await webPage.evaluate(() => {
+        const trayBtn = document.getElementById('trayManagerBtn');
+        trayBtn.click();
+        const mgrWin = document.querySelector('.win.is-manager');
+        const r = mgrWin.getBoundingClientRect();
+        const cx = Math.round(r.left + r.width / 2);
+        const cy = Math.round(r.top + r.height / 2);
+        const expectedX = Math.round(window.innerWidth / 2);
+        const expectedY = Math.round(window.innerHeight / 2);
+        return Math.abs(cx - expectedX) <= 10 && Math.abs(cy - expectedY) <= 10;
+      });
+      assert.equal(centered, true, 'Clicking manager button centers manager on screen');
+
+      // 3. Opening a memory that is partially off-screen positions it beside manager
+      const noteMovedBeside = await webPage.evaluate(async (id) => {
+        await window.MemoWeb.invoke('manager', 'restore_note', { id });
+        const noteWin = document.querySelector(`.win[data-label="note-${id}"]`);
+        // Move note offscreen
+        await window.MemoWeb.invoke(`note-${id}`, 'drag_start', { cx: 10, cy: 10 });
+        await window.MemoWeb.invoke(`note-${id}`, 'drag_to', { cx: window.innerWidth + 200, cy: 50 });
+        await window.MemoWeb.invoke(`note-${id}`, 'drag_end');
+
+        // Reopen note from manager
+        await window.MemoWeb.invoke('manager', 'open_note', { id });
+        const noteEl = document.querySelector(`.win[data-label="note-${id}"]`);
+        if (!noteEl) return false;
+        const nr = noteEl.getBoundingClientRect();
+        return nr.left >= 0 && nr.right <= window.innerWidth && nr.top >= 0 && nr.bottom <= window.innerHeight;
+      }, noteId);
+      assert.equal(noteMovedBeside, true, 'Partially offscreen memory appears beside manager inside screen bounds');
+
+      // 4. Drag & drop board to group
+      const boardJoinedGroup = await webPage.evaluate(async () => {
+        const g = window.MemoWeb.createGroup();
+        await window.MemoWeb.invoke('manager', 'new_board');
+        const boards = await window.MemoWeb.invoke('manager', 'list_boards');
+        const brd = boards[boards.length - 1];
+
+        const bWin = document.querySelector(`.win[data-label="board-${brd.id}"]`);
+        const gWin = document.querySelector(`.win[data-label="group-${g.id}"]`);
+        const gr = gWin.getBoundingClientRect();
+        const br = bWin.getBoundingClientRect();
+        await window.MemoWeb.invoke(`board-${brd.id}`, 'drag_start', { cx: 50, cy: 10 });
+        await window.MemoWeb.invoke(`board-${brd.id}`, 'drag_to', { cx: gr.left + 50 - br.left, cy: gr.top + 10 - br.top });
+        await window.MemoWeb.invoke(`board-${brd.id}`, 'drag_end');
+
+        const updatedBoards = await window.MemoWeb.invoke('manager', 'list_boards');
+        const updatedBrd = updatedBoards.find((x) => x.id === brd.id);
+        return Boolean(updatedBrd && updatedBrd.groupId === g.id);
+      });
+      assert.equal(boardJoinedGroup, true, 'Dragging board to group bar joins board to group');
+
+      // 5. Drag & drop note into board column
+      const noteDroppedInBoard = await webPage.evaluate(async (id) => {
+        const boards = await window.MemoWeb.invoke('manager', 'list_boards');
+        const brd = boards[boards.length - 1];
+        const colId = brd.columns[0].id;
+
+        await window.MemoWeb.invoke('manager', 'open_board', { id: brd.id });
+        await window.MemoWeb.invoke(`board-${brd.id}`, 'update_board_drop_zones', {
+          zones: [{ id: colId, left: 0, right: 300, top: 0, bottom: 500 }],
+        });
+
+        await window.MemoWeb.invoke('manager', 'open_note', { id });
+        const bWin = document.querySelector(`.win[data-label="board-${brd.id}"]`);
+        const nWin = document.querySelector(`.win[data-label="note-${id}"]`);
+        const br = bWin.getBoundingClientRect();
+        const nr = nWin.getBoundingClientRect();
+
+        await window.MemoWeb.invoke(`note-${id}`, 'drag_start', { cx: 50, cy: 10 });
+        await window.MemoWeb.invoke(`note-${id}`, 'drag_to', { cx: br.left + 50 - nr.left, cy: br.top + 50 - nr.top });
+        await window.MemoWeb.invoke(`note-${id}`, 'drag_end');
+
+        const updatedBoards = await window.MemoWeb.invoke('manager', 'list_boards');
+        const updatedBrd = updatedBoards.find((x) => x.id === brd.id);
+        const col = updatedBrd.columns.find((c) => c.id === colId);
+        const notes = await window.MemoWeb.invoke('manager', 'list_notes');
+        const updatedNote = notes.find((n) => n.id === id);
+        return col.noteIds.includes(id) && updatedNote.hidden;
+      }, noteId);
+      assert.equal(noteDroppedInBoard, true, 'Dropping note into board column moves note to column and hides window');
+    } finally {
       await webPage.close();
     }
   });

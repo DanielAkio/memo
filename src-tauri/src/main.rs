@@ -247,6 +247,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
     if let Some(existing) = app.get_webview_window(MANAGER) {
         let _ = existing.unminimize();
         let _ = existing.show();
+        let _ = existing.center();
         let _ = existing.set_focus();
         return Ok(());
     }
@@ -265,16 +266,7 @@ fn open_manager(app: &AppHandle) -> tauri::Result<()> {
         .accept_first_mouse(true)
         .visible(false)
         .build()?;
-    match (state.x, state.y) {
-        (Some(x), Some(y)) if is_on_screen(&window, x, y) => {
-            desk::set_position(&window, x, y);
-            // On another monitor's scale (see `build_note_window`).
-            set_logical_size(&window, state.width, state.height);
-        }
-        _ => {
-            let _ = window.center();
-        }
-    }
+    let _ = window.center();
     apply_theme(&window, &store.theme());
     track_geometry(app, &window);
     let _ = window.set_zoom(store.zoom());
@@ -1714,6 +1706,12 @@ fn beside(parent: &WebviewWindow) -> Option<(i32, i32)> {
     Some((x, y))
 }
 
+/// Sends the calling note window directly to the trash.
+#[tauri::command]
+async fn trash_note(app: AppHandle, window: WebviewWindow) {
+    trash(&app, &id_of(&window));
+}
+
 /// Closes the note (✕ button or middle click): it stays among the current
 /// ones and the manager reopens it. A note nobody touched (or a welcome copy)
 /// goes the way `trash` sends it: deleted outright.
@@ -1891,6 +1889,25 @@ fn list_notes(store: State<'_, Shared>) -> Vec<Note> {
         .collect()
 }
 
+fn ensure_note_on_screen(app: &AppHandle, win: &WebviewWindow, id: &str) {
+    if let (Some((x, y)), Some((w, h))) = (desk::inner_position(win), desk::inner_size(win)) {
+        if !desk::screens(win).iter().any(|m| {
+            let (sl, st, sw, sh) = m.work;
+            x >= sl && (x + w) <= (sl + sw) && y >= st && (y + h) <= (st + sh)
+        }) {
+            if let Some(mgr) = app.get_webview_window(MANAGER) {
+                if let Some((nx, ny)) = beside(&mgr) {
+                    desk::set_position(win, nx, ny);
+                    app.state::<Shared>().update(id, |n| {
+                        n.x = Some(nx);
+                        n.y = Some(ny);
+                    });
+                }
+            }
+        }
+    }
+}
+
 /// Opens an active note (or brings it to the front if already open).
 #[tauri::command]
 async fn open_note(app: AppHandle, id: String) -> Result<(), String> {
@@ -1910,7 +1927,8 @@ async fn open_note(app: AppHandle, id: String) -> Result<(), String> {
             take_out(&app, &group.id);
         }
         _ => {
-            open_note_window(&app, &note).map_err(|e| e.to_string())?;
+            let win = open_note_window(&app, &note).map_err(|e| e.to_string())?;
+            ensure_note_on_screen(&app, &win, &id);
         }
     }
     notify(&app);
@@ -1930,6 +1948,7 @@ async fn open_board_note(app: AppHandle, id: String) -> Result<(), String> {
     let store = app.state::<Shared>();
     let note = store.update(&id, |n| n.hidden = false).unwrap_or(note);
     let window = open_note_window(&app, &note).map_err(|e| e.to_string())?;
+    ensure_note_on_screen(&app, &window, &id);
     let _ = window.show();
     let _ = window.set_focus();
     notify(&app);
@@ -2785,6 +2804,12 @@ async fn new_note_in_group(app: AppHandle, window: WebviewWindow) -> Result<(), 
     Ok(())
 }
 
+/// Group bar window: sends the group and its notes to the trash.
+#[tauri::command]
+async fn trash_group(app: AppHandle, window: WebviewWindow) {
+    trash_group_by_id(&app, &group_id_of(&window));
+}
+
 /// Manager's Groups tab: sends group `id` to the trash, with its notes.
 #[tauri::command]
 async fn trash_group_id(app: AppHandle, id: String) {
@@ -3044,6 +3069,11 @@ async fn close_board(
 #[tauri::command]
 fn list_boards(store: State<'_, Shared>) -> Result<Vec<Board>, String> {
     Ok(store.boards())
+}
+
+#[tauri::command]
+fn trash_board(app: AppHandle, window: WebviewWindow, store: State<'_, Shared>) -> Result<(), String> {
+    trash_board_id(app, board_id_of(&window), store)
 }
 
 #[tauri::command]
@@ -4014,6 +4044,7 @@ fn main() {
             place_color_picker,
             new_note,
             close_note,
+            trash_note,
             load_manager,
             take_manager_view,
             close_manager,
@@ -4083,6 +4114,7 @@ fn main() {
             new_note_in_group,
             new_group,
             close_group,
+            trash_group,
             new_board,
             open_board,
             open_board_note,
@@ -4092,6 +4124,7 @@ fn main() {
             rename_board,
             set_board_color,
             close_board,
+            trash_board,
             list_boards,
             trash_board_id,
             restore_board_id,

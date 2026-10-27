@@ -20,6 +20,7 @@
   const titlebar = $('titlebar');
   const nameEl = $('groupName');
   const nameInput = $('nameInput');
+  const trashBtn = $('trashBtn');
   const closeBtn = $('closeBtn');
   const pinBtn = $('pinBtn');
   const toggleBtn = $('toggleBtn');
@@ -63,7 +64,8 @@
     colorBtn.title = t('groupColor');
     $('newBtn').title = `${t('newNoteInGroup')} (${newKeys})`;
     document.title = group.name ? `${group.name} — Memo` : 'Memo';
-    closeBtn.title = t('close');
+    trashBtn.title = t('groupToTrash');
+    closeBtn.title = t('minimize');
   }
 
   async function load() {
@@ -219,6 +221,10 @@
   function closeGroup() {
     invoke('close_group').catch((err) => console.error('close_group', err));
   }
+  function trashGroup() {
+    invoke('trash_group').catch((err) => console.error('trash_group', err));
+  }
+  trashBtn.addEventListener('click', trashGroup);
   closeBtn.addEventListener('click', closeGroup);
 
   // ------------------------------------------------------------- window
@@ -248,13 +254,14 @@
   // all the app's (chrome.js).
   window.MemoChrome.titleMenu({
     titlebar,
-    more: $('moreBtn'),
+
     items: () => (group ? [
       { label: t('rename'), run: startRename },
       { label: t('pin'), checked: !!group.pinned, run: togglePin },
       { label: t('groupColor'), run: openColors },
       { label: t(group.open ? 'groupHideHint' : 'groupShowHint'), run: toggle },
       { label: t('newNoteInGroup'), run: newNote },
+      { label: t('groupToTrash'), run: trashGroup },
       { label: t('close'), run: closeGroup },
     ] : []),
     onOpen: closeColors,

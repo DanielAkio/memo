@@ -946,6 +946,31 @@
     return null;
   }
 
+  const boardDropZones = {};
+
+  function boardColumnUnderCursor(px, py, sourceLabel = null) {
+    const srcWin = sourceLabel ? wins[sourceLabel] : null;
+    const srcPinned = !!(IS_SITE_HOME && srcWin && srcWin.pinned);
+    const docX = srcPinned ? px + window.scrollX : px;
+    const docY = srcPinned ? py + window.scrollY : py;
+    for (const [bid, zones] of Object.entries(boardDropZones)) {
+      const w = wins[`board-${bid}`];
+      if (!w || w.el.classList.contains('in-pip')) continue;
+      const bx = IS_SITE_HOME && w.pinned ? w.x + window.scrollX : w.x;
+      const by = IS_SITE_HOME && w.pinned ? w.y + window.scrollY : w.y;
+      if (docX >= bx && docX <= bx + w.w && docY >= by && docY <= by + w.h) {
+        const relX = docX - bx;
+        const relY = docY - by;
+        for (const col of zones) {
+          if (relX >= col.left && relX < col.right && relY >= col.top && relY < col.bottom) {
+            return { bid, cid: col.id };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   // ------------------------------------------- Document Picture-in-Picture
 
   function unpinFromPip(label) {
@@ -1207,7 +1232,7 @@
       n.y = pos.y;
       markDirty(false);
     }
-    return openWindow(`note-${n.id}`, 'index.html', { x: pos.x, y: pos.y, w, h, pinned: !!n.pinned, autofocus });
+    return openWindow(`note-${n.id}`, 'index.html', { x: pos.x, y: pos.y, w, h, pinned: !n.pinned, autofocus });
   }
 
   function openGroupWindow(g, autofocus = !IS_SITE_HOME) {
@@ -1224,9 +1249,23 @@
     return openWindow(`group-${g.id}`, 'group.html', { x: pos.x, y: pos.y, w, h, pinned: !!g.pinned, autofocus });
   }
 
-  function openManagerWindow(targetView = null, autofocus = !IS_SITE_HOME) {
+  function openManagerWindow(targetView = null, autofocus = !IS_SITE_HOME, center = true) {
     if (targetView) pendingManagerView = targetView;
+    const z = data.zoom || 1;
+    const m = data.manager;
+    const w = Math.round((m.width || 560) * z);
+    const h = Math.round((m.height || 480) * z);
+    const wa = workArea();
+    const cx = Math.max(wa.left, Math.round(wa.left + (wa.right - wa.left - w) / 2));
+    const cy = Math.max(wa.top, Math.round(wa.top + (wa.bottom - wa.top - h) / 2));
+
     if (wins.manager) {
+      if (center) {
+        setWinRect('manager', cx, cy, wins.manager.w, wins.manager.h);
+        m.x = cx;
+        m.y = cy;
+        markDirty(false);
+      }
       raiseWindow('manager');
       if (pendingManagerView) {
         const v = pendingManagerView;
@@ -1235,17 +1274,11 @@
       }
       return Promise.resolve(wins.manager);
     }
-    const z = data.zoom || 1;
-    const m = data.manager;
-    const w = Math.round((m.width || 560) * z);
-    const h = Math.round((m.height || 480) * z);
-    const wa = workArea();
-    const x = m.x != null ? m.x : Math.max(wa.left + 20, Math.round((wa.right - w) / 2 - 140));
-    const y = m.y != null ? m.y : Math.max(wa.top + 20, Math.round((wa.bottom - h) / 2));
-    m.x = x;
-    m.y = y;
-    return openWindow('manager', 'manager.html', { x, y, w, h, pinned: !!m.pinned, autofocus });
+    m.x = cx;
+    m.y = cy;
+    return openWindow('manager', 'manager.html', { x: cx, y: cy, w, h, pinned: !!m.pinned, autofocus });
   }
+
 
   function createNote({ parentLabel = null, groupId = '' } = {}) {
     const z = data.zoom || 1;
@@ -1775,6 +1808,7 @@
       startX: w.x,
       startY: w.y,
       hoverGroup: null,
+      hoverBoardCol: null,
       snapZone: null,
     };
   }
@@ -1792,6 +1826,34 @@
     setWinRect(label, snapped.x, snapped.y, w.w, w.h);
 
     if (isNote(label)) {
+      const colTarget = boardColumnUnderCursor(px, py, label);
+      const colKey = colTarget ? `${colTarget.bid}:${colTarget.cid}` : null;
+      const prevKey = activeDrag.hoverBoardCol ? `${activeDrag.hoverBoardCol.bid}:${activeDrag.hoverBoardCol.cid}` : null;
+      if (colKey !== prevKey) {
+        if (activeDrag.hoverBoardCol) {
+          emit('board-drop-hover', [activeDrag.hoverBoardCol.bid, activeDrag.hoverBoardCol.cid, false]);
+        }
+        activeDrag.hoverBoardCol = colTarget;
+        if (colTarget) {
+          emit('board-drop-hover', [colTarget.bid, colTarget.cid, true]);
+        }
+      }
+      if (colTarget) {
+        if (activeDrag.hoverGroup) {
+          emit('drop-hover', [activeDrag.hoverGroup, false]);
+          activeDrag.hoverGroup = null;
+        }
+        activeDrag.snapZone = null;
+        showSnapPreview(null);
+        return;
+      }
+    }
+
+    if (isNote(label) || isBoard(label)) {
+      if (activeDrag.hoverBoardCol) {
+        emit('board-drop-hover', [activeDrag.hoverBoardCol.bid, activeDrag.hoverBoardCol.cid, false]);
+        activeDrag.hoverBoardCol = null;
+      }
       const overGid = groupUnderCursor(px, py, label);
       if (overGid !== activeDrag.hoverGroup) {
         if (activeDrag.hoverGroup) emit('drop-hover', [activeDrag.hoverGroup, false]);
@@ -1820,33 +1882,92 @@
     showSnapPreview(null);
 
     if (!w) return;
-    if (d.hoverGroup && isNote(label)) {
-      emit('drop-hover', [d.hoverGroup, false]);
+    if (d.hoverBoardCol && isNote(label)) {
+      emit('board-drop-hover', [d.hoverBoardCol.bid, d.hoverBoardCol.cid, false]);
       const noteId = idOf(label);
-      const g = findGroup(d.hoverGroup);
-      updateNote(noteId, (n) => { n.groupId = d.hoverGroup; });
-      if (g && !g.open) {
-        const barWin = wins[`group-${g.id}`];
-        w.el.classList.add('sliding');
-        if (barWin) {
-          w.el.style.left = `${barWin.x}px`;
-          w.el.style.top = `${barWin.y}px`;
-        }
-        w.el.style.opacity = '0';
-        const n = findNote(noteId);
-        if (n) {
-          n.x = d.startX;
-          n.y = d.startY;
-        }
-        setTimeout(() => closeWindow(label), 150);
-      } else {
-        w.el.classList.add('sliding');
-        setWinRect(label, d.startX, d.startY, w.w, w.h);
-        setTimeout(() => w.el.classList.remove('sliding'), 170);
+      const b = findBoard(d.hoverBoardCol.bid);
+      if (b) {
+        updateBoard(b.id, (brd) => {
+          for (const col of brd.columns) {
+            col.noteIds = (col.noteIds || []).filter((id) => id !== noteId);
+          }
+          const targetCol = brd.columns.find((c) => c.id === d.hoverBoardCol.cid);
+          if (targetCol) {
+            if (!targetCol.noteIds) targetCol.noteIds = [];
+            targetCol.noteIds.push(noteId);
+          }
+        });
       }
-      notifyGroups();
+      updateNote(noteId, (n) => { n.hidden = true; });
+      closeWindow(label);
+      notifyBoards();
       notifyNotes();
+      markDirty(false);
       return;
+    }
+
+    if (d.hoverGroup && (isNote(label) || isBoard(label))) {
+      emit('drop-hover', [d.hoverGroup, false]);
+      const targetId = idOf(label);
+      const g = findGroup(d.hoverGroup);
+      if (isBoard(label)) {
+        updateBoard(targetId, (b) => { b.groupId = d.hoverGroup; });
+        if (g && !g.open) {
+          const barWin = wins[`group-${g.id}`];
+          w.el.classList.add('sliding');
+          if (barWin) {
+            w.el.style.left = `${barWin.x}px`;
+            w.el.style.top = `${barWin.y}px`;
+          }
+          w.el.style.opacity = '0';
+          const b = findBoard(targetId);
+          if (b) {
+            b.x = d.startX;
+            b.y = d.startY;
+          }
+          setTimeout(() => closeWindow(label), 150);
+        } else {
+          w.el.classList.add('sliding');
+          setWinRect(label, d.startX, d.startY, w.w, w.h);
+          setTimeout(() => w.el.classList.remove('sliding'), 170);
+        }
+        notifyGroups();
+        notifyBoards();
+        markDirty(false);
+        return;
+      } else {
+        updateNote(targetId, (n) => { n.groupId = d.hoverGroup; });
+        if (g && !g.open) {
+          const barWin = wins[`group-${g.id}`];
+          w.el.classList.add('sliding');
+          if (barWin) {
+            w.el.style.left = `${barWin.x}px`;
+            w.el.style.top = `${barWin.y}px`;
+          }
+          w.el.style.opacity = '0';
+          const n = findNote(targetId);
+          if (n) {
+            n.x = d.startX;
+            n.y = d.startY;
+          }
+          setTimeout(() => closeWindow(label), 150);
+        } else {
+          w.el.classList.add('sliding');
+          setWinRect(label, d.startX, d.startY, w.w, w.h);
+          setTimeout(() => w.el.classList.remove('sliding'), 170);
+        }
+        notifyGroups();
+        notifyNotes();
+        markDirty(false);
+        return;
+      }
+    }
+
+    if (d.hoverBoardCol) {
+      emit('board-drop-hover', [d.hoverBoardCol.bid, d.hoverBoardCol.cid, false]);
+    }
+    if (d.hoverGroup) {
+      emit('drop-hover', [d.hoverGroup, false]);
     }
 
     if (d.snapZone) {
@@ -3028,6 +3149,11 @@
       case 'close_note':
         if (n) closeNoteById(n.id);
         return null;
+      case 'trash_note': {
+        const noteId = (args && args.id) || (n && n.id) || idOf(label);
+        if (noteId) trashNoteById(noteId);
+        return null;
+      }
       case 'open_link':
         if (args.url && /^(https?:|mailto:)/i.test(args.url)) {
           window.open(args.url, '_blank', 'noopener,noreferrer');
@@ -3079,6 +3205,11 @@
         }
         return null;
       }
+      case 'trash_board': {
+        const brd = b || findBoard(id) || (args && findBoard(args.id));
+        if (brd) trashBoardById(brd.id);
+        return null;
+      }
       case 'new_board':
         createBoard(label);
         return null;
@@ -3100,8 +3231,11 @@
       case 'delete_board_forever':
         deleteBoardForever(args.id);
         return null;
-      case 'update_board_drop_zones':
+      case 'update_board_drop_zones': {
+        const bid = (b && b.id) || (args && args.id) || idOf(label);
+        boardDropZones[bid] = args.zones || [];
         return null;
+      }
       case 'take_note_out_of_board': {
         for (const brd of data.boards) {
           for (const col of brd.columns) {
@@ -3174,6 +3308,9 @@
       case 'close_group':
         if (g) closeGroupById(g.id);
         return null;
+      case 'trash_group':
+        if (g) trashGroupById(g.id);
+        return null;
       case 'trash_group_id':
         trashGroupById(args.id);
         return null;
@@ -3241,6 +3378,17 @@
           }
         }
         await openNoteWindow(target);
+        const wKey = `note-${target.id}`;
+        const win = wins[wKey];
+        if (win) {
+          const wa = workArea();
+          if (win.x < wa.left || win.y < wa.top || (win.x + win.w) > wa.right || (win.y + win.h) > wa.bottom) {
+            const pos = beside('manager', win.w, win.h);
+            setWinRect(wKey, pos.x, pos.y, win.w, win.h);
+            target.x = pos.x;
+            target.y = pos.y;
+          }
+        }
         raiseWindow(`note-${target.id}`);
         markDirty(false);
         notifyNotes();

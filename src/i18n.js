@@ -34,6 +34,8 @@ window.MemoI18n = (() => {
       bringAllToFront: 'Trazer todas as memórias para a frente',
       closeNote: 'Fechar memória',
       close: 'Fechar',
+      minimizeNote: 'Minimizar memória',
+      minimize: 'Minimizar',
       // Note
       noteColor: 'Cor da memória',
       colorIs: 'Cor: {name}',
@@ -278,6 +280,8 @@ window.MemoI18n = (() => {
       bringAllToFront: 'Bring all memories to the front',
       closeNote: 'Close memory',
       close: 'Close',
+      minimizeNote: 'Minimize memory',
+      minimize: 'Minimize',
       noteColor: 'Memory color',
       colorIs: 'Color: {name}',
       colorCustomIs: 'Color: Custom ({hex})',
