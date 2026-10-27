@@ -340,6 +340,36 @@ body {
   cursor: default;
 }
 .card-group:hover, .card-group:focus-visible { box-shadow: inset 0 0 0 1px var(--color-smoke); }
+/* A board holding the memory: its icon in its colour and its name, in the
+   same box as the group's; a click opens the board. */
+.card-board {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 120px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--overlay-hover);
+  box-shadow: var(--hairline);
+  color: var(--color-mist);
+  font-size: 12px;
+  cursor: default;
+}
+.card-board:hover, .card-board:focus-visible { outline: 0; box-shadow: inset 0 0 0 1px var(--color-smoke); }
+.card-board svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--color-ash);
+  stroke-linejoin: round;
+}
+.card-board svg[data-color]:not([data-color=""]) { stroke: var(--note-color); }
+.card-board span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .card-group option { background: var(--color-obsidian); color: var(--color-mist); }
 
 /* List layout (Settings → Appearance): the same cards as rows, one per
@@ -385,6 +415,7 @@ body {
 @media (max-width: 420px) {
   .as-list .card-meta { display: none; }
   .as-list .card-group { max-width: 110px; }
+  .as-list .card-board { max-width: 90px; }
 }
 
 /* Groups tab: the folder takes the place of a memory's colour dot. */

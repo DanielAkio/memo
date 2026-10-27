@@ -19,6 +19,7 @@ window.MemoI18n = (() => {
       newGroup: 'Novo grupo',
       addToGroup: 'Adicionar a um grupo',
       groupIs: 'Grupo: {name} (clique para mudar)',
+      boardIs: 'Quadro: {name} (clique para abrir)',
       moveToGroup: 'Grupo da memória',
       groupName: 'Nome do grupo',
       groupColor: 'Cor do grupo',
@@ -256,6 +257,7 @@ window.MemoI18n = (() => {
       newGroup: 'New group',
       addToGroup: 'Add to a group',
       groupIs: 'Group: {name} (click to change)',
+      boardIs: 'Board: {name} (click to open)',
       moveToGroup: 'Memory group',
       groupName: 'Group name',
       groupColor: 'Group color',
@@ -632,9 +634,9 @@ window.MemoI18n = (() => {
         items: [
           ['Abrir', 'Abre junto com o app, ou pelo ícone do Memo na bandeja.'],
           ['Menu da bandeja', 'Clique com o botão direito no ícone do Memo na bandeja (na barra de menus, no Mac) para criar uma memória ou um grupo, mostrar todas as memórias, abrir o Gerenciador, a Lixeira, as Configurações ou a Ajuda, trocar tema, idioma e a visualização do Gerenciador, ligar ou desligar o ímã das janelas, o início com o sistema e o controle por IA, sincronizar agora, procurar atualizações e sair.'],
-          ['Aba Memórias', 'Cada memória é um cartão com a cor, o título e o começo do texto. Clique num cartão para abrir a memória (as fechadas aparecem esmaecidas); no rodapé ficam a data da última edição, a caixa de grupo e o botão de lixeira.',
+          ['Aba Memórias', 'Cada memória é um cartão com a cor, o título e o começo do texto. Clique num cartão para abrir a memória (as fechadas aparecem esmaecidas); no rodapé ficam a data da última edição, os quadros em que ela está (clique para abrir), a caixa de grupo e o botão de lixeira.',
             '<span class="demo-card"><span class="demo-card-head"><span class="demo-dot" data-color="yellow"></span><span class="demo-name">Compras</span></span>'
-            + '<span class="demo-card-text">Café<br>Pão</span><span class="demo-card-foot"><span class="demo-meta">14:32</span><i data-icon="folder"></i><i data-icon="trash"></i></span></span>'],
+            + '<span class="demo-card-text">Café<br>Pão</span><span class="demo-card-foot"><span class="demo-meta">14:32</span><i data-icon="board"></i><i data-icon="folder"></i><i data-icon="trash"></i></span></span>'],
           ['Aba Grupos', 'Mostra os grupos em cartões, como a aba Memórias: busca, ordenação, quantas memórias cada um tem e se estão soltas ou recolhidas. Clique num grupo para trazer a barra dele (e as memórias, se estiverem soltas) para a frente; os botões do cartão soltam/recolhem as memórias e mandam o grupo para a lixeira.'],
           ['Cards ou lista', 'As abas Memórias e Grupos mostram cartões ou uma lista compacta, uma linha por item. Escolha em Configurações → Aparência → Visualização, ou no menu da bandeja.',
             '<span class="demo-seg"><span>Cards</span><span class="on">Lista</span></span>'],
@@ -766,9 +768,9 @@ window.MemoI18n = (() => {
         items: [
           ['Open', 'Opens with the app, or from the Memo tray icon.'],
           ['Tray menu', 'Right-click the Memo icon in the system tray (the menu bar, on Mac) to create a memory or a group, show all memories, open the Manager, the Trash, Settings or Help, change the theme, language and the Manager’s layout, turn the window magnet, starting with the system and AI control on or off, sync now, check for updates and quit.'],
-          ['Memories tab', 'Each memory is a card with its colour, title and the start of its text. Click a card to open the memory (closed ones look dimmed); its footer has the last edit date, the group box and the trash button.',
+          ['Memories tab', 'Each memory is a card with its colour, title and the start of its text. Click a card to open the memory (closed ones look dimmed); its footer has the last edit date, the boards it is on (click to open one), the group box and the trash button.',
             '<span class="demo-card"><span class="demo-card-head"><span class="demo-dot" data-color="yellow"></span><span class="demo-name">Groceries</span></span>'
-            + '<span class="demo-card-text">Coffee<br>Bread</span><span class="demo-card-foot"><span class="demo-meta">14:32</span><i data-icon="folder"></i><i data-icon="trash"></i></span></span>'],
+            + '<span class="demo-card-text">Coffee<br>Bread</span><span class="demo-card-foot"><span class="demo-meta">14:32</span><i data-icon="board"></i><i data-icon="folder"></i><i data-icon="trash"></i></span></span>'],
           ['Groups tab', 'Shows the groups as cards, like the Memories tab: search, sort, how many memories each has and whether they are out or put away. Click a group to bring its bar (and its memories, if they are out) to the front; the card’s buttons take its memories out / put them away and move the group to the trash.'],
           ['Cards or list', 'The Memories and Groups tabs show cards or a compact list, one row per item. Choose in Settings → Appearance → Layout, or in the tray menu.',
             '<span class="demo-seg"><span>Cards</span><span class="on">List</span></span>'],

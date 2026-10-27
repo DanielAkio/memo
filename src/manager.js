@@ -200,9 +200,9 @@
       return;
     }
     const source = inTrash() ? trashed : active;
-    // The group's name counts for the search too.
+    // The group's and boards' names count for the search too.
     const shown = q
-      ? source.filter((n) => fold(`${n.title}\n${plain(n.text)}\n${groupName(n)}`).includes(q))
+      ? source.filter((n) => fold(`${n.title}\n${plain(n.text)}\n${groupName(n)}\n${boardsOf(n).map((b) => b.name).join('\n')}`).includes(q))
       : source;
 
     list.replaceChildren(...shown.map(inTrash() ? noteTrashCard : noteCard));
@@ -244,6 +244,23 @@
   }
 
   const groupName = (note) => ([...groups, ...trashedGroups].find((g) => g.id === note.groupId) || {}).name || '';
+  // The boards a memory is on (in one of their columns).
+  const boardsOf = (note) => boards.filter((b) => (b.columns || []).some((c) => (c.noteIds || []).includes(note.id)));
+
+  // A board holding the memory, in its actions like the group box: the
+  // board icon in its colour and its name; a click opens the board.
+  function boardChip(board) {
+    const name = board.name || t('untitled');
+    const chip = el('button', 'card-board');
+    chip.type = 'button';
+    chip.dataset.board = board.id;
+    chip.title = t('boardIs', { name });
+    chip.setAttribute('aria-label', chip.title);
+    const mark = icon(BOARD_ICON);
+    MemoColor.paint(mark, board.color);
+    chip.append(mark, el('span', '', name));
+    return chip;
+  }
 
   // Group of a memory, changed right in the list: no group, a group or a new
   // one. Rust moves it (move_note_to_group) and emits "groups-changed".
@@ -446,14 +463,15 @@
     trashBtn.setAttribute('aria-label', t('moveToTrash'));
     trashBtn.append(icon(TRASH_ICON));
     const actions = el('div', 'card-actions');
-    // Always visible: the group select (which shows the group's name),
-    // preceded by the group's folder icon in its colour (grey without a
-    // group, as in the note's footer), and the trash button.
+    // Always visible: the boards it is on (if any), the group select (which
+    // shows the group's name), preceded by the group's folder icon in its
+    // colour (grey without a group, as in the note's footer), and the trash
+    // button.
     const group = groups.find((g) => g.id === note.groupId);
     const folder = icon(FOLDER_ICON);
     folder.classList.add('card-folder');
     MemoColor.paint(folder, group ? group.color : '');
-    actions.append(folder, groupSelect(note), trashBtn);
+    actions.append(...boardsOf(note).map(boardChip), folder, groupSelect(note), trashBtn);
     const item = noteBase(note, editedLabel(note.updatedAt), actions);
     // Closed with ✕: dimmed, a click reopens it.
     item.classList.toggle('is-closed', Boolean(note.hidden));
@@ -794,6 +812,11 @@
       return;
     }
     if (!item || e.target.closest('select')) return;
+    const chip = e.target.closest('[data-board]');
+    if (chip) {
+      invoke('open_board', { id: chip.dataset.board }).catch((err) => console.error('open_board', err));
+      return;
+    }
     const btn = e.target.closest('[data-act]');
     if (btn) act(btn.dataset.act, item.dataset.id);
     else if (!inTrash()) act('open', item.dataset.id);
@@ -813,7 +836,7 @@
   });
   list.addEventListener('auxclick', (e) => {
     const item = e.target.closest('.card');
-    if (e.button !== 1 || !item || e.target.closest('select')) return;
+    if (e.button !== 1 || !item || e.target.closest('select, [data-board]')) return;
     e.preventDefault();
     if (item.dataset.gid) {
       const command = inTrash() ? 'delete_group_forever' : 'trash_group_id';
@@ -1140,6 +1163,7 @@
     toggle: '<path d="M4.5 9.75 8 6.25l3.5 3.5"/>',
     'folder-plus': '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/>',
     folder: '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>',
+    board: BOARD_ICON,
     more: '<path class="dots" d="M3.75 8h0M8 8h0M12.25 8h0"/>',
     close: '<path d="M3.5 8h9"/>',
     search: '<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>',
