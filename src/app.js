@@ -25,8 +25,6 @@
   const colorBtn = $('colorBtn');
   const nameEl = $('noteName');
   const titleInput = $('titleInput');
-  const footBtn = $('footBtn');
-  const groupMenu = $('groupMenu');
 
   let note = null;
   let saveTimer = null;
@@ -57,9 +55,6 @@
   const displayName = () => note.title || firstLine(note.text);
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  // A group's label: its name, or "Untitled" (groups start unnamed).
-  const groupLabel = (g) => g.name || t('untitled');
-
   // ------------------------------------------------------------- render
 
   function render() {
@@ -76,16 +71,7 @@
     const n = wordCount(note.text);
     $('count').textContent = t(n === 1 ? 'wordOne' : 'wordMany', { n });
     // Bottom left, always: the note's group, or "No group".
-    const group = groups.find((g) => g.id === note.groupId);
-    footBtn.classList.toggle('has-group', Boolean(group));
-    // The footer's folder takes the group's colour.
-    const folder = footBtn.querySelector('.foot-folder');
-    const groupColor = (group && group.color) || '';
-    MemoColor.paint(folder, groupColor);
-    // The top of the window takes a soft wash of the same colour.
-    MemoColor.paint($('groupTint'), groupColor);
-    footBtn.title = group ? t('groupIs', { name: groupLabel(group) }) : t('addToGroup');
-    $('edited').textContent = group ? groupLabel(group) : t('noGroup');
+    groups.render();
     editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check, img'));
     renderName();
   }
@@ -3185,7 +3171,6 @@
   });
 
   document.addEventListener('mousedown', (e) => {
-    if (!groupMenu.hidden && !groupMenu.contains(e.target) && !footBtn.contains(e.target)) closeGroupMenu();
     if (!formatTray.hidden && !formatTray.contains(e.target) && !trayBtn.contains(e.target)) showTray(false);
   });
 
@@ -3194,69 +3179,33 @@
   // the note to another group, out of its group or into a new one. Rust does
   // the moving (set_note_group) and emits "groups-changed".
 
-  let groups = [];
+  const groups = new GroupPicker({
+    frame,
+    button: $('footBtn'),
+    menu: $('groupMenu'),
+    items: $('groupItems'),
+    label: $('edited'),
+    tint: $('groupTint'),
+    current: () => note && note.groupId,
+    onPick(groupId) {
+      flushText();
+      invoke('set_note_group', { groupId }).catch((err) => console.error('set_note_group', err));
+    },
+    onOpen: () => { colors.close(); hideFormatBar(); },
+  });
 
   async function loadGroups() {
     if (EMBED || !note) return;
     try {
-      [groups, note.groupId] = await Promise.all([invoke('list_groups'), invoke('get_note_group')]);
-      groups = groups.filter((g) => !g.trashedAt);
+      const [list, groupId] = await Promise.all([invoke('list_groups'), invoke('get_note_group')]);
+      note.groupId = groupId;
+      groups.setGroups(list);
     } catch (err) {
       console.error('list_groups', err);
     }
     renderMeta();
   }
 
-  function groupItem(label, value, { checked = false, muted = false } = {}) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `menu-item${muted ? ' muted' : ''}`;
-    btn.setAttribute('role', 'menuitemradio');
-    btn.setAttribute('aria-checked', String(checked));
-    btn.dataset.group = value;
-    const text = document.createElement('span');
-    text.textContent = label;
-    btn.append(text);
-    return btn;
-  }
-
-  function openGroupMenu() {
-    colors.close();
-    hideFormatBar();
-    const items = groups
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true }))
-      .map((g) => groupItem(groupLabel(g), g.id, { checked: g.id === note.groupId }));
-    const sep = document.createElement('div');
-    sep.className = 'menu-sep';
-    $('groupItems').replaceChildren(
-      ...items,
-      ...(items.length ? [sep] : []),
-      groupItem(t('noGroup'), '', { checked: !note.groupId, muted: true }),
-      groupItem(t('newGroup'), 'new', { muted: true }),
-    );
-    groupMenu.hidden = false;
-    frame.classList.add('menu-open');
-    footBtn.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeGroupMenu() {
-    if (groupMenu.hidden) return;
-    groupMenu.hidden = true;
-    frame.classList.remove('menu-open');
-    footBtn.setAttribute('aria-expanded', 'false');
-  }
-
-  footBtn.addEventListener('click', () => (groupMenu.hidden ? openGroupMenu() : closeGroupMenu()));
-  $('groupItems').addEventListener('click', (e) => {
-    const item = e.target.closest('.menu-item');
-    if (!item) return;
-    closeGroupMenu();
-    if (item.dataset.group === note.groupId) return;
-    flushText();
-    invoke('set_note_group', { groupId: item.dataset.group })
-      .catch((err) => console.error('set_note_group', err));
-  });
 
   // Titlebar (components/titlebar.js): pin, double-click edits the title,
   // drag with snapping, middle click closes, resize grip in the corner, and
@@ -3298,20 +3247,19 @@
       { label: t('moveToTrash'), run: trashNote },
       { label: t('closeNote'), run: closeNote },
     ] : []),
-    onMenuOpen: () => { saveMenuSelection(); colors.close(); closeGroupMenu(); hideFormatBar(); },
+    onMenuOpen: () => { saveMenuSelection(); colors.close(); groups.close(); hideFormatBar(); },
     // Native context menu only in the text and the title field (copy,
     // paste, spellcheck); elsewhere in the note it makes no sense.
     nativeMenuIn: 'input, #editor',
     onBlur: () => {
       hideFormatBar();
       showTray(false);
-      closeGroupMenu();
       flushText();
     },
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeGroupMenu(); hideFormatBar(); showTray(false); }
+    if (e.key === 'Escape') { hideFormatBar(); showTray(false); }
   });
   window.addEventListener('beforeunload', () => {
     if (textDirty) invoke(EMBED ? 'set_default_content' : 'save_text', { text: note.text, html: note.html });

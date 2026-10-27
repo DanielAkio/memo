@@ -588,7 +588,9 @@ try {
         if (fBtn && gMenu) {
           fBtn.click();
           footBtnOpensMenu = !gMenu.hidden;
-          fBtn.click();
+          // A click elsewhere closes it.
+          boardDoc.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          footBtnOpensMenu = footBtnOpensMenu && gMenu.hidden;
         }
       }
 
@@ -685,7 +687,7 @@ try {
       assert.equal(res.noAddColBtn, true, 'Add column buttons should be removed from board');
       assert.equal(res.hasFooterStatusbar, true, 'Board window should have a statusbar footer at the bottom');
       assert.equal(res.hasFootBtn, true, 'Board statusbar should contain a footBtn group selector');
-      assert.equal(res.footBtnOpensMenu, true, 'Clicking board footBtn should open group picker menu');
+      assert.equal(res.footBtnOpensMenu, true, 'Clicking board footBtn should open group picker menu, and a click elsewhere close it');
       assert.equal(res.cardMovedToCol1, true, 'Dragging a memory card from one column to another should move it');
       assert.equal(res.noteWindowOpenedOnClick, true, 'One left click on a memory card should open its note window');
       assert.equal(res.boardCardSnippetHasCheck, true, 'Board cards should render text components like .check');
@@ -761,6 +763,12 @@ try {
       // Reload web page: data must survive
       await webPage.reload();
       await webPage.waitForSelector(`iframe[name="${webNoteLabel}"]`);
+      // The note loads its content asynchronously after the frame appears.
+      await webPage.waitForFunction((label) => {
+        const frame = document.querySelector(`iframe[name="${label}"]`);
+        const ed = frame && frame.contentDocument && frame.contentDocument.getElementById('editor');
+        return ed && ed.innerText.trim().length > 0;
+      }, webNoteLabel, { timeout: 5000 }).catch(() => {});
       const webTextAfterReload = await webPage.evaluate((label) => {
         const frame = document.querySelector(`iframe[name="${label}"]`);
         return frame.contentDocument.getElementById('editor').innerText;

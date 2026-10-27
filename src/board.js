@@ -15,15 +15,9 @@
 
   const columnsTrack = $('columnsTrack');
   const boardBody = $('boardBody');
-  const groupTint = $('groupTint');
-  const groupMenu = $('groupMenu');
-  const groupItems = $('groupItems');
-  const footBtn = $('footBtn');
-  const edited = $('edited');
   const grip = $('grip');
 
   let currentBoard = null;
-  let groups = [];
   let allNotes = [];
   let draggedCard = null;
   let dragJustEnded = false;
@@ -163,12 +157,8 @@
     I18n.apply(document);
     MemoTheme.renderMono();
 
-    setupGroupMenu();
     window.addEventListener('resize', updateDropZones);
     boardBody.addEventListener('scroll', updateDropZones);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeGroupMenu();
-    });
 
     listen('theme-changed', (e) => MemoTheme.apply(e.payload));
     listen('language-changed', (e) => {
@@ -225,7 +215,7 @@
     input: $('customColor'),
     current: () => currentBoard && currentBoard.color,
     onPick: (color) => setBoardColor(color || ''),
-    onOpen: () => closeGroupMenu(),
+    onOpen: () => groups.close(),
   });
 
   // Titlebar (components/titlebar.js): pin, double-click renames, drag,
@@ -263,109 +253,48 @@
       { label: t('pin'), checked: !!(currentBoard && currentBoard.pinned), run: () => bar.togglePin() },
       { label: t('boardColor'), run: () => colors.open() },
       { label: t('addColumn'), run: onAddColumn },
-      { label: t('groupMenuTitle'), run: () => (groupMenu.hidden ? openGroupMenu() : closeGroupMenu()) },
+      { label: t('groupMenuTitle'), run: () => groups.toggle() },
       { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error(err)) },
       { label: t('moveToTrash'), run: trashBoard },
       { label: t('close'), run: closeBoard },
     ],
     onMenuOpen: () => {
       colors.close();
-      closeGroupMenu();
+      groups.close();
     },
     nativeMenuIn: 'input, textarea',
-    onBlur: () => closeGroupMenu(),
   });
 
   // ------------------------------------------------------------- Group Menu
 
-  const groupLabel = (g) => g.name || t('untitled');
+  // The board's group in the footer, as in a note (components/group-picker.js).
+  const groups = new GroupPicker({
+    frame,
+    button: $('footBtn'),
+    menu: $('groupMenu'),
+    items: $('groupItems'),
+    label: $('edited'),
+    tint: $('groupTint'),
+    current: () => currentBoard && currentBoard.groupId,
+    onPick(groupId) {
+      if (!currentBoard) return;
+      invoke('set_board_group', { groupId }).catch((err) => console.error('set_board_group', err));
+    },
+    onOpen: () => colors.close(),
+  });
 
   async function loadGroups() {
     if (!currentBoard) return;
     try {
-      [groups, currentBoard.groupId] = await Promise.all([
-        invoke('list_groups'),
-        invoke('get_board_group'),
-      ]);
-      groups = groups.filter((g) => !g.trashedAt);
+      const [list, groupId] = await Promise.all([invoke('list_groups'), invoke('get_board_group')]);
+      currentBoard.groupId = groupId;
+      groups.setGroups(list);
     } catch (err) {
       console.error('list_groups', err);
-    }
-    updateGroupTint();
-  }
-
-  function updateGroupTint() {
-    if (!currentBoard) return;
-    const group = currentBoard.groupId ? groups.find((g) => g.id === currentBoard.groupId) : null;
-    const groupColor = group ? group.color || '' : '';
-    MemoColor.paint(groupTint, groupColor);
-
-    if (footBtn) {
-      footBtn.classList.toggle('has-group', Boolean(group));
-      const folder = footBtn.querySelector('.foot-folder');
-      if (folder) {
-        MemoColor.paint(folder, groupColor);
-      }
-      footBtn.title = group ? t('groupIs', { name: groupLabel(group) }) : t('addToGroup');
-    }
-    if (edited) {
-      edited.textContent = group ? groupLabel(group) : t('noGroup');
+      groups.render();
     }
   }
 
-  function groupItem(label, value, { checked = false, muted = false } = {}) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `menu-item${muted ? ' muted' : ''}`;
-    btn.setAttribute('role', 'menuitemradio');
-    btn.setAttribute('aria-checked', String(checked));
-    btn.dataset.group = value;
-    const text = document.createElement('span');
-    text.textContent = label;
-    btn.append(text);
-    return btn;
-  }
-
-  function openGroupMenu() {
-    colors.close();
-    const items = groups
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name, I18n.locale(), { sensitivity: 'base', numeric: true }))
-      .map((g) => groupItem(groupLabel(g), g.id, { checked: g.id === currentBoard.groupId }));
-    const sep = document.createElement('div');
-    sep.className = 'menu-sep';
-    groupItems.replaceChildren(
-      ...items,
-      ...(items.length ? [sep] : []),
-      groupItem(t('noGroup'), '', { checked: !currentBoard.groupId, muted: true }),
-      groupItem(t('newGroup'), 'new', { muted: true }),
-    );
-    groupMenu.hidden = false;
-    frame.classList.add('menu-open');
-    if (footBtn) footBtn.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeGroupMenu() {
-    if (groupMenu.hidden) return;
-    groupMenu.hidden = true;
-    frame.classList.remove('menu-open');
-    if (footBtn) footBtn.setAttribute('aria-expanded', 'false');
-  }
-
-  function setupGroupMenu() {
-    if (footBtn) {
-      footBtn.addEventListener('click', () => (groupMenu.hidden ? openGroupMenu() : closeGroupMenu()));
-    }
-
-    groupItems.addEventListener('click', (e) => {
-      const item = e.target.closest('.menu-item');
-      if (!item || !currentBoard) return;
-      closeGroupMenu();
-      if (item.dataset.group === currentBoard.groupId) return;
-      invoke('set_board_group', { groupId: item.dataset.group })
-        .catch((err) => console.error('set_board_group', err));
-    });
-  }
 
   async function setBoardColor(color) {
     if (!currentBoard) return;
