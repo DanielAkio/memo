@@ -982,19 +982,19 @@ try {
       await M.openWin('board-sh-board', '/src/windows/board/board.html', { x: 360, y: 40, w: 420, h: 300 });
       await M.openWin('group-sh-group', '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 40 });
       await new Promise((r) => setTimeout(r, 300));
-      const toast = (label) => M.frameDoc(label).querySelector('.share-toast');
+      const toast = (label) => M.frameDoc(label).querySelector('.toast[data-key="share"]');
       const out = {};
       const doc = M.frameDoc('note-sh-note');
       await doc.defaultView.MemoShare.copy();
-      out.copied = toast('note-sh-note').textContent;
+      out.copied = M.frameDoc('note-sh-note').querySelector('.toast[data-key="copied"]').textContent;
       M.emit('share-available', { kind: 'board', name: 'Plano', notes: 3, boards: 1 });
       out.offer = toast('board-sh-board').textContent;
       // Every window shows it (the memory after its "Copied").
       await new Promise((r) => setTimeout(r, 3600));
       out.everywhere = ['note-sh-note', 'board-sh-board', 'group-sh-group']
-        .every((l) => toast(l) && !toast(l).hidden && toast(l).querySelector('.share-import'));
+        .every((l) => toast(l) && !toast(l).hidden && toast(l).querySelector('.toast-action'));
       out.groupGrew = calls.some(([k, h]) => k === 'height' && h > 40);
-      toast('board-sh-board').querySelector('.share-import').click();
+      toast('board-sh-board').querySelector('.toast-action').click();
       await new Promise((r) => setTimeout(r, 50));
       out.imported = calls.some(([k, l]) => k === 'import' && l === 'board-sh-board');
       out.hidden = ['note-sh-note', 'board-sh-board', 'group-sh-group'].every((l) => !toast(l) || toast(l).hidden);
@@ -1010,6 +1010,48 @@ try {
     assert.equal(res.groupGrew, true, 'A group bar grows to show the offer');
     assert.equal(res.imported, true, 'Import asks the app to import it into that window');
     assert.equal(res.hidden, true, 'The offer goes away in every window once imported');
+  });
+
+  // ------------------------------------------------ 7i. A new version: a notice in every window
+  await step('Update: a newer version shows a notice in every window, with Update and restart, progress and ✕', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const calls = [];
+      M.hooks.install_update = () => { calls.push('install'); return null; };
+      M.hooks.dismiss_update = () => { calls.push('dismiss'); return null; };
+      M.addNote({ id: 'up-note', text: 'x' });
+      M.addGroup({ id: 'up-group', name: 'G' });
+      await M.openWin('note-up-note', '/src/windows/note/index.html', { x: 40, y: 40, w: 300, h: 260 });
+      await M.openWin('group-up-group', '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 40 });
+      await new Promise((r) => setTimeout(r, 300));
+      const notice = (l) => M.frameDoc(l).querySelector('.toast[data-key="update"]');
+      const status = { checking: false, available: '9.9.9', progress: null, upToDate: false, error: null, dismissed: false };
+      M.emit('update-changed', status);
+      const out = {
+        text: notice('note-up-note') && notice('note-up-note').textContent,
+        inGroup: Boolean(notice('group-up-group')),
+      };
+      notice('note-up-note').querySelector('.toast-action').click();
+      M.emit('update-changed', { ...status, progress: 40 });
+      out.progress = notice('note-up-note').textContent;
+      out.noCloseWhileInstalling = !notice('note-up-note').querySelector('.toast-close');
+      M.emit('update-changed', { ...status, error: 'install' });
+      notice('group-up-group').querySelector('.toast-close').click();
+      M.emit('update-changed', { ...status, error: 'install', dismissed: true });
+      out.gone = !notice('note-up-note') && !notice('group-up-group');
+      out.calls = calls;
+      M.closeWin('note-up-note');
+      M.closeWin('group-up-group');
+      delete M.hooks.install_update;
+      delete M.hooks.dismiss_update;
+      return out;
+    });
+    assert.ok(res.text.includes('Nova versão do Memo: 9.9.9') && res.text.includes('Atualizar e reiniciar'), `The notice names the version (${res.text})`);
+    assert.equal(res.inGroup, true, 'Group bars show it too');
+    assert.ok(res.progress.includes('40%'), `It shows the download (${res.progress})`);
+    assert.equal(res.noCloseWhileInstalling, true, 'No ✕ while it installs');
+    assert.equal(res.gone, true, '✕ hides it in every window');
+    assert.deepEqual(res.calls, ['install', 'dismiss']);
   });
 
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
@@ -1456,7 +1498,7 @@ try {
         for (const id of [a, c]) await inv(`note-${id}`, 'set_note_group', { groupId: gid });
         const groupText = await inv(`group-${gid}`, 'copy_share');
         await new Promise((r) => setTimeout(r, 200));
-        const toast = document.querySelector('iframe[name="manager"]').contentDocument.querySelector('.share-toast');
+        const toast = document.querySelector('iframe[name="manager"]').contentDocument.querySelector('.toast[data-key="share"]');
         const ownOffered = Boolean(toast && !toast.hidden && toast.textContent.includes('Grupo compartilhado: “Casa”'));
         return { boardText, groupText, bid, gid, ownOffered };
       });
@@ -1477,12 +1519,12 @@ try {
           dt.setData('text/plain', text);
           frame.contentDocument.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
         };
-        const toast = () => frame.contentDocument.querySelector('.share-toast');
+        const toast = () => frame.contentDocument.querySelector('.toast[data-key="share"]');
         const out = {};
         paste(boardText);
         await wait(300);
         out.offer = toast() && !toast().hidden ? toast().textContent : '';
-        toast().querySelector('.share-import').click();
+        toast().querySelector('.toast-action').click();
         await wait(400);
         const boards = await inv('manager', 'list_boards');
         const copy = boards.find((b) => b.name === 'Mercado' && b.id !== bid);
@@ -1492,7 +1534,7 @@ try {
         out.boardOpen = Boolean(copy && document.querySelector(`.win[data-label="board-${copy.id}"]`));
         paste(groupText);
         await wait(300);
-        toast().querySelector('.share-import').click();
+        toast().querySelector('.toast-action').click();
         await wait(400);
         const group = (await inv('manager', 'list_groups')).find((g) => g.name === 'Casa' && g.id !== gid);
         const notesAfter = await inv('manager', 'list_notes');

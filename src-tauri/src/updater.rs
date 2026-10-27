@@ -43,11 +43,18 @@ pub struct Status {
     pub up_to_date: bool,
     /// The step that failed last: "check" or "install".
     pub error: Option<String>,
+    /// The windows' notice of this version was dismissed (its ✕).
+    pub dismissed: bool,
 }
 
 static STATUS: Mutex<Option<Status>> = Mutex::new(None);
 static PENDING: Mutex<Option<Update>> = Mutex::new(None);
 static BUSY: AtomicBool = AtomicBool::new(false);
+
+/// The windows' notice's ✕ (components/update.js).
+pub fn dismiss(app: &AppHandle) {
+    set_status(app, |s| s.dismissed = true);
+}
 
 pub fn status() -> Status {
     STATUS.lock().unwrap().clone().unwrap_or_default()
@@ -117,6 +124,10 @@ pub async fn check(app: &AppHandle, manual: bool) {
         s.checking = false;
         match &result {
             Ok(_) => {
+                // A newer version, or asking again, shows the notice again.
+                if changed || manual {
+                    s.dismissed = false;
+                }
                 s.available = found;
                 s.up_to_date = manual && s.available.is_none();
             }

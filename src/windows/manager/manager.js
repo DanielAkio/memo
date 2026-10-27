@@ -1473,8 +1473,9 @@
     }
   }
 
-  // Sharing (components/share.js): offers to import.
+  // Notices (components/toast.js): offers to import, and a new version.
   MemoShare.attach({ invoke, listen });
+  MemoUpdate.attach({ invoke, listen });
 
   init().catch((err) => console.error('init', err));
 })();

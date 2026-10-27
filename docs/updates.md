@@ -43,8 +43,10 @@ builds (`npm run build`, Docker) make no update packages and need no key.
 
 - Release builds check 10 s after launch and every 6 h, unless Settings → App → "Tell me about new versions" is off
   (`Config.updatesOff`). Debug builds (`npm run dev`) only check when asked. Automatic checks fail silently.
-- A newer version turns the tray's (and every titlebar menu's) "Check for updates" into "Update to version X", and
-  Settings → App shows it with "Update and restart". Installing downloads the package, checks the signature, saves
+- A newer version shows a notice at the bottom of every window ("New Memo version: X", **Update and restart**, ✕;
+  `components/update.js`), with the download's progress while it installs. ✕ (`dismiss_update`) hides it until a
+  newer version or a manual check. It also turns the tray's (and every titlebar menu's) "Check for updates" into
+  "Update to version X", and Settings → App shows it with "Update and restart". Installing downloads the package, checks the signature, saves
   pending changes, installs and restarts. On Windows the NSIS installer runs in passive mode (a progress bar, no
   questions) and closes the app itself.
 - Linux: the AppImage replaces itself.

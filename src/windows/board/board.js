@@ -125,8 +125,10 @@
 
   // ------------------------------------------------------------- Setup & Init
 
-  // Sharing (components/share.js): "Copied", and offers to import.
+  // Notices (components/toast.js): sharing ("Copied", offers to import)
+  // and a new version.
   MemoShare.attach({ invoke, listen });
+  MemoUpdate.attach({ invoke, listen });
 
   async function init() {
     const [, lang] = await invoke('get_language').catch(() => ['', 'en']);

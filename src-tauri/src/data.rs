@@ -278,6 +278,13 @@ pub(crate) async fn check_update(app: AppHandle) {
     updater::check(&app, true).await;
 }
 
+/// Hides the windows' notice of the version found (Settings and the tray
+/// still offer it).
+#[tauri::command]
+pub(crate) fn dismiss_update(app: AppHandle) {
+    updater::dismiss(&app);
+}
+
 /// Downloads and installs the update found, then restarts Memo.
 #[tauri::command]
 pub(crate) async fn install_update(app: AppHandle) {

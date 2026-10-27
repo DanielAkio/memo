@@ -259,6 +259,7 @@ const DESKTOP_ONLY = {
   set_auto_update: 'in-app updates are for installed builds',
   check_update: 'same',
   install_update: 'same',
+  dismiss_update: 'same',
 };
 {
   const rustCmds = handlerCommands();

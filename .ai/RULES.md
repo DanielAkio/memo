@@ -48,7 +48,9 @@ src/                     frontend: plain HTML/CSS/JS, no bundler (frontendDist =
     pill.js              MemoPill: where an item is (group / board), shown only (manager cards, note footer)
     text.js              MemoText: the plain-text format (lists, code, tables), fromPlain
     card.js              MemoCard: a note's preview on a card (manager, boards)
-    share.js             MemoShare: the toast for "Copied" and the offer to import a shared item (every window)
+    toast.js             MemoToast: notices at the bottom of every window, one per key (text, action, ✕)
+    share.js             MemoShare: "Copied" and the offer to import a shared item, as toasts
+    update.js            MemoUpdate: a newer Memo as a toast in every window (Update and restart, progress, ✕)
   assets/                no-image-pt/en.png: what an image becomes in an imported shared memory
   lib/
     chrome.js            window behaviour: drag, resize handles, snapping, title menu (MemoChrome), zoom (MemoZoom)

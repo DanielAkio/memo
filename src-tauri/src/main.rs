@@ -352,6 +352,7 @@ fn main() {
             set_auto_update,
             check_update,
             install_update,
+            dismiss_update,
             empty_group_trash,
             set_manager_layout,
             set_group_height,

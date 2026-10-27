@@ -3193,8 +3193,12 @@
     },
   });
 
-  // Sharing (components/share.js): "Copied", and offers to import.
-  if (!EMBED) MemoShare.attach({ invoke, listen: TAURI.event.listen });
+  // Notices (components/toast.js): sharing ("Copied", offers to import)
+  // and a new version.
+  if (!EMBED) {
+    MemoShare.attach({ invoke, listen: TAURI.event.listen });
+    MemoUpdate.attach({ invoke, listen: TAURI.event.listen });
+  }
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { hideFormatBar(); showTray(false); }
