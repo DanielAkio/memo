@@ -964,6 +964,58 @@ try {
     }
   });
 
+  // ------------------------------------------------ 10. Web version stacking
+  await step('Web version: the last clicked window stays on top, unless another one is pinned', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name^="note-"]');
+      await webPage.evaluate(() => document.querySelector('iframe[name="manager"]').contentDocument.getElementById('newBoardBtn').click());
+      await webPage.waitForSelector('.win[data-label^="board-"] iframe');
+      await webPage.waitForTimeout(400);
+      const res = await webPage.evaluate(async () => {
+        const note = document.querySelector('.win[data-label^="note-"]').dataset.label;
+        const board = document.querySelector('.win[data-label^="board-"]').dataset.label;
+        const win = (l) => document.querySelector(`.win[data-label="${l}"]`);
+        const z = (l) => Number(win(l).style.zIndex);
+        const top = () => [...document.querySelectorAll('.win')].sort((a, b) => b.style.zIndex - a.style.zIndex)[0].dataset.label;
+        // A click anywhere in a window (the workspace raises on pointerdown).
+        const click = async (l) => {
+          const doc = win(l).querySelector('iframe').contentDocument;
+          doc.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+          await new Promise((r) => setTimeout(r, 50));
+        };
+        const out = { notePinnedTier: win(note).classList.contains('pinned') };
+        await click(board);
+        await click(note);
+        out.noteOverBoard = top() === note;
+        await click('manager');
+        out.managerOnTop = top() === 'manager';
+        await click(note);
+        out.noteOnTopAgain = top() === note && z(note) > z(board) && z(note) > z('manager');
+        // Pin the board: it stays above the note even after the note is clicked.
+        win(board).querySelector('iframe').contentDocument.getElementById('pinBtn').click();
+        await new Promise((r) => setTimeout(r, 300));
+        await click(note);
+        out.pinnedBoardAbove = z(board) > z(note);
+        await new Promise((r) => setTimeout(r, 600)); // saves are debounced (400 ms)
+        const data = JSON.parse(localStorage.getItem('memo.web.data.v1') || '{}');
+        out.managerStaysUnpinned = !(data.manager && data.manager.pinned);
+        out.boardSavedPinned = (data.boards || []).some((b) => `board-${b.id}` === board && b.pinned);
+        return out;
+      });
+      assert.equal(res.notePinnedTier, false, 'An unpinned memory must not open in the pinned layer');
+      assert.equal(res.noteOverBoard, true, 'Clicking a memory brings it above the board');
+      assert.equal(res.managerOnTop, true, 'Clicking the manager brings it to the front');
+      assert.equal(res.noteOnTopAgain, true, 'Clicking the memory again brings it above the manager and board');
+      assert.equal(res.pinnedBoardAbove, true, 'A pinned board stays above an unpinned memory that is clicked');
+      assert.equal(res.managerStaysUnpinned, true, 'Pinning a board must not pin the manager');
+      assert.equal(res.boardSavedPinned, true, 'Pinning a board saves it as pinned');
+    } finally {
+      await webPage.close();
+    }
+  });
+
   assert.deepEqual(errors, [], `Unexpected console/page errors: ${errors.join('; ')}`);
   console.log(`\nAll ${passed} UI test suites passed with 0 runtime errors.`);
 } finally {

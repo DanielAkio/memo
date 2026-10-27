@@ -74,13 +74,16 @@ pub(crate) struct Resize {
     pub(crate) rect: Rect,
 }
 
-/// Whether the note (or the manager) is pinned, to put back after a drag.
+/// Whether the window (note, group, board or manager) is pinned, to put back
+/// after a drag.
 pub(crate) fn pinned(window: &WebviewWindow) -> bool {
     let store = window.state::<Shared>();
     if is_group(window) {
         store.group(&group_id_of(window)).is_some_and(|g| g.pinned)
     } else if is_note(window) {
         store.get(&id_of(window)).is_some_and(|n| n.pinned)
+    } else if is_board(window) {
+        store.board(&board_id_of(window)).is_some_and(|b| b.pinned)
     } else {
         store.manager().pinned
     }

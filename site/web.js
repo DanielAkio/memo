@@ -975,7 +975,7 @@
 
   function unpinFromPip(label) {
     const id = idOf(label);
-    const target = isNote(label) ? findNote(id) : isGroup(label) ? findGroup(id) : data.manager;
+    const target = isNote(label) ? findNote(id) : isGroup(label) ? findGroup(id) : isBoard(label) ? findBoard(id) : data.manager;
     if (target) target.pinned = false;
     const cur = wins[label];
     if (cur) {
@@ -1232,7 +1232,7 @@
       n.y = pos.y;
       markDirty(false);
     }
-    return openWindow(`note-${n.id}`, 'index.html', { x: pos.x, y: pos.y, w, h, pinned: !n.pinned, autofocus });
+    return openWindow(`note-${n.id}`, 'index.html', { x: pos.x, y: pos.y, w, h, pinned: !!n.pinned, autofocus });
   }
 
   function openGroupWindow(g, autofocus = !IS_SITE_HOME) {
@@ -3118,7 +3118,7 @@
         return null;
       }
       case 'set_pinned': {
-        const target = n || g || data.manager;
+        const target = n || g || b || data.manager;
         if (!target) return false;
         target.pinned = !!args.pinned;
         const w = wins[label];
