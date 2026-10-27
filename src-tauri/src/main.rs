@@ -123,6 +123,39 @@ fn is_app_window(window: &WebviewWindow) -> bool {
     window.label() != SNAP_PREVIEW
 }
 
+/// A colour sent by a window: a label or "#rrggbb" (`store::is_valid_color`).
+fn check_color(color: &str) -> Result<(), String> {
+    if is_valid_color(color) {
+        Ok(())
+    } else {
+        Err(format!("unknown color: {color}"))
+    }
+}
+
+/// Brings a window back: unminimised, shown and focused.
+fn reveal(window: &WebviewWindow) {
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+/// Native window title of a group bar or board (taskbar): its name, or the
+/// app's.
+fn window_title(name: &str) -> &str {
+    if name.trim().is_empty() {
+        "Memo"
+    } else {
+        name
+    }
+}
+
+/// Closes the window with this label for good, if it is open.
+fn destroy_window(app: &AppHandle, label: &str) {
+    if let Some(window) = app.get_webview_window(label) {
+        let _ = window.destroy();
+    }
+}
+
 /// Tells the windows (the manager) that the note list changed.
 fn notify(app: &AppHandle) {
     let _ = app.emit("notes-changed", ());
@@ -146,9 +179,7 @@ fn boards_changed(app: &AppHandle) {
 /// Opens a note's window (or brings it to the front if it is already open).
 fn open_note_window(app: &AppHandle, note: &Note) -> tauri::Result<WebviewWindow> {
     if let Some(existing) = app.get_webview_window(&label_for(&note.id)) {
-        let _ = existing.unminimize();
-        let _ = existing.show();
-        let _ = existing.set_focus();
+        reveal(&existing);
         return Ok(existing);
     }
     let window = build_note_window(app, note)?;
@@ -1504,9 +1535,7 @@ fn raise_notes(app: &AppHandle) -> bool {
     // Each focused window goes on top of the previous ones.
     windows.sort_by_key(is_group);
     for window in &windows {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
+        reveal(window);
     }
     !windows.is_empty()
 }
@@ -1524,9 +1553,7 @@ fn trash(app: &AppHandle, id: &str) {
         None => {}
     }
     store.flush();
-    if let Some(window) = app.get_webview_window(&label_for(id)) {
-        let _ = window.destroy();
-    }
+    destroy_window(app, &label_for(id));
     notify(app);
 }
 
@@ -1625,9 +1652,7 @@ fn set_color(
     color: String,
     store: State<'_, Shared>,
 ) -> Result<(), String> {
-    if !is_valid_color(&color) {
-        return Err(format!("unknown color: {color}"));
-    }
+    check_color(&color)?;
     store.update(&id_of(&window), |n| n.color = color);
     notify(&app);
     Ok(())
@@ -1727,9 +1752,7 @@ fn close_note_by_id(app: &AppHandle, id: &str) {
         Some(_) => {
             store.update(id, |n| n.hidden = true);
             store.flush();
-            if let Some(window) = app.get_webview_window(&label_for(id)) {
-                let _ = window.destroy();
-            }
+            destroy_window(app, &label_for(id));
             notify(app);
         }
         None => {}
@@ -2136,8 +2159,8 @@ fn get_group_defaults(store: State<'_, Shared>) -> (String, String) {
 
 #[tauri::command]
 fn set_default_group_color(color: String, store: State<'_, Shared>) -> Result<(), String> {
-    if color != RANDOM_COLOR && !is_valid_color(&color) {
-        return Err(format!("unknown color: {color}"));
+    if color != RANDOM_COLOR {
+        check_color(&color)?;
     }
     store.set_default_group_color(&color);
     Ok(())
@@ -2163,8 +2186,8 @@ fn set_default_color(
     color: String,
     store: State<'_, Shared>,
 ) -> Result<(), String> {
-    if color != RANDOM_COLOR && !is_valid_color(&color) {
-        return Err(format!("unknown color: {color}"));
+    if color != RANDOM_COLOR {
+        check_color(&color)?;
     }
     store.set_default_color(&color);
     notify(&app);
@@ -2209,15 +2232,6 @@ fn slide(
     });
 }
 
-/// Native window title of a group bar (taskbar): its name, or the app's.
-fn group_title(name: &str) -> &str {
-    if name.is_empty() {
-        "Memo"
-    } else {
-        name
-    }
-}
-
 /// Opens a group's bar (or brings it to the front if already open).
 fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWindow> {
     let label = group_label(&group.id);
@@ -2227,7 +2241,7 @@ fn open_group_window(app: &AppHandle, group: &Group) -> tauri::Result<WebviewWin
         return Ok(existing);
     }
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("group.html".into()))
-        .title(group_title(&group.name))
+        .title(window_title(&group.name))
         .inner_size(group.width, TITLEBAR_H * app.state::<Shared>().zoom())
         .min_inner_size(GROUP_MIN_W, TITLEBAR_H * app.state::<Shared>().zoom())
         .decorations(false)
@@ -2576,7 +2590,7 @@ fn rename_group_by_id(app: &AppHandle, id: &str, name: &str) -> String {
     let group = store.update_group(id, |g| g.name = name.clone());
     let saved = group.map(|g| g.name).unwrap_or_default();
     if let Some(window) = app.get_webview_window(&group_label(id)) {
-        let _ = window.set_title(group_title(&saved));
+        let _ = window.set_title(window_title(&saved));
     }
     groups_changed(app);
     notify(app);
@@ -2586,9 +2600,7 @@ fn rename_group_by_id(app: &AppHandle, id: &str, name: &str) -> String {
 /// Colour of the manager window (same labels as notes and groups).
 #[tauri::command]
 fn set_manager_color(color: String, store: State<'_, Shared>) -> Result<(), String> {
-    if !is_valid_color(&color) {
-        return Err(format!("unknown color: {color}"));
-    }
+    check_color(&color)?;
     store.update_manager(|m| m.color = color);
     Ok(())
 }
@@ -2616,9 +2628,7 @@ fn set_layout(app: &AppHandle, layout: &str) {
 /// Colour of the calling group (same labels as notes).
 #[tauri::command]
 fn set_group_color(app: AppHandle, window: WebviewWindow, color: String) -> Result<(), String> {
-    if !is_valid_color(&color) {
-        return Err(format!("unknown color: {color}"));
-    }
+    check_color(&color)?;
     app.state::<Shared>()
         .update_group(&group_id_of(&window), |g| g.color = color);
     groups_changed(&app);
@@ -2741,14 +2751,10 @@ async fn close_group(app: AppHandle, window: WebviewWindow) {
     } else {
         store.update_group(&id, |g| g.hidden = true);
         for note in store.members(&id) {
-            if let Some(note_window) = app.get_webview_window(&label_for(&note.id)) {
-                let _ = note_window.destroy();
-            }
+            destroy_window(&app, &label_for(&note.id));
         }
         for board in store.board_members(&id) {
-            if let Some(w) = app.get_webview_window(&board_label(&board.id)) {
-                let _ = w.destroy();
-            }
+            destroy_window(&app, &board_label(&board.id));
         }
     }
     store.flush();
@@ -2838,9 +2844,7 @@ fn trash_group_by_id(app: &AppHandle, id: &str) {
         }
     }
     store.flush();
-    if let Some(window) = app.get_webview_window(&group_label(id)) {
-        let _ = window.destroy();
-    }
+    destroy_window(app, &group_label(id));
     groups_changed(app);
     boards_changed(app);
     notify(app);
@@ -2926,19 +2930,11 @@ fn empty_group_trash(app: AppHandle, store: State<'_, Shared>) {
 // Boards
 // ---------------------------------------------------------------------------
 
-fn board_title(name: &str) -> &str {
-    if name.trim().is_empty() {
-        "Memo"
-    } else {
-        name
-    }
-}
-
 fn build_board_window(app: &AppHandle, board: &Board) -> tauri::Result<WebviewWindow> {
     let label = board_label(&board.id);
     let store = app.state::<Shared>();
     let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("board.html".into()))
-        .title(board_title(&board.name))
+        .title(window_title(&board.name))
         .inner_size(board.width, board.height)
         .min_inner_size(BOARD_MIN_W, BOARD_MIN_H)
         .decorations(false)
@@ -2966,9 +2962,7 @@ fn build_board_window(app: &AppHandle, board: &Board) -> tauri::Result<WebviewWi
 fn open_board_window(app: &AppHandle, board: &Board) -> tauri::Result<WebviewWindow> {
     let label = board_label(&board.id);
     if let Some(existing) = app.get_webview_window(&label) {
-        let _ = existing.unminimize();
-        let _ = existing.show();
-        let _ = existing.set_focus();
+        reveal(&existing);
         return Ok(existing);
     }
     let window = build_board_window(app, board)?;
@@ -3028,7 +3022,7 @@ fn rename_board(
     let id = board_id_of(&window);
     let clean = name.trim().chars().take(BOARD_NAME_MAX).collect::<String>();
     store.update_board(&id, |b| b.name = clean.clone());
-    let _ = window.set_title(board_title(&clean));
+    let _ = window.set_title(window_title(&clean));
     boards_changed(&app);
     Ok(clean)
 }
@@ -3040,9 +3034,7 @@ fn set_board_color(
     color: String,
     store: State<'_, Shared>,
 ) -> Result<(), String> {
-    if !is_valid_color(&color) {
-        return Err(format!("unknown color: {color}"));
-    }
+    check_color(&color)?;
     let id = board_id_of(&window);
     store.update_board(&id, |b| b.color = color);
     boards_changed(&app);
@@ -3083,9 +3075,7 @@ async fn trash_board_id(app: AppHandle, id: String) {
 }
 
 fn trash_board_by_id(app: &AppHandle, id: &str) {
-    if let Some(w) = app.get_webview_window(&board_label(id)) {
-        let _ = w.destroy();
-    }
+    destroy_window(app, &board_label(id));
     app.state::<Shared>().trash_board(id);
     boards_changed(app);
 }
@@ -3099,9 +3089,7 @@ fn restore_board_id(app: AppHandle, id: String, store: State<'_, Shared>) -> Res
 
 #[tauri::command]
 async fn delete_board_forever(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window(&board_label(&id)) {
-        let _ = w.destroy();
-    }
+    destroy_window(&app, &board_label(&id));
     store.remove_board(&id);
     boards_changed(&app);
     Ok(())
