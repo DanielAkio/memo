@@ -21,8 +21,8 @@ Memo Web. Without it, a build simply doesn't offer OneDrive (Google Drive still 
 - **Mobile and desktop applications** → custom redirect URI `http://localhost`. Microsoft accepts any port on
   `localhost`, which is what the desktop app's one-shot sign-in server uses.
 - **Single-page application** (for Memo Web) → `https://danielakio.github.io/memo/app.html` and, for local tests,
-  `http://localhost:3000/site/app.html` (Microsoft only takes `https://` or `http://localhost` here, so open the
-  local Memo Web as `localhost`, not `127.0.0.1`). Under **Implicit grant and hybrid flows**, tick **Access tokens**: Memo Web
+  `http://localhost:3000/memo/app.html` (Microsoft only takes `https://` or `http://localhost` here; `npm run web`
+  serves Memo Web there, as in production, and redirects `127.0.0.1` and `/site/` to it). Under **Implicit grant and hybrid flows**, tick **Access tokens**: Memo Web
   gets its token in the popup's redirect, as it does with Google. In the newer portal this checkbox may be hidden:
   set it in **Manifest** instead (`web.implicitGrantSettings.enableAccessTokenIssuance: true`, or
   `oauth2AllowImplicitFlow: true` in the older manifest format).

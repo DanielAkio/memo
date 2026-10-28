@@ -422,6 +422,18 @@ button { font: inherit; color: inherit; }
 }
 .card-dot[data-color=""] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-smoke); }
 
+/* A board column's colour (a board's columns, Settings → Defaults → Board):
+   a .card-dot that opens its swatches. */
+.col-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+.col-dot:hover { box-shadow: 0 0 0 3px var(--overlay-hover); }
+.col-dot[data-color=""]:hover { box-shadow: inset 0 0 0 1px var(--color-smoke), 0 0 0 3px var(--overlay-hover); }
+
 /* ------------------------------------------------- shared page and frame */
 
 html, body {
@@ -462,6 +474,14 @@ html, body {
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+/* The share button (#shareBtn) shows only while the pointer is over the
+   titlebar (or it has the keyboard focus), leaving its room to the name the
+   rest of the time; the other buttons always show. Touch screens, with no
+   hover, keep it. */
+@media (hover: hover) {
+  .titlebar:not(:hover) #shareBtn:not(:focus-visible) { display: none; }
 }
 
 

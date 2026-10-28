@@ -17,7 +17,9 @@ Memo is built with [Tauri 2](https://v2.tauri.app): a Rust backend (`src-tauri/`
 npm install
 npm run dev      # run in development mode (also "Run in dev mode" in VS Code, which first
                  # ends a dev Memo still running, so Restart works)
-npm run web      # serve the website and browser web app at http://127.0.0.1:3000/site/app.html
+npm run web      # serve the website and browser web app at http://localhost:3000/memo/app.html
+                 # (as in production; 127.0.0.1 and /site/ redirect there: one address for Google,
+                 # OneDrive and the browser's storage)
 npm run build    # installer for the current OS in src-tauri/target/release/bundle/
 cd src-tauri && cargo check && cargo clippy && cargo test
 ```

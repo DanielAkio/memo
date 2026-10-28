@@ -1,15 +1,16 @@
-//! Sharing a memory, a board or a group (with its memories and boards)
-//! through the clipboard, so it can go through any chat or email.
+//! Sharing a memory, a board or a group (with its memories and boards) as
+//! a link, so it can go through any chat or email.
 //!
-//! The text copied is readable (names and text) and ends with one line of
-//! code, `memo:v1:<data>`: the shared content as JSON, deflated (raw) and
-//! in base64url (site/web.js makes and reads the same codes). Only content
-//! goes: no ids, places, pins or dates; references between items are
-//! indices. Images are not shared: each becomes `NO_IMAGE`, and the Memo
-//! that imports puts a picture saying so in its place (`src/assets`).
+//! The link is `share_url()` + `memo:v1:<data>`: the shared content as JSON,
+//! deflated (raw) and in base64url (site/web.js makes and reads the same
+//! codes), in the fragment, so it never reaches a server. Only content goes:
+//! no ids, places, pins or dates; references between items are indices.
+//! Images are not shared: each becomes `NO_IMAGE`, and the Memo that imports
+//! puts a picture saying so in its place (`src/assets`).
 //!
-//! When a Memo window gets the focus with a code it hasn't offered yet in
-//! the clipboard, that window shows an offer to import it (share-available,
+//! Memo Web opens the link with an offer to import it, and its "Open in the
+//! app" hands it to this app as `memo://import#<code>` (tauri-plugin-deep-
+//! link, `open_link`): every window shows the offer (share-available,
 //! components/share.js), also in the tray menu while it is pending. Import
 //! makes new copies, never touching what is there.
 
@@ -24,6 +25,22 @@ use std::{
 };
 
 pub(crate) const PREFIX: &str = "memo:v1:";
+/// Links to a shared item: Memo Web, with the code after the `#`
+/// (site/web.js SHARE_URL, checked by tools/check.mjs).
+pub(crate) const SHARE_URL: &str = "https://danielakio.github.io/memo/app.html#";
+/// The same page served locally by `npm run web` (tools/serve-web.mjs), for
+/// links made by a dev build (site/web.js LOCAL_SHARE_URL).
+pub(crate) const LOCAL_SHARE_URL: &str = "http://localhost:3000/memo/app.html#";
+
+/// Where links point: the local Memo Web for a dev build (`npm run dev`), so
+/// what is shared while developing opens there; the published one otherwise.
+pub(crate) fn share_url() -> &'static str {
+    if cfg!(debug_assertions) {
+        LOCAL_SHARE_URL
+    } else {
+        SHARE_URL
+    }
+}
 /// Longer codes are cut by chat apps.
 pub(crate) const MAX_CODE: usize = 60_000;
 /// What an image becomes in shared HTML.
@@ -202,14 +219,6 @@ fn note_name(note: &SharedNote) -> String {
     note.text.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("").to_string()
 }
 
-fn or_untitled(name: &str, lang: &str) -> String {
-    match name.trim() {
-        "" if lang == "en" => "Untitled".into(),
-        "" => "Sem título".into(),
-        name => name.to_string(),
-    }
-}
-
 /// The shared item's name, as an offer shows it ("" = untitled).
 pub(crate) fn name_of(payload: &Payload) -> String {
     match payload.kind.as_str() {
@@ -227,60 +236,6 @@ pub(crate) fn summary(payload: &Payload) -> Summary {
         notes: payload.notes.len(),
         boards: payload.boards.len(),
     }
-}
-
-fn board_text(board: &SharedBoard, payload: &Payload, lang: &str, out: &mut String) {
-    for col in &board.columns {
-        out.push_str(&format!("\n## {}\n", or_untitled(&col.name, lang)));
-        for &i in &col.notes {
-            if let Some(note) = payload.notes.get(i) {
-                out.push_str(&format!("- {}\n", or_untitled(&note_name(note), lang)));
-            }
-        }
-    }
-}
-
-/// The readable part: what a person sees in the chat.
-pub(crate) fn readable(payload: &Payload, lang: &str) -> String {
-    let image = if lang == "en" { "[image not shared]" } else { "[imagem não compartilhada]" };
-    let mut out = String::new();
-    match payload.kind.as_str() {
-        "board" => {
-            if let Some(board) = payload.boards.first() {
-                out.push_str(&or_untitled(&board.name, lang));
-                out.push('\n');
-                board_text(board, payload, lang, &mut out);
-            }
-        }
-        "group" => {
-            if let Some(group) = payload.groups.first() {
-                out.push_str(&or_untitled(&group.name, lang));
-                out.push('\n');
-                for &i in &group.notes {
-                    if let Some(note) = payload.notes.get(i) {
-                        out.push_str(&format!("- {}\n", or_untitled(&note_name(note), lang)));
-                    }
-                }
-                for &i in &group.boards {
-                    if let Some(board) = payload.boards.get(i) {
-                        out.push_str(&format!("\n# {}\n", or_untitled(&board.name, lang)));
-                        board_text(board, payload, lang, &mut out);
-                    }
-                }
-            }
-        }
-        _ => {
-            if let Some(note) = payload.notes.first() {
-                if !note.title.trim().is_empty() {
-                    out.push_str(note.title.trim());
-                    out.push('\n');
-                }
-                out.push_str(&note.text.replace("[imagem]", image).replace("[image]", image));
-                out.push('\n');
-            }
-        }
-    }
-    out.trim_end().to_string()
 }
 
 // ------------------------------------------------------------------ code
@@ -332,21 +287,21 @@ fn hash_of(code: &str) -> u64 {
     h.finish()
 }
 
-/// The whole text to copy for note, board or group `id`: the readable part,
-/// a line saying what the code is, and the code.
-pub(crate) fn share_text(store: &Store, kind: Kind, id: &str) -> Result<String, String> {
+/// The payload of note, board or group `id` and its code.
+fn share_code(store: &Store, kind: Kind, id: &str) -> Result<(Payload, String), String> {
     let payload = build(store, kind, id).ok_or("item not found")?;
     let code = encode(&payload)?;
     if code.len() > MAX_CODE {
         return Err("too big to share".into());
     }
-    let lang = store.effective_language();
-    let footer = if lang == "en" {
-        "— Shared from Memo: copy this whole message and open Memo to import it —"
-    } else {
-        "— Compartilhado pelo Memo: copie esta mensagem inteira e abra o Memo para importar —"
-    };
-    Ok(format!("{}\n\n{footer}\n{code}", readable(&payload, lang)))
+    Ok((payload, code))
+}
+
+/// The link to note, board or group `id`: only the address, with the
+/// content in its code.
+pub(crate) fn share_link(store: &Store, kind: Kind, id: &str) -> Result<String, String> {
+    let (_, code) = share_code(store, kind, id)?;
+    Ok(format!("{}{code}", share_url()))
 }
 
 // ------------------------------------------------------------------ import
@@ -515,11 +470,9 @@ struct Offer {
     payload: Payload,
 }
 
-/// The shared item in the clipboard, offered in every window while it is
-/// there (copied here or elsewhere), until imported or dismissed.
+/// The shared item of the last link opened, offered in every window until
+/// imported or dismissed.
 static PENDING: Mutex<Option<Offer>> = Mutex::new(None);
-/// Codes imported or dismissed with the offer's ✕: not offered again.
-static DONE: Mutex<BTreeSet<u64>> = Mutex::new(BTreeSet::new());
 
 pub(crate) fn pending() -> bool {
     PENDING.lock().unwrap().is_some()
@@ -542,35 +495,9 @@ fn set_offer(app: &AppHandle, offer: Option<Offer>) {
     }
 }
 
-/// The offer for `text` (the clipboard's): its code, unless dismissed.
-fn offer_for(text: &str) -> Option<Offer> {
-    let code = find_code(text)?;
-    let hash = hash_of(code);
-    if DONE.lock().unwrap().contains(&hash) {
-        return None;
-    }
-    if let Some(o) = PENDING.lock().unwrap().as_ref().filter(|o| o.hash == hash) {
-        return Some(Offer { hash, payload: o.payload.clone() });
-    }
-    decode(code).map(|payload| Offer { hash, payload })
-}
-
-/// Looks at the clipboard when a Memo window gets the focus: a shared item
-/// there is offered in every window, and the offer goes once it isn't.
-pub(crate) fn on_focus(app: &AppHandle, _window: &WebviewWindow) {
-    let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        use tauri_plugin_clipboard_manager::ClipboardExt;
-        let text = app.clipboard().read_text().unwrap_or_default();
-        set_offer(&app, offer_for(&text));
-    });
-}
-
-/// Ends the offer (imported or dismissed): that code is not offered again.
+/// Ends the offer (imported or dismissed).
 fn take_offer(app: &AppHandle) -> Option<Payload> {
-    let offer = PENDING.lock().unwrap().as_ref().map(|o| (o.hash, o.payload.clone()));
-    let (hash, payload) = offer?;
-    DONE.lock().unwrap().insert(hash);
+    let payload = PENDING.lock().unwrap().as_ref().map(|o| o.payload.clone())?;
     set_offer(app, None);
     Some(payload)
 }
@@ -582,9 +509,9 @@ pub(crate) fn import_pending(app: &AppHandle, anchor: Option<&WebviewWindow>) {
     }
 }
 
-/// Puts the text to share for the calling window's note, board or group
-/// (or `kind` / `id`) in the clipboard, and returns it. Written from here:
-/// the titlebar menu is native, so the page has no click to copy with.
+/// Puts the link to the calling window's note, board or group (or `kind` /
+/// `id`) in the clipboard, and returns it. Written from here: the titlebar
+/// menu is native, so the page has no click to copy with.
 #[tauri::command]
 pub(crate) fn copy_share(
     app: AppHandle,
@@ -600,12 +527,21 @@ pub(crate) fn copy_share(
             Kind::of(&window).ok_or("nothing to share here")?
         }
     };
-    let text = share_text(&app.state::<Shared>(), kind, &id)?;
+    let text = share_link(&app.state::<Shared>(), kind, &id)?;
     use tauri_plugin_clipboard_manager::ClipboardExt;
     app.clipboard().write_text(text.clone()).map_err(|e| e.to_string())?;
-    // Now in the clipboard: offered like any shared item.
-    set_offer(&app, offer_for(&text));
     Ok(text)
+}
+
+/// A `memo://import#<code>` link opened (Memo Web's "Open in the app", or a
+/// link clicked anywhere): its item is offered, with the manager in front
+/// so the offer shows.
+pub(crate) fn open_link(app: &AppHandle, url: &str) {
+    let Some(code) = find_code(url) else { return };
+    let Some(payload) = decode(code) else { return };
+    set_offer(app, Some(Offer { hash: hash_of(code), payload }));
+    show_all(app);
+    let _ = open_manager(app);
 }
 
 /// The offer's Import button: the pending item, in the middle of the screen.
@@ -620,7 +556,7 @@ pub(crate) fn share_offer() -> Option<Summary> {
     PENDING.lock().unwrap().as_ref().map(|o| summary(&o.payload))
 }
 
-/// The offer's ✕: that code is not offered again.
+/// The offer's ✕.
 #[tauri::command]
 pub(crate) fn dismiss_share(app: AppHandle) {
     take_offer(&app);
@@ -653,6 +589,25 @@ mod tests {
     }
 
     #[test]
+    fn a_link_carries_the_same_code() {
+        let (store, dir) = temp_store("link");
+        let id = note(&store, "Mercado", "<div>pão</div>", "pão");
+        let link = share_link(&store, Kind::Note, &id).unwrap();
+        let url = link.as_str();
+        assert!(url.starts_with(share_url()), "only the link, no name before it: {url}");
+        // Tests run a dev build: the local Memo Web.
+        assert!(url.starts_with(LOCAL_SHARE_URL), "{url}");
+        assert!(!url.contains(char::is_whitespace), "{url}");
+        let code = find_code(url).unwrap();
+        assert_eq!(code.len(), url.len() - share_url().len(), "the whole fragment is the code");
+        // What Memo Web's "Open in the app" hands over.
+        let app_link = format!("memo://import#{code}");
+        assert_eq!(find_code(&app_link), Some(code));
+        assert_eq!(decode(&app_link).unwrap().notes[0].title, "Mercado");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn a_board_goes_and_comes_back_as_new_copies() {
         let (store, dir) = temp_store("board");
         let a = note(&store, "A", "<div>a</div>", "a");
@@ -663,10 +618,9 @@ mod tests {
             x.color = "iris".into();
         });
 
-        let text = share_text(&store, Kind::Board, &board.id).unwrap();
-        assert!(text.starts_with("Plan\n"), "{text}");
-        assert!(text.contains("## To Do\n- A\n- b"), "{text}");
-        let payload = decode(&text).expect("the text holds a code");
+        let link = share_link(&store, Kind::Board, &board.id).unwrap();
+        assert!(link.starts_with(&format!("{}memo:v1:", share_url())), "{link}");
+        let payload = decode(&link).expect("the link holds a code");
         assert_eq!(payload.kind, "board");
         assert_eq!(payload.notes.len(), 2);
         assert!(payload.notes[1].html.contains(NO_IMAGE), "images are not shared");
@@ -707,7 +661,7 @@ mod tests {
             b.group_id = group.id.clone();
         });
 
-        let payload = decode(&share_text(&store, Kind::Group, &group.id).unwrap()).unwrap();
+        let payload = decode(&share_link(&store, Kind::Group, &group.id).unwrap()).unwrap();
         assert_eq!((payload.notes.len(), payload.boards.len(), payload.groups.len()), (2, 1, 1));
         let created = create(&store, &payload, None);
         let gid = &created.groups[0];

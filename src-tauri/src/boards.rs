@@ -51,7 +51,7 @@ pub(crate) async fn new_board(app: AppHandle, store: State<'_, Shared>) -> Resul
     } else {
         vec!["A Fazer".into(), "Em Andamento".into(), "Concluído".into()]
     };
-    let board = store.create_board(None, default_cols, None);
+    let board = store.create_default_board(default_cols, None);
     open_board_window(&app, &board).map_err(|e| e.to_string())?;
     boards_changed(&app);
     Ok(board)

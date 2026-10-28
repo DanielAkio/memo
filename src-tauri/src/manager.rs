@@ -278,6 +278,33 @@ pub(crate) fn set_default_group_title(title: String, store: State<'_, Shared>) {
     store.set_default_group_title(title.trim().chars().take(GROUP_NAME_MAX).collect());
 }
 
+/// Colour, name and columns new boards start with, for the manager's
+/// Settings (columns `None` = the language's own).
+#[tauri::command]
+pub(crate) fn get_board_defaults(store: State<'_, Shared>) -> (String, String, Option<Vec<ColumnDefault>>) {
+    store.board_defaults()
+}
+
+/// `""` = no colour.
+#[tauri::command]
+pub(crate) fn set_default_board_color(color: String, store: State<'_, Shared>) -> Result<(), String> {
+    if !color.is_empty() && color != RANDOM_COLOR {
+        check_color(&color)?;
+    }
+    store.set_default_board_color(&color);
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) fn set_default_board_title(title: String, store: State<'_, Shared>) {
+    store.set_default_board_title(title.trim().chars().take(BOARD_NAME_MAX).collect());
+}
+
+#[tauri::command]
+pub(crate) fn set_default_board_columns(columns: Option<Vec<ColumnDefault>>, store: State<'_, Shared>) {
+    store.set_default_board_columns(columns);
+}
+
 /// Default content for new notes, edited in the manager with the same note
 /// editor (index.html?defaults): plain text and HTML, as a note stores them.
 #[tauri::command]

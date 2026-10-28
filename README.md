@@ -32,8 +32,8 @@ digging through windows to find what you wrote down.
   matters. Prefer the mouse? The selection bar and the Aa toolbar do it all in a click.
 - **Find things at a glance.** Give each memory a title and a colour (any colour, with the eyedropper), and gather
   related ones in a group you can put away and bring back in one click.
-- **Share in a message.** "Share (copy)" turns a memory, a board or a whole group into a text you can paste in any
-  chat or email; whoever gets it opens Memo and imports a copy with one click.
+- **Share in a message.** "Share link" turns a memory, a board or a whole group into a link you can paste in any
+  chat or email; whoever opens it imports a copy with one click, in the browser or in the app.
 - **Yours, and only yours.** No sign-up, no ads, no tracking, and it works offline. Your memories live on your
   computer, and if you want them on several computers, they sync through your own Google Drive
   or OneDrive ([privacy policy](https://danielakio.github.io/memo/privacy.html)).
@@ -96,7 +96,7 @@ in your hands.
 ## Get Memo
 
 Download Memo for Windows, macOS or Linux from **[its website](https://danielakio.github.io/memo/)**, which picks
-the right installer for your computer, or **[use Memo right in your browser](https://danielakio.github.io/memo/app.html)** (memories stay in your browser and can sync with the desktop app through Google Drive or OneDrive; pinning a memory uses Picture-in-Picture to float over other apps).
+the right installer for your computer, or **[use Memo right in your browser](https://danielakio.github.io/memo/app.html)** (memories stay in your browser and can sync with the desktop app through Google Drive or OneDrive; pinning a memory uses Picture-in-Picture to float over other apps; on a phone it floats read-only).
 
 Open it, and Memo greets you with a welcome memory that shows the basics. Closing a memory never deletes it, and
 closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.

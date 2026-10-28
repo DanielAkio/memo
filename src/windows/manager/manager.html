@@ -62,6 +62,22 @@
       <input type="color" class="custom-color" id="mgrCustomColor" tabindex="-1" aria-hidden="true">
     </div>
 
+    <!-- A default board column's colour (Settings → Defaults → Board). -->
+    <div class="menu color-menu" id="defColumnMenu" hidden>
+      <div class="menu-label" data-i18n="columnColor"></div>
+      <div class="swatches">
+        <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
+        <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
+        <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
+        <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
+        <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
+        <button type="button" class="swatch" data-color="mono"></button>
+        <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+        <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+      </div>
+      <input type="color" class="custom-color" id="defColumnCustomColor" tabindex="-1" aria-hidden="true">
+    </div>
+
     <div class="mgr-body">
       <header class="mgr-head">
         <div class="tabs" role="tablist">
@@ -161,13 +177,21 @@
             </div>
           </div>
         </div>
-        <div class="sec" data-sec="newNotes">
+        <!-- What new memories, groups and boards start with: one pane each,
+             the same rows in the same order (colour, title, then their own). -->
+        <div class="sec" data-sec="defaults">
           <h2 class="settings-title">
-            <span data-i18n="newNotes"></span>
-            <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=newNotesTip,data-tip=newNotesTip">i</span>
+            <span data-i18n="defaults"></span>
+            <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=defaultsTip,data-tip=defaultsTip">i</span>
           </h2>
-          <div class="setting">
-            <span class="setting-label" data-i18n="color"></span>
+          <div class="segmented def-switch" id="defaultsSwitch" role="tablist">
+            <button type="button" class="seg" role="tab" data-pane="note" aria-checked="true" data-i18n="defaultsNote"></button>
+            <button type="button" class="seg" role="tab" data-pane="group" aria-checked="false" data-i18n="defaultsGroup"></button>
+            <button type="button" class="seg" role="tab" data-pane="board" aria-checked="false" data-i18n="defaultsBoard"></button>
+          </div>
+          <div class="def-pane" data-pane="note">
+            <div class="setting">
+              <span class="setting-label" data-i18n="color"></span>
             <div class="swatches" id="defaultSwatches">
               <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
               <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
@@ -179,28 +203,24 @@
               <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
               <button type="button" class="swatch" data-color="random" data-i18n-attr="aria-label=randomColor,title=randomColor"></button>
             </div>
-          </div>
-          <div class="setting">
-            <label class="setting-label" for="defaultTitle" data-i18n="title"></label>
-            <input class="field" id="defaultTitle" type="text" maxlength="80" spellcheck="false"
-                   autocomplete="off" data-i18n-attr="placeholder=untitled">
-          </div>
-          <div class="setting setting-top">
-            <label class="setting-label" for="defaultTextFrame" data-i18n="text"></label>
-            <div class="field-wrap">
-              <!-- The note editor itself, in embedded mode: renders exactly like a note. -->
-              <iframe class="field note-frame" id="defaultTextFrame" src="../note/index.html?defaults"
-                      data-i18n-attr="title=text"></iframe>
+            </div>
+            <div class="setting">
+              <label class="setting-label" for="defaultTitle" data-i18n="title"></label>
+              <input class="field" id="defaultTitle" type="text" maxlength="80" spellcheck="false"
+                     autocomplete="off" data-i18n-attr="placeholder=untitled">
+            </div>
+            <div class="setting setting-top">
+              <label class="setting-label" for="defaultTextFrame" data-i18n="text"></label>
+              <div class="field-wrap">
+                <!-- The note editor itself, in embedded mode: renders exactly like a note. -->
+                <iframe class="field note-frame" id="defaultTextFrame" src="../note/index.html?defaults"
+                        data-i18n-attr="title=text"></iframe>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="sec" data-sec="groupDefaults">
-          <h2 class="settings-title">
-            <span data-i18n="groupDefaults"></span>
-            <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=groupDefaultsTip,data-tip=groupDefaultsTip">i</span>
-          </h2>
-          <div class="setting">
-            <span class="setting-label" data-i18n="color"></span>
+          <div class="def-pane" data-pane="group" hidden>
+            <div class="setting">
+              <span class="setting-label" data-i18n="color"></span>
             <div class="swatches" id="groupSwatches">
               <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
               <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
@@ -212,11 +232,44 @@
               <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
               <button type="button" class="swatch" data-color="random" data-i18n-attr="aria-label=randomColor,title=randomColor"></button>
             </div>
+            </div>
+            <div class="setting">
+              <label class="setting-label" for="groupDefaultTitle" data-i18n="title"></label>
+              <input class="field" id="groupDefaultTitle" type="text" maxlength="60" spellcheck="false"
+                     autocomplete="off" data-i18n-attr="placeholder=untitled">
+            </div>
           </div>
-          <div class="setting">
-            <label class="setting-label" for="groupDefaultTitle" data-i18n="title"></label>
-            <input class="field" id="groupDefaultTitle" type="text" maxlength="60" spellcheck="false"
-                   autocomplete="off" data-i18n-attr="placeholder=untitled">
+          <div class="def-pane" data-pane="board" hidden>
+            <div class="setting">
+              <span class="setting-label" data-i18n="color"></span>
+            <div class="swatches" id="boardSwatches">
+              <button type="button" class="swatch" data-color="yellow" data-i18n-attr="aria-label=yellow,title=yellow"></button>
+              <button type="button" class="swatch" data-color="green" data-i18n-attr="aria-label=green,title=green"></button>
+              <button type="button" class="swatch" data-color="coral" data-i18n-attr="aria-label=coral,title=coral"></button>
+              <button type="button" class="swatch" data-color="teal" data-i18n-attr="aria-label=teal,title=teal"></button>
+              <button type="button" class="swatch" data-color="iris" data-i18n-attr="aria-label=iris,title=iris"></button>
+              <button type="button" class="swatch" data-color="mono"></button>
+              <button type="button" class="swatch" data-color="" data-i18n-attr="aria-label=noColor,title=noColor"></button>
+              <button type="button" class="swatch" data-color="custom" data-i18n-attr="aria-label=custom,title=customMore"></button>
+              <button type="button" class="swatch" data-color="random" data-i18n-attr="aria-label=randomColor,title=randomColor"></button>
+            </div>
+            </div>
+            <div class="setting">
+              <label class="setting-label" for="boardDefaultTitle" data-i18n="title"></label>
+              <input class="field" id="boardDefaultTitle" type="text" maxlength="60" spellcheck="false"
+                     autocomplete="off" data-i18n-attr="placeholder=untitled">
+            </div>
+            <div class="setting setting-top">
+              <span class="setting-label" data-i18n="columns"></span>
+              <div class="field-wrap">
+                <!-- One row per column: colour dot, name, ↑ ↓, ✕ (manager.js). -->
+                <ol class="def-columns" id="boardDefaultColumns"></ol>
+                <div class="app-actions">
+                  <button type="button" class="btn" id="addDefaultColumn" data-i18n="addColumn"></button>
+                  <button type="button" class="btn" id="restoreDefaultColumns" data-i18n="restoreColumns" hidden></button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <!-- Cloud sync: only in builds with a Google or Microsoft OAuth client (cloud.rs). -->
@@ -363,6 +416,7 @@
         <p class="empty sec-empty" hidden></p>
         <input type="color" class="custom-color" id="groupCustomColor" tabindex="-1" aria-hidden="true">
         <input type="color" class="custom-color" id="customColor" tabindex="-1" aria-hidden="true">
+        <input type="color" class="custom-color" id="boardCustomColor" tabindex="-1" aria-hidden="true">
       </section>
 
       <!-- Help tab: how to use Memo, grouped by topic. The groups come from

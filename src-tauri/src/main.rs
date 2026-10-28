@@ -30,7 +30,7 @@ use std::{
 };
 
 use store::{
-    is_valid_color, now_ms, Board, BoardColumn, Config, Group, ManagerState, Note, Store, BOARD_MIN_H,
+    is_valid_color, now_ms, Board, BoardColumn, ColumnDefault, Config, Group, ManagerState, Note, Store, BOARD_MIN_H,
     BOARD_MIN_W, BOARD_NAME_MAX, DEFAULT_H, DEFAULT_TEXT_MAX, DEFAULT_W, GROUP_NAME_MAX, LANGUAGES,
     LAYOUTS, RANDOM_COLOR, THEMES, TITLEBAR_H, TITLE_MAX, ZOOM_STEP,
 };
@@ -79,7 +79,9 @@ const TITLEBAR_SNAP: f64 = 40.0;
 /// Minimum widths (logical) of a note, the manager and a group bar.
 const MIN_W: f64 = 180.0;
 const MANAGER_MIN_W: f64 = 380.0;
-const GROUP_MIN_W: f64 = MIN_W;
+/// A group bar fits all its buttons (toggle, share, +, minimise, ✕) beside
+/// the pin and folder (site/web.js GROUP_MIN_W, checked by tools/check.mjs).
+const GROUP_MIN_W: f64 = 210.0;
 /// Group animation: notes slide out of / into their group in this many steps.
 const SLIDE_STEPS: u32 = 10;
 const SLIDE_STEP: Duration = Duration::from_millis(14);
@@ -237,6 +239,29 @@ fn migrate_old_data(dir: &Path) {
     }
 }
 
+/// `memo://import#<code>` links offer a shared item (share.rs `open_link`):
+/// the one Memo was started with, and those opened while it runs. Installers
+/// register the scheme (macOS through Info.plist); Linux and Windows dev
+/// builds register it at runtime.
+fn init_deep_link(app: &AppHandle) {
+    use tauri_plugin_deep_link::DeepLinkExt;
+    #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+    if let Err(err) = app.deep_link().register_all() {
+        eprintln!("memo: deep link: {err}");
+    }
+    let handle = app.clone();
+    app.deep_link().on_open_url(move |event| {
+        for url in event.urls() {
+            share::open_link(&handle, url.as_str());
+        }
+    });
+    if let Ok(Some(urls)) = app.deep_link().get_current() {
+        for url in urls {
+            share::open_link(app, url.as_str());
+        }
+    }
+}
+
 fn main() {
     // `memo --mcp`: the stdio MCP server AI assistants launch (mcp.rs), not
     // the app.
@@ -273,11 +298,13 @@ fn main() {
                 .arg(AUTOSTART_ARG)
                 .build(),
         )
-        // Launching the app again brings the notes to the front and opens the manager.
+        // Launching the app again brings the notes to the front and opens the
+        // manager (a `memo://` link passed to it goes to the deep-link plugin).
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_all(app);
             let _ = open_manager(app);
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             get_theme,
             drag_start,
@@ -319,6 +346,10 @@ fn main() {
             get_group_defaults,
             set_default_group_color,
             set_default_group_title,
+            get_board_defaults,
+            set_default_board_color,
+            set_default_board_title,
+            set_default_board_columns,
             set_default_content,
             get_data_dir,
             choose_data_dir,
@@ -407,6 +438,7 @@ fn main() {
 
             let handle = app.handle().clone();
             build_tray(&handle)?;
+            init_deep_link(&handle);
             init_autostart(&handle, &default_dir);
 
             // The manager opens on every launch (but a start with the system

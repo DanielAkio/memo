@@ -93,7 +93,7 @@ pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str, full: bool) -> tauri
         item("new-board", l.new_board)?.kind(),
         item("show", l.show)?.kind(),
     ];
-    // While a shared item is in the clipboard (share.rs).
+    // While a shared link's item is offered (share.rs).
     if share::pending() {
         items.push(item("import-share", l.import_share)?.kind());
     }

@@ -13,7 +13,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # macos-private-api: transparent windows on macOS (the Snap preview, snap.html).
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
-tauri-plugin-single-instance = "2"
+# deep-link: a `memo://` link opened while Memo runs reaches this instance.
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 serde = { version = "1", features = ["derive"] }
 # preserve_order: AI clients' config files keep their key order (clients.rs).
 serde_json = { version = "1", features = ["preserve_order"] }
@@ -32,8 +33,10 @@ sha2 = "0.10"
 base64 = "0.22"
 # Shared items' codes are deflated (share.rs).
 flate2 = "1"
-# Reads the clipboard for shared items (share.rs).
+# Writes share links to the clipboard (share.rs).
 tauri-plugin-clipboard-manager = "2"
+# `memo://import#<code>` links open shared items (share.rs `open_link`).
+tauri-plugin-deep-link = "2"
 getrandom = "0.3"
 tokio = { version = "1", features = ["sync", "time"] }
 # In-app updates from the GitHub releases (updater.rs).

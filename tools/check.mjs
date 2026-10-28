@@ -199,7 +199,8 @@ for (const rel of SRC_JS) {
 }
 // Every key is used: quoted, or as an attribute value (data-i18n-attr
 // "title=key"), in a page or script, or in the Help data after STRINGS.
-const usage = [...SRC_JS.filter((f) => f !== 'src/lib/i18n.js'), ...SRC_HTML].map(read).join('\n')
+// Memo Web counts too: it shows notices in the windows, in their language.
+const usage = [...SRC_JS.filter((f) => f !== 'src/lib/i18n.js'), ...SRC_HTML, 'site/web.js'].map(read).join('\n')
   + i18nSrc.slice(i18nSrc.indexOf('const PLACEHOLDERS'));
 for (const k of ptKeys) {
   if (k === 'lavender') continue; // legacy colour: valid in stored notes, not offered
@@ -272,6 +273,58 @@ const DESKTOP_ONLY = {
     if (!rustCmds.includes(cmd)) fail(`check.mjs DESKTOP_ONLY lists '${cmd}', which is no longer a command`);
   }
   if (failures === before) pass(`Memo Web parity (${rustCmds.length - Object.keys(DESKTOP_ONLY).length} commands, ${Object.keys(DESKTOP_ONLY).length} desktop-only)`);
+}
+
+// Local Memo Web is only http://localhost:<port>/memo/, as in production (one
+// origin and path for Google, Microsoft and the browser's storage): 127.0.0.1
+// and the old /site/ addresses redirect there.
+{
+  const { localhostRedirect, localPath } = await import('./serve-web.mjs');
+  const hosts = [
+    ['127.0.0.1:3000', '/memo/app.html', 'http://localhost:3000/memo/app.html'],
+    ['127.0.0.1', '/', 'http://localhost/'],
+    ['localhost:3000', '/memo/app.html', null],
+  ];
+  const paths = [
+    ['/', { redirect: '/memo/app.html' }],
+    ['/memo', { redirect: '/memo/app.html' }],
+    ['/site/app.html', { redirect: '/memo/app.html' }],
+    ['/site/privacy.html', { redirect: '/memo/privacy.html' }],
+    ['/memo/app.html', { path: '/site/app.html' }],
+    ['/memo/', { path: '/site/' }],
+    ['/memo/src/windows/note/index.html', { path: '/src/windows/note/index.html' }],
+  ];
+  const bad = [
+    ...hosts.filter(([host, path, want]) => localhostRedirect(host, path) !== want),
+    ...paths.filter(([p, want]) => JSON.stringify(localPath(p)) !== JSON.stringify(want)),
+  ];
+  if (bad.length) fail(`serve-web.mjs local addresses: ${JSON.stringify(bad)}`);
+  else pass('Local Memo Web at localhost/memo/ (127.0.0.1 and /site/ redirect)');
+}
+
+// A group bar's minimum width, the same on the desktop and Memo Web.
+{
+  const rust = /const GROUP_MIN_W: f64 = ([\d.]+);/.exec(read('src-tauri/src/main.rs'));
+  const web = /const GROUP_MIN_W = (\d+);/.exec(read('site/web.js'));
+  if (!rust || !web || Number(rust[1]) !== Number(web[1])) fail(`GROUP_MIN_W differs: main.rs ${rust && rust[1]} vs site/web.js ${web && web[1]}`);
+  else pass(`Group bar minimum width (${web[1]})`);
+}
+
+// Share links: the desktop app and Memo Web make the same ones.
+{
+  const shareRs = read('src-tauri/src/share.rs');
+  const webJs = read('site/web.js');
+  const rust = /const SHARE_URL: &str = "([^"]+)"/.exec(shareRs);
+  const web = /const SHARE_URL = '([^']+)'/.exec(webJs);
+  const rustLocal = /const LOCAL_SHARE_URL: &str = "([^"]+)"/.exec(shareRs);
+  const webLocal = /const LOCAL_SHARE_URL = '([^']+)'/.exec(webJs);
+  const serve = read('tools/serve-web.mjs');
+  if (!rust || !web || !rustLocal || !webLocal) fail('SHARE_URL / LOCAL_SHARE_URL not found in share.rs or site/web.js');
+  else if (rust[1] !== web[1]) fail(`SHARE_URL differs: share.rs ${rust[1]} vs site/web.js ${web[1]}`);
+  else if (rustLocal[1] !== webLocal[1]) fail(`LOCAL_SHARE_URL differs: share.rs ${rustLocal[1]} vs site/web.js ${webLocal[1]}`);
+  else if (!/^http:\/\/localhost:3000\/memo\/app\.html#$/.test(rustLocal[1]) || !/process\.env\.PORT \|\| 3000/.test(serve)) {
+    fail(`LOCAL_SHARE_URL ${rustLocal[1]} must be where npm run web serves Memo Web (localhost:3000/memo/app.html)`);
+  } else pass(`Share links (${rust[1]}; local ${rustLocal[1]})`);
 }
 
 if (failures > 0) {

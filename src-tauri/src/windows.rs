@@ -393,8 +393,6 @@ pub(crate) fn track_geometry(app: &AppHandle, window: &WebviewWindow) {
             // Coming back to Memo: fetch what changed on other computers.
             WindowEvent::Focused(true) => {
                 sync::on_focus();
-                // A shared memory, board or group in the clipboard is offered.
-                share::on_focus(&app, &win);
             }
             WindowEvent::Focused(false) => {
                 if Kind::Note.is(&win) {

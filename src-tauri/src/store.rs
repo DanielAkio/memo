@@ -222,6 +222,14 @@ struct FileData {
     default_group_color: Option<String>,
     /// Name new groups start with; empty = unnamed.
     default_group_title: String,
+    /// Colour new boards start with (`RANDOM_COLOR` = a random label for
+    /// each); `None` = no colour.
+    default_board_color: Option<String>,
+    /// Name new boards start with; empty = unnamed.
+    default_board_title: String,
+    /// Columns new boards start with; `None` = the language's own (To Do,
+    /// In Progress, Done).
+    default_board_columns: Option<Vec<ColumnDefault>>,
     notes: Vec<Note>,
     /// Groups of notes (compact bars that show or hide their notes).
     groups: Vec<Group>,
@@ -310,6 +318,9 @@ pub struct SettingsDoc {
     pub default_html: String,
     pub default_group_color: Option<String>,
     pub default_group_title: String,
+    pub default_board_color: Option<String>,
+    pub default_board_title: String,
+    pub default_board_columns: Option<Vec<ColumnDefault>>,
     pub updated_at: u64,
 }
 
@@ -424,6 +435,27 @@ pub struct BoardColumn {
     /// Memories shown folded (title only) in this column.
     pub collapsed: Vec<String>,
 }
+
+/// A column new boards start with (Settings → Defaults → Board).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ColumnDefault {
+    pub name: String,
+    pub color: String,
+}
+
+impl ColumnDefault {
+    /// Name cut to `BOARD_NAME_MAX`, unknown colours dropped.
+    pub fn clean(&self) -> Self {
+        ColumnDefault {
+            name: self.name.trim().chars().take(BOARD_NAME_MAX).collect(),
+            color: if is_valid_color(&self.color) { self.color.clone() } else { String::new() },
+        }
+    }
+}
+
+/// At most this many default columns.
+pub const DEFAULT_COLUMNS_MAX: usize = 20;
 
 /// A kanban board (Trello-like) containing status columns with memories.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1191,6 +1223,44 @@ impl Store {
         self.mark_dirty();
     }
 
+    /// Colour (`""` = none, `RANDOM_COLOR`, a label or `#rrggbb`), name and
+    /// columns (`None` = the language's own) new boards start with.
+    pub fn board_defaults(&self) -> (String, String, Option<Vec<ColumnDefault>>) {
+        let data = self.data.lock().unwrap();
+        let color = match &data.default_board_color {
+            Some(c) if c == RANDOM_COLOR || is_valid_color(c) => c.clone(),
+            _ => String::new(),
+        };
+        (color, data.default_board_title.clone(), data.default_board_columns.clone())
+    }
+
+    /// `""` = new boards start with no colour.
+    pub fn set_default_board_color(&self, color: &str) {
+        let mut data = self.data.lock().unwrap();
+        data.default_board_color = (!color.is_empty()).then(|| color.to_string());
+        data.defaults_updated_at = now_ms();
+        drop(data);
+        self.mark_dirty();
+    }
+
+    pub fn set_default_board_title(&self, title: String) {
+        let mut data = self.data.lock().unwrap();
+        data.default_board_title = title;
+        data.defaults_updated_at = now_ms();
+        drop(data);
+        self.mark_dirty();
+    }
+
+    /// `None` goes back to the language's columns.
+    pub fn set_default_board_columns(&self, columns: Option<Vec<ColumnDefault>>) {
+        let mut data = self.data.lock().unwrap();
+        data.default_board_columns =
+            columns.map(|c| c.iter().take(DEFAULT_COLUMNS_MAX).map(ColumnDefault::clean).collect());
+        data.defaults_updated_at = now_ms();
+        drop(data);
+        self.mark_dirty();
+    }
+
     pub fn set_default_content(&self, text: String, html: String) {
         let mut data = self.data.lock().unwrap();
         data.default_text = text;
@@ -1282,26 +1352,53 @@ impl Store {
         default_cols: Vec<String>,
         pos: Option<(i32, i32)>,
     ) -> Board {
+        let columns = default_cols.into_iter().map(|name| ColumnDefault { name, color: String::new() });
+        self.insert_board(name.unwrap_or_default(), None, columns.collect(), pos)
+    }
+
+    /// New board with the defaults chosen in Settings: name, colour and
+    /// columns (`lang_cols`, the language's own, when none are chosen).
+    pub fn create_default_board(&self, lang_cols: Vec<String>, pos: Option<(i32, i32)>) -> Board {
+        let (color, title, columns) = self.board_defaults();
+        let columns = columns.unwrap_or_else(|| {
+            lang_cols.into_iter().map(|name| ColumnDefault { name, color: String::new() }).collect()
+        });
+        self.insert_board(title, Some(color), columns, pos)
+    }
+
+    /// `color`: `None` = none, `RANDOM_COLOR` = the least used label.
+    fn insert_board(
+        &self,
+        name: String,
+        color: Option<String>,
+        columns: Vec<ColumnDefault>,
+        pos: Option<(i32, i32)>,
+    ) -> Board {
         let board = {
             let mut data = self.data.lock().unwrap();
             let seq = data.next_board_seq.max(1);
             data.next_board_seq = seq + 1;
             let now = now_ms();
-            let columns = default_cols
+            let color = match color {
+                Some(c) if c == RANDOM_COLOR => random_color(data.boards.iter().map(|b| b.color.as_str())),
+                Some(c) => c,
+                None => String::new(),
+            };
+            let columns = columns
                 .into_iter()
                 .enumerate()
-                .map(|(i, col_name)| BoardColumn {
+                .map(|(i, col)| BoardColumn {
                     id: format!("col-{}", i + 1),
-                    name: col_name,
-                    color: String::new(),
+                    name: col.name,
+                    color: col.color,
                     note_ids: Vec::new(),
                     ..Default::default()
                 })
                 .collect();
             let board = Board {
                 id: format!("{:x}-b{}", now_nanos(), seq),
-                name: name.unwrap_or_default(),
-                color: String::new(),
+                name,
+                color,
                 columns,
                 x: pos.map(|p| p.0),
                 y: pos.map(|p| p.1),
@@ -1361,12 +1458,22 @@ impl Store {
         self.mark_dirty();
     }
 
+    /// The board is as it was created: no name beyond the default one, the
+    /// default colour (with random colours: the one it was given, i.e. never
+    /// edited), and no memories.
     pub fn is_pristine_board(&self, id: &str) -> bool {
         let Some(board) = self.board(id) else {
             return false;
         };
-        board.name.trim().is_empty()
-            && board.color.is_empty()
+        let (color, title, _) = self.board_defaults();
+        let name = board.name.trim();
+        let default_color = if color == RANDOM_COLOR {
+            RANDOM_COLORS.contains(&board.color.as_str()) && board.updated_at == board.created_at
+        } else {
+            board.color == color
+        };
+        (name.is_empty() || name == title.trim())
+            && default_color
             && board.columns.iter().all(|c| c.note_ids.is_empty())
     }
 
@@ -1521,6 +1628,9 @@ impl Store {
                 default_html: data.default_html.clone(),
                 default_group_color: data.default_group_color.clone(),
                 default_group_title: data.default_group_title.clone(),
+                default_board_color: data.default_board_color.clone(),
+                default_board_title: data.default_board_title.clone(),
+                default_board_columns: data.default_board_columns.clone(),
                 updated_at: data.defaults_updated_at,
             },
         }
@@ -1690,6 +1800,13 @@ impl Store {
         data.default_html = doc.default_html.clone();
         data.default_group_color = doc.default_group_color.clone().filter(|c| is_valid_color(c));
         data.default_group_title = doc.default_group_title.chars().take(GROUP_NAME_MAX).collect();
+        data.default_board_color =
+            doc.default_board_color.clone().filter(|c| c == RANDOM_COLOR || is_valid_color(c));
+        data.default_board_title = doc.default_board_title.chars().take(BOARD_NAME_MAX).collect();
+        data.default_board_columns = doc
+            .default_board_columns
+            .as_ref()
+            .map(|c| c.iter().take(DEFAULT_COLUMNS_MAX).map(ColumnDefault::clean).collect());
         data.defaults_updated_at = doc.updated_at;
         drop(data);
         self.mark_dirty();
@@ -1849,6 +1966,43 @@ mod tests {
         let boards: Vec<String> = store.boards().into_iter().map(|b| b.id).collect();
         assert_eq!(boards, vec![live.id], "only the trashed board goes");
         assert!(store.get(&note.id).is_some(), "its memories stay");
+    }
+
+    #[test]
+    fn new_boards_start_with_the_board_defaults() {
+        let dir = temp_dir("board-defaults");
+        let store = Store::load(dir.join("notes.json"));
+        let lang = || vec!["To Do".to_string(), "Done".to_string()];
+        // Nothing chosen: no name, no colour, the language's columns.
+        let plain = store.create_default_board(lang(), None);
+        assert_eq!((plain.name.as_str(), plain.color.as_str()), ("", ""));
+        assert_eq!(plain.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["To Do", "Done"]);
+        assert!(store.is_pristine_board(&plain.id));
+
+        store.set_default_board_color("teal");
+        store.set_default_board_title("Sprint".into());
+        let col = |name: &str, color: &str| ColumnDefault { name: name.into(), color: color.into() };
+        store.set_default_board_columns(Some(vec![col("Ideas", "coral"), col(" Now ", "nope")]));
+        let board = store.create_default_board(lang(), None);
+        assert_eq!((board.name.as_str(), board.color.as_str()), ("Sprint", "teal"));
+        let cols: Vec<_> = board.columns.iter().map(|c| (c.name.as_str(), c.color.as_str())).collect();
+        assert_eq!(cols, [("Ideas", "coral"), ("Now", "")], "names trimmed, unknown colours dropped");
+        assert!(store.is_pristine_board(&board.id), "a board with only the defaults is untouched");
+
+        // They are saved, and travel with the other defaults.
+        store.flush();
+        let again = Store::load(dir.join("notes.json"));
+        assert_eq!(again.board_defaults(), store.board_defaults());
+        let doc = store.sync_snapshot().settings;
+        assert_eq!(doc.default_board_title, "Sprint");
+
+        // Random gives each new board a label; None goes back to the language's columns.
+        store.set_default_board_color(RANDOM_COLOR);
+        store.set_default_board_columns(None);
+        let random = store.create_default_board(lang(), None);
+        assert!(RANDOM_COLORS.contains(&random.color.as_str()));
+        assert_eq!(random.columns.len(), 2);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

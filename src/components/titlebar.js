@@ -15,8 +15,9 @@
 //                = can't rename yet), how to show a new one (the bar saves it
 //                with `rename`, the same command for every window), and hooks
 //                around the editing (onEnd runs after, saved or not)
-//   buttons      { elementId: onClick } (✕ #closeBtn and #trashBtn are
-//                wired by the bar: close() / trash())
+//   buttons      { elementId: onClick } (✕ #closeBtn, #trashBtn and the
+//                share link #shareBtn are wired by the bar: close() / trash()
+//                / MemoShare.copy())
 //   beforeLeave() before closing or trashing (save pending text…); false
 //                keeps the window open
 //   onNew        Mod+N (ignored while renaming)
@@ -42,6 +43,9 @@ class TitleBar {
     const trashBtn = o.titlebar.querySelector('#trashBtn');
     if (closeBtn) closeBtn.addEventListener('click', () => this.close());
     if (trashBtn) trashBtn.addEventListener('click', () => this.trash());
+    // Notes, boards and group bars: the item's link to the clipboard.
+    const shareBtn = o.titlebar.querySelector('#shareBtn');
+    if (shareBtn) shareBtn.addEventListener('click', () => window.MemoShare.copy());
     if (o.rename) {
       o.rename.input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); this.finishRename(true); }

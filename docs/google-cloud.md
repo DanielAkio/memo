@@ -32,7 +32,7 @@ selected (here: `memo`):
 **Clients → Create client**: application type **Desktop app**, name `Memo desktop`.
 Copy the **client ID** and **client secret**.
 
-For the browser web app (`site/app.html`), also create a second client in the same project: application type **Web application**, name `Memo web`, with Authorized JavaScript origins `https://danielakio.github.io` and `http://127.0.0.1:3000` (both clients share the same `appDataFolder` in Google Drive). Set its client ID in `MEMO_GOOGLE_WEB_CLIENT_ID` locally or `GOOGLE_WEB_CLIENT_ID` in GitHub Actions secrets/variables.
+For the browser web app (`site/app.html`), also create a second client in the same project: application type **Web application**, name `Memo web`, with Authorized JavaScript origins `https://danielakio.github.io` and `http://localhost:3000` (local Memo Web runs only on `localhost`; `npm run web` redirects `127.0.0.1` there) (both clients share the same `appDataFolder` in Google Drive). Set its client ID in `MEMO_GOOGLE_WEB_CLIENT_ID` locally or `GOOGLE_WEB_CLIENT_ID` in GitHub Actions secrets/variables.
 
 For desktop apps Google does not treat the secret as confidential (it ships inside
 the app), but keep both out of the repository and of chats anyway: they are read

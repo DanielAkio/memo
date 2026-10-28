@@ -1,8 +1,8 @@
-// MemoShare: sharing memories, boards and groups through the clipboard
-// (share.rs), shown with components/toast.js: "Copied" for a moment after
-// "Share (copy)", and the offer to import the shared item the clipboard
-// holds (share-available, to every window, until imported or dismissed),
-// with Import and ✕.
+// MemoShare: sharing memories, boards and groups as a link (share.rs),
+// shown with components/toast.js: "Link copied" for a moment after "Share
+// link", and the offer to import the item of a link opened (share-available,
+// to every window, until imported or dismissed), with Import and ✕. (Memo
+// Web asks where to import a link's item in a dialog instead, web.js.)
 (function () {
   const t = (k, v) => window.MemoI18n.t(k, v);
   let invoke = null;
@@ -41,7 +41,7 @@
       // Opened while an item is offered: shows it too.
       invoke('share_offer').then(offer).catch((err) => console.error('share_offer', err));
     },
-    // "Share (copy)": the text goes to the clipboard (share.rs writes it),
+    // "Share link": the link goes to the clipboard (share.rs writes it),
     // `args` = { kind, id } outside the item's own window.
     async copy(args) {
       try {

@@ -17,8 +17,6 @@
   const search = $('search');
   const trashBar = $('trashBar');
   const emptyTrashBtn = $('emptyTrash');
-  const customColor = $('customColor');
-  const customSwatch = document.querySelector('#defaultSwatches .swatch[data-color="custom"]');
 
   const DAY_MS = 86_400_000;
   const TRASH_DAYS = 30;
@@ -173,7 +171,7 @@
     const toUpdate = view === 'settings' && scrollToUpdate;
     if (toUpdate) showSection('application');
     renderSections();
-    renderDefaultColor();
+    notePane.show(defaultColor);
     if (view === 'settings') fitSettings();
     if (toUpdate) {
       scrollToUpdate = false;
@@ -449,22 +447,6 @@
     return noteBase(note, purgeLabel(note.trashedAt), actions);
   }
 
-  // ---------------------------------------------------- default colour
-
-  function renderDefaultColor() {
-    MemoColor.mark($('defaultSwatches'), defaultColor);
-  }
-
-  async function setDefaultColor(color) {
-    defaultColor = color;
-    renderDefaultColor();
-    try {
-      await invoke('set_default_color', { color });
-    } catch (err) {
-      console.error('set_default_color', err);
-    }
-  }
-
   // ----------------------------------------------------------------- data
 
   async function load() {
@@ -483,87 +465,241 @@
     render();
   }
 
-  // ------------------------------------------- default title and text
-  // The default text is edited with the note editor itself, embedded in an
-  // <iframe> (index.html?defaults) that loads and saves the content on its
-  // own. Only the title is handled here.
+  // ----------------------------------------------------------- defaults
+  // Settings → Defaults: what new memories, groups and boards start with,
+  // one pane each with the same rows (colour, title, then their own). The
+  // memory's text is the note editor itself, embedded in an <iframe>
+  // (index.html?defaults), which loads and saves on its own.
 
-  // ----------------------------------------------------- group defaults
-  // Colour and name new groups start with (by default a random label for
-  // each group, 'random', and unnamed like a new note).
-
-  const groupSwatches = $('groupSwatches');
-  const groupCustomSwatch = groupSwatches.querySelector('.swatch[data-color="custom"]');
-  const groupCustomColor = $('groupCustomColor');
-  const groupDefaultTitle = $('groupDefaultTitle');
-  let groupDefaultColor = 'random';
-  let groupTitleTimer = null;
-
-  function renderGroupDefaultColor() {
-    MemoColor.mark(groupSwatches, groupDefaultColor);
+  // A pane's colour swatches and title field: the colour shows at once and
+  // is saved; the title shortly after typing stops, and when leaving it.
+  function defaultsPane({ swatches, input, title, setColor, setTitle, onColor }) {
+    const custom = swatches.querySelector('.swatch[data-color="custom"]');
+    const pane = {
+      color: '',
+      show(color) {
+        pane.color = color;
+        MemoColor.mark(swatches, color);
+      },
+    };
+    const pick = (color) => {
+      pane.show(color);
+      if (onColor) onColor(color);
+      invoke(setColor, { color }).catch((err) => console.error(setColor, err));
+    };
+    swatches.addEventListener('click', (e) => {
+      const sw = e.target.closest('.swatch');
+      if (!sw) return;
+      if (sw === custom) {
+        input.value = MemoColor.isCustom(pane.color) ? pane.color : '#f2c94c';
+        MemoColorPicker.open(input, sw);
+        return;
+      }
+      pick(sw.dataset.color);
+    });
+    input.addEventListener('change', () => pick(input.value.toLowerCase()));
+    let timer = null;
+    const flush = () => {
+      clearTimeout(timer);
+      invoke(setTitle, { title: title.value }).catch((err) => console.error(setTitle, err));
+    };
+    title.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(flush, 400);
+    });
+    title.addEventListener('change', flush);
+    return pane;
   }
 
-  function setGroupDefaultColor(color) {
-    groupDefaultColor = color;
-    renderGroupDefaultColor();
-    invoke('set_default_group_color', { color }).catch((err) => console.error('set_default_group_color', err));
-  }
-
-  async function loadGroupDefaults() {
-    try {
-      [groupDefaultColor, groupDefaultTitle.value] = await invoke('get_group_defaults');
-    } catch (err) {
-      console.error('get_group_defaults', err);
-    }
-    renderGroupDefaultColor();
-  }
-
-  function flushGroupTitle() {
-    clearTimeout(groupTitleTimer);
-    invoke('set_default_group_title', { title: groupDefaultTitle.value })
-      .catch((err) => console.error('set_default_group_title', err));
-  }
-
-  groupSwatches.addEventListener('click', (e) => {
-    const sw = e.target.closest('.swatch');
-    if (!sw) return;
-    if (sw === groupCustomSwatch) {
-      groupCustomColor.value = MemoColor.isCustom(groupDefaultColor) ? groupDefaultColor : '#f2c94c';
-      MemoColorPicker.open(groupCustomColor, sw);
-      return;
-    }
-    setGroupDefaultColor(sw.dataset.color);
+  // Memories: no colour by default (the colour comes with list_notes).
+  const notePane = defaultsPane({
+    swatches: $('defaultSwatches'),
+    input: $('customColor'),
+    title: $('defaultTitle'),
+    setColor: 'set_default_color',
+    setTitle: 'set_default_title',
+    onColor: (color) => { defaultColor = color; },
   });
-  groupCustomColor.addEventListener('change', () => setGroupDefaultColor(groupCustomColor.value.toLowerCase()));
-  groupDefaultTitle.addEventListener('input', () => {
-    clearTimeout(groupTitleTimer);
-    groupTitleTimer = setTimeout(flushGroupTitle, 400);
+  // Groups: a random label for each by default.
+  const groupPane = defaultsPane({
+    swatches: $('groupSwatches'),
+    input: $('groupCustomColor'),
+    title: $('groupDefaultTitle'),
+    setColor: 'set_default_group_color',
+    setTitle: 'set_default_group_title',
   });
-  groupDefaultTitle.addEventListener('change', flushGroupTitle);
-
-  const defaultTitle = $('defaultTitle');
-  let defaultsTimer = null;
+  // Boards: no colour by default, and their columns.
+  const boardPane = defaultsPane({
+    swatches: $('boardSwatches'),
+    input: $('boardCustomColor'),
+    title: $('boardDefaultTitle'),
+    setColor: 'set_default_board_color',
+    setTitle: 'set_default_board_title',
+  });
 
   async function loadDefaults() {
     try {
-      [defaultTitle.value] = await invoke('get_new_note_defaults');
+      let groupColor, boardColor;
+      [[$('defaultTitle').value], [groupColor, $('groupDefaultTitle').value], [boardColor, $('boardDefaultTitle').value, defColumns.list]] =
+        await Promise.all([invoke('get_new_note_defaults'), invoke('get_group_defaults'), invoke('get_board_defaults')]);
+      groupPane.show(groupColor);
+      boardPane.show(boardColor);
     } catch (err) {
-      console.error('get_new_note_defaults', err);
+      console.error('defaults', err);
+    }
+    renderDefColumns();
+  }
+
+  // The columns new boards start with: `list` null = the language's own
+  // (To Do, In Progress, Done), shown as such until one is changed; then
+  // Restore goes back to them.
+  const defColumns = { list: null };
+  const langColumns = () => (I18n.lang === 'en'
+    ? ['To Do', 'In Progress', 'Done']
+    : ['A Fazer', 'Em Andamento', 'Concluído']).map((name) => ({ name, color: '' }));
+  const columnsNow = () => defColumns.list || langColumns();
+  let columnsTimer = null;
+
+  function saveDefColumns(list) {
+    defColumns.list = list;
+    clearTimeout(columnsTimer);
+    columnsTimer = setTimeout(() => {
+      invoke('set_default_board_columns', { columns: defColumns.list })
+        .catch((err) => console.error('set_default_board_columns', err));
+    }, list ? 300 : 0);
+  }
+
+  function renderDefColumns() {
+    const ol = $('boardDefaultColumns');
+    const cols = columnsNow();
+    ol.replaceChildren(...cols.map((col, i) => {
+      const li = el('li', 'def-column');
+      li.dataset.index = i;
+      const dot = el('button', 'col-dot card-dot');
+      dot.type = 'button';
+      dot.dataset.act = 'color';
+      MemoColor.paint(dot, col.color);
+      dot.setAttribute('aria-label', t('columnColor'));
+      const name = el('input', 'field');
+      name.type = 'text';
+      name.maxLength = 60;
+      name.spellcheck = false;
+      name.value = col.name;
+      name.placeholder = t('untitled');
+      name.dataset.act = 'name';
+      const btn = (act, text, label, off) => {
+        const b = el('button', 'btn', text);
+        b.type = 'button';
+        b.dataset.act = act;
+        b.disabled = off;
+        b.setAttribute('aria-label', t(label));
+        b.title = t(label);
+        return b;
+      };
+      li.append(dot, name, btn('up', '↑', 'moveUp', i === 0), btn('down', '↓', 'moveDown', i === cols.length - 1),
+        btn('remove', '✕', 'delete', false));
+      return li;
+    }));
+    $('restoreDefaultColumns').hidden = !defColumns.list;
+  }
+
+  $('boardDefaultColumns').addEventListener('input', (e) => {
+    const li = e.target.closest('.def-column');
+    if (!li || e.target.dataset.act !== 'name') return;
+    const list = columnsNow().map((c) => ({ ...c }));
+    list[li.dataset.index].name = e.target.value;
+    saveDefColumns(list);
+    $('restoreDefaultColumns').hidden = false;
+  });
+  $('boardDefaultColumns').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act]');
+    const li = e.target.closest('.def-column');
+    if (!btn || !li) return;
+    const i = Number(li.dataset.index);
+    const list = columnsNow().map((c) => ({ ...c }));
+    const act = btn.dataset.act;
+    if (act === 'color') {
+      openDefColumnColor(i, btn);
+      return;
+    }
+    if (act === 'up' && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
+    else if (act === 'down' && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
+    else if (act === 'remove') list.splice(i, 1);
+    else return;
+    saveDefColumns(list);
+    renderDefColumns();
+  });
+  $('addDefaultColumn').addEventListener('click', () => {
+    // A new column starts unnamed, like one added on a board.
+    saveDefColumns([...columnsNow().map((c) => ({ ...c })), { name: '', color: '' }]);
+    renderDefColumns();
+    const names = $('boardDefaultColumns').querySelectorAll('input');
+    names[names.length - 1].focus();
+  });
+  $('restoreDefaultColumns').addEventListener('click', () => {
+    saveDefColumns(null);
+    renderDefColumns();
+  });
+
+  // A default column's colour: the same swatches as a board column's.
+  let colorColumn = -1;
+  const defColumnColors = new ColorMenu({
+    frame,
+    menu: $('defColumnMenu'),
+    input: $('defColumnCustomColor'),
+    current: () => (colorColumn < 0 ? null : columnsNow()[colorColumn].color),
+    onPick: (color) => {
+      const list = columnsNow().map((c) => ({ ...c }));
+      list[colorColumn].color = color;
+      saveDefColumns(list);
+      renderDefColumns();
+    },
+    save: () => {},
+  });
+
+  function openDefColumnColor(i, dot) {
+    if (defColumnColors.isOpen && colorColumn === i) {
+      defColumnColors.close();
+      return;
+    }
+    colorColumn = i;
+    defColumnColors.render(columnsNow()[i].color);
+    const menu = $('defColumnMenu');
+    const f = frame.getBoundingClientRect();
+    const r = dot.getBoundingClientRect();
+    menu.style.top = `${Math.round(r.bottom - f.top + 6)}px`;
+    menu.style.left = `${Math.max(6, Math.round(r.left - f.left - 6))}px`;
+    defColumnColors.open(dot);
+  }
+
+  // Memória · Grupo · Quadro: one pane at a time (the last one chosen is
+  // remembered here); a search shows the rows that match in all of them.
+  let defPane = 'note';
+  try {
+    defPane = localStorage.getItem('memo.defaultsPane') || 'note';
+  } catch {}
+
+  function renderDefPanes() {
+    const searching = Boolean(search.value.trim());
+    for (const pane of document.querySelectorAll('.def-pane')) {
+      pane.hidden = !searching && pane.dataset.pane !== defPane;
+    }
+    $('defaultsSwitch').hidden = searching;
+    for (const seg of $('defaultsSwitch').querySelectorAll('.seg')) {
+      seg.setAttribute('aria-checked', String(seg.dataset.pane === defPane));
     }
   }
 
-  function flushDefaults() {
-    clearTimeout(defaultsTimer);
-    invoke('set_default_title', { title: defaultTitle.value })
-      .catch((err) => console.error('set_default_title', err));
-  }
-
-  // Saves on its own, shortly after typing stops, and when leaving the field.
-  defaultTitle.addEventListener('input', () => {
-    clearTimeout(defaultsTimer);
-    defaultsTimer = setTimeout(flushDefaults, 400);
+  $('defaultsSwitch').addEventListener('click', (e) => {
+    const seg = e.target.closest('.seg');
+    if (!seg) return;
+    defPane = seg.dataset.pane;
+    try {
+      localStorage.setItem('memo.defaultsPane', defPane);
+    } catch {}
+    renderDefPanes();
+    fitSettings();
   });
-  defaultTitle.addEventListener('change', flushDefaults);
 
   // Several changes in a row (typing in a note) become a single reload.
   function scheduleLoad() {
@@ -671,6 +807,7 @@
     const panel = panels[view];
     if (!panel) return;
     const q = fold(search.value.trim());
+    renderDefPanes();
     // The Help intro and welcome button only above the sections, not results.
     $('helpView').querySelector('.help-top').hidden = Boolean(q);
     let found = 0;
@@ -791,18 +928,6 @@
       console.error(command, err);
     }
   });
-
-  $('defaultSwatches').addEventListener('click', (e) => {
-    const sw = e.target.closest('.swatch');
-    if (!sw) return;
-    if (sw === customSwatch) {
-      customColor.value = MemoColor.isCustom(defaultColor) ? defaultColor : '#f2c94c';
-      MemoColorPicker.open(customColor, sw);
-      return;
-    }
-    setDefaultColor(sw.dataset.color);
-  });
-  customColor.addEventListener('change', () => setDefaultColor(customColor.value.toLowerCase()));
 
   $('helpBtn').addEventListener('click', () => {
     invoke('show_welcome').catch((err) => console.error('show_welcome', err));
@@ -1097,6 +1222,7 @@
     pin: PIN_SVG,
     'pin-on': PIN_SVG,
     plus: '<path d="M8 3.25v9.5M3.25 8h9.5"/>',
+    share: '<path d="M6.75 9.25a2.5 2.5 0 0 0 3.54 0l2-2a2.5 2.5 0 0 0-3.54-3.54l-.75.75"/><path d="M9.25 6.75a2.5 2.5 0 0 0-3.54 0l-2 2a2.5 2.5 0 0 0 3.54 3.54l.75-.75"/>',
     manager: '<rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2"/><path d="M5.25 6h5.5M5.25 8.25h5.5M5.25 10.5h3.25"/>',
     toggle: '<path d="M4.5 9.75 8 6.25l3.5 3.5"/>',
     'folder-plus': '<path d="M2.5 4.25a1 1 0 0 1 1-1h2.9l1.5 1.5h4.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M8 7.25v3.5M6.25 9h3.5"/>',
@@ -1175,6 +1301,7 @@
     renderCloud();
     renderUpdate();
     renderAi(aiSwitch.getAttribute('aria-checked') === 'true');
+    renderDefColumns();
     render();
   }
 
@@ -1461,7 +1588,7 @@
     // Switched to another folder's notes file: its theme, language and
     // defaults may differ, so start over.
     listen('store-replaced', () => location.reload());
-    await Promise.all([load(), loadDefaults(), loadGroupDefaults(), loadDataDir()]);
+    await Promise.all([load(), loadDefaults(), loadDataDir()]);
     if (!new URLSearchParams(location.search).has('nofocus')) {
       search.focus({ preventScroll: true });
     }

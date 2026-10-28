@@ -30,6 +30,8 @@
   const TITLEBAR_SNAP = 40;
   const MIN_W = 200;
   const MANAGER_MIN_W = 320;
+  // A group bar fits all its buttons (main.rs GROUP_MIN_W).
+  const GROUP_MIN_W = 210;
   const SNAP_GAP = 6;
   const SNAP_DISTANCE = 16;
   const SNAP_EDGE = 6;
@@ -40,6 +42,8 @@
   const ZOOM_STEP = 0.1;
   const TITLE_MAX = 80;
   const GROUP_NAME_MAX = 60;
+  const BOARD_NAME_MAX = 60;
+  const DEFAULT_COLUMNS_MAX = 20;
   const DEFAULT_TEXT_MAX = 5000;
   const COLORS = ['', 'yellow', 'green', 'coral', 'teal', 'iris', 'lavender', 'mono'];
   const RANDOM_COLORS = ['yellow', 'green', 'coral', 'teal', 'iris'];
@@ -230,6 +234,12 @@
       magnet: 'Ímã das janelas',
       syncNow: 'Sincronizar agora',
       moreCommands: 'Mais comandos',
+      shareAsk: { note: 'Importar a memória “{name}”', board: 'Importar o quadro “{name}”', group: 'Importar o grupo “{name}”' },
+      shareWhere: 'Onde você quer importar a cópia?',
+      shareHere: 'Neste navegador',
+      shareApp: 'No app do computador',
+      close: 'Fechar',
+      untitled: 'Sem título',
     },
     en: {
       newNote: 'New memory',
@@ -252,6 +262,12 @@
       magnet: 'Window magnet',
       syncNow: 'Sync now',
       moreCommands: 'More commands',
+      shareAsk: { note: 'Import the memory “{name}”', board: 'Import the board “{name}”', group: 'Import the group “{name}”' },
+      shareWhere: 'Where do you want to import the copy?',
+      shareHere: 'In this browser',
+      shareApp: 'In the desktop app',
+      close: 'Close',
+      untitled: 'Untitled',
     },
   };
 
@@ -281,6 +297,7 @@
   let activeResize = null;
   let focusedLabel = null;
   let activePip = null; // { label, pipWin }
+  let videoPip = null; // { label, video, draw }: read-only PiP (openVideoPip)
 
   // ------------------------------------------------------------- helpers
 
@@ -488,6 +505,9 @@
       defaultHtml: '',
       defaultGroupColor: 'random',
       defaultGroupTitle: '',
+      defaultBoardColor: '',
+      defaultBoardTitle: '',
+      defaultBoardColumns: null,
       defaultsUpdatedAt: 0,
       manager: { x: null, y: null, width: 560, height: 480, pinned: false, color: 'iris', layout: 'cards' },
       notes: [],
@@ -766,6 +786,21 @@
     return isValidColor(dc) ? dc : 'iris';
   }
 
+  function newBoardColor() {
+    const dc = data.defaultBoardColor || '';
+    if (dc === 'random') return randomColor(activeBoards().map((b) => b.color));
+    return isValidColor(dc) ? dc : '';
+  }
+
+  // Default columns as Store::set_default_board_columns keeps them.
+  function cleanColumnDefaults(cols) {
+    if (!Array.isArray(cols)) return null;
+    return cols.slice(0, DEFAULT_COLUMNS_MAX).map((c) => ({
+      name: String((c && c.name) || '').trim().slice(0, BOARD_NAME_MAX),
+      color: c && isValidColor(c.color) ? c.color : '',
+    }));
+  }
+
   // ---------------------------------------------------------------- events
 
   function listen(ev, cb, winObj) {
@@ -802,6 +837,7 @@
 
   function notifyNotes() {
     emit('notes-changed');
+    if (videoPip) videoPip.draw();
   }
 
   function notifyGroups() {
@@ -1040,7 +1076,7 @@
   }
 
   async function openPipForWindow(label) {
-    if (isMobile() || !('documentPictureInPicture' in window)) return false;
+    if (isMobile() || !('documentPictureInPicture' in window)) return openVideoPip(label);
     const w = wins[label];
     if (!w) return false;
     try {
@@ -1084,6 +1120,7 @@
   }
 
   function closePipForWindow(label, closeOsWin = true) {
+    if (videoPip && videoPip.label === label) closeVideoPip();
     if (!activePip || activePip.label !== label) return;
     const { pipWin } = activePip;
     activePip = null;
@@ -1095,6 +1132,150 @@
     if (closeOsWin) {
       try { pipWin.close(); } catch {}
     }
+  }
+
+  // ------------------------------------------------ read-only video PiP
+  // Phones' browsers (and some desktop ones) have no Document PiP, only a
+  // video's: a pinned memory is drawn on a canvas streamed into a <video>
+  // that floats over other apps, redrawn whenever memories change.
+  // Read-only: it is a picture; the memory is edited here.
+
+  function videoPipSupported() {
+    const v = HTMLVideoElement.prototype;
+    return typeof HTMLCanvasElement.prototype.captureStream === 'function'
+      && (typeof v.requestPictureInPicture === 'function' || typeof v.webkitSetPresentationMode === 'function');
+  }
+
+  // A memory as its window shows it, simplified: the label's bar, the
+  // title and the text (checklists as ☐ / ☑), in the window's theme.
+  function drawNoteCard(canvas, note, doc) {
+    const ctx = canvas.getContext('2d');
+    const scale = 2;
+    const W = canvas.width / scale;
+    const H = canvas.height / scale;
+    const css = getComputedStyle(doc.documentElement);
+    const tok = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+    const probe = doc.createElement('span');
+    paintLabel(probe, note.color);
+    doc.body.append(probe);
+    const label = getComputedStyle(probe).getPropertyValue('--note-color').trim();
+    probe.remove();
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.fillStyle = tok('--color-carbon', '#0f1011');
+    ctx.fillRect(0, 0, W, H);
+    if (label && label !== 'transparent') {
+      ctx.fillStyle = label;
+      ctx.fillRect(0, 0, W, 4);
+    }
+    const font = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    const pad = 14;
+    let y = pad + 16;
+    const wrap = (text, size, weight, color, maxLines) => {
+      ctx.font = `${weight} ${size}px ${font}`;
+      ctx.fillStyle = color;
+      let lines = 0;
+      for (const para of text.split('\n')) {
+        let line = '';
+        for (const word of para.split(/(\s+)/)) {
+          if (line && ctx.measureText(line + word).width > W - pad * 2) {
+            ctx.fillText(line.trimEnd(), pad, y);
+            y += size * 1.45;
+            line = word.trimStart();
+            if (++lines >= maxLines || y > H - pad) return;
+          } else {
+            line += word;
+          }
+        }
+        ctx.fillText(line, pad, y);
+        y += size * 1.45;
+        if (++lines >= maxLines || y > H - pad) return;
+      }
+    };
+    const title = (note.title || '').trim();
+    const untitled = !title && !(note.text || '').trim();
+    if (title || untitled) {
+      wrap(title || (effectiveLanguage() === 'en' ? 'Untitled' : 'Sem título'), 15, 500,
+        tok(untitled ? '--color-fog' : '--color-paper', '#ffffff'), 2);
+      y += 4;
+    }
+    const text = (note.text || '')
+      .replace(/^(\s*)\[[xX]\] /gm, '$1☑ ')
+      .replace(/^(\s*)\[ \] /gm, '$1☐ ');
+    wrap(text, 13, 400, tok('--color-mist', '#d0d6e0'), 200);
+  }
+
+  // data-color / --note-color as MemoColor.paint does (color-menu.js).
+  function paintLabel(el, color) {
+    const custom = /^#[0-9a-f]{6}$/i.test(color || '');
+    el.dataset.color = custom ? 'custom' : color || '';
+    if (custom) el.style.setProperty('--note-color', color);
+  }
+
+  async function openVideoPip(label) {
+    const w = wins[label];
+    if (!isNote(label) || !w || !videoPipSupported()) return false;
+    closeVideoPip();
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(Math.min(Math.max(w.w, 240), 420) * 2);
+    canvas.height = Math.round(Math.min(Math.max(w.h, 160), 420) * 2);
+    const draw = () => {
+      const note = findNote(idOf(label));
+      try {
+        if (note && w.f.contentDocument) drawNoteCard(canvas, note, w.f.contentDocument);
+      } catch {}
+    };
+    draw();
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    Object.assign(video.style, { position: 'fixed', left: '0', top: '0', width: '2px', height: '2px', opacity: '0', pointerEvents: 'none' });
+    video.srcObject = canvas.captureStream();
+    document.body.append(video);
+    videoPip = { label, video, draw };
+    const left = () => {
+      if (!videoPip || videoPip.video !== video) return;
+      closeVideoPip();
+      unpinFromPip(label);
+    };
+    video.addEventListener('leavepictureinpicture', left);
+    video.addEventListener('webkitpresentationmodechanged', () => {
+      if (video.webkitPresentationMode !== 'picture-in-picture') left();
+    });
+    try {
+      video.play().catch(() => {});
+      if (video.readyState < 1) {
+        await new Promise((resolve) => {
+          video.addEventListener('loadedmetadata', resolve, { once: true });
+          setTimeout(resolve, 1500);
+        });
+      }
+      if (typeof video.requestPictureInPicture === 'function') await video.requestPictureInPicture();
+      else video.webkitSetPresentationMode('picture-in-picture');
+    } catch {
+      closeVideoPip();
+      return false;
+    }
+    // It floats, but only as a picture: say so in the memory.
+    try {
+      const frame = w.f.contentWindow;
+      frame.MemoToast.flash('pip', frame.MemoI18n.t('pipReadOnly'), 4000);
+    } catch {}
+    return true;
+  }
+
+  function closeVideoPip() {
+    if (!videoPip) return;
+    const { video } = videoPip;
+    videoPip = null;
+    try {
+      if (document.pictureInPictureElement === video) document.exitPictureInPicture().catch(() => {});
+      else if (video.webkitPresentationMode === 'picture-in-picture') video.webkitSetPresentationMode('inline');
+    } catch {}
+    try {
+      for (const track of video.srcObject.getTracks()) track.stop();
+    } catch {}
+    video.remove();
   }
 
   // --------------------------------------------------------------- windows
@@ -1221,10 +1402,6 @@
             closeContextMenu();
             raiseWindow(label);
           }, true);
-          // A shared item pasted (outside a text field) or, with clipboard
-          // access granted, in the clipboard when the window gets the focus.
-          f.contentWindow.addEventListener('focus', checkClipboard);
-          f.contentDocument.addEventListener('paste', onSharePaste);
           const sub = f.contentDocument.getElementById('defaultTextFrame');
           if (sub) {
             sub.addEventListener('load', () => applyZoomToFrame(f));
@@ -1438,18 +1615,19 @@
     const pos = beside(parentLabel, Math.round(BOARD_DEFAULT_W * z), Math.round(BOARD_DEFAULT_H * z));
     const now = nowMs();
     const lang = effectiveLanguage();
-    const defaultCols = lang === 'en'
+    const defaultCols = data.defaultBoardColumns || (lang === 'en'
       ? ['To Do', 'In Progress', 'Done']
-      : ['A Fazer', 'Em Andamento', 'Concluído'];
-    const columns = defaultCols.map((name) => ({
+      : ['A Fazer', 'Em Andamento', 'Concluído']).map((name) => ({ name, color: '' }));
+    const columns = defaultCols.map((col) => ({
       id: genId(),
-      name,
+      name: col.name,
+      color: col.color || '',
       noteIds: [],
     }));
     const board = {
       id: genId(),
-      name: '',
-      color: '',
+      name: (data.defaultBoardTitle || '').trim(),
+      color: newBoardColor(),
       groupId: '',
       x: pos.x,
       y: pos.y,
@@ -1478,10 +1656,14 @@
     return b;
   }
 
-  // As created: no name, no colour, empty columns (Store::is_pristine_board).
+  // As created: no name but the default one, the default colour, empty
+  // columns (Store::is_pristine_board).
   function isPristineBoard(b) {
-    return Boolean(b) && !(b.name || '').trim() && !b.color
-      && (b.columns || []).every((c) => !(c.noteIds || []).length);
+    if (!b || !(b.columns || []).every((c) => !(c.noteIds || []).length)) return false;
+    const name = (b.name || '').trim();
+    if (name && name !== (data.defaultBoardTitle || '').trim()) return false;
+    const dc = data.defaultBoardColor || '';
+    return dc === 'random' ? RANDOM_COLORS.includes(b.color) : (b.color || '') === dc;
   }
 
   // Closed with ✕: stays among the current ones; one nobody touched is
@@ -1561,8 +1743,16 @@
   const SHARE_MAX = 60000;
   const NO_IMAGE = '<img src="memo:no-image">';
   const SHARE_CODE_RE = /memo:v1:[A-Za-z0-9_-]+/;
+  // Links to a shared item: this page with the code after the `#`, never
+  // sent to a server (share.rs SHARE_URL, checked by tools/check.mjs).
+  const SHARE_URL = 'https://danielakio.github.io/memo/app.html#';
+  // Memo Web running locally (`npm run web`, localhost or 127.0.0.1) links to
+  // itself there, on its port (share.rs LOCAL_SHARE_URL).
+  const LOCAL_SHARE_URL = 'http://localhost:3000/memo/app.html#';
+  const shareUrl = () => (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+    ? LOCAL_SHARE_URL.replace(':3000', location.port ? `:${location.port}` : '')
+    : SHARE_URL);
   let sharePending = null; // { code, payload }
-  const shareDone = new Set();
 
   const sharedNote = (n) => ({
     title: n.title || '',
@@ -1614,31 +1804,11 @@
   }
 
   const noteName = (n) => (n.title || '').trim() || ((n.text || '').split('\n').map((l) => l.trim()).find(Boolean) || '');
-  const orUntitled = (name, lang) => (name || '').trim() || (lang === 'en' ? 'Untitled' : 'Sem título');
 
   function sharedName(p) {
     if (p.kind === 'board') return (p.boards[0] && p.boards[0].name) || '';
     if (p.kind === 'group') return (p.groups[0] && p.groups[0].name) || '';
     return p.notes[0] ? noteName(p.notes[0]) : '';
-  }
-
-  function readableShare(p, lang) {
-    const image = lang === 'en' ? '[image not shared]' : '[imagem não compartilhada]';
-    const boardText = (b) => b.columns.map((c) => `\n## ${orUntitled(c.name, lang)}\n`
-      + c.notes.map((i) => (p.notes[i] ? `- ${orUntitled(noteName(p.notes[i]), lang)}\n` : '')).join('')).join('');
-    let out = '';
-    if (p.kind === 'board' && p.boards[0]) {
-      out = `${orUntitled(p.boards[0].name, lang)}\n${boardText(p.boards[0])}`;
-    } else if (p.kind === 'group' && p.groups[0]) {
-      const g = p.groups[0];
-      out = `${orUntitled(g.name, lang)}\n`
-        + g.notes.map((i) => (p.notes[i] ? `- ${orUntitled(noteName(p.notes[i]), lang)}\n` : '')).join('')
-        + g.boards.map((i) => (p.boards[i] ? `\n# ${orUntitled(p.boards[i].name, lang)}\n${boardText(p.boards[i])}` : '')).join('');
-    } else if (p.notes[0]) {
-      const n = p.notes[0];
-      out = `${n.title.trim() ? `${n.title.trim()}\n` : ''}${n.text.replace(/\[imagem\]|\[image\]/g, image)}\n`;
-    }
-    return out.trimEnd();
   }
 
   async function encodeShare(payload) {
@@ -1668,16 +1838,14 @@
     }
   }
 
-  async function shareText(kind, id) {
+  // The link to an item: only the address, with the content in its code
+  // (share.rs `share_link`).
+  async function shareLink(kind, id) {
     const payload = buildShare(kind, id);
     if (!payload) throw new Error('item not found');
     const code = await encodeShare(payload);
     if (code.length > SHARE_MAX) throw new Error('too big to share');
-    const lang = effectiveLanguage();
-    const footer = lang === 'en'
-      ? '— Shared from Memo: copy this whole message and open Memo to import it —'
-      : '— Compartilhado pelo Memo: copie esta mensagem inteira e abra o Memo para importar —';
-    return `${readableShare(payload, lang)}\n\n${footer}\n${code}`;
+    return `${shareUrl()}${code}`;
   }
 
   // The picture an image becomes, in the importing Memo's language.
@@ -1760,61 +1928,109 @@
     return Array.isArray(x) ? x : [];
   }
 
-  const shareSummary = (p) => ({ kind: p.kind, name: sharedName(p), notes: p.notes.length, boards: p.boards.length });
+  // What the offer shows.
+  const shareSummary = (pending) => {
+    const p = pending.payload;
+    return { kind: p.kind, name: sharedName(p), notes: p.notes.length, boards: p.boards.length };
+  };
 
-  // A shared code in `text` (pasted, copied here, or in the clipboard on
-  // focus with access granted) is offered in every window until imported
-  // or dismissed; the offer goes once the clipboard holds something else.
-  async function offerShared(text) {
-    const m = SHARE_CODE_RE.exec(text || '');
-    const code = m && !shareDone.has(m[0]) ? m[0] : null;
-    if ((sharePending && sharePending.code) === code) return;
-    const payload = code ? await decodeShare(code) : null;
-    sharePending = payload ? { code, payload } : null;
-    emit('share-available', payload ? shareSummary(payload) : null);
-  }
-
-  // Browsers ask before a page reads the clipboard: on focus only once the
-  // person allowed it (the menus' "Import shared item" asks, see
-  // importFromClipboard); a paste always works.
-  async function checkClipboard() {
+  // Opened from a shared link (SHARE_URL + code): one dialog asks where to
+  // import it, and the code leaves the address bar so a reload doesn't ask
+  // again.
+  async function offerSharedLink() {
+    const m = SHARE_CODE_RE.exec(location.hash);
+    if (!m) return;
     try {
-      const perm = await navigator.permissions.query({ name: 'clipboard-read' });
-      if (perm.state !== 'granted') return;
-      offerShared(await navigator.clipboard.readText());
+      history.replaceState(null, '', location.pathname + location.search);
     } catch {}
+    const payload = await decodeShare(m[0]);
+    if (payload) askWhereToImport(m[0], payload);
   }
 
-  // A paste anywhere (even in a memory's text, which still gets it) offers
-  // the shared item it carries.
-  function onSharePaste(e) {
-    offerShared(e.clipboardData && e.clipboardData.getData('text/plain'));
-  }
-  document.addEventListener('paste', onSharePaste);
-  window.addEventListener('focus', checkClipboard);
-
-  // The menus' "Import shared item": the offer, or else what the clipboard
-  // holds, even if dismissed before (the browser may ask first).
-  async function importFromClipboard(label) {
-    let payload = takeShare();
-    if (!payload) {
-      try {
-        const m = SHARE_CODE_RE.exec(await navigator.clipboard.readText());
-        if (m) {
-          shareDone.add(m[0]);
-          payload = await decodeShare(m[0]);
-        }
-      } catch {}
-    }
-    if (payload) await importShare(payload, label);
+  // The dialog: in this browser (a copy here, in the middle of the screen)
+  // or in the desktop app (`memo://import#<code>`, share.rs `open_link`,
+  // which offers it there). Its ✕, a click outside it or Esc cancel; Enter
+  // imports here.
+  function askWhereToImport(code, payload) {
+    const L = TRAY_LABELS[effectiveLanguage()];
+    const old = document.getElementById('shareDialog');
+    if (old) old.remove();
+    const back = document.createElement('div');
+    back.id = 'shareDialog';
+    back.className = 'share-dialog-back';
+    const box = document.createElement('div');
+    box.className = 'share-dialog';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'shareDialogTitle');
+    const title = document.createElement('h2');
+    title.id = 'shareDialogTitle';
+    const name = (sharedName(payload) || '').trim() || L.untitled;
+    title.textContent = (L.shareAsk[payload.kind] || L.shareAsk.note).replace('{name}', name);
+    const text = document.createElement('p');
+    text.textContent = L.shareWhere;
+    const actions = document.createElement('div');
+    actions.className = 'share-dialog-actions';
+    const close = () => {
+      back.remove();
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const here = document.createElement('button');
+    here.type = 'button';
+    here.className = 'share-dialog-btn is-primary';
+    here.dataset.choice = 'web';
+    here.textContent = L.shareHere;
+    here.addEventListener('click', () => {
+      close();
+      importShare(payload, 'manager');
+    });
+    // A link, so the browser hands it to the app registered for memo://.
+    const app = document.createElement('a');
+    app.className = 'share-dialog-btn';
+    app.dataset.choice = 'app';
+    app.href = `memo://import#${code}`;
+    app.textContent = L.shareApp;
+    app.addEventListener('click', () => setTimeout(close, 0));
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'share-dialog-close';
+    x.title = L.close;
+    x.setAttribute('aria-label', L.close);
+    x.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.25 4.25l7.5 7.5M11.75 4.25l-7.5 7.5"/></svg>';
+    x.addEventListener('click', close);
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      } else if (e.key === 'Enter') {
+        // The choice with the focus, else this browser.
+        e.preventDefault();
+        const focused = box.contains(document.activeElement) && document.activeElement.closest('[data-choice]');
+        (focused || here).click();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    back.addEventListener('mousedown', (e) => {
+      if (e.target === back) close();
+    });
+    actions.append(app, here);
+    box.append(x, title, text, actions);
+    back.append(box);
+    document.body.append(back);
+    here.focus();
   }
 
   function takeShare() {
     const pending = sharePending;
     sharePending = null;
-    if (pending) shareDone.add(pending.code);
     emit('share-available', null);
     return pending && pending.payload;
+  }
+
+  // The offer's Import, or the menus' "Import shared item".
+  async function importPendingShare(label) {
+    const payload = takeShare();
+    if (payload) await importShare(payload, label);
   }
 
   // As trash() on the desktop: a note nobody touched and a welcome copy are
@@ -2334,7 +2550,7 @@
     const px = w.x + cx * z;
     const py = w.y + cy * z;
     const wa = workArea();
-    const minW = Math.round((label === 'manager' ? MANAGER_MIN_W : MIN_W) * z);
+    const minW = Math.round((label === 'manager' ? MANAGER_MIN_W : isGroup(label) ? GROUP_MIN_W : MIN_W) * z);
     const minH = Math.round(TITLEBAR_H * z);
 
     let left = w.x;
@@ -2397,8 +2613,7 @@
 
   // The app's commands, as in the desktop tray (`full`); a titlebar menu
   // ends with the few a window needs at hand (tray.rs `app_menu_items`).
-  // "Import shared item" is always there: a browser lets a page read the
-  // clipboard only on a click like this one (or a paste).
+  // "Import shared item" while a link's item is offered, as on the desktop.
   function buildAppTrayItems(sourceLabel = null, full = true) {
     const lang = effectiveLanguage();
     const L = TRAY_LABELS[lang];
@@ -2410,7 +2625,7 @@
       { label: L.newNote, run: () => createNote({ parentLabel: sourceLabel || 'manager' }) },
       { label: L.newGroup, run: () => createGroup(sourceLabel || 'manager') },
       { label: L.newBoard, run: () => createBoard(sourceLabel || 'manager') },
-      { label: L.importShare, run: () => importFromClipboard(sourceLabel || 'manager') },
+      ...(sharePending ? [{ label: L.importShare, run: () => importPendingShare(sourceLabel || 'manager') }] : []),
     ];
     if (!full) {
       return [...create, null, { label: L.manager, run: () => openManagerWindow({ view: 'notes', scope: 'current' }) }];
@@ -3036,6 +3251,9 @@
       defaultHtml: data.defaultHtml || '',
       defaultGroupColor: data.defaultGroupColor || 'random',
       defaultGroupTitle: data.defaultGroupTitle || '',
+      defaultBoardColor: data.defaultBoardColor || null,
+      defaultBoardTitle: data.defaultBoardTitle || '',
+      defaultBoardColumns: data.defaultBoardColumns || null,
       updatedAt: data.defaultsUpdatedAt || 0,
     };
   }
@@ -3335,6 +3553,9 @@
             data.defaultHtml = doc.defaultHtml || '';
             data.defaultGroupColor = doc.defaultGroupColor || 'random';
             data.defaultGroupTitle = doc.defaultGroupTitle || '';
+            data.defaultBoardColor = doc.defaultBoardColor === 'random' || isValidColor(doc.defaultBoardColor) ? doc.defaultBoardColor : '';
+            data.defaultBoardTitle = String(doc.defaultBoardTitle || '').slice(0, BOARD_NAME_MAX);
+            data.defaultBoardColumns = cleanColumnDefaults(doc.defaultBoardColumns);
             data.defaultsUpdatedAt = doc.updatedAt || 0;
           }
           st.files[file.name] = { fileId: file.id, synced: file.stamp };
@@ -3743,18 +3964,15 @@
         const kind = args.kind || (isNote(label) ? 'note' : isBoard(label) ? 'board' : isGroup(label) ? 'group' : '');
         const id = args.id || idOf(label);
         if (!kind) throw new Error('nothing to share here');
-        const text = await shareText(kind, id);
-        await navigator.clipboard.writeText(text);
-        await offerShared(text);
-        return text;
+        const link = await shareLink(kind, id);
+        await navigator.clipboard.writeText(link);
+        return link;
       }
       case 'share_offer':
-        return sharePending ? shareSummary(sharePending.payload) : null;
-      case 'import_share': {
-        const payload = takeShare();
-        if (payload) await importShare(payload, label);
+        return sharePending ? shareSummary(sharePending) : null;
+      case 'import_share':
+        await importPendingShare(label);
         return null;
-      }
       case 'dismiss_share':
         takeShare();
         return null;
@@ -3944,6 +4162,23 @@
         return null;
       case 'set_default_group_title':
         data.defaultGroupTitle = String(args.title || '').trim().slice(0, GROUP_NAME_MAX);
+        data.defaultsUpdatedAt = nowMs();
+        markDirty(true);
+        return null;
+      case 'get_board_defaults':
+        return [data.defaultBoardColor || '', data.defaultBoardTitle || '', copy(data.defaultBoardColumns || null)];
+      case 'set_default_board_color':
+        data.defaultBoardColor = args.color === 'random' || isValidColor(args.color) ? args.color : '';
+        data.defaultsUpdatedAt = nowMs();
+        markDirty(true);
+        return null;
+      case 'set_default_board_title':
+        data.defaultBoardTitle = String(args.title || '').trim().slice(0, BOARD_NAME_MAX);
+        data.defaultsUpdatedAt = nowMs();
+        markDirty(true);
+        return null;
+      case 'set_default_board_columns':
+        data.defaultBoardColumns = cleanColumnDefaults(args.columns);
         data.defaultsUpdatedAt = nowMs();
         markDirty(true);
         return null;
@@ -4690,6 +4925,8 @@
       }
     }
 
+    await offerSharedLink();
+    window.addEventListener('hashchange', offerSharedLink);
     syncAllClouds();
     setInterval(() => syncAllClouds(), 5 * 60_000);
   }

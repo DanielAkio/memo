@@ -1003,7 +1003,7 @@ try {
       delete M.hooks.set_group_height;
       return out;
     });
-    assert.ok(res.copied.startsWith('Copiado'), `"Share" says it copied (${res.copied})`);
+    assert.ok(res.copied.startsWith('Link copiado'), `"Share link" says it copied the link (${res.copied})`);
     assert.ok(res.offer.includes('Quadro compartilhado: “Plano” · 3 memórias') && res.offer.includes('Importar'),
       `The offer names the shared board, with Import (${res.offer})`);
     assert.equal(res.everywhere, true, 'The offer shows in every window, after "Copied" where that was showing');
@@ -1203,6 +1203,104 @@ try {
   });
 
   // ------------------------------------------------ 7l. Short titlebar menus
+  await step('Titlebar: memories, boards and group bars have a share button that copies the item\'s link', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const calls = [];
+      M.hooks.copy_share = (label, a) => { calls.push([label, a || {}]); return 'http://localhost:3000/memo/app.html#memo:v1:x'; };
+      M.addNote({ id: 'sb-note', text: 'x' });
+      M.addBoard({ id: 'sb-board', name: 'B' });
+      M.addGroup({ id: 'sb-group', name: 'G' });
+      const labels = ['note-sb-note', 'board-sb-board', 'group-sb-group'];
+      await M.openWin(labels[0], '/src/windows/note/index.html', { x: 40, y: 40, w: 300, h: 260 });
+      await M.openWin(labels[1], '/src/windows/board/board.html', { x: 360, y: 40, w: 420, h: 300 });
+      await M.openWin(labels[2], '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 40 });
+      await wait(300);
+      const out = {};
+      for (const l of labels) {
+        const doc = M.frameDoc(l);
+        const btn = doc.querySelector('#titlebar #shareBtn');
+        const actions = btn ? [...btn.parentElement.children].map((b) => b.id) : [];
+        out[l] = { title: btn ? btn.title : '', firstAction: actions[0] === 'shareBtn' };
+        if (btn) btn.click();
+        await wait(100);
+        const toast = doc.querySelector('.toast[data-key="copied"]');
+        out[l].toast = toast ? toast.textContent : '';
+      }
+      out.calls = calls.map(([l]) => l);
+      delete M.hooks.copy_share;
+      for (const l of labels) M.closeWin(l);
+      return out;
+    });
+    for (const l of ['note-sb-note', 'board-sb-board', 'group-sb-group']) {
+      assert.equal(res[l].title, 'Compartilhar link', `${l} has the share button`);
+      assert.ok(res[l].firstAction, `${l}: it is the far left of the titlebar's buttons`);
+      assert.ok(res[l].toast.startsWith('Link copiado'), `${l}: a click copies the link (${res[l].toast})`);
+    }
+    assert.deepEqual(res.calls, ['note-sb-note', 'board-sb-board', 'group-sb-group'], 'Each copies its own item');
+  });
+
+  await step('Titlebar: the share button shows only while the pointer is over the titlebar; the other buttons always', async () => {
+    const labels = ['note-hv-note', 'board-hv-board', 'group-hv-group', 'group-hv-narrow'];
+    await page.evaluate(async (labels) => {
+      const M = window.Memo;
+      M.addNote({ id: 'hv-note', title: 'Uma memória com um título bem comprido', text: 'x' });
+      M.addBoard({ id: 'hv-board', name: 'B' });
+      M.addGroup({ id: 'hv-group', name: 'G' });
+      M.addGroup({ id: 'hv-narrow', name: 'N' });
+      await M.openWin(labels[0], '/src/windows/note/index.html', { x: 40, y: 40, w: 260, h: 200 });
+      await M.openWin(labels[1], '/src/windows/board/board.html', { x: 320, y: 40, w: 420, h: 200 });
+      await M.openWin(labels[2], '/src/windows/group/group.html', { x: 40, y: 280, w: 300, h: 40 });
+      // A group bar at its minimum width (main.rs GROUP_MIN_W).
+      await M.openWin(labels[3], '/src/windows/group/group.html', { x: 360, y: 280, w: 210, h: 40 });
+    }, labels);
+    await page.mouse.move(900, 500);
+    await page.waitForTimeout(150);
+    const state = (label) => page.evaluate((label) => {
+      const M = window.Memo;
+      const doc = M.frameDoc(label);
+      const actions = doc.querySelector('#titlebar .actions');
+      const name = doc.querySelector('#titlebar .win-name, #titlebar .identity');
+      const edge = doc.documentElement.clientWidth;
+      const btns = [...actions.querySelectorAll('.icon-btn')].filter((b) => !b.hidden);
+      const r = M.wins[label].f.getBoundingClientRect();
+      const visible = (b) => getComputedStyle(b).display !== 'none';
+      const always = btns.filter((b) => b.id !== 'shareBtn');
+      const share = doc.getElementById('shareBtn');
+      return {
+        always: always.length >= 3 && always.every(visible),
+        shown: visible(share),
+        hidden: !visible(share),
+        nameW: name ? name.getBoundingClientRect().width : 0,
+        fits: btns.every((b) => b.getBoundingClientRect().right <= edge + 0.5),
+        bar: { x: r.left + r.width / 2, y: r.top + 12 },
+      };
+    }, label);
+    const res = {};
+    for (const label of labels) {
+      const before = await state(label);
+      await page.mouse.move(before.bar.x, before.bar.y);
+      await page.waitForTimeout(120);
+      const over = await state(label);
+      await page.mouse.move(900, 500);
+      await page.waitForTimeout(120);
+      const after = await state(label);
+      res[label] = { before, over, after };
+    }
+    await page.evaluate((labels) => labels.forEach((l) => window.Memo.closeWin(l)), labels);
+    for (const label of labels) {
+      const { before, over, after } = res[label];
+      assert.equal(before.always && over.always && after.always, true, `${label}: +, −, ✕ (and a group's toggle) always show`);
+      assert.equal(before.hidden, true, `${label}: the share button waits for the pointer`);
+      assert.equal(over.shown, true, `${label}: the pointer over the titlebar shows them`);
+      assert.equal(over.fits, true, `${label}: they all fit in the bar`);
+      assert.equal(after.hidden, true, `${label}: it goes when the pointer leaves`);
+    }
+    assert.ok(res['note-hv-note'].before.nameW > res['note-hv-note'].over.nameW,
+      `The name has the share button's room while it is hidden (${res['note-hv-note'].before.nameW} > ${res['note-hv-note'].over.nameW})`);
+  });
+
   await step('Titlebar menus keep only the window\'s own commands (no Close, no duplicates of the app part)', async () => {
     const res = await page.evaluate(async () => {
       const M = window.Memo;
@@ -1230,35 +1328,54 @@ try {
     for (const gone of ['Fechar', 'Fechar memória', 'Nova memória', 'Trazer todas para a frente']) {
       assert.ok(!all.includes(gone), `"${gone}" is not in a titlebar's own commands (${all})`);
     }
+    for (const [label, items] of Object.entries(res)) {
+      assert.ok(!items.includes('Compartilhar link') && !items.includes('Compartilhar (copiar)'),
+        `${label}: sharing is the titlebar's button, not a menu item (${items})`);
+    }
   });
 
-  // ------------------------------------------------ Web: import from the menu, centered; a paste anywhere offers it
-  await step('Web version: "Import shared item" reads the clipboard, the copy opens centered; a paste in a memory offers it', async () => {
+  // ------------------------------------------------ Web: only a link imports (never the clipboard or a paste)
+  await step('Web version: a link\'s item is imported from its dialog, centered; a pasted or copied code is never offered', async () => {
     const webPage = await browser.newPage();
     try {
       await webPage.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: `http://127.0.0.1:${port}` });
+      // A code made by Memo Web elsewhere (the fixture share.rs reads too).
+      const code = fs.readFileSync(path.join(ROOT, 'src-tauri/tests/web-share-code.txt'), 'utf8').trim();
       await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
       await webPage.waitForSelector('iframe[name^="note-"]');
       await webPage.waitForTimeout(400);
-      // A code made by Memo Web elsewhere (the fixture share.rs reads too).
-      const elsewhere = fs.readFileSync(path.join(ROOT, 'src-tauri/tests/web-share-code.txt'), 'utf8').trim();
-      const res = await webPage.evaluate(async (elsewhere) => {
+      const res = await webPage.evaluate(async (code) => {
         const inv = window.MemoWeb.invoke;
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const out = {};
         const label = document.querySelector('.win[data-label^="note-"]').dataset.label;
-        const text = await inv(label, 'copy_share');
-        await inv(label, 'dismiss_share'); // as if copied from a chat later
-        await inv(label, 'rename', { name: 'Again' });
-        const again = await inv(label, 'copy_share');
-        await inv(label, 'dismiss_share');
-        // The titlebar menu: short, with the import.
-        await inv(label, 'show_title_menu', { items: [] });
-        const rows = [...document.querySelectorAll('#contextMenu .ctx-item')].map((b) => b.textContent);
-        out.rows = rows;
+        const doc = document.querySelector(`iframe[name="${label}"]`).contentDocument;
+        const menu = async () => {
+          await inv(label, 'show_title_menu', { items: [] });
+          return [...document.querySelectorAll('#contextMenu .ctx-item')].map((b) => b.textContent);
+        };
+        // Neither a paste, the clipboard on focus, nor copying here offers anything.
+        await navigator.clipboard.writeText(`Oi\n${code}`);
+        window.dispatchEvent(new Event('focus'));
+        const dt = new DataTransfer();
+        dt.setData('text/plain', `Oi\n${code}`);
+        doc.getElementById('editor').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+        await inv(label, 'copy_share');
+        await wait(300);
+        out.offered = await inv('manager', 'share_offer');
+        out.menuBefore = await menu();
+        document.body.click();
+        // A link opened: Esc closes its dialog with nothing imported; opened
+        // again, Enter imports it here.
         const before = new Set((await inv('manager', 'list_notes')).map((n) => n.id));
-        await navigator.clipboard.writeText(text.replace(/memo:v1:\S+/, '') + '\n' + again.match(/memo:v1:\S+/)[0]);
-        [...document.querySelectorAll('#contextMenu .ctx-item')].find((b) => b.textContent === 'Importar item compartilhado').click();
+        location.hash = code;
+        await wait(400);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await wait(100);
+        out.cancelled = [document.querySelectorAll('.share-dialog').length, (await inv('manager', 'list_notes')).length - before.size];
+        location.hash = code;
+        await wait(400);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
         await wait(600);
         const fresh = (await inv('manager', 'list_notes')).find((n) => !before.has(n.id));
         out.imported = fresh ? fresh.title : null;
@@ -1269,26 +1386,17 @@ try {
           out.dx = Math.abs(r.left + r.width / 2 - (desk.left + desk.width / 2));
           out.dy = Math.abs(r.top + r.height / 2 - (desk.top + desk.height / 2));
         }
-        // A paste inside a memory's text offers the code it carries.
-        const third = `Oi
-
-${elsewhere}`;
-        const doc = document.querySelector(`iframe[name="${label}"]`).contentDocument;
-        const dt = new DataTransfer();
-        dt.setData('text/plain', third);
-        doc.getElementById('editor').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-        await wait(300);
-        const toast = doc.querySelector('.toast[data-key="share"]');
-        out.pasteOffer = toast && !toast.hidden ? toast.textContent : '';
         return out;
-      }, elsewhere);
-      assert.ok(res.rows.includes('Importar item compartilhado') && res.rows.includes('Novo quadro'), `The titlebar menu offers to import (${res.rows})`);
+      }, code);
+      assert.equal(res.offered, null, 'A code pasted, in the clipboard or just copied is not offered');
+      assert.ok(!res.menuBefore.includes('Importar item compartilhado') && res.menuBefore.includes('Novo quadro'),
+        `No import in the menu without a link (${res.menuBefore})`);
       for (const gone of ['Tema', 'Configurações', 'Idioma', 'Lixeira']) {
-        assert.ok(!res.rows.includes(gone), `"${gone}" stays in the tray, not in a titlebar menu (${res.rows})`);
+        assert.ok(!res.menuBefore.includes(gone), `"${gone}" stays in the tray, not in a titlebar menu (${res.menuBefore})`);
       }
-      assert.equal(res.imported, 'Again', 'The menu imports the code in the clipboard');
+      assert.deepEqual(res.cancelled, [0, 0], 'Esc closes the dialog and imports nothing');
+      assert.equal(res.imported, 'Oi', 'Enter imports the link\'s item in this browser');
       assert.ok(res.dx <= 40 && res.dy <= 60, `The imported memory opens in the middle (${res.dx}, ${res.dy})`);
-      assert.ok(res.pasteOffer.includes('“Oi”'), `A paste in a memory offers the shared item (${res.pasteOffer})`);
     } finally {
       await webPage.close();
     }
@@ -1882,7 +1990,7 @@ ${elsewhere}`;
   });
 
   // ------------------------------------------------ Web: share a board and a group, import them elsewhere
-  await step('Web version: a shared board and group are imported as new copies from a pasted code', async () => {
+  await step('Web version: a shared board and group are imported as new copies from their links', async () => {
     const sender = await browser.newPage();
     const receiver = await browser.newPage();
     try {
@@ -1906,41 +2014,32 @@ ${elsewhere}`;
         const board = await inv(`board-${bid}`, 'load_board');
         board.columns[0].noteIds = [a, b];
         await inv(`board-${bid}`, 'save_board_columns', { columns: board.columns });
-        const boardText = await inv(`board-${bid}`, 'copy_share');
+        const boardLink = await inv(`board-${bid}`, 'copy_share');
         const gid = await newOne('new_group', 'list_groups', `note-${a}`);
         await inv(`group-${gid}`, 'rename', { name: 'Casa' });
         const c = await newOne('new_note', 'list_notes');
         await inv(`note-${c}`, 'rename', { name: 'Contas' });
         for (const id of [a, c]) await inv(`note-${id}`, 'set_note_group', { groupId: gid });
-        const groupText = await inv(`group-${gid}`, 'copy_share');
-        await new Promise((r) => setTimeout(r, 200));
-        const toast = document.querySelector('iframe[name="manager"]').contentDocument.querySelector('.toast[data-key="share"]');
-        const ownOffered = Boolean(toast && !toast.hidden && toast.textContent.includes('Grupo compartilhado: “Casa”'));
-        return { boardText, groupText, bid, gid, ownOffered };
+        const groupLink = await inv(`group-${gid}`, 'copy_share');
+        return { boardLink, groupLink, bid, gid };
       });
-      assert.ok(shared.boardText.startsWith('Mercado\n') && shared.boardText.includes('- Pão\n- Leite'),
-        `The board's text reads in a chat (${shared.boardText.slice(0, 80)})`);
-      assert.ok(/\nmemo:v1:[A-Za-z0-9_-]+$/.test(shared.boardText), 'The text ends with the code');
-      assert.equal(shared.ownOffered, true, 'What you just copied is offered too, while it is in the clipboard');
+      assert.ok(/^http:\/\/localhost:\d+\/memo\/app\.html#memo:v1:[A-Za-z0-9_-]+$/.test(shared.boardLink), `The board's link, nothing else (${shared.boardLink.slice(0, 80)})`);
 
       await receiver.goto(`http://127.0.0.1:${port}/site/app.html`);
       await receiver.waitForSelector('iframe[name="manager"]');
       await receiver.waitForTimeout(400);
-      const imported = await receiver.evaluate(async ({ boardText, groupText, bid, gid }) => {
+      const imported = await receiver.evaluate(async ({ boardLink, groupLink, bid, gid }) => {
         const inv = window.MemoWeb.invoke;
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const frame = document.querySelector('iframe[name="manager"]');
-        const paste = (text) => {
-          const dt = new DataTransfer();
-          dt.setData('text/plain', text);
-          frame.contentDocument.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }));
-        };
-        const toast = () => frame.contentDocument.querySelector('.toast[data-key="share"]');
+        // Opening a link: its fragment, here.
+        const open = (link) => { location.hash = link.slice(link.indexOf('#') + 1); };
+        const dialog = () => document.querySelector('.share-dialog');
         const out = {};
-        paste(boardText);
+        open(boardLink);
         await wait(300);
-        out.offer = toast() && !toast().hidden ? toast().textContent : '';
-        toast().querySelector('.toast-action').click();
+        out.offer = dialog() ? dialog().textContent : '';
+        dialog().querySelector('[data-choice="web"]').click();
         await wait(400);
         const boards = await inv('manager', 'list_boards');
         const copy = boards.find((b) => b.name === 'Mercado' && b.id !== bid);
@@ -1948,27 +2047,223 @@ ${elsewhere}`;
         const title = (id) => (notes.find((n) => n.id === id) || {}).title;
         out.board = copy ? copy.columns[0].noteIds.map(title) : null;
         out.boardOpen = Boolean(copy && document.querySelector(`.win[data-label="board-${copy.id}"]`));
-        paste(groupText);
+        open(groupLink);
         await wait(300);
-        toast().querySelector('.toast-action').click();
+        dialog().querySelector('[data-choice="web"]').click();
         await wait(400);
         const group = (await inv('manager', 'list_groups')).find((g) => g.name === 'Casa' && g.id !== gid);
         const notesAfter = await inv('manager', 'list_notes');
         out.group = group ? notesAfter.filter((n) => n.groupId === group.id).map((n) => n.title).sort() : null;
-        // The same code again is not offered twice.
-        paste(groupText);
-        await wait(300);
-        out.offeredAgain = Boolean(toast() && !toast().hidden);
+        out.addressBar = location.hash;
         return out;
       }, shared);
-      assert.ok(imported.offer.includes('Quadro compartilhado: “Mercado”'), `A pasted code is offered (${imported.offer})`);
+      assert.ok(imported.offer.includes('Importar o quadro “Mercado”'), `An opened link asks where to import (${imported.offer})`);
       assert.deepEqual(imported.board, ['Pão', 'Leite'], 'Import makes a new board with the same column of memories');
       assert.equal(imported.boardOpen, true, 'The imported board opens');
       assert.deepEqual(imported.group, ['Contas', 'Pão'], 'A group comes with its memories');
-      assert.equal(imported.offeredAgain, false, 'An imported code is not offered again');
+      assert.equal(imported.addressBar, '', 'The code leaves the address bar');
     } finally {
       await sender.close();
       await receiver.close();
+    }
+  });
+
+  // ------------------------------------------------ Web: share by link
+  await step('Web version: "Share link" makes a link; opening it asks in one dialog: this browser or the desktop app', async () => {
+    const sender = await browser.newPage();
+    const receiver = await browser.newPage();
+    try {
+      await sender.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: `http://127.0.0.1:${port}` });
+      await sender.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await sender.waitForSelector('iframe[name="manager"]');
+      const sent = await sender.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const before = new Set((await inv('manager', 'list_notes')).map((n) => n.id));
+        await inv('manager', 'new_note');
+        const id = (await inv('manager', 'list_notes')).map((n) => n.id).find((x) => !before.has(x));
+        await inv(`note-${id}`, 'rename', { name: 'Feira' });
+        const link = await inv(`note-${id}`, 'copy_share');
+        return { link, clip: await navigator.clipboard.readText() };
+      });
+      assert.equal(sent.clip, sent.link, 'The link goes to the clipboard');
+      // Memo Web running locally links to itself on localhost, at /memo/ as published.
+      assert.ok(new RegExp(`^http://localhost:${port}/memo/app\\.html#memo:v1:[A-Za-z0-9_-]+$`).test(sent.link),
+        `Only the link, on the local Memo Web (${sent.link.slice(0, 90)})`);
+
+      const hash = sent.link.slice(sent.link.indexOf('#'));
+      await receiver.goto(`http://127.0.0.1:${port}/site/app.html${hash}`);
+      await receiver.waitForSelector('iframe[name="manager"]');
+      await receiver.waitForTimeout(600);
+      const got = await receiver.evaluate(async (code) => {
+        const inv = window.MemoWeb.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const dialogs = document.querySelectorAll('.share-dialog');
+        const dialog = dialogs[0];
+        const toast = document.querySelector('iframe[name="manager"]').contentDocument.querySelector('.toast[data-key="share"]');
+        const out = {
+          hash: location.hash,
+          dialogs: dialogs.length,
+          title: dialog ? dialog.querySelector('h2').textContent : '',
+          choices: dialog ? [...dialog.querySelectorAll('[data-choice]')].map((b) => [b.dataset.choice, b.textContent]) : [],
+          appHref: dialog ? dialog.querySelector('[data-choice="app"]').getAttribute('href') : '',
+          buttons: dialog ? dialog.querySelectorAll('.share-dialog-btn').length : 0,
+          hasX: Boolean(dialog && dialog.querySelector('.share-dialog-close')),
+          toast: Boolean(toast && !toast.hidden),
+        };
+        // The ✕ and a click outside cancel; then open it again.
+        dialog.querySelector('.share-dialog-close').click();
+        out.afterX = [document.querySelectorAll('.share-dialog').length, (await inv('manager', 'list_notes')).some((n) => n.title === 'Feira')];
+        location.hash = code;
+        await wait(400);
+        const back = document.querySelector('.share-dialog-back');
+        back.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        out.afterOutside = document.querySelectorAll('.share-dialog').length;
+        location.hash = code;
+        await wait(400);
+        document.querySelector('.share-dialog [data-choice="web"]').click();
+        await wait(400);
+        out.after = document.querySelectorAll('.share-dialog').length;
+        out.imported = (await inv('manager', 'list_notes')).some((n) => n.title === 'Feira');
+        return out;
+      }, hash.slice(1));
+      assert.equal(got.hash, '', 'The code leaves the address bar');
+      assert.equal(got.dialogs, 1, 'Opening the link shows one dialog');
+      assert.equal(got.title, 'Importar a memória “Feira”');
+      assert.deepEqual(got.choices, [['app', 'No app do computador'], ['web', 'Neste navegador']],
+        'It asks: this browser or the desktop app');
+      assert.equal(got.buttons, 2, 'Only two buttons');
+      assert.equal(got.hasX, true, 'A ✕ at the top right');
+      assert.deepEqual(got.afterX, [0, false], 'The ✕ closes it, importing nothing');
+      assert.equal(got.afterOutside, 0, 'A click outside closes it');
+      assert.ok(got.appHref.startsWith('memo://import#memo:v1:'), `The desktop app gets it through memo:// (${got.appHref.slice(0, 40)})`);
+      assert.equal(got.toast, false, 'No other offer beside the dialog');
+      assert.equal(got.after, 0, 'The dialog closes');
+      assert.equal(got.imported, true, '"In this browser" makes the copy here');
+    } finally {
+      await sender.close();
+      await receiver.close();
+    }
+  });
+
+  // ------------------------------------------------ Web on a phone: read-only video PiP
+  await step('Web version on a phone: pinning floats the memory read-only in a video PiP, redrawn on edits', async () => {
+    const webPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const res = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        // The browser's PiP, recorded: the canvas streamed and the video.
+        const capture = HTMLCanvasElement.prototype.captureStream;
+        HTMLCanvasElement.prototype.captureStream = function (...a) {
+          window.__pipCanvas = this;
+          return capture.apply(this, a);
+        };
+        HTMLVideoElement.prototype.requestPictureInPicture = async function () {
+          window.__pipVideo = this;
+          return {};
+        };
+        const before = new Set((await inv('manager', 'list_notes')).map((n) => n.id));
+        await inv('manager', 'new_note');
+        const id = (await inv('manager', 'list_notes')).map((n) => n.id).find((x) => !before.has(x));
+        const label = `note-${id}`;
+        await inv(label, 'rename', { name: 'Lista' });
+        await wait(300);
+        const pinned = await inv(label, 'set_pinned', { pinned: true });
+        await wait(200);
+        const canvas = window.__pipCanvas;
+        const pixels = () => {
+          const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+          let lit = 0;
+          let sum = 0;
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i] + d[i + 1] + d[i + 2] > 300) lit++;
+            sum = (sum * 31 + d[i] + d[i + 1] * 7 + d[i + 2] * 13) % 1e9;
+          }
+          return { lit, sum };
+        };
+        const out = { pinned, mobile: window.MemoWeb.isMobile(), video: Boolean(window.__pipVideo), drawn: canvas && pixels() };
+        const toast = document.querySelector(`iframe[name="${label}"]`).contentDocument.querySelector('.toast[data-key="pip"]');
+        out.toast = toast ? toast.textContent : '';
+        await inv(label, 'save_text', { text: 'pão\nleite', html: '<div>pão</div><div>leite</div>' });
+        await wait(200);
+        out.redrawn = pixels();
+        window.__pipVideo.dispatchEvent(new Event('leavepictureinpicture'));
+        await wait(200);
+        out.after = (await inv('manager', 'list_notes')).find((n) => n.id === id).pinned;
+        return out;
+      });
+      assert.equal(res.mobile, true, 'A phone-sized page');
+      assert.equal(res.pinned, true);
+      assert.equal(res.video, true, 'Pinning asks the browser for a video PiP');
+      assert.ok(res.drawn && res.drawn.lit > 50, `The memory is drawn on the canvas (${JSON.stringify(res.drawn)})`);
+      assert.ok(res.toast.includes('só para leitura'), `The memory says it floats read-only (${res.toast})`);
+      assert.notEqual(res.redrawn.sum, res.drawn.sum, 'Editing the memory redraws the picture');
+      assert.equal(res.after, false, 'Closing the PiP unpins the memory');
+    } finally {
+      await webPage.close();
+    }
+  });
+
+  // ------------------------------------------------ Settings → Defaults: board pane (web)
+  await step('Web version: Settings → Defaults has Memory, Group and Board panes; a new board takes the board defaults', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const res = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const doc = document.querySelector('iframe[name="manager"]').contentDocument;
+        doc.getElementById('tabSettings').click();
+        await wait(100);
+        const shown = () => [...doc.querySelectorAll('.def-pane')].filter((p) => !p.hidden).map((p) => p.dataset.pane);
+        const out = { start: shown() };
+        doc.querySelector('#defaultsSwitch [data-pane="group"]').click();
+        out.group = shown();
+        doc.querySelector('#defaultsSwitch [data-pane="board"]').click();
+        out.board = shown();
+        const rows = () => [...doc.querySelectorAll('#boardDefaultColumns .def-column')];
+        const names = () => rows().map((r) => r.querySelector('input').value);
+        out.langColumns = names();
+        doc.querySelector('#boardSwatches .swatch[data-color="teal"]').click();
+        const title = doc.getElementById('boardDefaultTitle');
+        title.value = 'Sprint';
+        title.dispatchEvent(new Event('change'));
+        doc.getElementById('addDefaultColumn').click();
+        const last = rows().at(-1).querySelector('input');
+        last.value = 'Ideias';
+        last.dispatchEvent(new Event('input', { bubbles: true }));
+        rows().at(-1).querySelector('[data-act="up"]').click();
+        rows()[0].querySelector('[data-act="remove"]').click();
+        out.edited = names();
+        await wait(500);
+        out.saved = await inv('manager', 'get_board_defaults');
+        const before = new Set((await inv('manager', 'list_boards')).map((b) => b.id));
+        await inv('manager', 'new_board');
+        const board = (await inv('manager', 'list_boards')).find((b) => !before.has(b.id));
+        out.newBoard = [board.name, board.color, board.columns.map((c) => c.name)];
+        doc.getElementById('restoreDefaultColumns').click();
+        await wait(100);
+        out.restored = [(await inv('manager', 'get_board_defaults'))[2], names()];
+        return out;
+      });
+      assert.deepEqual(res.start, ['note'], 'One pane at a time, Memory first');
+      assert.deepEqual(res.group, ['group']);
+      assert.deepEqual(res.board, ['board']);
+      assert.deepEqual(res.langColumns, ['A Fazer', 'Em Andamento', 'Concluído'], 'Board columns start as the language\'s');
+      assert.deepEqual(res.edited, ['Em Andamento', 'Ideias', 'Concluído'], 'Add, move up and remove a column');
+      assert.equal(res.saved[0], 'teal');
+      assert.equal(res.saved[1], 'Sprint');
+      assert.deepEqual(res.saved[2].map((c) => c.name), ['Em Andamento', 'Ideias', 'Concluído']);
+      assert.deepEqual(res.newBoard, ['Sprint', 'teal', ['Em Andamento', 'Ideias', 'Concluído']], 'A new board takes the defaults');
+      assert.equal(res.restored[0], null, 'Restore goes back to the language\'s columns');
+      assert.deepEqual(res.restored[1], ['A Fazer', 'Em Andamento', 'Concluído']);
+    } finally {
+      await webPage.close();
     }
   });
 

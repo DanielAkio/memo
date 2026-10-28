@@ -256,7 +256,6 @@
       { label: t('boardColor'), run: () => colors.open() },
       { label: t('addColumn'), run: () => onAddColumn('right') },
       { label: t('groupMenuTitle'), run: () => groups.toggle() },
-      { label: t('share'), run: () => MemoShare.copy() },
       { label: t('moveToTrash'), run: () => bar.trash() },
     ],
     onMenuOpen: () => {

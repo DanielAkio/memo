@@ -149,6 +149,7 @@
       case 'get_default_color': return 'iris';
       case 'get_new_note_defaults': return ['', '', ''];
       case 'get_group_defaults': return ['random', ''];
+      case 'get_board_defaults': return ['', '', null];
       case 'get_data_dir': return ['C:\\Users\\ana\\AppData\\Roaming\\memo', true];
       case 'get_cloud_account': return [['google', 'microsoft'], []];
       case 'get_autostart': return true;

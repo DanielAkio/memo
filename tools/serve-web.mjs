@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PORT = Number(process.argv[2] || process.env.PORT || 3000);
@@ -33,21 +33,44 @@ const MIME = {
   ".ico": "image/x-icon",
 };
 
+// Memo Web runs locally only as http://localhost:<port>: Google and Microsoft
+// sign-in each know one origin, and localStorage differs per origin, so a
+// visit through 127.0.0.1 goes to the same address on localhost.
+export function localhostRedirect(host, path) {
+  const m = /^127\.0\.0\.1(:\d+)?$/.exec(host || "");
+  return m ? `http://localhost${m[1] || ""}${path || "/"}` : null;
+}
+
+// The site is served as in production (GitHub Pages, pages.yml): `site/` at
+// /memo/, with `src/` copied into it (/memo/src/). `{ redirect }` for the
+// addresses that move there (/, /memo, the old /site/...), else the repo
+// path to serve.
+export function localPath(pathname) {
+  if (pathname === "/" || pathname === "/memo") return { redirect: "/memo/app.html" };
+  if (pathname === "/site" || pathname.startsWith("/site/")) {
+    return { redirect: `/memo${pathname.slice("/site".length) || "/"}` };
+  }
+  if (pathname.startsWith("/memo/src/")) return { path: pathname.slice("/memo".length) };
+  if (pathname.startsWith("/memo/")) return { path: `/site${pathname.slice("/memo".length)}` };
+  return { path: pathname };
+}
+
 const server = createServer(async (req, res) => {
   try {
-    const url = new URL(req.url || "/", `http://${req.headers.host || "127.0.0.1"}`);
-    let pathname = decodeURIComponent(url.pathname);
-    if (pathname === "/") {
-      res.writeHead(302, { Location: "/site/app.html" });
+    const moved = localhostRedirect(req.headers.host, req.url);
+    if (moved) {
+      res.writeHead(302, { Location: moved });
       res.end();
       return;
     }
-    // Support both `/site/src/...` (production layout where `src/` is copied into `site/src/`)
-    // and `/src/...` (repo root relative path from `/site/app.html`).
-    if (pathname.startsWith("/site/src/")) {
-      pathname = pathname.replace(/^\/site\/src\//, "/src/");
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    const local = localPath(decodeURIComponent(url.pathname));
+    if (local.redirect) {
+      res.writeHead(302, { Location: local.redirect + url.search });
+      res.end();
+      return;
     }
-    let filePath = normalize(join(ROOT, pathname));
+    let filePath = normalize(join(ROOT, local.path));
     if (!filePath.startsWith(ROOT)) {
       res.writeHead(403);
       res.end("Forbidden");
@@ -88,8 +111,10 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`Memo Web running at http://127.0.0.1:${PORT}/site/app.html`);
-  console.log(`  (for OneDrive sign-in, open it as http://localhost:${PORT}/site/app.html: docs/onedrive.md)`);
-  console.log(`Memo Site running at http://127.0.0.1:${PORT}/site/`);
-});
+// Bound to 127.0.0.1 (localhost resolves to it; 127.0.0.1 itself redirects).
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+  server.listen(PORT, "127.0.0.1", () => {
+    console.log(`Memo Web running at http://localhost:${PORT}/memo/app.html`);
+    console.log(`Memo Site running at http://localhost:${PORT}/memo/`);
+  });
+}

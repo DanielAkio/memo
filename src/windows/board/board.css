@@ -144,16 +144,6 @@
 body.is-col-moving,
 body.is-col-moving * { cursor: grabbing !important; user-select: none; }
 
-/* The column's colour (base.css .card-dot); a click opens its swatches. */
-.col-dot {
-  width: 10px;
-  height: 10px;
-  padding: 0;
-  border: 0;
-  cursor: pointer;
-}
-.col-dot:hover { box-shadow: 0 0 0 3px var(--overlay-hover); }
-.col-dot[data-color=""]:hover { box-shadow: inset 0 0 0 1px var(--color-smoke), 0 0 0 3px var(--overlay-hover); }
 
 /* The column's swatches open under its dot (board.js openColumnColor). */
 #colColorMenu { right: auto; }

@@ -3178,7 +3178,6 @@
       { label: t('rename'), run: () => bar.startRename() },
       { label: t('pin'), checked: !!note.pinned, run: () => bar.togglePin() },
       { label: t('noteColor'), run: () => colors.open() },
-      { label: t('share'), run: () => MemoShare.copy() },
       { label: t('moveToTrash'), run: () => bar.trash() },
     ] : []),
     onMenuOpen: () => { saveMenuSelection(); colors.close(); groups.close(); hideFormatBar(); },

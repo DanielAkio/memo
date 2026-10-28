@@ -621,6 +621,16 @@ textarea.field { resize: vertical; min-height: 84px; }
 
 .app-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
+/* Settings → Defaults: Memória · Grupo · Quadro above their panes. */
+.def-switch { width: max-content; margin: 0 0 12px; }
+
+/* The columns new boards start with: dot, name, ↑ ↓ ✕ per row. */
+.def-columns { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
+.def-column { display: flex; align-items: center; gap: 6px; }
+.def-column .col-dot { flex: none; margin: 0 4px; }
+.def-column .field { flex: 1; min-width: 0; }
+.def-column .btn { flex: none; width: 26px; padding: 0; }
+
 /* On/off switch: a pill with a knob, filled when on. */
 .switch {
   position: relative;
