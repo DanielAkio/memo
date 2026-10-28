@@ -84,7 +84,22 @@ pub(crate) fn save_board_columns(
     Ok(())
 }
 
-
+/// A column's "New memory": a new memory at the bottom of that column of the
+/// calling board, opened as one opened from the board.
+#[tauri::command]
+pub(crate) async fn new_board_note(
+    app: AppHandle,
+    window: WebviewWindow,
+    column_id: String,
+) -> Result<(), String> {
+    let board_id = Kind::Board.id_of(&window);
+    let note = app
+        .state::<Shared>()
+        .create_in_column(&board_id, &column_id)
+        .ok_or("column not found")?;
+    boards_changed(&app);
+    open_board_note(app, note.id).await
+}
 
 /// Closes board `id` (✕ or middle click): it stays among the current ones;
 /// a board nobody touched (`Store::is_pristine_board`) is removed, as a group.

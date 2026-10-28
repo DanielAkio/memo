@@ -205,6 +205,16 @@
         M.emit('notes-changed');
         return null;
       }
+      case 'new_board_note': {
+        const col = b && b.columns.find((c) => c.id === a.columnId);
+        if (!col) return null;
+        const x = M.addNote({ id: `n${Date.now()}`, text: '' });
+        col.noteIds.push(x.id);
+        M.emit('boards-changed');
+        M.openNote(x.id);
+        M.emit('notes-changed');
+        return null;
+      }
       case 'open_board_note':
       case 'open_note': {
         const x = M.notes[a.id];
@@ -251,7 +261,7 @@
     if (!w) return;
     w.el.style.zIndex = w.el.classList.contains('pinned') ? 1000 + (++z) : ++z;
   };
-  M.raiseEl = (el) => { el.style.zIndex = ++z; };
+  M.raiseEl = (el) => { el.style.zIndex = ++z; M.front = el; };
   M.closeWin = (label) => {
     const w = M.wins[label];
     if (!w) return;
@@ -299,5 +309,64 @@
   M.cursor = (x, y, kind) => {
     cur.style.transform = `translate(${x}px, ${y}px)`;
     if (kind) cur.dataset.kind = kind;
+  };
+
+  // ------------------------------------------------------------- fake apps
+
+  // A spreadsheet (#sheet): click a cell to select it, type digits, Enter
+  // goes down a row.
+  M.sheetApp = ({ rows, title, box }) => {
+    const fmt = (v) => (typeof v === 'number' ? v.toLocaleString('en-US') : v);
+    const head = '<tr><th></th>' + 'ABCDEFGH'.split('').map((c) => `<th>${c}</th>`).join('') + '</tr>';
+    const body = rows.map((r, i) => `<tr><td class="rn">${i + 1}</td>${r.map((v) => `<td>${fmt(v)}</td>`).join('')}</tr>`).join('');
+    desk.insertAdjacentHTML('beforeend', `<div class="app" id="sheet" style="${box}">
+      <div class="bar"><span class="dots"><i></i><i></i><i></i></span>${title}</div>
+      <div class="tools"><span>B</span><span>I</span><span>%</span><span>Σ</span><span class="fx" id="fx"></span></div>
+      <table class="sheet"><tbody>${head}${body}</tbody></table></div>`);
+    const sheet = document.getElementById('sheet');
+    const fx = document.getElementById('fx');
+    let sel = null;
+    let typed = null;
+    const select = (td) => {
+      if (sel) sel.classList.remove('sel');
+      sel = td; typed = null;
+      td.classList.add('sel');
+      fx.textContent = td.textContent;
+    };
+    sheet.addEventListener('pointerdown', (e) => {
+      M.raiseEl(sheet);
+      const td = e.target.closest('td');
+      if (td && !td.classList.contains('rn')) select(td);
+      document.activeElement.blur?.();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!sel || M.front !== sheet) return;
+      if (/^[0-9]$/.test(e.key)) {
+        typed = (typed || '') + e.key;
+        sel.textContent = typed; fx.textContent = typed;
+      } else if (e.key === 'Enter') {
+        if (typed) sel.textContent = Number(typed).toLocaleString('en-US');
+        const tr = sel.parentElement.nextElementSibling;
+        if (tr) select(tr.children[[...sel.parentElement.children].indexOf(sel)]);
+      }
+    });
+    M.raiseEl(sheet);
+    return sheet;
+  };
+  // Stage centre of a spreadsheet cell.
+  M.cell = (r, c) => {
+    const b = document.querySelectorAll('#sheet tr')[r].children[c].getBoundingClientRect();
+    return { cx: b.left + b.width / 2, cy: b.top + b.height / 2 };
+  };
+
+  // ---------------------------------------------------- presentation overlays
+
+  // A pulse where a click lands.
+  M.ring = (x, y) => {
+    const el = document.createElement('div');
+    el.className = 'ring';
+    Object.assign(el.style, { left: `${x}px`, top: `${y}px` });
+    document.body.append(el);
+    setTimeout(() => el.remove(), 800);
   };
 })();

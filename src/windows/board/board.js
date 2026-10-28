@@ -385,35 +385,68 @@
     return ghost;
   }
 
+  // A board with no columns shows one wide place to add the first.
+  function addFirstColumn() {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'col-first';
+    btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>';
+    const label = document.createElement('span');
+    label.textContent = t('addColumn');
+    btn.append(label);
+    btn.addEventListener('click', () => onAddColumn('right'));
+    return btn;
+  }
+
   // ------------------------------------------------------------- Moving a column
 
-  // A column dragged by its header moves left or right among the others,
-  // live; dropped, the new order is saved. A click (no drag) still renames.
+  // A column dragged by its header follows the pointer, as a memory does,
+  // with a skeleton among the others where a drop puts it; dropped, the new
+  // order is saved. A click (no drag) still renames.
   let colDrag = null;
   let colDragJustEnded = false;
+  const colSkeleton = document.createElement('div');
+  colSkeleton.className = 'col-skeleton';
 
   window.addEventListener('pointermove', (e) => {
     if (!colDrag) return;
     if (!colDrag.moving) {
       if (Math.abs(e.clientX - colDrag.startX) < 6) return;
       colDrag.moving = true;
+      const rect = colDrag.el.getBoundingClientRect();
+      colDrag.offsetX = colDrag.startX - rect.left;
+      colDrag.offsetY = colDrag.startY - rect.top;
+      const avatar = colDrag.el.cloneNode(true);
+      avatar.classList.add('col-drag-avatar');
+      avatar.style.width = rect.width + 'px';
+      avatar.style.height = rect.height + 'px';
+      document.body.append(avatar);
+      colDrag.avatar = avatar;
+      colSkeleton.style.width = rect.width + 'px';
+      columnsTrack.insertBefore(colSkeleton, colDrag.el);
       colDrag.el.classList.add('is-moving');
       document.body.classList.add('is-col-moving');
     }
+    colDrag.avatar.style.left = (e.clientX - colDrag.offsetX) + 'px';
+    colDrag.avatar.style.top = (e.clientY - colDrag.offsetY) + 'px';
     const others = [...columnsTrack.querySelectorAll('.board-column')].filter((c) => c !== colDrag.el);
     const next = others.find((c) => {
       const r = c.getBoundingClientRect();
       return e.clientX < r.left + r.width / 2;
     });
     const before = next || columnsTrack.querySelector('.col-add[data-side="right"]');
-    if (colDrag.el.nextElementSibling !== before) columnsTrack.insertBefore(colDrag.el, before);
+    if (colSkeleton.nextElementSibling !== before) columnsTrack.insertBefore(colSkeleton, before);
   });
 
   const endColumnDrag = () => {
     if (!colDrag) return;
-    const { moving, el } = colDrag;
+    const { moving, el, avatar } = colDrag;
     colDrag = null;
     if (!moving) return;
+    // It lands where the skeleton shows it.
+    if (colSkeleton.isConnected) columnsTrack.insertBefore(el, colSkeleton);
+    colSkeleton.remove();
+    if (avatar) avatar.remove();
     el.classList.remove('is-moving');
     document.body.classList.remove('is-col-moving');
     colDragJustEnded = true;
@@ -515,7 +548,7 @@
       head.title = t('moveColumn');
       head.addEventListener('pointerdown', (e) => {
         if (e.button !== 0 || e.target.closest('button, input')) return;
-        colDrag = { el: colEl, startX: e.clientX, moving: false };
+        colDrag = { el: colEl, startX: e.clientX, startY: e.clientY, moving: false };
       });
 
       // The column's colour, as a card's dot; a click picks it.
@@ -714,12 +747,29 @@
         cardsList.append(card);
       }
 
-      colEl.append(head, cardsList);
+      // A new memory straight at the bottom of this column (also the way on
+      // a phone, where nothing can be dragged onto the board).
+      const addNote = document.createElement('button');
+      addNote.type = 'button';
+      addNote.className = 'col-add-note';
+      addNote.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v9.5M3.25 8h9.5"/></svg>';
+      const addLabel = document.createElement('span');
+      addLabel.textContent = t('newNote');
+      addNote.append(addLabel);
+      addNote.addEventListener('click', () => {
+        invoke('new_board_note', { columnId: col.id }).catch((err) => console.error('new_board_note', err));
+      });
+
+      colEl.append(head, cardsList, addNote);
       columnsTrack.append(colEl);
     }
 
-    columnsTrack.prepend(addGhost('left'));
-    columnsTrack.append(addGhost('right'));
+    if (currentBoard.columns.length) {
+      columnsTrack.prepend(addGhost('left'));
+      columnsTrack.append(addGhost('right'));
+    } else {
+      columnsTrack.append(addFirstColumn());
+    }
     setTimeout(updateDropZones, 50);
   }
 

@@ -20,6 +20,16 @@ function playwright() {
   }
 }
 
+// ffmpeg on the PATH, or the one in `ffmpeg-static` (npm install --no-save ffmpeg-static).
+function ffmpeg() {
+  try {
+    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
+    return 'ffmpeg';
+  } catch {
+    return createRequire(path.join(ROOT, 'package.json'))('ffmpeg-static');
+  }
+}
+
 async function launchChromium(chromium) {
   for (const opts of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
     try {
@@ -126,7 +136,7 @@ export class Rec {
     fs.writeFileSync(list, this.frames.map(([f, ms]) => `file '${f}'\nduration ${(ms / 1000).toFixed(3)}\n`).join('') + `file '${last}'\n`);
     const vf = 'scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=192:stats_mode=diff[p];'
       + '[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle';
-    execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, '-vf', vf, '-vsync', 'vfr', out]);
+    execFileSync(ffmpeg(), ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, '-vf', vf, '-fps_mode', 'vfr', out]);
     fs.rmSync(this.dir, { recursive: true, force: true });
   }
 }

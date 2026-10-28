@@ -4,6 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 import vm from 'vm';
+import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,7 +43,15 @@ for (const rel of jsFiles) {
     fail(`syntax error in ${rel}: ${err.message}`);
   }
 }
-if (!failures) pass(`JS syntax (${jsFiles.length} files)`);
+// The demo recorder's modules (not run by the tests).
+for (const rel of ['tools/demos/lib.mjs', 'tools/demos/record.mjs']) {
+  try {
+    execFileSync(process.execPath, ['--check', path.join(ROOT, rel)], { stdio: 'pipe' });
+  } catch (err) {
+    fail(`syntax error in ${rel}: ${String(err.stderr).split('\n').slice(0, 5).join(' ')}`);
+  }
+}
+if (!failures) pass(`JS syntax (${jsFiles.length + 2} files)`);
 
 // ------------------------------------------------------------ 2. Tauri commands
 
@@ -301,6 +310,20 @@ const DESKTOP_ONLY = {
   ];
   if (bad.length) fail(`serve-web.mjs local addresses: ${JSON.stringify(bad)}`);
   else pass('Local Memo Web at localhost/memo/ (127.0.0.1 and /site/ redirect)');
+}
+
+// The README points to the website instead of repeating it: none of the
+// landing page's section headings, and links to the site and the code
+// signing policy (SignPath requires that one).
+{
+  const readme = read('README.md');
+  const headings = [...read('site/index.html').matchAll(/<h[23] lang="en">([^<]+)</g)].map((m) => m[1].trim());
+  const repeated = headings.filter((h) => readme.includes(h));
+  const links = ['https://danielakio.github.io/memo/', 'https://danielakio.github.io/memo/code-signing.html']
+    .filter((l) => !readme.includes(l));
+  if (repeated.length) fail(`README.md repeats the landing page: ${repeated.join(', ')}`);
+  else if (links.length) fail(`README.md misses links: ${links.join(', ')}`);
+  else pass('README.md points to the website without repeating it');
 }
 
 // A group bar's minimum width, the same on the desktop and Memo Web.

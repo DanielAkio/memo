@@ -3929,6 +3929,16 @@
       case 'new_board':
         createBoard(label);
         return null;
+      // A column's "New memory" (boards.rs new_board_note): at its bottom.
+      case 'new_board_note': {
+        const col = b && !b.trashedAt && b.columns.find((c) => c.id === args.columnId);
+        if (!col) return null;
+        const note = createNote({ parentLabel: label, open: false });
+        updateBoard(b.id, (x) => { x.columns.find((c) => c.id === args.columnId).noteIds.push(note.id); });
+        notifyBoards();
+        await openNoteWindow(note, true);
+        return null;
+      }
       case 'open_board': {
         const brd = findBoard(args.id);
         if (brd) {

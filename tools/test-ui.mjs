@@ -875,6 +875,101 @@ try {
     assert.equal(res.opened, true, 'The new memory opens');
   });
 
+  // ------------------------------------------------ 7d2. Board: no columns left, one place to add the first
+  await step('Board: with every column deleted, one wide "Add column" replaces the edge strips and adds the first', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      M.addBoard({ id: 'empty-board', name: 'Empty' });
+      M.boards['empty-board'].columns = [];
+      await M.openWin('board-empty-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 620, h: 320 });
+      await new Promise((r) => setTimeout(r, 200));
+      const doc = M.frameDoc('board-empty-board');
+      const first = doc.querySelector('.col-first');
+      const track = doc.querySelector('.columns-track').getBoundingClientRect();
+      const r = first && first.getBoundingClientRect();
+      const out = {
+        strips: doc.querySelectorAll('.col-add').length,
+        label: first && first.textContent,
+        fills: Boolean(r) && r.width > track.width * 0.9,
+        firstLook: first && ((cs) => [cs.backgroundColor, cs.borderTopStyle, cs.borderTopColor])(getComputedStyle(first)),
+      };
+      first.click();
+      await new Promise((r) => setTimeout(r, 200));
+      out.columns = M.boards['empty-board'].columns.length;
+      out.firstGone = !doc.querySelector('.col-first');
+      out.stripsAfter = doc.querySelectorAll('.col-add').length;
+      const look = (el) => { const cs = getComputedStyle(el); return [cs.backgroundColor, cs.borderTopStyle, cs.borderTopColor]; };
+      out.sameLook = [...doc.querySelectorAll('.col-add')].every((el) => JSON.stringify(look(el)) === JSON.stringify(out.firstLook));
+      M.closeWin('board-empty-board');
+      return out;
+    });
+    assert.equal(res.strips, 0, 'No edge strip (which sat at the left) on an empty board');
+    assert.equal(res.label, 'Adicionar coluna');
+    assert.equal(res.fills, true, 'It fills the board');
+    assert.equal(res.columns, 1, 'Clicking it adds the first column');
+    assert.equal(res.firstGone && res.stripsAfter === 2, true, 'Then the edge strips come back');
+    assert.equal(res.firstLook[0], 'rgba(0, 0, 0, 0)', 'Unfilled');
+    assert.equal(res.sameLook, true, 'The edge strips look like it: unfilled, dashed');
+  });
+
+  // ------------------------------------------------ 7d4. Demo stage: the presentation helpers (record.mjs pitch)
+  await step('Demo stage: no captions or closing card, and a pinned memory above an app brought forward', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const out = {};
+      out.noCaption = !('caption' in M);
+      out.noEndCard = !('endCard' in M);
+      M.addNote({ id: 'pitch-note', text: 'x', x: 600, y: 60 });
+      await M.openNote('pitch-note');
+      await M.invoke('note-pitch-note', 'set_pinned', { pinned: true });
+      const sheet = M.sheetApp({ rows: [['A', 1]], title: 'S', box: 'left:0;top:0;width:900px;height:460px' });
+      sheet.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      out.front = M.front === sheet;
+      out.noteAbove = Number(M.wins['note-pitch-note'].el.style.zIndex) > Number(sheet.style.zIndex);
+      sheet.remove();
+      await M.invoke('note-pitch-note', 'set_pinned', { pinned: false });
+      M.closeWin('note-pitch-note');
+      return out;
+    });
+    assert.equal(res.noCaption, true, 'The presentation GIF has no captions');
+    assert.equal(res.front, true, 'A clicked app comes forward');
+    assert.equal(res.noteAbove, true, 'A pinned memory stays above it');
+    assert.equal(res.noEndCard, true, 'It loops on the app in use, with no closing card');
+  });
+
+  // ------------------------------------------------ 7d3. Board: "New memory" at the bottom of a column
+  await step('Board: each column ends with "New memory", which adds one at its bottom and opens it', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      M.addBoard({ id: 'add-board', name: 'Add' });
+      await M.openWin('board-add-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 820, h: 360 });
+      await new Promise((r) => setTimeout(r, 200));
+      const doc = M.frameDoc('board-add-board');
+      const cols = [...doc.querySelectorAll('.board-column')];
+      const out = { buttons: cols.map((c) => c.lastElementChild.matches('.col-add-note')) };
+      out.label = cols[1].querySelector('.col-add-note').textContent;
+      const before = Object.keys(M.notes);
+      cols[1].querySelector('.col-add-note').click();
+      await new Promise((r) => setTimeout(r, 300));
+      const added = Object.keys(M.notes).filter((id) => !before.includes(id));
+      const b = M.boards['add-board'];
+      out.added = added.length;
+      out.inColumn = b.columns[1].noteIds.at(-1) === added[0];
+      out.others = b.columns[0].noteIds.length + b.columns[2].noteIds.length;
+      out.opened = Boolean(added[0] && M.wins['note-' + added[0]]);
+      out.cards = doc.querySelectorAll('.board-column')[1].querySelectorAll('.board-card').length;
+      if (added[0]) M.closeWin('note-' + added[0]);
+      M.closeWin('board-add-board');
+      return out;
+    });
+    assert.deepEqual(res.buttons, [true, true, true], 'Every column ends with the button');
+    assert.equal(res.label, 'Nova memória');
+    assert.equal(res.added, 1, 'One memory is created');
+    assert.equal(res.inColumn && res.others === 0, true, 'At the bottom of that column only');
+    assert.equal(res.opened, true, 'It opens to be written');
+    assert.equal(res.cards, 1, 'Its card shows in the column');
+  });
+
   // ------------------------------------------------ 7e. Card preview: long lines don't overlap
   await step('Card preview: long checklist lines wrap without overlapping the next', async () => {
     const res = await page.evaluate(async () => {
@@ -1079,7 +1174,14 @@ try {
       head.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: r1.left + 40, clientY: y }));
       win.dispatchEvent(new win.PointerEvent('pointermove', { clientX: r1.left + 60, clientY: y }));
       win.dispatchEvent(new win.PointerEvent('pointermove', { clientX: r2.right - 10, clientY: y }));
+      // While moving: the column follows the pointer and a skeleton holds its place, as a memory's.
+      const skel = doc.querySelector('.columns-track > .col-skeleton');
+      out.skeletonAfterTwo = Boolean(skel) && skel.previousElementSibling === col('c2');
+      out.skeletonLook = skel && win.getComputedStyle(skel).animationName;
+      out.avatar = Boolean(doc.querySelector('body > .col-drag-avatar'));
+      out.hidden = col('c1').getBoundingClientRect().width === 0;
       win.dispatchEvent(new win.PointerEvent('pointerup', { clientX: r2.right - 10, clientY: y }));
+      out.cleaned = !doc.querySelector('.col-skeleton') && !doc.querySelector('.col-drag-avatar');
       await wait(200);
       out.order = M.boards['cf-board'].columns.map((c) => c.id);
       out.drawn = [...doc.querySelectorAll('.board-column')].map((c) => c.dataset.colId);
@@ -1101,6 +1203,10 @@ try {
     assert.equal(res.saved, 'teal', 'The picked colour is saved with the columns');
     assert.equal(res.painted, 'teal', 'The dot shows it');
     assert.equal(res.menuClosed, true, 'Picking closes the swatches');
+    assert.equal(res.skeletonAfterTwo, true, 'A skeleton shows where the column will land');
+    assert.equal(res.skeletonLook, 'card-skeleton', 'It is the memories\' skeleton');
+    assert.equal(res.avatar && res.hidden, true, 'The column follows the pointer, out of its old place');
+    assert.equal(res.cleaned, true, 'Dropped, the skeleton and the dragged copy go');
     assert.deepEqual(res.order, ['c2', 'c1'], 'A column dragged past another moves there, saved');
     assert.deepEqual(res.drawn, ['c2', 'c1'], 'and is drawn there');
     assert.equal(res.folded, true, 'A folded memory shows only its title');
@@ -2197,6 +2303,38 @@ try {
   });
 
   // ------------------------------------------------ Web: a trashed board takes its memories
+  await step('Web version on a phone: a column\'s "New memory" adds one at its bottom', async () => {
+    const webPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const res = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const before = new Set((await inv('manager', 'list_boards')).map((x) => x.id));
+        await inv('manager', 'new_board');
+        const bid = (await inv('manager', 'list_boards')).map((x) => x.id).find((x) => !before.has(x));
+        await new Promise((r) => setTimeout(r, 400));
+        const frame = document.querySelector(`iframe[name="board-${bid}"]`);
+        const btn = frame && frame.contentDocument.querySelectorAll('.col-add-note')[2];
+        const notesBefore = (await inv('manager', 'list_notes')).length;
+        if (btn) btn.click();
+        await new Promise((r) => setTimeout(r, 400));
+        const board = await inv(`board-${bid}`, 'load_board');
+        return {
+          button: Boolean(btn),
+          added: (await inv('manager', 'list_notes')).length - notesBefore,
+          counts: board.columns.map((c) => c.noteIds.length),
+        };
+      });
+      assert.equal(res.button, true, 'The board shows the button on a phone');
+      assert.equal(res.added, 1, 'It creates one memory');
+      assert.deepEqual(res.counts, [0, 0, 1], 'In that column');
+    } finally {
+      await webPage.close();
+    }
+  });
+
   await step('Web version: trashing a board sends its memories to the trash; restoring it brings them back', async () => {
     const webPage = await browser.newPage();
     try {

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://danielakio.github.io/memo/"><b>Website</b></a> · <a href="https://danielakio.github.io/memo/app.html"><b>Use in browser</b></a>
+  <a href="https://danielakio.github.io/memo/"><b>Website & download</b></a> · <a href="https://danielakio.github.io/memo/app.html"><b>Use in browser</b></a>
 </p>
 
 <p align="center">
@@ -20,120 +20,24 @@
   </picture>
 </p>
 
-Every memory is its own little window. Click the **pin** and it floats over every other app: the to-do list next to
-the spreadsheet, the phone number during the call, the command you always forget above the terminal. No more
-digging through windows to find what you wrote down.
+Every memory is its own little window. Click the **pin** and it floats over every other app. Memories save
+themselves, gather in groups and boards, share as a link, and can sync through your own Google Drive or OneDrive.
+There is no sign-up, no ads and no tracking.
 
-## Why people like it
-
-- **Always in sight.** One click on the pin and the memory stays on top while you work in anything else.
-- **Write without thinking.** Type and it's saved. `[]` starts a checklist, `-` a list, `1.` a numbered list, `| a | b |` a table,
-  backticks turn a command into code, a screenshot pastes right in, and a quick selection lets you highlight what
-  matters. Prefer the mouse? The selection bar and the Aa toolbar do it all in a click.
-- **Find things at a glance.** Give each memory a title and a colour (any colour, with the eyedropper), and gather
-  related ones in a group you can put away and bring back in one click.
-- **Share in a message.** "Share link" turns a memory, a board or a whole group into a link you can paste in any
-  chat or email; whoever opens it imports a copy with one click, in the browser or in the app.
-- **Yours, and only yours.** No sign-up, no ads, no tracking, and it works offline. Your memories live on your
-  computer, and if you want them on several computers, they sync through your own Google Drive
-  or OneDrive ([privacy policy](https://danielakio.github.io/memo/privacy.html)).
-
-## Jot it down in seconds
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="site/media/write-light-en.gif">
-    <img src="site/media/write-dark-en.gif" width="860" alt="Naming a memory, typing a checklist and a command between backticks that turns into code, highlighting a line, ticking two items and picking the memory's colour">
-  </picture>
-</p>
-
-Name it with a double-click on the top bar, type `[]` for a checklist, tick items as you go, highlight a line and pick
-a colour. That's all there is to learn.
-
-For the technical bits, put a command between backticks (`` `npm run dev` ``) and it shows as code, or type ```` ``` ````
-for a whole code block coloured for its language. Copy a screenshot and paste it in, then drag its corner to resize
-it. New memories start without a colour, or with a random one if you like; the colour dot offers a few to pick from,
-and its eyedropper any colour at all.
-
-## Keep related memories together
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="site/media/group-light-en.gif">
-    <img src="site/media/group-dark-en.gif" width="860" alt="A group bar puts its memories away and brings them back; a memory dropped on the bar joins the group">
-  </picture>
-</p>
-
-A group is a slim bar that holds memories. The arrow tucks them all into the bar and brings them back exactly where
-they were. Drop a memory on a bar to add it. Each new group gets a colour of its own, which tints its memories so you
-can tell at a glance where each one belongs.
-
-## Everything in one place
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="site/media/manager-light-en.gif">
-    <img src="site/media/manager-dark-en.gif" width="860" alt="The Memo Manager searches memories, moves one to the trash, restores it from the trash and reopens it">
-  </picture>
-</p>
-
-The **Memo Manager** shows every memory as a card, open or closed. Search them, reopen one with a click, move it to a
-group or sort them. Sent something to the trash by mistake? Restore it: the trash keeps memories for 30 days.
-
-Every bar stays clean, with just the buttons you use most. Everything else is one click away: the **…** button, or a
-right click anywhere on the bar of a memory, a group or the Manager, opens a menu with that window's commands and
-all of Memo's, from a new group to Settings, so you never have to hunt for the right window.
-
-## Let your AI assistant take notes
-
-Turn on **AI control** in Settings and click **Connect** next to your AI assistant: Claude, ChatGPT's Codex,
-GitHub Copilot in VS Code, Cursor, Windsurf, Gemini CLI and Cline are found and set up for you, and any other app that
-speaks [MCP](https://modelcontextprotocol.io) takes one copy and paste. Then just ask: *"put my shopping list in a yellow memory and pin it"*, *"what's in my Work group?"*,
-*"tick off coffee"*. Your assistant finds, reads, writes, pins, colors and groups memories, and you watch them
-change on screen. It's off until you turn it on, only apps on your computer can connect, and deleting for good stays
-in your hands.
-
-## Get Memo
-
-Download Memo for Windows, macOS or Linux from **[its website](https://danielakio.github.io/memo/)**, which picks
-the right installer for your computer, or **[use Memo right in your browser](https://danielakio.github.io/memo/app.html)** (memories stay in your browser and can sync with the desktop app through Google Drive or OneDrive; pinning a memory uses Picture-in-Picture to float over other apps; on a phone it floats read-only).
-
-Open it, and Memo greets you with a welcome memory that shows the basics. Closing a memory never deletes it, and
-closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.
-
-You only download it once: when a new version is out, Memo tells you in the tray menu and in Settings, and one click
-updates it and opens it again, memories and all. Settings → App shows which version you have.
-
-<details>
-<summary><b>Your computer warns you the first time?</b></summary>
-
-Memo is new and its installers aren't signed yet, so your system may be cautious the first time. It only happens
-once:
-
-- **Windows**: if you see "Windows protected your PC", click **More info → Run anyway**.
-- **macOS**: Apple only skips this warning for developers who pay for its Developer Program, and Memo doesn't. Drag
-  Memo to Applications and open it; when macOS blocks it, click **Done**, go to **System Settings → Privacy &
-  Security**, scroll down and click **Open Anyway**. If it says the app "is damaged", run
-  `xattr -cr /Applications/Memo.app` in Terminal and open it again.
-- **Linux**: make the `.AppImage` executable
-  (`chmod +x Memo*.AppImage`) and run it.
-
-</details>
+Features, downloads and help for the first launch are all on the **[website](https://danielakio.github.io/memo/)**.
 
 ## Ideas and bug reports
 
-Memo gets better with your feedback. **[Report a bug](https://github.com/DanielAkio/memo/issues/new?template=bug_report.yml)**
-or **[suggest an improvement](https://github.com/DanielAkio/memo/issues/new?template=feature_request.yml)**, in
-English or Portuguese. If someone already asked for the same thing in the
-[open issues](https://github.com/DanielAkio/memo/issues), a 👍 on it helps too.
-
----
+**[Report a bug](https://github.com/DanielAkio/memo/issues/new?template=bug_report.yml)** or
+**[suggest an improvement](https://github.com/DanielAkio/memo/issues/new?template=feature_request.yml)**, in English
+or Portuguese. If the same idea is already in the [open issues](https://github.com/DanielAkio/memo/issues), give it
+a 👍.
 
 ## For developers
 
-Memo is built with [Tauri 2](https://v2.tauri.app) (Rust + plain HTML/CSS/JS). How to build it, run it in
-development and make installers is in **[docs/development.md](docs/development.md)**. Windows installers are signed
-for free by SignPath Foundation under this [code signing policy](https://danielakio.github.io/memo/code-signing.html).
+Memo is built with [Tauri 2](https://v2.tauri.app) (Rust + plain HTML/CSS/JS). Building, running in development and
+making installers are covered in **[docs/development.md](docs/development.md)**. Windows installers are signed for
+free by SignPath Foundation under this [code signing policy](https://danielakio.github.io/memo/code-signing.html).
 
 ## License
 

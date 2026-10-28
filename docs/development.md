@@ -81,7 +81,7 @@ glyph in black, used as a macOS template image). Change the SVGs first, then reg
 
 `site/` is the home page and privacy policy published to GitHub Pages by `.github/workflows/pages.yml`
 (<https://danielakio.github.io/memo/>), in English and Portuguese. The GIFs in `site/media/` are used by
-both the site and the README; each one comes in dark and light versions and in both languages
+the site (the README shows only the pin one); each one comes in dark and light versions and in both languages
 (`<scene>-<theme>-<lang>.gif`).
 
 Each page holds both languages: every translated element appears twice, marked `lang="en"` and `lang="pt-BR"`, and
@@ -96,9 +96,10 @@ theme button override both; the choice is kept in `localStorage` (`memo-lang`, `
 The GIFs are recorded from the app's own pages, so re-record them whenever the windows change:
 
 ```bash
-npm install --no-save playwright         # once; ffmpeg must be on the PATH
+npm install --no-save playwright         # once; ffmpeg on the PATH (or npm install --no-save ffmpeg-static)
 node tools/demos/record.mjs              # every scene, theme and language (a few minutes)
 node tools/demos/record.mjs write dark en  # just one
+node tools/demos/record.mjs pitch dark pt  # presentation GIF of the pin over several apps, into dist/
 ```
 
 `tools/demos/stage.html` is a fake desktop where each Memo window is an `<iframe>` of `src/windows/note/index.html`,

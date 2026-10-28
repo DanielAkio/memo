@@ -1,7 +1,9 @@
 // Records the demo GIFs in site/media/ from the real app pages (src/), in a
 // fake desktop (stage.html) with a fake Tauri API (mock.js).
 //   node tools/demos/record.mjs [pin|write|group|manager|all] [dark|light|all] [en|pt|all]
+//   node tools/demos/record.mjs pitch dark pt   (presentation GIF, into dist/)
 // Needs Playwright (npm install --no-save playwright) and ffmpeg.
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { serve, open, Rec, ROOT } from './lib.mjs';
@@ -15,8 +17,10 @@ const at = async (label, sel, i = 0) => ev(([l, s, k]) => window.Memo.rectIn(l, 
 
 // ------------------------------------------------------------------- pin
 
-async function pin() {
-  const rows = [
+// The budget spreadsheet and the "Today" checklist of the pin scenes.
+const budget = () => ({
+  title: L('Budget 2027.xlsx', 'Orçamento 2027.xlsx'),
+  rows: [
     [L('Category', 'Categoria'), ...L('Jan Feb Mar Apr May Jun Jul', 'Jan Fev Mar Abr Mai Jun Jul').split(' ')],
     [L('Rent', 'Aluguel'), 5214, 5847, 1839, 2904, 3120, 4410, 3807],
     [L('Team', 'Equipe'), 8710, 6105, 4497, 3352, 6620, 2981, 5039],
@@ -26,58 +30,24 @@ async function pin() {
     [L('Events', 'Eventos'), 2893, 5723, 3773, 2182, 7756, 3965, 3951],
     [L('Supplies', 'Materiais'), 1517, 9136, 2948, 8757, 5036, 2924, 6227],
     [L('Consulting', 'Consultoria'), 4416, 7630, 6675, 2024, 2815, 4853, 1612],
-  ];
-  await ev(async ({ rows, title, note }) => {
+  ],
+});
+const todayNote = () => ({
+  title: L('Today', 'Hoje'),
+  text: L('[ ] Send the report\n[ ] Review the budget\n[ ] Call Ana', '[ ] Enviar o relatório\n[ ] Revisar o orçamento\n[ ] Ligar para a Ana'),
+});
+const cell = (r, c) => ev(([r, c]) => window.Memo.cell(r, c), [r, c]);
+
+async function pin() {
+  await ev(async ({ sheet, note }) => {
     const M = window.Memo;
-    const desk = document.getElementById('desk');
-    const fmt = (v) => (typeof v === 'number' ? v.toLocaleString('en-US') : v);
-    const head = '<tr><th></th>' + 'ABCDEFGH'.split('').map((c) => `<th>${c}</th>`).join('') + '</tr>';
-    const body = rows.map((r, i) => `<tr><td class="rn">${i + 1}</td>${r.map((v) => `<td>${fmt(v)}</td>`).join('')}</tr>`).join('');
-    desk.insertAdjacentHTML('beforeend', `<div class="app" id="sheet" style="left:36px;top:22px;width:888px;height:442px">
-      <div class="bar"><span class="dots"><i></i><i></i><i></i></span>${title}</div>
-      <div class="tools"><span>B</span><span>I</span><span>%</span><span>Σ</span><span class="fx" id="fx"></span></div>
-      <table class="sheet"><tbody>${head}${body}</tbody></table></div>
-      <div class="dock"><i></i><i></i><i class="on" id="memoIcon"></i><i></i><i></i></div>`);
-    const sheet = document.getElementById('sheet');
-    const fx = document.getElementById('fx');
-    let sel = null;
-    let typed = null;
-    const select = (td) => {
-      if (sel) sel.classList.remove('sel');
-      sel = td; typed = null;
-      td.classList.add('sel');
-      fx.textContent = td.textContent;
-    };
-    sheet.addEventListener('pointerdown', (e) => {
-      M.raiseEl(sheet);
-      const td = e.target.closest('td');
-      if (td && !td.classList.contains('rn')) select(td);
-      document.activeElement.blur?.();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (!sel) return;
-      if (/^[0-9]$/.test(e.key)) {
-        typed = (typed || '') + e.key;
-        sel.textContent = typed; fx.textContent = typed;
-      } else if (e.key === 'Enter') {
-        if (typed) sel.textContent = Number(typed).toLocaleString('en-US');
-        const tr = sel.parentElement.nextElementSibling;
-        if (tr) select(tr.children[[...sel.parentElement.children].indexOf(sel)]);
-      }
-    });
+    M.sheetApp({ ...sheet, box: 'left:36px;top:22px;width:888px;height:442px' });
+    document.getElementById('desk').insertAdjacentHTML('beforeend',
+      '<div class="dock"><i></i><i></i><i class="on" id="memoIcon"></i><i></i><i></i></div>');
     document.getElementById('memoIcon').addEventListener('pointerdown', () => M.raise('note-today'));
-    M.raiseEl(sheet);
     M.addNote({ id: 'today', title: note.title, color: 'yellow', x: 600, y: 74, width: 300, height: 250, text: note.text });
     await M.openNote('today');
-  }, {
-    rows, title: L('Budget 2027.xlsx', 'Orçamento 2027.xlsx'),
-    note: { title: L('Today', 'Hoje'), text: L('[ ] Send the report\n[ ] Review the budget\n[ ] Call Ana', '[ ] Enviar o relatório\n[ ] Revisar o orçamento\n[ ] Ligar para a Ana') },
-  });
-  const cell = (r, c) => ev(([r, c]) => {
-    const td = document.querySelectorAll('#sheet tr')[r].children[c];
-    const b = td.getBoundingClientRect();
-    return { cx: b.left + b.width / 2, cy: b.top + b.height / 2 };
-  }, [r, c]);
+  }, { sheet: budget(), note: todayNote() });
   const dock = await ev(() => { const b = document.getElementById('memoIcon').getBoundingClientRect(); return { cx: b.left + 15, cy: b.top + 15 }; });
 
   rec.x = 330; rec.y = 470;
@@ -327,11 +297,125 @@ async function manager() {
   await rec.hold(2000);
 }
 
-const scenes = { pin, write, group, manager };
+// ----------------------------------------------------------------- pitch
+
+// For presentations, not the site (dist/): a pinned memory stays on top of
+// every app that comes forward — a spreadsheet, a browser, a terminal.
+async function pitch() {
+  await ev(async ({ sheet, note, page }) => {
+    const M = window.Memo;
+    const desk = document.getElementById('desk');
+    const box = 'left:24px;top:16px;width:912px;height:462px';
+    M.sheetApp({ ...sheet, box }).hidden = true;
+    desk.insertAdjacentHTML('beforeend', `
+      <div class="app browser" id="browser" style="${box}" hidden>
+        <div class="tabs"><span class="dots" style="display:flex;gap:7px;margin:0 12px 10px 2px"><i></i><i></i><i></i></span>
+          <span class="tab on">${page.tab}</span><span class="tab">Docs</span></div>
+        <div class="url">${page.url}</div>
+        <div class="page" id="browserPage" style="height:360px;overflow:hidden">
+          <i class="h"></i><i class="img"></i><i></i><i style="width:92%"></i><i style="width:80%"></i><i></i>
+          <i class="img"></i><i style="width:70%"></i><i></i><i style="width:85%"></i><i class="img"></i><i></i>
+        </div>
+      </div>
+      <div class="app term" id="term" style="${box}" hidden>
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span>Terminal</div>
+        <div class="out" id="termOut"><b>~/projects/site $</b> <span id="termLine"></span></div>
+      </div>
+      <div class="dock"><i data-app="sheet">X</i><i data-app="browser">W</i><i data-app="term">&gt;_</i><i class="on"></i></div>`);
+    for (const icon of document.querySelectorAll('.dock i[data-app]')) {
+      icon.addEventListener('pointerdown', () => {
+        const app = document.getElementById(icon.dataset.app);
+        app.hidden = false;
+        M.raiseEl(app);
+        for (const i of document.querySelectorAll('.dock i')) i.classList.toggle('front', i === icon);
+      });
+    }
+    const term = document.getElementById('term');
+    term.addEventListener('pointerdown', () => M.raiseEl(term));
+    document.addEventListener('keydown', (e) => {
+      if (M.front !== term) return;
+      const line = document.getElementById('termLine');
+      if (e.key.length === 1) line.textContent += e.key;
+      else if (e.key === 'Enter') {
+        document.getElementById('termOut').insertAdjacentHTML('beforeend',
+          '\n✓ build ok (1.2s)\n<b>~/projects/site $</b> ');
+        line.removeAttribute('id');
+        document.getElementById('termOut').insertAdjacentHTML('beforeend', '<span id="termLine"></span>');
+      }
+    });
+    M.addNote({ id: 'today', title: note.title, color: 'yellow', x: 600, y: 60, width: 300, height: 230, text: note.text });
+    await M.openNote('today');
+  }, { sheet: budget(), note: todayNote(), page: { tab: L('Project plan', 'Plano do projeto'), url: 'example.com/plan' } });
+
+  const dockIcon = (app) => ev((a) => {
+    const b = document.querySelector(`.dock i[data-app="${a}"]`).getBoundingClientRect();
+    return { cx: b.left + b.width / 2, cy: b.top + b.height / 2 };
+  }, app);
+  // Brings an app forward from the dock.
+  const bring = async (app) => {
+    const d = await dockIcon(app);
+    await rec.move(d.cx, d.cy, 900);
+    await rec.click({ after: 900 });
+  };
+  const tick = async (i) => {
+    const box = await at('note-today', '.check', i);
+    await rec.move(box.x + 9, box.cy, 900);
+    await rec.click({ after: 800 });
+  };
+
+  rec.x = 300; rec.y = 300;
+  await rec.cursor('arrow');
+  // 1. Pin it.
+  await rec.hold(900);
+  const p = await at('note-today', '#pinBtn');
+  await rec.move(p.cx, p.cy, 1100);
+  await rec.hold(400);
+  await ev(([x, y]) => window.Memo.ring(x, y), [p.cx, p.cy]);
+  await rec.click({ after: 120 });
+  await rec.hold(1300);
+  // 2. A spreadsheet comes forward: the memory stays on top.
+  await bring('sheet');
+  const c = await cell(4, 4);
+  await rec.move(c.cx, c.cy, 900);
+  await rec.click({ after: 300 });
+  await rec.type('4200', 110);
+  await rec.press('Enter', 500);
+  await tick(0);
+  // 3. A browser.
+  await bring('browser');
+  await rec.move(360, 300, 800);
+  for (let i = 0; i < 8; i++) {
+    await ev(() => { document.getElementById('browserPage').scrollTop += 22; });
+    await rec.shot(60);
+  }
+  await rec.hold(300);
+  await tick(1);
+  // 4. A terminal; the memory moves anywhere and stays on top.
+  await bring('term');
+  await rec.move(300, 120, 800);
+  await rec.click({ after: 200 });
+  await rec.type('npm run build', 85);
+  await rec.press('Enter', 700);
+  const n = await at('note-today', '#noteName');
+  await rec.move(n.cx + 40, n.cy, 800);
+  await rec.hold(200);
+  await page.mouse.down();
+  const start = await ev(() => { const s = window.Memo.wins['note-today'].el.style; return { x: parseInt(s.left, 10), y: parseInt(s.top, 10) }; });
+  const drag = (dx, dy) => ev(([x, y]) => window.Memo.move('note-today', x, y), [start.x + dx, start.y + dy]);
+  await rec.move(n.cx - 60, n.cy + 110, 1000, { drag });
+  await page.mouse.up();
+  await rec.hold(300);
+  await tick(2);
+  await rec.hold(1800);
+}
+
+const scenes = { pin, write, group, manager, pitch };
+// Scenes for presentations only: recorded by name, into dist/.
+const extra = ['pitch'];
 const pick = (arg, all) => (!arg || arg === 'all' ? all : [arg]);
 const [sceneArg, themeArg, langArg] = process.argv.slice(2);
 const server = await serve();
-for (const scene of pick(sceneArg, Object.keys(scenes))) {
+for (const scene of pick(sceneArg, Object.keys(scenes).filter((s) => !extra.includes(s)))) {
   for (const theme of pick(themeArg, ['dark', 'light'])) {
     for (lang of pick(langArg, ['en', 'pt'])) {
       const name = `${scene}-${theme}-${lang}`;
@@ -339,7 +423,9 @@ for (const scene of pick(sceneArg, Object.keys(scenes))) {
       page = opened.page;
       rec = new Rec(page, path.join(os.tmpdir(), `memo-demo-${name}`));
       await scenes[scene]();
-      rec.encode(path.join(ROOT, 'site', 'media', `${name}.gif`));
+      const outDir = extra.includes(scene) ? path.join(ROOT, 'dist') : path.join(ROOT, 'site', 'media');
+      fs.mkdirSync(outDir, { recursive: true });
+      rec.encode(path.join(outDir, `${name}.gif`));
       await opened.browser.close();
       console.log(name);
     }

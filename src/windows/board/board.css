@@ -90,15 +90,15 @@
   justify-content: center;
   width: 18px;
   padding: 0;
-  border: 0;
-  background: var(--color-obsidian);
-  box-shadow: var(--hairline);
+  /* Unfilled, dashed: drawn as the empty board's "Add column" (.col-first). */
+  border: 1px dashed var(--color-graphite);
+  background: transparent;
   color: var(--color-ash);
   cursor: default;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.col-add[data-side="left"] { margin-left: -16px; border-radius: 0 10px 10px 0; }
-.col-add[data-side="right"] { margin-right: -16px; border-radius: 10px 0 0 10px; }
+.col-add[data-side="left"] { margin-left: -16px; border-left: 0; border-radius: 0 10px 10px 0; }
+.col-add[data-side="right"] { margin-right: -16px; border-right: 0; border-radius: 10px 0 0 10px; }
 .col-add:hover { background: var(--overlay-hover); color: var(--color-paper); }
 .col-add svg {
   width: 12px;
@@ -136,10 +136,11 @@
   cursor: grab;
 }
 
-/* A column being dragged by its header to another place (board.js). */
+/* A column being dragged by its header to another place (board.js): it
+   follows the pointer as a memory does (.col-drag-avatar), and a skeleton
+   (.col-skeleton, the memories' .card-skeleton) holds its landing place. */
 .board-column.is-moving {
-  opacity: 0.6;
-  box-shadow: inset 0 0 0 1.5px var(--color-iris), 0 0 0 1px var(--color-iris);
+  display: none !important;
 }
 body.is-col-moving,
 body.is-col-moving * { cursor: grabbing !important; user-select: none; }
@@ -225,6 +226,56 @@ body.is-col-moving * { cursor: grabbing !important; user-select: none; }
   overflow-x: hidden;
 }
 
+/* A column's "New memory", under its cards (board.js). */
+.col-add-note {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 10px 10px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ash);
+  font: inherit;
+  font-size: 12px;
+  cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.col-add-note:hover { background: var(--overlay-hover); color: var(--color-paper); }
+
+/* The only thing on a board with no columns: add the first one. */
+.col-first {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0;
+  border: 1px dashed var(--color-graphite);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-ash);
+  font: inherit;
+  font-size: 13px;
+  cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.col-first:hover { background: var(--overlay-hover); color: var(--color-paper); }
+.col-add-note svg,
+.col-first svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+}
+.col-first svg { width: 18px; height: 18px; }
+
 /* ------------------------------------------------------------- Memory Card */
 
 .board-card {
@@ -253,7 +304,8 @@ body.is-col-moving * { cursor: grabbing !important; user-select: none; }
 
 /* Where a dragged memory will land (board.js showSkeleton): a card-sized
    placeholder with a slow shimmer, in the place a drop puts it. */
-.card-skeleton {
+.card-skeleton,
+.col-skeleton {
   flex: none;
   border-radius: 8px;
   background: linear-gradient(90deg, var(--overlay-hover) 0%, var(--overlay-strong) 50%, var(--overlay-hover) 100%);
@@ -262,12 +314,14 @@ body.is-col-moving * { cursor: grabbing !important; user-select: none; }
   animation: card-skeleton 1.2s ease-in-out infinite;
   pointer-events: none;
 }
+.col-skeleton { border-radius: 10px; }
 @keyframes card-skeleton {
   from { background-position: 100% 0; }
   to { background-position: -100% 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card-skeleton { animation: none; background: var(--overlay-active); }
+  .card-skeleton,
+  .col-skeleton { animation: none; background: var(--overlay-active); }
 }
 
 .card-top {
@@ -320,7 +374,8 @@ body.is-card-dragging * {
   user-select: none !important;
 }
 
-.card-drag-avatar {
+.card-drag-avatar,
+.col-drag-avatar {
   position: fixed;
   z-index: 9999;
   pointer-events: none;

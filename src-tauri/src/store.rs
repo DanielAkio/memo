@@ -1428,6 +1428,24 @@ impl Store {
         Some(updated)
     }
 
+    /// A new memory (the defaults, as `create`) at the bottom of column
+    /// `column_id` of board `board_id`. `None` when there is no such column.
+    pub fn create_in_column(&self, board_id: &str, column_id: &str) -> Option<Note> {
+        let has_column = self
+            .board(board_id)
+            .is_some_and(|b| b.trashed_at.is_none() && b.columns.iter().any(|c| c.id == column_id));
+        if !has_column {
+            return None;
+        }
+        let note = self.create(None);
+        self.update_board(board_id, |b| {
+            if let Some(c) = b.columns.iter_mut().find(|c| c.id == column_id) {
+                c.note_ids.push(note.id.clone());
+            }
+        });
+        Some(note)
+    }
+
     /// Sends board `id` to the trash with the memories on it (a group's
     /// way): they share its `trashed_at`, which is how `restore_board` finds
     /// them. Returns those memories' ids.
@@ -1995,6 +2013,22 @@ mod tests {
         let boards: Vec<String> = store.boards().into_iter().map(|b| b.id).collect();
         assert_eq!(boards, vec![live.id], "only the trashed board goes");
         assert!(store.get(&note.id).is_some(), "its memories stay");
+    }
+
+    #[test]
+    fn a_new_memory_in_a_column_goes_to_its_bottom() {
+        let dir = temp_dir("board-column-note");
+        let store = Store::load(dir.join("notes.json"));
+        let board = store.create_board(Some("B".into()), vec!["A".into(), "B".into()], None);
+        let col = board.columns[1].id.clone();
+        let first = store.create_in_column(&board.id, &col).unwrap();
+        let second = store.create_in_column(&board.id, &col).unwrap();
+        let b = store.board(&board.id).unwrap();
+        assert!(b.columns[0].note_ids.is_empty());
+        assert_eq!(b.columns[1].note_ids, vec![first.id, second.id]);
+        assert!(store.create_in_column(&board.id, "no-such-column").is_none());
+        assert_eq!(store.active().len(), 2, "no memory without a column");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
