@@ -8,19 +8,17 @@
 //! Images are not shared: each becomes `NO_IMAGE`, and the Memo that imports
 //! puts a picture saying so in its place (`src/assets`).
 //!
-//! Memo Web opens the link with an offer to import it, and its "Open in the
-//! app" hands it to this app as `memo://import#<code>` (tauri-plugin-deep-
-//! link, `open_link`): every window shows the offer (share-available,
-//! components/share.js), also in the tray menu while it is pending. Import
-//! makes new copies, never touching what is there.
+//! Memo Web opening the link asks where to import it; "In the desktop app"
+//! hands it to this app as `memo://import#<code>` (tauri-plugin-deep-link,
+//! `open_link`), which imports it right away. Import makes new copies, never
+//! touching what is there.
 
 use crate::*;
 use serde::{Deserialize, Serialize};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use flate2::{read::DeflateDecoder, write::DeflateEncoder, Compression};
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
-    hash::{Hash, Hasher},
+    collections::{BTreeSet, HashMap},
     io::{Read, Write},
 };
 
@@ -281,12 +279,6 @@ pub(crate) fn decode(text: &str) -> Option<Payload> {
     (payload.v == 1 && has_item).then_some(payload)
 }
 
-fn hash_of(code: &str) -> u64 {
-    let mut h = DefaultHasher::new();
-    code.hash(&mut h);
-    h.finish()
-}
-
 /// The payload of note, board or group `id` and its code.
 fn share_code(store: &Store, kind: Kind, id: &str) -> Result<(Payload, String), String> {
     let payload = build(store, kind, id).ok_or("item not found")?;
@@ -463,52 +455,6 @@ fn center(app: &AppHandle, store: &Store, payload: &Payload, created: &Created, 
     }
 }
 
-// ------------------------------------------------------------------ offers
-
-struct Offer {
-    hash: u64,
-    payload: Payload,
-}
-
-/// The shared item of the last link opened, offered in every window until
-/// imported or dismissed.
-static PENDING: Mutex<Option<Offer>> = Mutex::new(None);
-
-pub(crate) fn pending() -> bool {
-    PENDING.lock().unwrap().is_some()
-}
-
-/// Makes `offer` the pending one; when that changes, every window shows it
-/// (or hides it, `None`) and the tray follows.
-fn set_offer(app: &AppHandle, offer: Option<Offer>) {
-    let mut pending = PENDING.lock().unwrap();
-    if pending.as_ref().map(|o| o.hash) == offer.as_ref().map(|o| o.hash) {
-        return;
-    }
-    let summary = offer.as_ref().map(|o| summary(&o.payload));
-    let changed = pending.is_some() != offer.is_some();
-    *pending = offer;
-    drop(pending);
-    let _ = app.emit("share-available", summary);
-    if changed {
-        refresh_tray(app);
-    }
-}
-
-/// Ends the offer (imported or dismissed).
-fn take_offer(app: &AppHandle) -> Option<Payload> {
-    let payload = PENDING.lock().unwrap().as_ref().map(|o| o.payload.clone())?;
-    set_offer(app, None);
-    Some(payload)
-}
-
-/// The offer's Import, or the tray's "Import shared item".
-pub(crate) fn import_pending(app: &AppHandle, anchor: Option<&WebviewWindow>) {
-    if let Some(payload) = take_offer(app) {
-        import(app, &payload, anchor);
-    }
-}
-
 /// Puts the link to the calling window's note, board or group (or `kind` /
 /// `id`) in the clipboard, and returns it. Written from here: the titlebar
 /// menu is native, so the page has no click to copy with.
@@ -533,33 +479,13 @@ pub(crate) fn copy_share(
     Ok(text)
 }
 
-/// A `memo://import#<code>` link opened (Memo Web's "Open in the app", or a
-/// link clicked anywhere): its item is offered, with the manager in front
-/// so the offer shows.
+/// A `memo://import#<code>` link opened (Memo Web's "In the desktop app",
+/// or a link clicked anywhere): the choice was made there, so its item is
+/// imported right away, with no question, in the middle of the screen.
 pub(crate) fn open_link(app: &AppHandle, url: &str) {
-    let Some(code) = find_code(url) else { return };
-    let Some(payload) = decode(code) else { return };
-    set_offer(app, Some(Offer { hash: hash_of(code), payload }));
-    show_all(app);
-    let _ = open_manager(app);
-}
-
-/// The offer's Import button: the pending item, in the middle of the screen.
-#[tauri::command]
-pub(crate) async fn import_share(app: AppHandle, window: WebviewWindow) {
-    import_pending(&app, Some(&window));
-}
-
-/// The offer a window opening now shows (`None`: nothing to import).
-#[tauri::command]
-pub(crate) fn share_offer() -> Option<Summary> {
-    PENDING.lock().unwrap().as_ref().map(|o| summary(&o.payload))
-}
-
-/// The offer's ✕.
-#[tauri::command]
-pub(crate) fn dismiss_share(app: AppHandle) {
-    take_offer(&app);
+    if let Some(payload) = decode(url) {
+        import(app, &payload, None);
+    }
 }
 
 #[cfg(test)]
@@ -604,6 +530,13 @@ mod tests {
         let app_link = format!("memo://import#{code}");
         assert_eq!(find_code(&app_link), Some(code));
         assert_eq!(decode(&app_link).unwrap().notes[0].title, "Mercado");
+        // Opened in the app, it is imported as it is, with no offer first
+        // (open_link): a new copy beside the original.
+        let before = store.active().len();
+        let created = create(&store, &decode(&app_link).unwrap(), None);
+        assert_eq!(store.active().len(), before + 1);
+        assert_ne!(created.notes[0], id);
+        assert_eq!(store.get(&created.notes[0]).unwrap().title, "Mercado");
         let _ = fs::remove_dir_all(&dir);
     }
 

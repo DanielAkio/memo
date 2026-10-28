@@ -968,48 +968,37 @@ try {
     assert.deepEqual(res.afterTwo, [], 'The next removal is saved too, emptying the column');
   });
 
-  // ------------------------------------------------ 7h. Share: the toast in every window
-  await step('Share: "Copied" and the import offer show in a memory, a board and a group bar', async () => {
+  // ------------------------------------------------ 7h. Share: "Link copied" in every window
+  await step('Share: "Link copied" shows in a memory, a board and a group bar (which grows for it); no import offer', async () => {
     const res = await page.evaluate(async () => {
       const M = window.Memo;
       const calls = [];
-      M.hooks.import_share = (label) => { calls.push(['import', label]); };
-      M.hooks.set_group_height = (label, a) => { calls.push(['height', a.height]); return null; };
+      M.hooks.set_group_height = (label, a) => { calls.push(a.height); return null; };
       M.addNote({ id: 'sh-note', text: 'x' });
       M.addBoard({ id: 'sh-board', name: 'B' });
       M.addGroup({ id: 'sh-group', name: 'G' });
-      await M.openWin('note-sh-note', '/src/windows/note/index.html', { x: 40, y: 40, w: 300, h: 260 });
-      await M.openWin('board-sh-board', '/src/windows/board/board.html', { x: 360, y: 40, w: 420, h: 300 });
-      await M.openWin('group-sh-group', '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 40 });
+      const labels = ['note-sh-note', 'board-sh-board', 'group-sh-group'];
+      await M.openWin(labels[0], '/src/windows/note/index.html', { x: 40, y: 40, w: 300, h: 260 });
+      await M.openWin(labels[1], '/src/windows/board/board.html', { x: 360, y: 40, w: 420, h: 300 });
+      await M.openWin(labels[2], '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 40 });
       await new Promise((r) => setTimeout(r, 300));
-      const toast = (label) => M.frameDoc(label).querySelector('.toast[data-key="share"]');
-      const out = {};
-      const doc = M.frameDoc('note-sh-note');
-      await doc.defaultView.MemoShare.copy();
-      out.copied = M.frameDoc('note-sh-note').querySelector('.toast[data-key="copied"]').textContent;
-      M.emit('share-available', { kind: 'board', name: 'Plano', notes: 3, boards: 1 });
-      out.offer = toast('board-sh-board').textContent;
-      // Every window shows it (the memory after its "Copied").
-      await new Promise((r) => setTimeout(r, 3600));
-      out.everywhere = ['note-sh-note', 'board-sh-board', 'group-sh-group']
-        .every((l) => toast(l) && !toast(l).hidden && toast(l).querySelector('.toast-action'));
-      out.groupGrew = calls.some(([k, h]) => k === 'height' && h > 40);
-      toast('board-sh-board').querySelector('.toast-action').click();
-      await new Promise((r) => setTimeout(r, 50));
-      out.imported = calls.some(([k, l]) => k === 'import' && l === 'board-sh-board');
-      out.hidden = ['note-sh-note', 'board-sh-board', 'group-sh-group'].every((l) => !toast(l) || toast(l).hidden);
-      for (const l of ['note-sh-note', 'board-sh-board', 'group-sh-group']) M.closeWin(l);
-      delete M.hooks.import_share;
+      const out = { copied: {} };
+      for (const l of labels) {
+        await M.frameDoc(l).defaultView.MemoShare.copy();
+        const toast = M.frameDoc(l).querySelector('.toast[data-key="copied"]');
+        out.copied[l] = toast ? toast.textContent : '';
+      }
+      out.groupGrew = calls.some((h) => h > 40);
+      out.offers = labels.some((l) => M.frameDoc(l).querySelector('.toast[data-key="share"]'));
+      for (const l of labels) M.closeWin(l);
       delete M.hooks.set_group_height;
       return out;
     });
-    assert.ok(res.copied.startsWith('Link copiado'), `"Share link" says it copied the link (${res.copied})`);
-    assert.ok(res.offer.includes('Quadro compartilhado: “Plano” · 3 memórias') && res.offer.includes('Importar'),
-      `The offer names the shared board, with Import (${res.offer})`);
-    assert.equal(res.everywhere, true, 'The offer shows in every window, after "Copied" where that was showing');
-    assert.equal(res.groupGrew, true, 'A group bar grows to show the offer');
-    assert.equal(res.imported, true, 'Import asks the app to import it into that window');
-    assert.equal(res.hidden, true, 'The offer goes away in every window once imported');
+    for (const [l, text] of Object.entries(res.copied)) {
+      assert.ok(text.startsWith('Link copiado'), `${l}: "Share link" says it copied the link (${text})`);
+    }
+    assert.equal(res.groupGrew, true, 'A group bar grows to show the notice');
+    assert.equal(res.offers, false, 'No import offer: a link imports where it is opened');
   });
 
   // ------------------------------------------------ 7i. A new version: a notice in every window
@@ -1362,7 +1351,7 @@ try {
         doc.getElementById('editor').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
         await inv(label, 'copy_share');
         await wait(300);
-        out.offered = await inv('manager', 'share_offer');
+        out.offered = Boolean(document.querySelector('.share-dialog') || doc.querySelector('.toast[data-key="share"]'));
         out.menuBefore = await menu();
         document.body.click();
         // A link opened: Esc closes its dialog with nothing imported; opened
@@ -1388,7 +1377,7 @@ try {
         }
         return out;
       }, code);
-      assert.equal(res.offered, null, 'A code pasted, in the clipboard or just copied is not offered');
+      assert.equal(res.offered, false, 'A code pasted, in the clipboard or just copied is not offered');
       assert.ok(!res.menuBefore.includes('Importar item compartilhado') && res.menuBefore.includes('Novo quadro'),
         `No import in the menu without a link (${res.menuBefore})`);
       for (const gone of ['Tema', 'Configurações', 'Idioma', 'Lixeira']) {
@@ -2202,6 +2191,47 @@ try {
       assert.ok(res.toast.includes('só para leitura'), `The memory says it floats read-only (${res.toast})`);
       assert.notEqual(res.redrawn.sum, res.drawn.sum, 'Editing the memory redraws the picture');
       assert.equal(res.after, false, 'Closing the PiP unpins the memory');
+    } finally {
+      await webPage.close();
+    }
+  });
+
+  // ------------------------------------------------ Web: a trashed board takes its memories
+  await step('Web version: trashing a board sends its memories to the trash; restoring it brings them back', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const res = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const ids = async (cmd) => (await inv('manager', cmd)).map((x) => x.id);
+        const newOne = async (cmd, list) => {
+          const before = new Set(await ids(list));
+          await inv('manager', cmd);
+          return (await ids(list)).find((x) => !before.has(x));
+        };
+        const a = await newOne('new_note', 'list_notes');
+        const b = await newOne('new_note', 'list_notes');
+        const loose = await newOne('new_note', 'list_notes');
+        for (const [id, name] of [[a, 'A'], [b, 'B'], [loose, 'Solta']]) await inv(`note-${id}`, 'rename', { name });
+        const bid = await newOne('new_board', 'list_boards');
+        await inv(`board-${bid}`, 'rename', { name: 'Q' });
+        const board = await inv(`board-${bid}`, 'load_board');
+        board.columns[0].noteIds = [a, b];
+        await inv(`board-${bid}`, 'save_board_columns', { columns: board.columns });
+        const trashed = async () => (await inv('manager', 'list_notes')).filter((n) => n.trashedAt).map((n) => n.title).sort();
+        await inv('manager', 'trash_board_id', { id: bid });
+        const out = { afterTrash: await trashed(), boardTrashed: Boolean((await inv('manager', 'list_boards')).find((x) => x.id === bid).trashedAt) };
+        out.windowsGone = !document.querySelector(`.win[data-label="note-${a}"]`) && !document.querySelector(`.win[data-label="note-${b}"]`);
+        await inv('manager', 'restore_board_id', { id: bid });
+        out.afterRestore = await trashed();
+        return out;
+      });
+      assert.equal(res.boardTrashed, true);
+      assert.deepEqual(res.afterTrash, ['A', 'B'], 'The board\'s memories go to the trash with it (not the loose one)');
+      assert.equal(res.windowsGone, true, 'Their windows close');
+      assert.deepEqual(res.afterRestore, [], 'Restoring the board brings its memories back');
     } finally {
       await webPage.close();
     }

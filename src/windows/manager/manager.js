@@ -1594,8 +1594,7 @@
     }
   }
 
-  // Notices (components/toast.js): offers to import, and a new version.
-  MemoShare.attach({ invoke, listen });
+  // Notices (components/toast.js): a new version.
   MemoUpdate.attach({ invoke, listen });
 
   init().catch((err) => console.error('init', err));

@@ -110,23 +110,29 @@ pub(crate) async fn trash_board_id(app: AppHandle, id: String) {
     trash_board_by_id(&app, &id);
 }
 
-/// Sends board `id` to the trash; one nobody touched is removed outright, as
-/// a note or a group.
+/// Sends board `id` to the trash with the memories on it; one nobody touched
+/// is removed outright, as a note or a group.
 pub(crate) fn trash_board_by_id(app: &AppHandle, id: &str) {
     destroy_window(app, &Kind::Board.label(id));
     let store = app.state::<Shared>();
     if store.is_pristine_board(id) {
         store.remove_board(id);
     } else {
-        store.trash_board(id);
+        for note_id in store.trash_board(id) {
+            destroy_window(app, &Kind::Note.label(&note_id));
+        }
+        store.flush();
+        notify(app);
     }
     boards_changed(app);
 }
 
 #[tauri::command]
 pub(crate) fn restore_board_id(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
+    // With the memories that went to the trash with it.
     store.restore_board(&id);
     boards_changed(&app);
+    notify(&app);
     Ok(())
 }
 

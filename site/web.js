@@ -217,7 +217,6 @@
       newNote: 'Nova memória',
       newGroup: 'Novo grupo',
       newBoard: 'Novo quadro',
-      importShare: 'Importar item compartilhado',
       showAll: 'Mostrar todas as memórias',
       manager: 'Gerenciador do Memo',
       trash: 'Lixeira',
@@ -245,7 +244,6 @@
       newNote: 'New memory',
       newGroup: 'New group',
       newBoard: 'New board',
-      importShare: 'Import shared item',
       showAll: 'Show all memories',
       manager: 'Memo Manager',
       trash: 'Trash',
@@ -1690,15 +1688,34 @@
       data.boards = data.boards.filter((x) => x.id !== id);
       markDirty(false);
     } else {
-      updateBoard(id, (x) => { x.trashedAt = nowMs(); });
+      // With the memories on it, sharing its trashedAt (Store::trash_board).
+      const now = nowMs();
+      updateBoard(id, (x) => { x.trashedAt = now; });
+      for (const nid of b.columns.flatMap((c) => c.noteIds || [])) {
+        const n = findNote(nid);
+        if (n && !n.trashedAt) {
+          closeWindow(`note-${nid}`);
+          updateNote(nid, (x) => { x.trashedAt = now; });
+        }
+      }
+      notifyNotes();
     }
     notifyBoards();
   }
 
+  // Back with the memories that went to the trash with it.
   function restoreBoardById(id) {
     const b = findBoard(id);
     if (!b) return;
+    const since = b.trashedAt;
     updateBoard(id, (x) => { x.trashedAt = null; });
+    if (since) {
+      for (const nid of b.columns.flatMap((c) => c.noteIds || [])) {
+        const n = findNote(nid);
+        if (n && n.trashedAt && n.trashedAt >= since) updateNote(nid, (x) => { x.trashedAt = null; });
+      }
+      notifyNotes();
+    }
     notifyBoards();
   }
 
@@ -1752,7 +1769,6 @@
   const shareUrl = () => (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
     ? LOCAL_SHARE_URL.replace(':3000', location.port ? `:${location.port}` : '')
     : SHARE_URL);
-  let sharePending = null; // { code, payload }
 
   const sharedNote = (n) => ({
     title: n.title || '',
@@ -1928,12 +1944,6 @@
     return Array.isArray(x) ? x : [];
   }
 
-  // What the offer shows.
-  const shareSummary = (pending) => {
-    const p = pending.payload;
-    return { kind: p.kind, name: sharedName(p), notes: p.notes.length, boards: p.boards.length };
-  };
-
   // Opened from a shared link (SHARE_URL + code): one dialog asks where to
   // import it, and the code leaves the address bar so a reload doesn't ask
   // again.
@@ -2018,19 +2028,6 @@
     back.append(box);
     document.body.append(back);
     here.focus();
-  }
-
-  function takeShare() {
-    const pending = sharePending;
-    sharePending = null;
-    emit('share-available', null);
-    return pending && pending.payload;
-  }
-
-  // The offer's Import, or the menus' "Import shared item".
-  async function importPendingShare(label) {
-    const payload = takeShare();
-    if (payload) await importShare(payload, label);
   }
 
   // As trash() on the desktop: a note nobody touched and a welcome copy are
@@ -2613,7 +2610,6 @@
 
   // The app's commands, as in the desktop tray (`full`); a titlebar menu
   // ends with the few a window needs at hand (tray.rs `app_menu_items`).
-  // "Import shared item" while a link's item is offered, as on the desktop.
   function buildAppTrayItems(sourceLabel = null, full = true) {
     const lang = effectiveLanguage();
     const L = TRAY_LABELS[lang];
@@ -2625,7 +2621,6 @@
       { label: L.newNote, run: () => createNote({ parentLabel: sourceLabel || 'manager' }) },
       { label: L.newGroup, run: () => createGroup(sourceLabel || 'manager') },
       { label: L.newBoard, run: () => createBoard(sourceLabel || 'manager') },
-      ...(sharePending ? [{ label: L.importShare, run: () => importPendingShare(sourceLabel || 'manager') }] : []),
     ];
     if (!full) {
       return [...create, null, { label: L.manager, run: () => openManagerWindow({ view: 'notes', scope: 'current' }) }];
@@ -3968,14 +3963,6 @@
         await navigator.clipboard.writeText(link);
         return link;
       }
-      case 'share_offer':
-        return sharePending ? shareSummary(sharePending) : null;
-      case 'import_share':
-        await importPendingShare(label);
-        return null;
-      case 'dismiss_share':
-        takeShare();
-        return null;
       case 'take_note_out_of_board': {
         for (const brd of data.boards) {
           for (const col of brd.columns) {

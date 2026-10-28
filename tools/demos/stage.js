@@ -199,9 +199,6 @@
         return null;
       }
       case 'copy_share': return 'shared';
-      case 'share_offer': return null;
-      case 'import_share':
-      case 'dismiss_share': M.emit('share-available', null); return null;
       case 'new_note': {
         const x = M.addNote({ id: `n${Date.now()}`, text: '' });
         M.openNote(x.id);

@@ -157,7 +157,6 @@
   // Notices (components/toast.js): sharing and a new version; the bar
   // grows to hold them.
   MemoToast.init({ onResize: (height) => setHeight(titlebar.offsetHeight + (height || 0)) });
-  MemoShare.attach({ invoke, listen });
   MemoUpdate.attach({ invoke, listen });
 
   init().catch((err) => console.error('init', err));

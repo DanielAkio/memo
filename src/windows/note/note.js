@@ -3191,10 +3191,8 @@
     },
   });
 
-  // Notices (components/toast.js): sharing ("Copied", offers to import)
-  // and a new version.
+  // Notices (components/toast.js): a new version.
   if (!EMBED) {
-    MemoShare.attach({ invoke, listen: TAURI.event.listen });
     MemoUpdate.attach({ invoke, listen: TAURI.event.listen });
   }
 

@@ -30,6 +30,7 @@ function pass(msg) {
 const jsFiles = [
   ...SRC_JS,
   'site/prefs.js',
+  'site/web.js',
   'tools/demos/mock.js',
   'tools/demos/stage.js',
 ];

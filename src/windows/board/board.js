@@ -128,9 +128,7 @@
 
   // ------------------------------------------------------------- Setup & Init
 
-  // Notices (components/toast.js): sharing ("Copied", offers to import)
-  // and a new version.
-  MemoShare.attach({ invoke, listen });
+  // Notices (components/toast.js): a new version.
   MemoUpdate.attach({ invoke, listen });
 
   async function init() {

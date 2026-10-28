@@ -1428,13 +1428,42 @@ impl Store {
         Some(updated)
     }
 
-    pub fn trash_board(&self, id: &str) {
+    /// Sends board `id` to the trash with the memories on it (a group's
+    /// way): they share its `trashed_at`, which is how `restore_board` finds
+    /// them. Returns those memories' ids.
+    pub fn trash_board(&self, id: &str) -> Vec<String> {
         let now = now_ms();
-        self.update_board(id, |b| b.trashed_at = Some(now));
+        let Some(board) = self.update_board(id, |b| b.trashed_at = Some(now)) else {
+            return Vec::new();
+        };
+        let mut trashed = Vec::new();
+        for note_id in board.columns.iter().flat_map(|c| c.note_ids.iter()) {
+            let on = self.update(note_id, |n| {
+                if n.trashed_at.is_none() {
+                    n.trashed_at = Some(now);
+                }
+            });
+            if on.is_some_and(|n| n.trashed_at == Some(now)) {
+                trashed.push(note_id.clone());
+            }
+        }
+        trashed
     }
 
+    /// Brings board `id` back with the memories that went to the trash with
+    /// it (on its columns, trashed since it was).
     pub fn restore_board(&self, id: &str) {
+        let Some(board) = self.board(id) else { return };
+        let since = board.trashed_at;
         self.update_board(id, |b| b.trashed_at = None);
+        let Some(since) = since else { return };
+        for note_id in board.columns.iter().flat_map(|c| c.note_ids.iter()) {
+            self.update(note_id, |n| {
+                if n.trashed_at.is_some_and(|t| t >= since) {
+                    n.trashed_at = None;
+                }
+            });
+        }
     }
 
     /// Permanently deletes every board in the trash (their memories stay).
@@ -1966,6 +1995,34 @@ mod tests {
         let boards: Vec<String> = store.boards().into_iter().map(|b| b.id).collect();
         assert_eq!(boards, vec![live.id], "only the trashed board goes");
         assert!(store.get(&note.id).is_some(), "its memories stay");
+    }
+
+    #[test]
+    fn a_trashed_board_takes_its_memories_and_brings_them_back() {
+        let dir = temp_dir("board-trash-notes");
+        let store = Store::load(dir.join("notes.json"));
+        let on = store.create(None);
+        let earlier = store.create(None);
+        let loose = store.create(None);
+        for id in [&on.id, &earlier.id, &loose.id] {
+            store.update(id, |n| n.text = "x".into());
+        }
+        // A memory trashed before the board stays in the trash after it.
+        store.update(&earlier.id, |n| n.trashed_at = Some(1));
+        let board = store.create_board(Some("B".into()), vec!["A".into()], None);
+        store.update_board(&board.id, |b| b.columns[0].note_ids = vec![on.id.clone(), earlier.id.clone()]);
+
+        let trashed = store.trash_board(&board.id);
+        assert_eq!(trashed, vec![on.id.clone()], "only what was current goes with it");
+        assert!(store.board(&board.id).unwrap().trashed_at.is_some());
+        assert!(store.get(&on.id).unwrap().trashed_at.is_some(), "its memory goes to the trash too");
+        assert!(store.get(&loose.id).unwrap().trashed_at.is_none(), "memories elsewhere stay");
+
+        store.restore_board(&board.id);
+        assert!(store.board(&board.id).unwrap().trashed_at.is_none());
+        assert!(store.get(&on.id).unwrap().trashed_at.is_none(), "it comes back with the board");
+        assert_eq!(store.get(&earlier.id).unwrap().trashed_at, Some(1), "one trashed before stays there");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

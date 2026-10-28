@@ -29,9 +29,6 @@ pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str, full: bool) -> tauri
             item("new-group", l.new_group)?.kind(),
             item("new-board", l.new_board)?.kind(),
         ];
-        if share::pending() {
-            items.push(item("import-share", l.import_share)?.kind());
-        }
         items.extend([separator()?, item("manager", l.manager)?.kind()]);
         if let Some(version) = available {
             items.push(item("update", &format!("{} {version}", l.update_to))?.kind());
@@ -93,10 +90,6 @@ pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str, full: bool) -> tauri
         item("new-board", l.new_board)?.kind(),
         item("show", l.show)?.kind(),
     ];
-    // While a shared link's item is offered (share.rs).
-    if share::pending() {
-        items.push(item("import-share", l.import_share)?.kind());
-    }
     items.extend([
         separator()?,
         item("manager", l.manager)?.kind(),
@@ -306,7 +299,6 @@ pub(crate) fn on_tray_menu(app: &AppHandle, id: &str) {
             boards_changed(app);
         }
         "show" => show_all(app),
-        "import-share" => share::import_pending(app, None),
         "manager" => {
             let _ = open_manager(app);
         }
