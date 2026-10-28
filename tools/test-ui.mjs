@@ -1673,6 +1673,34 @@ try {
     }
   });
 
+  // ------------------------------------------------ 8a. Landing page: live windows invite a click
+  await step('Landing page: each window glows three times the first time it comes into view', async () => {
+    const sitePage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    try {
+      await sitePage.goto(`http://127.0.0.1:${port}/site/index.html`);
+      await sitePage.waitForSelector('.win[data-label="manager"] iframe');
+      await sitePage.waitForTimeout(300);
+      const glow = (label) => sitePage.evaluate((l) => {
+        const el = document.querySelector(`.win[data-label="${l}"]`);
+        const cs = getComputedStyle(el);
+        return { on: el.classList.contains('invite'), name: cs.animationName, times: cs.animationIterationCount, color: cs.getPropertyValue('--invite-glow').trim() !== '' };
+      }, label);
+      const hero = await glow('note-demo-today');
+      const managerBefore = await glow('manager');
+      await sitePage.evaluate(() => document.querySelector('.win[data-label="manager"]').scrollIntoView({ block: 'center' }));
+      await sitePage.waitForTimeout(300);
+      const managerSeen = await glow('manager');
+      await sitePage.waitForTimeout(5200);
+      const heroAfter = await glow('note-demo-today');
+      assert.deepEqual(hero, { on: true, name: 'memo-invite', times: '3', color: true }, 'A window in view pulses three times, in a defined glow colour');
+      assert.equal(managerBefore.on, false, 'One not yet in view waits');
+      assert.equal(managerSeen.on, true, 'It pulses once scrolled into view');
+      assert.equal(heroAfter.on, false, 'Then the pulse is gone for good');
+    } finally {
+      await sitePage.close();
+    }
+  });
+
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
   await step('Web vs Landing page: landing page is ephemeral, web version persists data', async () => {
     const sitePage = await browser.newPage();

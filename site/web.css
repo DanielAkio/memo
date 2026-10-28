@@ -12,6 +12,7 @@
   --overlay-hover: rgba(255, 255, 255, 0.06);
   --overlay-active: rgba(255, 255, 255, 0.1);
   --shadow-win: 0 12px 34px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --invite-glow: rgba(255, 255, 255, 0.2);
   --shadow-menu: rgba(255, 255, 255, 0.04) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.65) 0px 0px 0px 1px, rgba(8, 9, 10, 0.65) 0px 8px 28px 0px;
   --font-ui: system-ui, "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Ubuntu, Cantarell, "Noto Sans", sans-serif;
   color-scheme: dark;
@@ -30,6 +31,7 @@
     --overlay-hover: rgba(0, 0, 0, 0.05);
     --overlay-active: rgba(0, 0, 0, 0.09);
     --shadow-win: 0 10px 28px rgba(24, 34, 60, 0.14), 0 2px 6px rgba(24, 34, 60, 0.08);
+    --invite-glow: rgba(94, 106, 210, 0.28);
     --shadow-menu: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.14) 0px 6px 20px 0px;
     color-scheme: light;
   }
@@ -47,6 +49,7 @@
   --overlay-hover: rgba(0, 0, 0, 0.05);
   --overlay-active: rgba(0, 0, 0, 0.09);
   --shadow-win: 0 10px 28px rgba(24, 34, 60, 0.14), 0 2px 6px rgba(24, 34, 60, 0.08);
+  --invite-glow: rgba(94, 106, 210, 0.28);
   --shadow-menu: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.14) 0px 6px 20px 0px;
   color-scheme: light;
 }
@@ -107,6 +110,22 @@ body.home #desk {
    so it stays in sight over the entire website while scrolling. */
 body.home .win.pinned {
   position: fixed;
+}
+
+/* On the landing page, a window's first time in view: a light glow behind it
+   pulses three times, to say it can be used (web.js invitePulse). */
+body.home .win.invite {
+  animation: memo-invite 1.6s ease-in-out 3;
+}
+@keyframes memo-invite {
+  0%, 100% { box-shadow: var(--shadow-win); }
+  50% {
+    box-shadow: var(--shadow-win),
+      0 0 32px 6px var(--invite-glow);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.home .win.invite { animation: none; }
 }
 
 .win.in-pip {

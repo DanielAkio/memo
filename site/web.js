@@ -4826,6 +4826,22 @@
       window.scrollTo(0, 0);
     }
     window.addEventListener('resize', () => alignSiteHomeWindows(false));
+    invitePulse();
+  }
+
+  // Landing page: each live window glows softly behind itself three times the
+  // first time it comes into view, to say it can be used.
+  function invitePulse() {
+    if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const seen = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        seen.unobserve(e.target);
+        e.target.classList.add('invite');
+        e.target.addEventListener('animationend', () => e.target.classList.remove('invite'), { once: true });
+      }
+    }, { threshold: 0.5 });
+    for (const w of Object.values(wins)) seen.observe(w.el);
   }
 
   window.addEventListener('message', (e) => {
