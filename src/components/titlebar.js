@@ -97,8 +97,34 @@ class TitleBar {
     return this.leave('close_window');
   }
 
+  // The ✕ trashes (the – only closes), so until "Don't show again" is
+  // checked it first says so in a notice: ✕ cancels, the action trashes.
   trash() {
-    return this.leave('trash_window');
+    if (TitleBar.trashHintOff()) return this.leave('trash_window');
+    const t = window.MemoI18n.t;
+    const done = ({ checked }) => {
+      if (checked) TitleBar.trashHintOff(true);
+      window.MemoToast.set('trash-hint', null);
+    };
+    window.MemoToast.set('trash-hint', {
+      text: t('trashHint'),
+      check: t('dontShowAgain'),
+      top: true,
+      outside: true,
+      action: { label: t('proceed'), run: (s) => { done(s); this.leave('trash_window'); } },
+      onClose: done,
+    });
+  }
+
+  // Shared by every window (same origin), in this device's storage.
+  static trashHintOff(set) {
+    const key = 'memo.trashHintOff';
+    try {
+      if (set) localStorage.setItem(key, '1');
+      return localStorage.getItem(key) === '1';
+    } catch {
+      return Boolean(set);
+    }
   }
 
   async leave(command) {

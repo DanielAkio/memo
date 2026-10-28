@@ -228,6 +228,23 @@ pub(crate) fn change_theme(app: AppHandle, theme: String) -> Result<(), String> 
     Ok(())
 }
 
+/// Settings → "Restore default settings": theme, language, zoom, layout,
+/// the magnet, update notices and the defaults for new items go back to how
+/// Memo comes. Start with the system, AI control, cloud accounts and the
+/// data folder stay as they are (they are set up, not preferences).
+#[tauri::command]
+pub(crate) fn reset_settings(app: AppHandle) -> Result<(), String> {
+    set_theme(&app, "system");
+    set_language(&app, "system");
+    change_zoom(app.clone(), 0);
+    set_layout(&app, LAYOUTS[0]);
+    toggle_magnet(&app, true);
+    updater::set_auto(&app, true)?;
+    app.state::<Shared>().reset_defaults();
+    notify(&app);
+    Ok(())
+}
+
 /// Reopens the welcome note (button in the manager's Help tab).
 #[tauri::command]
 pub(crate) async fn show_welcome(app: AppHandle, window: WebviewWindow) -> Result<(), String> {

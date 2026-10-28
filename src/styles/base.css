@@ -842,6 +842,7 @@ html, body {
   gap: 6px;
 }
 .toasts[hidden] { display: none; }
+.toasts.is-top { top: calc(var(--titlebar-h) + 8px); bottom: auto; }
 .toast {
   display: flex;
   align-items: center;
@@ -876,6 +877,14 @@ html, body {
   cursor: default;
 }
 .toast-action:hover { background: var(--overlay-active); }
+/* A notice with a checkbox (TitleBar's trash notice): the text wraps, the
+   checkbox, action and ✕ go on a row below it. */
+.toast.has-check { flex-direction: column; align-items: stretch; gap: 6px; padding: 8px 6px 6px 12px; }
+.toast.has-check .toast-text { white-space: normal; color: var(--color-paper); }
+.toast-row { display: flex; align-items: center; gap: 8px; }
+.toast-head { align-items: flex-start; margin: -2px 0 0; }
+.toast-head .toast-text { padding-top: 4px; }.toast-check { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; line-height: 1.25; }
+.toast-check input { margin: 0; accent-color: var(--color-fog); }
 .toast-close {
   flex: none;
   display: flex;

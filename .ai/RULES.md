@@ -84,7 +84,7 @@ src-tauri/
   tauri.conf.json        app id br.memo.notas, CSP, bundle config (no static windows)
   capabilities/default.json  permissions for note-*, group-*, board-* and manager windows
 site/                    GitHub Pages home page + privacy policy (en + pt in each page) for Google's consent screen
-  media/                 demo GIFs (<scene>-<dark|light>-<en|pt>.gif); the README shows only the pin one
+  media/                 demo GIFs (<scene>-<dark|light>-<en|pt>.gif); the README shows only the pitch one
 tools/
   check.mjs              fast static & invariant checks (JS syntax, Tauri commands/events, i18n, colours)
   test-ui.mjs            headless Playwright UI tests on the real pages via tools/demos/stage.html

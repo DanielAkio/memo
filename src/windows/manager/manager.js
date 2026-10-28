@@ -932,6 +932,18 @@
   $('helpBtn').addEventListener('click', () => {
     invoke('show_welcome').catch((err) => console.error('show_welcome', err));
   });
+  // Every preference back to how Memo comes (reset_settings), the ✕'s
+  // notice included; second click. The page reloads to show them.
+  $('resetSettingsBtn').addEventListener('click', async () => {
+    if (!confirmFirst($('resetSettingsBtn'), t('resetSettingsConfirm'))) return;
+    try {
+      await invoke('reset_settings');
+      try { localStorage.removeItem('memo.trashHintOff'); } catch {}
+      location.reload();
+    } catch (err) {
+      console.error('reset_settings', err);
+    }
+  });
   // Quit closes the whole app (every note); requires a second click.
   $('quitBtn').addEventListener('click', () => {
     if (!confirmFirst($('quitBtn'), t('quitConfirm'))) return;

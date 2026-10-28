@@ -15,8 +15,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: light)" srcset="site/media/pin-light-en.gif">
-    <img src="site/media/pin-dark-en.gif" width="860" alt="A memory with a to-do list is pinned over a spreadsheet and stays in sight while the spreadsheet is being edited">
+    <source media="(prefers-color-scheme: light)" srcset="site/media/pitch-light-en.gif">
+    <img src="site/media/pitch-dark-en.gif" width="860" alt="A pinned memory stays on top while a spreadsheet, a browser and a terminal come forward in turn">
   </picture>
 </p>
 

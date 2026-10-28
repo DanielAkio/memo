@@ -577,9 +577,11 @@
       console.error('Failed to read localStorage store', err);
     }
     // Clean up any demo notes that may have leaked into web storage from earlier landing page runs
+    const before = data.notes.length + data.groups.length;
     data.notes = data.notes.filter((n) => !n.demoSeed && !n.id.startsWith('demo-'));
     data.groups = data.groups.filter((g) => !g.demoSeed && !g.id.startsWith('demo-'));
-    if (data.notes.length === 0 && data.groups.length === 0) {
+    // Only demo leftovers were there: a first run after all. Emptied by the user is not.
+    if (before > 0 && data.notes.length === 0 && data.groups.length === 0) {
       data.nextSeq = 1;
     }
     purgeExpired(nowMs());
@@ -3774,6 +3776,24 @@
         markDirty(false);
         emit('magnet-changed', !data.magnetOff);
         return !data.magnetOff;
+      // As reset_settings on the desktop: preferences and the defaults for
+      // new items back to how Memo comes (sign-ins stay).
+      case 'reset_settings':
+        setThemeSetting('system');
+        setLanguageSetting('system');
+        stepZoom(0);
+        setManagerLayout('cards');
+        data.magnetOff = false;
+        emit('magnet-changed', true);
+        Object.assign(data, {
+          defaultColor: '', defaultTitle: '', defaultText: '', defaultHtml: '',
+          defaultGroupColor: '', defaultGroupTitle: '',
+          defaultBoardColor: '', defaultBoardTitle: '', defaultBoardColumns: null,
+          defaultsUpdatedAt: nowMs(),
+        });
+        markDirty(true);
+        notifyNotes();
+        return null;
 
       // Dragging & Resizing
       case 'drag_start':
@@ -4930,8 +4950,6 @@
 
     if (first) {
       openWelcomeNote('manager', false, !mobile);
-    } else if (activeNotes().length === 0 && activeGroups().length === 0 && !mobile) {
-      createNote({ parentLabel: 'manager' });
     } else if (!mobile) {
       for (const n of visibleNotes()) {
         await openNoteWindow(n);

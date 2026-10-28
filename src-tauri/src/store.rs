@@ -1836,6 +1836,12 @@ impl Store {
         changed
     }
 
+    /// Settings → "Restore default settings": new memories, groups and
+    /// boards start as Memo comes (and the cloud gets that, as an edit).
+    pub fn reset_defaults(&self) {
+        self.apply_settings_doc(&SettingsDoc { updated_at: now_ms(), ..Default::default() });
+    }
+
     pub fn apply_settings_doc(&self, doc: &SettingsDoc) {
         let mut data = self.data.lock().unwrap();
         data.default_color = doc
@@ -2013,6 +2019,26 @@ mod tests {
         let boards: Vec<String> = store.boards().into_iter().map(|b| b.id).collect();
         assert_eq!(boards, vec![live.id], "only the trashed board goes");
         assert!(store.get(&note.id).is_some(), "its memories stay");
+    }
+
+    #[test]
+    fn restoring_default_settings_clears_every_default() {
+        let dir = temp_dir("reset-defaults");
+        let store = Store::load(dir.join("notes.json"));
+        let fresh = (store.default_color(), store.new_note_defaults(), store.group_defaults(), store.board_defaults());
+        store.set_default_color("coral");
+        store.set_default_title("T".into());
+        store.set_default_content("x".into(), "<p>x</p>".into());
+        store.set_default_group_color("teal");
+        store.set_default_group_title("G".into());
+        store.set_default_board_color("iris");
+        store.set_default_board_title("B".into());
+        store.set_default_board_columns(Some(vec![]));
+        store.reset_defaults();
+        let after = (store.default_color(), store.new_note_defaults(), store.group_defaults(), store.board_defaults());
+        assert_eq!(format!("{after:?}"), format!("{fresh:?}"));
+        assert!(store.data.lock().unwrap().defaults_updated_at > 0, "the cloud gets the reset as an edit");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

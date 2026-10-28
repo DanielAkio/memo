@@ -99,7 +99,7 @@ The GIFs are recorded from the app's own pages, so re-record them whenever the w
 npm install --no-save playwright         # once; ffmpeg on the PATH (or npm install --no-save ffmpeg-static)
 node tools/demos/record.mjs              # every scene, theme and language (a few minutes)
 node tools/demos/record.mjs write dark en  # just one
-node tools/demos/record.mjs pitch dark pt  # presentation GIF of the pin over several apps, into dist/
+node tools/demos/record.mjs pitch all en   # the README's GIF: the pin over several apps
 ```
 
 `tools/demos/stage.html` is a fake desktop where each Memo window is an `<iframe>` of `src/windows/note/index.html`,

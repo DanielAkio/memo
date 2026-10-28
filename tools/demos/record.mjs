@@ -1,7 +1,6 @@
 // Records the demo GIFs in site/media/ from the real app pages (src/), in a
 // fake desktop (stage.html) with a fake Tauri API (mock.js).
-//   node tools/demos/record.mjs [pin|write|group|manager|all] [dark|light|all] [en|pt|all]
-//   node tools/demos/record.mjs pitch dark pt   (presentation GIF, into dist/)
+//   node tools/demos/record.mjs [pin|write|group|manager|pitch|all] [dark|light|all] [en|pt|all]
 // Needs Playwright (npm install --no-save playwright) and ffmpeg.
 import fs from 'fs';
 import os from 'os';
@@ -299,8 +298,8 @@ async function manager() {
 
 // ----------------------------------------------------------------- pitch
 
-// For presentations, not the site (dist/): a pinned memory stays on top of
-// every app that comes forward — a spreadsheet, a browser, a terminal.
+// The README's GIF: a pinned memory stays on top of every app that comes
+// forward — a spreadsheet, a browser, a terminal.
 async function pitch() {
   await ev(async ({ sheet, note, page }) => {
     const M = window.Memo;
@@ -410,12 +409,10 @@ async function pitch() {
 }
 
 const scenes = { pin, write, group, manager, pitch };
-// Scenes for presentations only: recorded by name, into dist/.
-const extra = ['pitch'];
 const pick = (arg, all) => (!arg || arg === 'all' ? all : [arg]);
 const [sceneArg, themeArg, langArg] = process.argv.slice(2);
 const server = await serve();
-for (const scene of pick(sceneArg, Object.keys(scenes).filter((s) => !extra.includes(s)))) {
+for (const scene of pick(sceneArg, Object.keys(scenes))) {
   for (const theme of pick(themeArg, ['dark', 'light'])) {
     for (lang of pick(langArg, ['en', 'pt'])) {
       const name = `${scene}-${theme}-${lang}`;
@@ -423,7 +420,7 @@ for (const scene of pick(sceneArg, Object.keys(scenes).filter((s) => !extra.incl
       page = opened.page;
       rec = new Rec(page, path.join(os.tmpdir(), `memo-demo-${name}`));
       await scenes[scene]();
-      const outDir = extra.includes(scene) ? path.join(ROOT, 'dist') : path.join(ROOT, 'site', 'media');
+      const outDir = path.join(ROOT, 'site', 'media');
       fs.mkdirSync(outDir, { recursive: true });
       rec.encode(path.join(outDir, `${name}.gif`));
       await opened.browser.close();

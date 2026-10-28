@@ -35,6 +35,9 @@ async function step(name, fn) {
 }
 
 const { browser, page, errors } = await open({ port, theme: 'dark', lang: 'pt' });
+// The ✕'s first-time notice (TitleBar.trash) is off, so a ✕ trashes at once;
+// its own step turns it on.
+await page.evaluate(() => localStorage.setItem('memo.trashHintOff', '1'));
 
 try {
   // ------------------------------------------------ 1. Welcome note round-trip
@@ -350,6 +353,91 @@ try {
     assert.equal(res.trashedAt, null, 'Closing with ✕ must NOT trash the note');
     assert.equal(res.hasTrashBtn, true, 'Note must have #trashBtn');
     assert.equal(res.trashedAfterTrashBtn, true, 'Clicking #trashBtn must send note to trash');
+  });
+
+  // ------------------------------------------------ The ✕'s notice: it trashes
+  await step('Titlebar ✕: a notice says it trashes; its ✕ cancels, the action trashes, "Don\'t show again" sticks', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const calls = [];
+      M.hooks.trash_window = (label) => { calls.push(label); return null; };
+      const heights = [];
+      M.hooks.set_group_height = (label, a) => { heights.push(a.height); return null; };
+      localStorage.removeItem('memo.trashHintOff');
+      M.addNote({ id: 'th-note', text: 'x' });
+      M.addGroup({ id: 'th-group', name: 'G' });
+      await M.openWin('note-th-note', '/src/windows/note/index.html', { x: 40, y: 40, w: 300, h: 260 });
+      await M.openWin('group-th-group', '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 40 });
+      await wait(300);
+      const doc = (l) => M.frameDoc(l);
+      const notice = (l) => doc(l).querySelector('.toast[data-key="trash-hint"]');
+      const out = {};
+      // ✕ shows the notice instead of trashing; its own ✕ cancels.
+      doc('note-th-note').getElementById('trashBtn').click();
+      await wait(30);
+      out.text = notice('note-th-note') && notice('note-th-note').textContent;
+      out.hasCheck = Boolean(notice('note-th-note') && notice('note-th-note').querySelector('input[type=checkbox]'));
+      // In the upper part, right under the titlebar (next to the ✕).
+      {
+        const d = doc('note-th-note');
+        const gap = notice('note-th-note').getBoundingClientRect().top - d.querySelector('.titlebar').getBoundingClientRect().bottom;
+        out.underTitlebar = gap >= 0 && gap <= 12;
+        // Its ✕ at the top right: level with the text, right of everything.
+        const n = notice('note-th-note').getBoundingClientRect();
+        const x = notice('note-th-note').querySelector('.toast-close').getBoundingClientRect();
+        const go = notice('note-th-note').querySelector('.toast-action').getBoundingClientRect();
+        out.closeTopRight = x.top - n.top <= 10 && n.right - x.right <= 10 && x.bottom <= go.top;
+      }
+      notice('note-th-note').querySelector('.toast-close').click();
+      await wait(30);
+      out.afterCancel = { notice: Boolean(notice('note-th-note')), calls: calls.length };
+      // A click inside it keeps it; one anywhere else closes it, as its ✕.
+      const down = (target) => target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      doc('note-th-note').getElementById('trashBtn').click();
+      await wait(30);
+      down(notice('note-th-note').querySelector('.toast-text'));
+      out.keptOnInside = Boolean(notice('note-th-note'));
+      down(doc('note-th-note').getElementById('editor'));
+      await wait(30);
+      out.afterOutside = { notice: Boolean(notice('note-th-note')), calls: calls.length };
+      // A group bar (too short for it) shows it too; proceeding trashes, once.
+      doc('group-th-group').getElementById('trashBtn').click();
+      await wait(30);
+      out.groupGrew = heights.some((h) => h > 80);
+      notice('group-th-group').querySelector('.toast-action').click();
+      await wait(30);
+      out.afterGo = calls.slice();
+      out.offAfterGo = localStorage.getItem('memo.trashHintOff');
+      // Checked "Don't show again": the next ✕ trashes at once, in any window.
+      doc('note-th-note').getElementById('trashBtn').click();
+      await wait(30);
+      const n = notice('note-th-note');
+      n.querySelector('input[type=checkbox]').click();
+      n.querySelector('.toast-action').click();
+      await wait(30);
+      doc('note-th-note').getElementById('trashBtn').click();
+      await wait(30);
+      out.direct = { notice: Boolean(notice('note-th-note')), calls: calls.length, off: localStorage.getItem('memo.trashHintOff') };
+      M.closeWin('note-th-note');
+      M.closeWin('group-th-group');
+      delete M.notes['th-note'];
+      delete M.groups['th-group'];
+      delete M.hooks.trash_window;
+      delete M.hooks.set_group_height;
+      return out;
+    });
+    assert.ok(res.text.includes('O ✕ manda para a lixeira.') && !res.text.includes('–') && res.text.includes('Não mostrar de novo') && res.text.includes('Continuar'), `The notice explains the ✕ (${res.text})`);
+    assert.equal(res.hasCheck, true, 'It has a "Don\'t show again" checkbox');
+    assert.equal(res.underTitlebar, true, 'It shows in the upper part, under the titlebar');
+    assert.equal(res.closeTopRight, true, 'Its ✕ is at the top right');
+    assert.deepEqual(res.afterCancel, { notice: false, calls: 0 }, 'Its ✕ cancels: nothing trashed');
+    assert.equal(res.keptOnInside, true, 'A click inside it keeps it');
+    assert.deepEqual(res.afterOutside, { notice: false, calls: 0 }, 'A click outside closes it: nothing trashed');
+    assert.equal(res.groupGrew, true, 'A group bar grows for it');
+    assert.deepEqual(res.afterGo, ['group-th-group'], 'The action trashes');
+    assert.equal(res.offAfterGo, null, 'Unchecked, it shows again next time');
+    assert.deepEqual(res.direct, { notice: false, calls: 3, off: '1' }, 'Checked, the next ✕ trashes at once');
   });
 
   // ------------------------------------------------ 4. Group bar window
@@ -1429,6 +1517,78 @@ try {
     }
   });
 
+  // ------------------------------------------------ Settings: restore every preference
+  await step('Settings: "Default settings" restores every preference on the second click (Memo Web)', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      const snapshot = () => webPage.evaluate(async () => {
+        const inv = (c, a) => window.MemoWeb.invoke('manager', c, a);
+        return {
+          theme: await inv('get_theme'),
+          language: (await inv('get_language'))[0],
+          zoom: await inv('get_zoom'),
+          magnet: await inv('get_magnet'),
+          note: [await inv('get_default_color'), await inv('get_new_note_defaults')],
+          group: await inv('get_group_defaults'),
+          board: await inv('get_board_defaults'),
+          layout: (await inv('load_manager')).layout || 'cards',
+          trashHint: localStorage.getItem('memo.trashHintOff'),
+        };
+      });
+      const fresh = await snapshot();
+      await webPage.evaluate(async () => {
+        const inv = (c, a) => window.MemoWeb.invoke('manager', c, a);
+        await inv('change_theme', { theme: 'light' });
+        await inv('change_language', { language: 'en' });
+        await inv('change_zoom', { step: 2 });
+        await inv('set_magnet', { on: false });
+        await inv('set_manager_layout', { layout: 'list' });
+        await inv('set_default_color', { color: 'coral' });
+        await inv('set_default_title', { title: 'T' });
+        await inv('set_default_group_color', { color: 'teal' });
+        await inv('set_default_group_title', { title: 'G' });
+        await inv('set_default_board_color', { color: 'iris' });
+        await inv('set_default_board_title', { title: 'B' });
+        await inv('set_default_board_columns', { columns: [] });
+        localStorage.setItem('memo.trashHintOff', '1');
+      });
+      const changed = await snapshot();
+      const btn = () => webPage.frameLocator('iframe[name="manager"]').locator('#resetSettingsBtn');
+      await btn().dispatchEvent('click');
+      const afterOne = await snapshot();
+      await btn().dispatchEvent('click');
+      await webPage.waitForTimeout(500);
+      const after = await snapshot();
+      assert.notDeepEqual(changed, fresh, 'The settings were changed');
+      assert.deepEqual(afterOne, changed, 'One click changes nothing (it asks for a second)');
+      assert.deepEqual(after, fresh, 'The second click restores every preference');
+    } finally {
+      await webPage.close();
+    }
+  });
+
+  // ------------------------------------------------ Web: launching with no memories creates none
+  await step('Web version: a launch with no memories (not the first) opens only the manager, no new memory', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.addInitScript(() => {
+        localStorage.setItem('memo.web.data.v1', JSON.stringify({ notes: [], groups: [], nextSeq: 5 }));
+      });
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(600);
+      const res = await webPage.evaluate(async () => ({
+        windows: document.querySelectorAll('.win[data-label^="note-"]').length,
+        notes: (await window.MemoWeb.invoke('manager', 'list_notes')).length,
+      }));
+      assert.deepEqual(res, { windows: 0, notes: 0 });
+    } finally {
+      await webPage.close();
+    }
+  });
+
   // ------------------------------------------------ Web: only a link imports (never the clipboard or a paste)
   await step('Web version: a link\'s item is imported from its dialog, centered; a pasted or copied code is never offered', async () => {
     const webPage = await browser.newPage();
@@ -1835,10 +1995,17 @@ try {
       assert.ok(noteLabel, 'Note window exists');
       const noteId = noteLabel.replace('note-', '');
 
-      await webPage.evaluate((lbl) => {
-        const frame = document.querySelector(`iframe[name="${lbl}"]`);
-        frame.contentDocument.getElementById('trashBtn').click();
+      // The first time, through its notice (as on the desktop).
+      const hinted = await webPage.evaluate(async (lbl) => {
+        const doc = document.querySelector(`iframe[name="${lbl}"]`).contentDocument;
+        doc.getElementById('trashBtn').click();
+        await new Promise((r) => setTimeout(r, 30));
+        const n = doc.querySelector('.toast[data-key="trash-hint"]');
+        if (!n) return false;
+        n.querySelector('.toast-action').click();
+        return true;
       }, noteLabel);
+      assert.equal(hinted, true, 'The ✕ first shows its notice in Memo Web too');
 
       await webPage.waitForFunction((lbl) => !document.querySelector(`iframe[name="${lbl}"]`), noteLabel);
 

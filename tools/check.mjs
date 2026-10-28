@@ -63,6 +63,11 @@ const handlerCommands = () => handlerMatch[1]
   .split(',')
   .map((s) => s.trim().split('::').pop())
   .filter(Boolean);
+// A launch never creates a memory (only the first run's welcome note); the web
+// version is covered in test-ui.mjs.
+if (/create_and_open/.test(mainRs)) {
+  fail('main.rs calls create_and_open: launching Memo must not create a memory');
+}
 if (!handlerMatch) {
   fail('could not find generate_handler![...] in src-tauri/src/main.rs');
 } else {
@@ -324,6 +329,11 @@ const DESKTOP_ONLY = {
   if (repeated.length) fail(`README.md repeats the landing page: ${repeated.join(', ')}`);
   else if (links.length) fail(`README.md misses links: ${links.join(', ')}`);
   else pass('README.md points to the website without repeating it');
+  // Its GIF is the pitch (the pin over several apps), in English, and exists.
+  const gifs = [...readme.matchAll(/site\/media\/[\w-]+\.gif/g)].map((m) => m[0]);
+  const wrong = gifs.filter((g) => !/^site\/media\/pitch-(dark|light)-en\.gif$/.test(g) || !fs.existsSync(path.join(ROOT, g)));
+  if (!gifs.length || wrong.length) fail(`README.md must show site/media/pitch-<theme>-en.gif: ${wrong.join(', ') || 'none'}`);
+  else pass('README.md shows the English pitch GIF');
 }
 
 // A group bar's minimum width, the same on the desktop and Memo Web.

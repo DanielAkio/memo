@@ -37,6 +37,8 @@ A note created with `+` (or from the manager, or the welcome note) is placed by 
 
 ✕ / middle click never trash. On a note, `close_window` (→ `close_note_by_id`; groups and boards have their own `_by_id`) sets `Note.hidden` and destroys the window; the note stays among the current ones (dimmed `.is-closed` row in the manager) and `open_note` reopens it. A pristine note (`is_pristine`) or a welcome copy is deleted outright through `trash()`. Only the manager's trash buttons trash: `move_to_trash` → `trash()` sets `trashedAt` and destroys the window (a note with no text and no title is removed outright). `take_out`, `leave_group` and `restore_*` clear `hidden`.
 
+In the titlebars the – (`#closeBtn`) closes and the ✕ (`#trashBtn`) trashes. Until the user checks "Não mostrar de novo", `TitleBar.trash()` first shows a notice (`MemoToast` key `trash-hint`, with `check`, `top`: under the titlebar): its ✕ cancels, "Continuar" trashes. The flag is `localStorage['memo.trashHintOff']`, shared by every window of the same origin (desktop and Memo Web alike). `test-ui.mjs` turns it on at start so other steps trash at once.
+
 ## Startup, first run, lifecycle
 
 - `setup` opens the manager plus `Store::visible()` notes and every active group bar; the same on relaunch (single-instance plugin → `show_all`) and macOS Dock reopen (`RunEvent::Reopen` → `show_all`).

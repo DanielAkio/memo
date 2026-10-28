@@ -333,6 +333,7 @@ fn main() {
             delete_forever,
             empty_trash,
             change_theme,
+            reset_settings,
             get_zoom,
             change_zoom,
             get_language,
@@ -456,9 +457,8 @@ fn main() {
             if store.is_first_run() {
                 let pos = handle.get_webview_window(MANAGER).and_then(|m| beside(&m));
                 open_welcome(&handle, pos, false)?;
-            } else if store.active().is_empty() && store.active_groups().is_empty() && !at_login {
-                create_and_open(&handle, None)?;
             } else {
+                // Never a new memory on launch: the manager is there to make one.
                 // Notes inside closed groups stay in them.
                 for note in &store.visible() {
                     open_note_window(&handle, note)?;
