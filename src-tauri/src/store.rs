@@ -4,7 +4,7 @@
 //! pending, so dragging or resizing a note doesn't hit the disk on every
 //! pixel. Writes are atomic (temporary file + rename).
 
-use crate::images;
+use crate::{cloud::Provider, images};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -232,9 +232,11 @@ struct FileData {
     defaults_updated_at: u64,
     /// Notes and groups deleted for good, kept for `TOMBSTONE_TTL_MS`.
     deleted: Vec<Tombstone>,
-    /// Cloud sync bookkeeping (see `SyncState`); per machine, like the rest
-    /// of this file.
+    /// Cloud sync bookkeeping (see `SyncState`), one per cloud: Google
+    /// Drive's (`sync`, its name from before OneDrive) and OneDrive's; per
+    /// machine, like the rest of this file.
     sync: SyncState,
+    sync_microsoft: SyncState,
 }
 
 // ------------------------------------------------------------ cloud format
@@ -342,7 +344,6 @@ pub struct SyncSnapshot {
     pub groups: Vec<Group>,
     pub deleted: Vec<Tombstone>,
     pub settings: SettingsDoc,
-    pub state: SyncState,
 }
 
 /// What applying a cloud note did, so the caller can update its window.
@@ -420,6 +421,8 @@ pub struct BoardColumn {
     pub name: String,
     pub color: String,
     pub note_ids: Vec<String>,
+    /// Memories shown folded (title only) in this column.
+    pub collapsed: Vec<String>,
 }
 
 /// A kanban board (Trello-like) containing status columns with memories.
@@ -537,6 +540,9 @@ pub struct Config {
     /// E-mail of the Google account connected for cloud sync on this
     /// computer (its token is in the OS credential store, see cloud.rs).
     pub google_account: Option<String>,
+    /// E-mail of the Microsoft account connected for OneDrive sync; with
+    /// both set, Memo syncs with both clouds.
+    pub microsoft_account: Option<String>,
     /// AI assistants may control Memo through MCP on this computer (see
     /// mcp.rs). Off by default.
     pub ai_control: bool,
@@ -777,6 +783,7 @@ impl Store {
             copy.groups.retain(|g| g.trashed_at.is_none());
             copy.deleted.clear();
             copy.sync = SyncState::default();
+            copy.sync_microsoft = SyncState::default();
             normalize(&mut copy);
             serde_json::to_string_pretty(&copy)
         };
@@ -1288,6 +1295,7 @@ impl Store {
                     name: col_name,
                     color: String::new(),
                     note_ids: Vec::new(),
+                    ..Default::default()
                 })
                 .collect();
             let board = Board {
@@ -1330,6 +1338,19 @@ impl Store {
 
     pub fn restore_board(&self, id: &str) {
         self.update_board(id, |b| b.trashed_at = None);
+    }
+
+    /// Permanently deletes every board in the trash (their memories stay).
+    pub fn empty_board_trash(&self) {
+        let ids: Vec<String> = self
+            .boards()
+            .into_iter()
+            .filter(|b| b.trashed_at.is_some())
+            .map(|b| b.id)
+            .collect();
+        for id in ids {
+            self.remove_board(&id);
+        }
     }
 
     pub fn remove_board(&self, id: &str) {
@@ -1502,12 +1523,26 @@ impl Store {
                 default_group_title: data.default_group_title.clone(),
                 updated_at: data.defaults_updated_at,
             },
-            state: data.sync.clone(),
         }
     }
 
-    pub fn update_sync<F: FnOnce(&mut SyncState)>(&self, f: F) {
-        f(&mut self.data.lock().unwrap().sync);
+    /// The sync bookkeeping for `cloud`.
+    pub fn sync_state(&self, cloud: Provider) -> SyncState {
+        let data = self.data.lock().unwrap();
+        match cloud {
+            Provider::Google => data.sync.clone(),
+            Provider::Microsoft => data.sync_microsoft.clone(),
+        }
+    }
+
+    pub fn update_sync<F: FnOnce(&mut SyncState)>(&self, cloud: Provider, f: F) {
+        {
+            let mut data = self.data.lock().unwrap();
+            f(match cloud {
+                Provider::Google => &mut data.sync,
+                Provider::Microsoft => &mut data.sync_microsoft,
+            });
+        }
         self.mark_dirty();
     }
 
@@ -1802,6 +1837,21 @@ mod tests {
     }
 
     #[test]
+    fn emptying_the_board_trash_keeps_current_boards_and_memories() {
+        let dir = temp_dir("board-trash");
+        let store = Store::load(dir.join("notes.json"));
+        let note = store.create(None);
+        let old = store.create_board(Some("Old".into()), vec!["A".into()], None);
+        let live = store.create_board(Some("Live".into()), Vec::new(), None);
+        store.update_board(&old.id, |b| b.columns[0].note_ids = vec![note.id.clone()]);
+        store.trash_board(&old.id);
+        store.empty_board_trash();
+        let boards: Vec<String> = store.boards().into_iter().map(|b| b.id).collect();
+        assert_eq!(boards, vec![live.id], "only the trashed board goes");
+        assert!(store.get(&note.id).is_some(), "its memories stay");
+    }
+
+    #[test]
     fn pinned_members_stay_out_of_a_group_put_away() {
         let dir = temp_dir("pinned-out");
         let store = Store::load(dir.join("notes.json"));
@@ -1818,6 +1868,16 @@ mod tests {
         store.update_group(&group.id, |g| g.hidden = true);
         assert!(store.visible().is_empty(), "closed with the bar's ✕: none");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn board_columns_keep_folded_memories() {
+        // Columns saved before folding existed load with none folded.
+        let old: BoardColumn = serde_json::from_str(r#"{"id":"c1","name":"","color":"teal","noteIds":["a"]}"#).unwrap();
+        assert!(old.collapsed.is_empty());
+        let folded: BoardColumn = serde_json::from_str(r#"{"id":"c1","noteIds":["a","b"],"collapsed":["b"]}"#).unwrap();
+        assert_eq!(folded.collapsed, vec!["b".to_string()]);
+        assert!(serde_json::to_string(&folded).unwrap().contains(r#""collapsed":["b"]"#));
     }
 
     #[test]

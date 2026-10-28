@@ -114,7 +114,6 @@
       { label: t('newNoteInGroup'), run: newNote },
       { label: t('share'), run: () => MemoShare.copy() },
       { label: t('groupToTrash'), run: () => bar.trash() },
-      { label: t('close'), run: () => bar.close() },
     ] : []),
     onMenuOpen: () => colors.close(),
   });

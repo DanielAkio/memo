@@ -84,23 +84,28 @@ window.MemoTheme = (() => {
 //   onChange(open) after opening or closing (a group bar resizes)
 //   closeOnBlur  close when the window loses focus (not a note's: the
 //                system picker itself takes the focus on some platforms)
+//   save(c)      saves the colour instead of set_color (a board column's,
+//                which has no button: open(anchor) from its dot)
 class ColorMenu {
-  constructor({ frame, button, menu, input, current, onPick, customStart, onOpen, onChange, closeOnBlur = true }) {
+  constructor({ frame, button, menu, input, current, onPick, customStart, onOpen, onChange, save, closeOnBlur = true }) {
     const { invoke } = (window.__TAURI__ || window.parent.__TAURI__).core;
+    const persist = save || ((color) => invoke('set_color', { color }).catch((err) => console.error('set_color', err)));
     // Immediate feedback, then saved.
     const pick = (color) => {
       if (current() == null) return;
       onPick(color);
-      invoke('set_color', { color }).catch((err) => console.error('set_color', err));
+      persist(color);
     };
     Object.assign(this, { frame, button, menu, onOpen, onChange });
     this.customSwatch = menu.querySelector('.swatch[data-color="custom"]');
 
-    button.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (menu.hidden) this.open();
-      else this.close();
-    });
+    if (button) {
+      button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (menu.hidden) this.open();
+        else this.close();
+      });
+    }
     menu.addEventListener('click', (e) => {
       const sw = e.target.closest('.swatch');
       if (!sw) return;
@@ -120,7 +125,8 @@ class ColorMenu {
       this.close();
     });
     document.addEventListener('mousedown', (e) => {
-      if (!menu.hidden && !menu.contains(e.target) && !button.contains(e.target)) this.close();
+      const opener = this.anchor || button;
+      if (!menu.hidden && !menu.contains(e.target) && !(opener && opener.contains(e.target))) this.close();
     });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.close();
@@ -132,11 +138,13 @@ class ColorMenu {
     return !this.menu.hidden;
   }
 
-  open() {
+  // `anchor`: what opened it, when not the button (a column's dot).
+  open(anchor = null) {
     if (this.onOpen) this.onOpen();
+    this.anchor = anchor;
     this.menu.hidden = false;
     this.frame.classList.add('menu-open');
-    this.button.setAttribute('aria-expanded', 'true');
+    if (this.button) this.button.setAttribute('aria-expanded', 'true');
     if (this.onChange) this.onChange(true);
   }
 
@@ -144,7 +152,7 @@ class ColorMenu {
     if (this.menu.hidden) return;
     this.menu.hidden = true;
     this.frame.classList.remove('menu-open');
-    this.button.setAttribute('aria-expanded', 'false');
+    if (this.button) this.button.setAttribute('aria-expanded', 'false');
     if (this.onChange) this.onChange(false);
   }
 

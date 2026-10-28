@@ -1,1 +1,14 @@
-{}
+{
+  "regression-test": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ../.ai/hooks/regression-test.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

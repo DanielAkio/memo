@@ -373,6 +373,7 @@ fn main() {
             trash_board_id,
             restore_board_id,
             delete_board_forever,
+            empty_board_trash,
             update_board_drop_zones,
             get_board_group,
             set_board_group,

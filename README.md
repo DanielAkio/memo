@@ -36,7 +36,7 @@ digging through windows to find what you wrote down.
   chat or email; whoever gets it opens Memo and imports a copy with one click.
 - **Yours, and only yours.** No sign-up, no ads, no tracking, and it works offline. Your memories live on your
   computer, and if you want them on several computers, they sync through your own Google Drive
-  ([privacy policy](https://danielakio.github.io/memo/privacy.html)).
+  or OneDrive ([privacy policy](https://danielakio.github.io/memo/privacy.html)).
 
 ## Jot it down in seconds
 
@@ -96,7 +96,7 @@ in your hands.
 ## Get Memo
 
 Download Memo for Windows, macOS or Linux from **[its website](https://danielakio.github.io/memo/)**, which picks
-the right installer for your computer, or **[use Memo right in your browser](https://danielakio.github.io/memo/app.html)** (memories stay in your browser and can sync with the desktop app through Google Drive; pinning a memory uses Picture-in-Picture to float over other apps).
+the right installer for your computer, or **[use Memo right in your browser](https://danielakio.github.io/memo/app.html)** (memories stay in your browser and can sync with the desktop app through Google Drive or OneDrive; pinning a memory uses Picture-in-Picture to float over other apps).
 
 Open it, and Memo greets you with a welcome memory that shows the basics. Closing a memory never deletes it, and
 closing the last one keeps Memo in the system tray (the menu bar on a Mac), ready for the next idea.

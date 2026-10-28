@@ -30,11 +30,13 @@ cd src-tauri && cargo check && cargo clippy && cargo test
   `TAURI_SIGNING_PRIVATE_KEY` secret it also publishes the signed update packages the app updates itself from
   ([`updates.md`](updates.md)).
 
-## Google Drive sync
+## Cloud sync (Google Drive, OneDrive)
 
-The sync section only shows in builds made with a Google OAuth client. For local builds, put it in `.env` at the
-repository root (template: `.env.example`); CI reads the `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` secrets. Setting
-up the Google Cloud project is in [`google-cloud.md`](google-cloud.md).
+The sync section only shows in builds made with a Google OAuth client or a Microsoft app id, and offers each cloud
+whose client the build has. For local builds, put them in `.env` at the repository root (template: `.env.example`);
+CI reads the `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and `MICROSOFT_CLIENT_ID` secrets. Setting up the Google
+Cloud project is in [`google-cloud.md`](google-cloud.md), the Microsoft app registration in
+[`onedrive.md`](onedrive.md).
 
 ## AI control (MCP)
 

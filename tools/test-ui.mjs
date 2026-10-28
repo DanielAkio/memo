@@ -1054,6 +1054,422 @@ try {
     assert.deepEqual(res.calls, ['install', 'dismiss']);
   });
 
+  // ------------------------------------------------ 7j. Board columns: colour, moving, folded memories
+  await step('Board: a column\'s dot picks its colour, a column dragged by its header moves, a memory folds to its title', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      M.addNote({ id: 'cf-a', title: 'A', text: 'A\nfirst line' });
+      M.addNote({ id: 'cf-b', title: 'B', text: 'B\nsecond line' });
+      M.addBoard({ id: 'cf-board', name: 'Cols', columns: [
+        { id: 'c1', name: 'One', color: '', noteIds: ['cf-a'] },
+        { id: 'c2', name: 'Two', color: '', noteIds: ['cf-b'] },
+      ] });
+      await M.openWin('board-cf-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 640, h: 400 });
+      await wait(300);
+      const doc = M.frameDoc('board-cf-board');
+      const win = doc.defaultView;
+      const col = (id) => doc.querySelector(`.board-column[data-col-id="${id}"]`);
+      const out = {};
+
+      // Colour: the dot opens the swatches; a swatch paints and saves it.
+      col('c1').querySelector('.col-dot').click();
+      const menu = doc.getElementById('colColorMenu');
+      out.menuOpen = Boolean(menu && !menu.hidden);
+      menu.querySelector('.swatch[data-color="teal"]').click();
+      await wait(200);
+      out.saved = M.boards['cf-board'].columns[0].color;
+      out.painted = col('c1').querySelector('.col-dot').dataset.color;
+      out.menuClosed = menu.hidden;
+
+      // Moving: drag "One" by its header past the middle of "Two".
+      const head = col('c1').querySelector('.col-head');
+      const r1 = head.getBoundingClientRect();
+      const r2 = col('c2').getBoundingClientRect();
+      const y = r1.top + r1.height / 2;
+      head.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: r1.left + 40, clientY: y }));
+      win.dispatchEvent(new win.PointerEvent('pointermove', { clientX: r1.left + 60, clientY: y }));
+      win.dispatchEvent(new win.PointerEvent('pointermove', { clientX: r2.right - 10, clientY: y }));
+      win.dispatchEvent(new win.PointerEvent('pointerup', { clientX: r2.right - 10, clientY: y }));
+      await wait(200);
+      out.order = M.boards['cf-board'].columns.map((c) => c.id);
+      out.drawn = [...doc.querySelectorAll('.board-column')].map((c) => c.dataset.colId);
+
+      // Folding: the arrow keeps only the title, and opens it again.
+      const card = () => doc.querySelector('.board-card[data-note-id="cf-a"]');
+      card().querySelector('.card-fold-btn').click();
+      await wait(200);
+      out.folded = card().classList.contains('is-folded') && !card().querySelector('.card-snippet');
+      out.foldSaved = [...(M.boards['cf-board'].columns.find((c) => c.id === 'c1').collapsed || [])];
+      card().querySelector('.card-fold-btn').click();
+      await wait(200);
+      out.unfolded = !card().classList.contains('is-folded') && Boolean(card().querySelector('.card-snippet'));
+      out.opened = M.wins['note-cf-a'] ? 'opened' : 'not opened';
+      M.closeWin('board-cf-board');
+      return out;
+    });
+    assert.equal(res.menuOpen, true, 'The column dot opens the colour swatches');
+    assert.equal(res.saved, 'teal', 'The picked colour is saved with the columns');
+    assert.equal(res.painted, 'teal', 'The dot shows it');
+    assert.equal(res.menuClosed, true, 'Picking closes the swatches');
+    assert.deepEqual(res.order, ['c2', 'c1'], 'A column dragged past another moves there, saved');
+    assert.deepEqual(res.drawn, ['c2', 'c1'], 'and is drawn there');
+    assert.equal(res.folded, true, 'A folded memory shows only its title');
+    assert.deepEqual(res.foldSaved, ['cf-a'], 'Folding is saved in the column');
+    assert.equal(res.unfolded, true, 'The arrow opens it again');
+    assert.equal(res.opened, 'not opened', 'Folding does not open the memory');
+  });
+
+  // ------------------------------------------------ 7k. A ✕ that deletes acts on one click
+  await step('A ✕ that deletes acts on the first click: a column (with its memories), a card, the titlebar trash', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      for (const id of ['dl-a', 'dl-b', 'dl-n']) M.addNote({ id, text: id });
+      M.addBoard({ id: 'dl-board', name: 'Del', columns: [
+        { id: 'c1', name: 'One', noteIds: ['dl-a'] },
+        { id: 'c2', name: 'Two', noteIds: ['dl-b'] },
+      ] });
+      await M.openWin('board-dl-board', '/src/windows/board/board.html', { x: 40, y: 40, w: 640, h: 400 });
+      await M.openWin('note-dl-n', '/src/windows/note/index.html', { x: 700, y: 40, w: 300, h: 260 });
+      await wait(300);
+      const doc = M.frameDoc('board-dl-board');
+      const out = {};
+      doc.querySelector('.board-column[data-col-id="c1"] .col-menu-btn').click();
+      await wait(200);
+      out.colGone = M.boards['dl-board'].columns.map((c) => c.id);
+      out.memoryTrashed = Boolean(M.notes['dl-a'].trashedAt);
+      doc.querySelector('.board-card[data-note-id="dl-b"] .card-del-btn').click();
+      await wait(200);
+      out.cardGone = !M.boards['dl-board'].columns[0].noteIds.includes('dl-b');
+      M.frameDoc('note-dl-n').getElementById('trashBtn').click();
+      await wait(200);
+      out.noteTrashed = Boolean(M.notes['dl-n'].trashedAt);
+      M.closeWin('board-dl-board');
+      return out;
+    });
+    assert.deepEqual(res.colGone, ['c2'], 'One click on a column ✕ deletes the column');
+    assert.equal(res.memoryTrashed, true, 'and sends its memories to the trash');
+    assert.equal(res.cardGone, true, 'One click on a card ✕ removes it from the board');
+    assert.equal(res.noteTrashed, true, 'One click on the titlebar trash trashes the memory');
+  });
+
+  // ------------------------------------------------ 7m. Boards tab: "Empty trash" empties the boards' trash
+  await step('Manager: "Empty trash" in the Boards tab deletes the trashed boards (not memories)', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      M.addNote({ id: 'et-note', text: 'trashed memory' });
+      M.notes['et-note'].trashedAt = Date.now();
+      M.addBoard({ id: 'et-board', name: 'Old' });
+      M.boards['et-board'].trashedAt = Date.now();
+      M.addBoard({ id: 'et-live', name: 'Live' });
+      const calls = [];
+      M.hooks.empty_trash = () => { calls.push('empty_trash'); };
+      M.hooks.empty_board_trash = () => { calls.push('empty_board_trash'); };
+      await M.openManager();
+      await wait(200);
+      const doc = M.frameDoc('manager');
+      doc.getElementById('tabBoards').click();
+      doc.querySelector('#scopeSwitch [data-scope="trash"]').click();
+      await wait(100);
+      const btn = doc.getElementById('emptyTrash');
+      const enabled = !btn.disabled;
+      btn.click(); // armed: "Empty trash" asks for a second click
+      btn.click();
+      await wait(200);
+      delete M.hooks.empty_trash;
+      delete M.hooks.empty_board_trash;
+      const out = {
+        enabled,
+        calls,
+        boardGone: !M.boards['et-board'],
+        liveKept: Boolean(M.boards['et-live']),
+        noteKept: Boolean(M.notes['et-note']),
+        cards: doc.querySelectorAll('#list .card').length,
+      };
+      doc.querySelector('#scopeSwitch [data-scope="current"]').click();
+      doc.getElementById('tabNotes').click();
+      delete M.notes['et-note'];
+      delete M.boards['et-live'];
+      return out;
+    });
+    assert.equal(res.enabled, true, 'The button is on with a board in the trash');
+    assert.deepEqual(res.calls, ['empty_board_trash'], 'It empties the boards\' trash, not the memories\'');
+    assert.equal(res.boardGone, true, 'The trashed board is gone');
+    assert.equal(res.liveKept, true, 'A current board stays');
+    assert.equal(res.noteKept, true, 'A trashed memory stays');
+    assert.equal(res.cards, 0, 'The Boards trash is empty');
+  });
+
+  // ------------------------------------------------ 7l. Short titlebar menus
+  await step('Titlebar menus keep only the window\'s own commands (no Close, no duplicates of the app part)', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const menus = {};
+      M.hooks.show_title_menu = (label, a) => { menus[label] = (a.items || []).filter(Boolean).map((i) => i.label); return null; };
+      M.addNote({ id: 'mn-note', text: 'x' });
+      M.addBoard({ id: 'mn-board', name: 'B' });
+      M.addGroup({ id: 'mn-group', name: 'G' });
+      await M.openWin('note-mn-note', '/src/windows/note/index.html', { x: 40, y: 40, w: 300, h: 260 });
+      await M.openWin('board-mn-board', '/src/windows/board/board.html', { x: 360, y: 40, w: 420, h: 300 });
+      await M.openWin('group-mn-group', '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 40 });
+      await wait(300);
+      for (const l of ['note-mn-note', 'board-mn-board', 'group-mn-group']) {
+        const doc = M.frameDoc(l);
+        doc.getElementById('titlebar').dispatchEvent(new doc.defaultView.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 10 }));
+      }
+      await wait(100);
+      delete M.hooks.show_title_menu;
+      for (const l of ['note-mn-note', 'board-mn-board', 'group-mn-group']) M.closeWin(l);
+      return menus;
+    });
+    const all = Object.values(res).flat();
+    assert.equal(Object.keys(res).length, 3, `Every window opens its menu (${Object.keys(res)})`);
+    for (const gone of ['Fechar', 'Fechar memória', 'Nova memória', 'Trazer todas para a frente']) {
+      assert.ok(!all.includes(gone), `"${gone}" is not in a titlebar's own commands (${all})`);
+    }
+  });
+
+  // ------------------------------------------------ Web: import from the menu, centered; a paste anywhere offers it
+  await step('Web version: "Import shared item" reads the clipboard, the copy opens centered; a paste in a memory offers it', async () => {
+    const webPage = await browser.newPage();
+    try {
+      await webPage.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: `http://127.0.0.1:${port}` });
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name^="note-"]');
+      await webPage.waitForTimeout(400);
+      // A code made by Memo Web elsewhere (the fixture share.rs reads too).
+      const elsewhere = fs.readFileSync(path.join(ROOT, 'src-tauri/tests/web-share-code.txt'), 'utf8').trim();
+      const res = await webPage.evaluate(async (elsewhere) => {
+        const inv = window.MemoWeb.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const out = {};
+        const label = document.querySelector('.win[data-label^="note-"]').dataset.label;
+        const text = await inv(label, 'copy_share');
+        await inv(label, 'dismiss_share'); // as if copied from a chat later
+        await inv(label, 'rename', { name: 'Again' });
+        const again = await inv(label, 'copy_share');
+        await inv(label, 'dismiss_share');
+        // The titlebar menu: short, with the import.
+        await inv(label, 'show_title_menu', { items: [] });
+        const rows = [...document.querySelectorAll('#contextMenu .ctx-item')].map((b) => b.textContent);
+        out.rows = rows;
+        const before = new Set((await inv('manager', 'list_notes')).map((n) => n.id));
+        await navigator.clipboard.writeText(text.replace(/memo:v1:\S+/, '') + '\n' + again.match(/memo:v1:\S+/)[0]);
+        [...document.querySelectorAll('#contextMenu .ctx-item')].find((b) => b.textContent === 'Importar item compartilhado').click();
+        await wait(600);
+        const fresh = (await inv('manager', 'list_notes')).find((n) => !before.has(n.id));
+        out.imported = fresh ? fresh.title : null;
+        const w = fresh && document.querySelector(`.win[data-label="note-${fresh.id}"]`);
+        if (w) {
+          const r = w.getBoundingClientRect();
+          const desk = document.getElementById('desk').getBoundingClientRect();
+          out.dx = Math.abs(r.left + r.width / 2 - (desk.left + desk.width / 2));
+          out.dy = Math.abs(r.top + r.height / 2 - (desk.top + desk.height / 2));
+        }
+        // A paste inside a memory's text offers the code it carries.
+        const third = `Oi
+
+${elsewhere}`;
+        const doc = document.querySelector(`iframe[name="${label}"]`).contentDocument;
+        const dt = new DataTransfer();
+        dt.setData('text/plain', third);
+        doc.getElementById('editor').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+        await wait(300);
+        const toast = doc.querySelector('.toast[data-key="share"]');
+        out.pasteOffer = toast && !toast.hidden ? toast.textContent : '';
+        return out;
+      }, elsewhere);
+      assert.ok(res.rows.includes('Importar item compartilhado') && res.rows.includes('Novo quadro'), `The titlebar menu offers to import (${res.rows})`);
+      for (const gone of ['Tema', 'Configurações', 'Idioma', 'Lixeira']) {
+        assert.ok(!res.rows.includes(gone), `"${gone}" stays in the tray, not in a titlebar menu (${res.rows})`);
+      }
+      assert.equal(res.imported, 'Again', 'The menu imports the code in the clipboard');
+      assert.ok(res.dx <= 40 && res.dy <= 60, `The imported memory opens in the middle (${res.dx}, ${res.dy})`);
+      assert.ok(res.pasteOffer.includes('“Oi”'), `A paste in a memory offers the shared item (${res.pasteOffer})`);
+    } finally {
+      await webPage.close();
+    }
+  });
+
+  // ------------------------------------------------ Sync: Google Drive, OneDrive or both in Settings
+  await step('Settings: Sync has a row per cloud; one, the other or both can be connected', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const calls = [];
+      const accounts = [];
+      const idle = { syncing: false, lastSync: 0, pending: 0, error: null };
+      const emails = { google: 'me@gmail.com', microsoft: 'me@outlook.com' };
+      M.hooks.get_cloud_account = () => [['google', 'microsoft'], accounts.slice()];
+      M.hooks.connect_cloud = (label, a) => {
+        calls.push(['connect', a.provider]);
+        accounts.push({ provider: a.provider, email: emails[a.provider], status: idle });
+        return emails[a.provider];
+      };
+      M.hooks.disconnect_cloud = (label, a) => {
+        calls.push(['disconnect', a.provider]);
+        accounts.splice(accounts.findIndex((x) => x.provider === a.provider), 1);
+        return null;
+      };
+      await M.openManager();
+      await wait(200);
+      const doc = M.frameDoc('manager');
+      doc.getElementById('tabSettings').click();
+      await wait(100);
+      const row = (p) => doc.querySelector(`[data-cloud-row="${p}"]`);
+      const btn = (p, act) => row(p).querySelector(`[data-cloud-act="${act}"]`);
+      const state = (p) => ({
+        connect: !btn(p, 'connect').hidden,
+        disconnect: !btn(p, 'disconnect').hidden,
+        status: row(p).querySelector('[data-cloud-status]').textContent,
+      });
+      const out = { rows: [!row('google').hidden, !row('microsoft').hidden], start: [state('google'), state('microsoft')] };
+      btn('microsoft', 'connect').click();
+      await wait(200);
+      out.oneDriveOnly = [state('google'), state('microsoft')];
+      btn('google', 'connect').click();
+      await wait(200);
+      out.both = [state('google'), state('microsoft')];
+      btn('microsoft', 'disconnect').click();
+      await wait(200);
+      out.googleOnly = [state('google'), state('microsoft')];
+      out.calls = calls;
+      delete M.hooks.get_cloud_account;
+      delete M.hooks.connect_cloud;
+      delete M.hooks.disconnect_cloud;
+      doc.getElementById('tabNotes').click();
+      return out;
+    });
+    assert.deepEqual(res.rows, [true, true], 'A row for Google Drive and one for OneDrive');
+    assert.ok(res.start.every((r) => r.connect && !r.disconnect), 'Both can be connected at first');
+    assert.ok(res.oneDriveOnly[1].disconnect && res.oneDriveOnly[1].status.includes('me@outlook.com'), 'OneDrive connected');
+    assert.ok(res.oneDriveOnly[0].connect, 'Google Drive can still be connected beside it');
+    assert.ok(res.both.every((r) => r.disconnect && !r.connect), `Both connected at once (${JSON.stringify(res.both)})`);
+    assert.ok(res.googleOnly[0].disconnect && res.googleOnly[1].connect, 'Disconnecting OneDrive leaves Google Drive connected');
+    assert.deepEqual(res.calls, [['connect', 'microsoft'], ['connect', 'google'], ['disconnect', 'microsoft']]);
+  });
+
+  // ------------------------------------------------ Web: OneDrive sync between two browsers (fake Graph)
+  await step('Web version: memories sync through OneDrive between two browsers, one file per memory', async () => {
+    const GRAPH = 'https://graph.microsoft.com/v1.0';
+    const fake = { files: new Map(), log: [], next: 0 };
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,OPTIONS' };
+    const json = (route, body) => route.fulfill({ status: 200, headers: { ...cors, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const item = (id, name) => (fake.files.has(id) ? { id, name, file: {} } : { id, name, deleted: {} });
+    const graph = async (route) => {
+      const req = route.request();
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      const url = new URL(req.url());
+      const path = decodeURIComponent(url.pathname.replace('/v1.0', ''));
+      if (path === '/me/drive/special/approot/delta') {
+        return json(route, { value: [], '@odata.deltaLink': `${GRAPH}/delta/${fake.log.length}` });
+      }
+      if (path.startsWith('/delta/')) {
+        const from = Number(path.slice('/delta/'.length));
+        return json(route, { value: fake.log.slice(from).map(([id, name]) => item(id, name)), '@odata.deltaLink': `${GRAPH}/delta/${fake.log.length}` });
+      }
+      if (path === '/me/drive/special/approot/children') {
+        return json(route, { value: [...fake.files].map(([id, f]) => ({ id, name: f.name, file: {} })) });
+      }
+      const put = path.match(/^\/me\/drive\/special\/approot:\/(.+):\/content$/);
+      if (put && req.method() === 'PUT') {
+        const name = put[1];
+        let id = [...fake.files].find(([, f]) => f.name === name)?.[0];
+        if (!id) id = `o${++fake.next}`;
+        fake.files.set(id, { name, body: req.postDataBuffer() || Buffer.alloc(0) });
+        fake.log.push([id, name]);
+        return json(route, { id });
+      }
+      const one = path.match(/^\/me\/drive\/items\/([^/]+)$/);
+      if (one && req.method() === 'DELETE') {
+        const f = fake.files.get(one[1]);
+        if (f) {
+          fake.files.delete(one[1]);
+          fake.log.push([one[1], f.name]);
+        }
+        return route.fulfill({ status: 204, headers: cors });
+      }
+      if (one) return json(route, { id: one[1], '@microsoft.graph.downloadUrl': `https://download.example/${one[1]}` });
+      return route.fulfill({ status: 404, headers: cors, body: '' });
+    };
+    const download = (route) => {
+      const id = new URL(route.request().url()).pathname.slice(1);
+      return route.fulfill({ status: 200, headers: cors, body: fake.files.get(id).body });
+    };
+    const signedIn = async () => {
+      const p = await browser.newPage();
+      await p.route(`${GRAPH}/**`, graph);
+      await p.route('https://download.example/**', download);
+      await p.addInitScript(() => {
+        localStorage.setItem('memo.web.microsoftClientId', 'test-client');
+        localStorage.setItem('memo.web.microsoftToken', JSON.stringify({ accessToken: 'test', expiresAt: Date.now() + 3_600_000 }));
+        if (!localStorage.getItem('memo.web.data.v1')) {
+          localStorage.setItem('memo.web.data.v1', JSON.stringify({ syncMicrosoft: { account: 'me@outlook.com' } }));
+        }
+      });
+      await p.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await p.waitForSelector('iframe[name="manager"]');
+      return p;
+    };
+    // Sync now and wait for it to end.
+    const syncNow = (p) => p.evaluate(async () => {
+      const inv = window.MemoWeb.invoke;
+      await inv('manager', 'sync_cloud');
+      for (let i = 0; i < 100; i++) {
+        const [, accounts] = await inv('manager', 'get_cloud_account');
+        const st = accounts.find((x) => x.provider === 'microsoft').status;
+        if (!st.syncing) return st;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return { error: 'timeout' };
+    });
+    const a = await signedIn();
+    const b = await signedIn();
+    try {
+      const account = await a.evaluate(async () => {
+        const [providers, accounts] = await window.MemoWeb.invoke('manager', 'get_cloud_account');
+        return [providers, accounts.map((x) => x.email).join(), accounts.map((x) => x.provider).join()];
+      });
+      const id = await a.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const before = new Set((await inv('manager', 'list_notes')).map((n) => n.id));
+        await inv('manager', 'new_note');
+        const fresh = (await inv('manager', 'list_notes')).find((n) => !before.has(n.id)).id;
+        await inv(`note-${fresh}`, 'rename', { name: 'Na nuvem' });
+        await inv(`note-${fresh}`, 'save_text', { text: 'Na nuvem\nolá', html: '<div>olá</div>' });
+        return fresh;
+      });
+      const stA = await syncNow(a);
+      const namesAfterFirst = [...fake.files.values()].map((f) => f.name);
+      const stB = await syncNow(b);
+      const onB = await b.evaluate(async (id) => (await window.MemoWeb.invoke('manager', 'list_notes')).find((n) => n.id === id), id);
+      // Edited again on A: the newer file replaces the old one.
+      await a.evaluate(async (id) => {
+        await new Promise((r) => setTimeout(r, 20));
+        await window.MemoWeb.invoke(`note-${id}`, 'save_text', { text: 'Na nuvem\nde novo', html: '<div>de novo</div>' });
+      }, id);
+      await syncNow(a);
+      await syncNow(b);
+      const onBAgain = await b.evaluate(async (id) => (await window.MemoWeb.invoke('manager', 'list_notes')).find((n) => n.id === id), id);
+      const noteFiles = [...fake.files.values()].map((f) => f.name).filter((n) => n.startsWith(`note-${id}.json~`));
+
+      assert.equal(account[1], 'me@outlook.com', 'The OneDrive account is connected');
+      assert.equal(account[2], 'microsoft', 'as a Microsoft account');
+      assert.ok(account[0].includes('microsoft'), `OneDrive is offered (${account[0]})`);
+      assert.ok(!stA.error && !stB.error, `Both syncs succeed (${stA.error}, ${stB.error})`);
+      assert.ok(namesAfterFirst.some((n) => new RegExp(`^note-${id}\\.json~\\d+$`).test(n)), `The memory is a file named with its stamp (${namesAfterFirst})`);
+      assert.equal(onB && onB.title, 'Na nuvem', 'The memory reached the other browser');
+      assert.equal(onBAgain && onBAgain.text, 'Na nuvem\nde novo', 'and so does its next edit');
+      assert.equal(noteFiles.length, 1, `One file per memory in OneDrive (${noteFiles})`);
+    } finally {
+      await a.close();
+      await b.close();
+    }
+  });
+
   // ------------------------------------------------ 8. Web vs Landing page storage isolation
   await step('Web vs Landing page: landing page is ephemeral, web version persists data', async () => {
     const sitePage = await browser.newPage();

@@ -91,6 +91,9 @@ jobs:
           # these secrets the build simply has no cloud sync.
           MEMO_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           MEMO_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          # Microsoft app for OneDrive sync (docs/onedrive.md); a public
+          # client, so only its id.
+          MEMO_MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
           # In-app updates (docs/updates.md): signs the update packages.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

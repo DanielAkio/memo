@@ -67,15 +67,15 @@ const server = createServer(async (req, res) => {
     const ext = extname(filePath).toLowerCase();
     if (filePath.endsWith(join("site", "app.html"))) {
       const clientId = process.env.MEMO_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID || process.env.MEMO_GOOGLE_CLIENT_ID || "";
+      const microsoftId = process.env.MEMO_MICROSOFT_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID || "";
+      let html = body.toString("utf8");
       if (clientId) {
-        body = Buffer.from(
-          body.toString("utf8").replace(
-            /(<meta\s+name="memo-google-client-id"\s+content=")([^"]*)"/,
-            `$1${clientId}"`
-          ),
-          "utf8"
-        );
+        html = html.replace(/(<meta\s+name="memo-google-client-id"\s+content=")([^"]*)"/, `$1${clientId}"`);
       }
+      if (microsoftId) {
+        html = html.replace(/(<meta\s+name="memo-microsoft-client-id"\s+content=")([^"]*)"/, `$1${microsoftId}"`);
+      }
+      body = Buffer.from(html, "utf8");
     }
     res.writeHead(200, {
       "Content-Type": MIME[ext] || "application/octet-stream",
@@ -90,5 +90,6 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`Memo Web running at http://127.0.0.1:${PORT}/site/app.html`);
+  console.log(`  (for OneDrive sign-in, open it as http://localhost:${PORT}/site/app.html: docs/onedrive.md)`);
   console.log(`Memo Site running at http://127.0.0.1:${PORT}/site/`);
 });

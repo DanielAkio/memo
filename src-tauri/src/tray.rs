@@ -6,18 +6,38 @@ use crate::*;
 /// showing, the manager's tabs, appearance, sync) and "Quit". Rebuilt by
 /// `refresh_tray` whenever a checked item or a label changes.
 pub(crate) fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let items = app_menu_items(app, "")?;
+    let items = app_menu_items(app, "", true)?;
     let refs: Vec<&dyn IsMenuItem<tauri::Wry>> = items.iter().map(|i| i as &dyn IsMenuItem<tauri::Wry>).collect();
     Menu::with_items(app, &refs)
 }
 
-/// The app's commands, as in the tray menu: also the bottom part of every
-/// titlebar menu (`show_title_menu`), with the item ids behind `prefix`.
-pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec<MenuItemKind<tauri::Wry>>> {
+/// The app's commands, as in the tray menu (`full`); every titlebar menu
+/// (`show_title_menu`) ends with the few a window needs at hand (creating,
+/// importing, the manager, a newer version), with the item ids behind
+/// `prefix`. Settings and the rest stay in the tray and the manager.
+pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str, full: bool) -> tauri::Result<Vec<MenuItemKind<tauri::Wry>>> {
     let store = app.state::<Shared>();
     let l = tray_labels(store.effective_language());
     let id = |id: &str| format!("{prefix}{id}");
     let item = |key: &str, text: &str| MenuItem::with_id(app, id(key), text, true, None::<&str>);
+    let separator = || PredefinedMenuItem::separator(app).map(|s| s.kind());
+    // A newer version found (updater.rs) replaces "Check for updates".
+    let available = updater::status().available;
+    if !full {
+        let mut items = vec![
+            item("new", l.new_note)?.kind(),
+            item("new-group", l.new_group)?.kind(),
+            item("new-board", l.new_board)?.kind(),
+        ];
+        if share::pending() {
+            items.push(item("import-share", l.import_share)?.kind());
+        }
+        items.extend([separator()?, item("manager", l.manager)?.kind()]);
+        if let Some(version) = available {
+            items.push(item("update", &format!("{} {version}", l.update_to))?.kind());
+        }
+        return Ok(items);
+    }
     let check = |key: &str, text: &str, on: bool| CheckMenuItem::with_id(app, id(key), text, true, on, None::<&str>);
 
     let theme = store.theme();
@@ -67,7 +87,6 @@ pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec
     )?;
 
     let ai_control = default_data_dir(app).is_ok_and(|dir| mcp::enabled(&dir));
-    let separator = || PredefinedMenuItem::separator(app).map(|s| s.kind());
     let mut items = vec![
         item("new", l.new_note)?.kind(),
         item("new-group", l.new_group)?.kind(),
@@ -97,9 +116,8 @@ pub(crate) fn app_menu_items(app: &AppHandle, prefix: &str) -> tauri::Result<Vec
         items.push(item("sync", l.sync)?.kind());
     }
     items.push(separator()?);
-    // A newer version found (updater.rs) replaces "Check for updates".
     items.push(
-        match updater::status().available {
+        match available {
             Some(version) => item("update", &format!("{} {version}", l.update_to))?,
             None => item("check-updates", l.check_updates)?,
         }
@@ -153,8 +171,8 @@ pub(crate) fn title_menu_entry(app: &AppHandle, prefix: &str, item: Option<Title
 }
 
 /// Right click on a titlebar, or its "…" button: a native menu with the
-/// window's own commands on top and all the app's commands (the tray menu's)
-/// below, so any window reaches every command. Native, so it is never cut
+/// window's own commands on top and the app's most used ones below
+/// (`app_menu_items`; the rest is in the tray and the manager). Native, so it is never cut
 /// by a small window. `at` is the button's bottom-left corner (CSS pixels);
 /// without it the menu opens at the pointer. Clicks come back in
 /// `on_tray_menu` as `win:<label>:<id>`.
@@ -174,7 +192,7 @@ pub(crate) async fn show_title_menu(
     if !own.is_empty() {
         own.push(PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?.kind());
     }
-    own.extend(app_menu_items(&app, &prefix).map_err(|e| e.to_string())?);
+    own.extend(app_menu_items(&app, &prefix, false).map_err(|e| e.to_string())?);
     for item in &own {
         menu.append(item).map_err(|e| e.to_string())?;
     }

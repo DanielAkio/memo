@@ -3180,7 +3180,6 @@
       { label: t('noteColor'), run: () => colors.open() },
       { label: t('share'), run: () => MemoShare.copy() },
       { label: t('moveToTrash'), run: () => bar.trash() },
-      { label: t('closeNote'), run: () => bar.close() },
     ] : []),
     onMenuOpen: () => { saveMenuSelection(); colors.close(); groups.close(); hideFormatBar(); },
     // Native context menu only in the text and the title field (copy,

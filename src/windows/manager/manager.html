@@ -219,22 +219,35 @@
                    autocomplete="off" data-i18n-attr="placeholder=untitled">
           </div>
         </div>
-        <!-- Cloud sync: only in builds with a Google OAuth client (cloud.rs). -->
+        <!-- Cloud sync: only in builds with a Google or Microsoft OAuth client (cloud.rs). -->
         <div class="sec" data-sec="sync" data-cloud hidden>
           <h2 class="settings-title">
             <span data-i18n="sync"></span>
             <span class="info" tabindex="0" role="img" data-i18n-attr="aria-label=syncTip,data-tip=syncTip">i</span>
           </h2>
-          <div class="setting setting-top">
+          <!-- One row per cloud: connect one, the other or both. -->
+          <div class="setting setting-top" data-cloud-row="google" hidden>
             <span class="setting-label" data-i18n="googleDrive"></span>
             <div class="field-wrap">
               <div class="app-actions">
-                <button type="button" class="btn" id="cloudConnectBtn" data-i18n="cloudConnect"></button>
-                <button type="button" class="btn" id="cloudCancelBtn" data-i18n="cancel" hidden></button>
-                <button type="button" class="btn" id="cloudSyncBtn" data-i18n="cloudSyncNow" hidden></button>
-                <button type="button" class="btn" id="cloudDisconnectBtn" data-i18n="cloudDisconnect" hidden></button>
+                <button type="button" class="btn" data-cloud-act="connect" data-i18n="cloudConnect"></button>
+                <button type="button" class="btn" data-cloud-act="cancel" data-i18n="cancel" hidden></button>
+                <button type="button" class="btn" data-cloud-act="sync" data-i18n="cloudSyncNow" hidden></button>
+                <button type="button" class="btn" data-cloud-act="disconnect" data-i18n="cloudDisconnect" hidden></button>
               </div>
-              <p class="storage-status" id="cloudStatus" role="status"></p>
+              <p class="storage-status" data-cloud-status role="status"></p>
+            </div>
+          </div>
+          <div class="setting setting-top" data-cloud-row="microsoft" hidden>
+            <span class="setting-label" data-i18n="oneDrive"></span>
+            <div class="field-wrap">
+              <div class="app-actions">
+                <button type="button" class="btn" data-cloud-act="connect" data-i18n="cloudConnect"></button>
+                <button type="button" class="btn" data-cloud-act="cancel" data-i18n="cancel" hidden></button>
+                <button type="button" class="btn" data-cloud-act="sync" data-i18n="cloudSyncNow" hidden></button>
+                <button type="button" class="btn" data-cloud-act="disconnect" data-i18n="cloudDisconnect" hidden></button>
+              </div>
+              <p class="storage-status" data-cloud-status role="status"></p>
             </div>
           </div>
         </div>
@@ -375,6 +388,7 @@
   <script src="../../components/toast.js"></script>
   <script src="../../components/share.js"></script>
   <script src="../../components/update.js"></script>
+  <script src="../../components/confirm.js"></script>
   <script src="../../components/titlebar.js"></script>
   <script src="../../components/pill.js"></script>
   <script src="../../components/text.js"></script>

@@ -1,6 +1,6 @@
 /// Build-time variables that may come from `.env` at the repository root
 /// (see `.env.example`). A variable already set in the environment wins.
-const DOTENV_VARS: &[&str] = &["MEMO_GOOGLE_CLIENT_ID", "MEMO_GOOGLE_CLIENT_SECRET"];
+const DOTENV_VARS: &[&str] = &["MEMO_GOOGLE_CLIENT_ID", "MEMO_GOOGLE_CLIENT_SECRET", "MEMO_MICROSOFT_CLIENT_ID"];
 
 fn main() {
     // The icons are embedded in the executable (window/taskbar icon and the

@@ -17,15 +17,15 @@
 
   <h1 lang="en">Privacy policy</h1>
   <h1 lang="pt-BR">Política de privacidade</h1>
-  <p lang="en" class="muted">Last updated: October 22, 2026</p>
-  <p lang="pt-BR" class="muted">Última atualização: 22 de outubro de 2026</p>
+  <p lang="en" class="muted">Last updated: October 27, 2026</p>
+  <p lang="pt-BR" class="muted">Última atualização: 27 de outubro de 2026</p>
 
   <p lang="en">Memo is a desktop sticky-notes app made by Daniel Akio Teixeira. This policy explains what data Memo handles
     and where it goes. In short: your memories stay on your computer and, if you turn on sync, in your own Google
-    Drive. Nobody else receives them, the developer included.</p>
+    Drive or OneDrive. Nobody else receives them, the developer included.</p>
   <p lang="pt-BR">O Memo é um app de notas adesivas para computador feito por Daniel Akio Teixeira. Esta política explica quais
     dados o Memo usa e para onde eles vão. Em resumo: suas memórias ficam no seu computador e, se você ativar a
-    sincronização, no seu próprio Google Drive. Ninguém mais as recebe, nem o desenvolvedor.</p>
+    sincronização, no seu próprio Google Drive ou OneDrive. Ninguém mais as recebe, nem o desenvolvedor.</p>
 
   <h2 lang="en">Data stored on your computer</h2>
   <h2 lang="pt-BR">Dados guardados no seu computador</h2>
@@ -80,6 +80,33 @@
     Serviços de API do Google</a>, incluindo os requisitos de Uso Limitado. O Memo não usa esses dados para
     publicidade, não os vende e não os usa para treinar modelos de IA.</p>
 
+  <h2 lang="en">OneDrive sync (optional)</h2>
+  <h2 lang="pt-BR">Sincronização com o OneDrive (opcional)</h2>
+  <p lang="en">Instead of Google Drive, or beside it, you can sign in with a Microsoft account (personal, work or school). Memo then asks
+    Microsoft for these permissions:</p>
+  <p lang="pt-BR">Em vez do Google Drive, ou junto com ele, você pode entrar com uma conta Microsoft (pessoal, de trabalho ou escola). O Memo
+    então pede à Microsoft estas permissões:</p>
+  <ul>
+    <li lang="en"><strong>Have full access to the application's folder</strong> (<code>Files.ReadWrite.AppFolder</code>): Memo
+      stores a copy of your memories and groups in its own folder, <code>Apps/Memo</code>, in your OneDrive. Memo
+      cannot see, read or change any other file in your OneDrive.</li>
+    <li lang="pt-BR"><strong>Acesso total à pasta do aplicativo</strong> (<code>Files.ReadWrite.AppFolder</code>): o Memo guarda
+      uma cópia das suas memórias e grupos na própria pasta, <code>Aplicativos/Memo</code>, no seu OneDrive. O Memo não
+      consegue ver, ler nem alterar nenhum outro arquivo do seu OneDrive.</li>
+    <li lang="en"><strong>Sign you in and read your profile</strong> (<code>User.Read</code>): only your e-mail address is used,
+      shown in Memo's settings so you know which account is connected.</li>
+    <li lang="pt-BR"><strong>Entrar e ler seu perfil</strong> (<code>User.Read</code>): só o seu e-mail é usado, mostrado nas
+      configurações do Memo para você saber qual conta está conectada.</li>
+    <li lang="en"><strong>Maintain access</strong> (<code>offline_access</code>): Memo keeps syncing without asking you to sign
+      in again.</li>
+    <li lang="pt-BR"><strong>Manter o acesso</strong> (<code>offline_access</code>): o Memo continua sincronizando sem pedir
+      para você entrar de novo.</li>
+  </ul>
+  <p lang="en">As with Google, Memo talks to Microsoft directly from your computer, the data goes only between your computer
+    and your own Microsoft account, and the sign-in token stays in your system's credential store.</p>
+  <p lang="pt-BR">Como com o Google, o Memo fala diretamente com a Microsoft a partir do seu computador, os dados vão apenas
+    entre o seu computador e a sua própria conta Microsoft, e o token fica no cofre de credenciais do sistema.</p>
+
   <h2 lang="en">Removing your data</h2>
   <h2 lang="pt-BR">Como remover seus dados</h2>
   <ul>
@@ -94,6 +121,14 @@
       data.</li>
     <li lang="pt-BR"><strong>Apague a cópia sincronizada</strong> no Google Drive: Configurações → Gerenciar apps → Memo → Excluir
       dados ocultos do app.</li>
+    <li lang="en"><strong>OneDrive:</strong> revoke access at
+      <a href="https://account.live.com/consent/Manage">account.live.com/consent/Manage</a> (personal accounts) or
+      <a href="https://myapps.microsoft.com">myapps.microsoft.com</a> (work or school), and delete the
+      <code>Apps/Memo</code> folder in your OneDrive.</li>
+    <li lang="pt-BR"><strong>OneDrive:</strong> revogue o acesso em
+      <a href="https://account.live.com/consent/Manage">account.live.com/consent/Manage</a> (contas pessoais) ou
+      <a href="https://myapps.microsoft.com">myapps.microsoft.com</a> (trabalho ou escola), e apague a pasta
+      <code>Aplicativos/Memo</code> do seu OneDrive.</li>
     <li lang="en"><strong>Delete the local data</strong> by removing Memo's data folder or uninstalling the app.</li>
     <li lang="pt-BR"><strong>Apague os dados locais</strong> removendo a pasta de dados do Memo ou desinstalando o app.</li>
   </ul>

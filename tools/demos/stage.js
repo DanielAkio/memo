@@ -150,7 +150,7 @@
       case 'get_new_note_defaults': return ['', '', ''];
       case 'get_group_defaults': return ['random', ''];
       case 'get_data_dir': return ['C:\\Users\\ana\\AppData\\Roaming\\memo', true];
-      case 'get_cloud_account': return [true, null, { syncing: false, lastSync: 0, pending: 0, error: null }];
+      case 'get_cloud_account': return [['google', 'microsoft'], []];
       case 'get_autostart': return true;
       case 'get_magnet': return true;
       case 'get_updates': return [true, { checking: false, available: null, progress: null, upToDate: false, error: null }];
@@ -160,6 +160,10 @@
       case 'restore_note': M.notes[a.id].trashedAt = null; M.notes[a.id].hidden = true; M.emit('notes-changed'); return null;
       case 'delete_forever': delete M.notes[a.id]; M.emit('notes-changed'); return null;
       case 'delete_group_forever': delete M.groups[a.id]; M.emit('groups-changed'); return null;
+      case 'empty_board_trash':
+        for (const [k, v] of Object.entries(M.boards)) { if (v.trashedAt) delete M.boards[k]; }
+        M.emit('boards-changed');
+        return null;
       case 'empty_trash':
         for (const [k, v] of Object.entries(M.notes)) { if (v.trashedAt) delete M.notes[k]; }
         M.emit('notes-changed');

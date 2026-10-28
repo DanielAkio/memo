@@ -571,28 +571,9 @@
     reloadTimer = setTimeout(load, 150);
   }
 
-  // "Empty trash" and "Quit" require a second click within 3 s. The second
-  // click restores the button at once instead of waiting for the timer.
-  const confirmStates = new Map();
-  function confirmFirst(btn, label) {
-    const state = confirmStates.get(btn);
-    const restore = (s) => {
-      clearTimeout(s.timer);
-      confirmStates.delete(btn);
-      btn.classList.remove('confirming');
-      btn.textContent = s.original;
-    };
-    if (state) {
-      restore(state);
-      return true;
-    }
-    const next = { original: btn.textContent };
-    next.timer = setTimeout(() => restore(next), 3000);
-    confirmStates.set(btn, next);
-    btn.classList.add('confirming');
-    btn.textContent = label;
-    return false;
-  }
+  // "Empty trash" and "Quit" require a second click within 3 s
+  // (components/confirm.js).
+  const confirmFirst = (btn, label) => MemoConfirm.ask(btn, label);
 
   async function act(action, id) {
     try {
@@ -803,7 +784,7 @@
 
   emptyTrashBtn.addEventListener('click', async () => {
     if (!confirmFirst(emptyTrashBtn, t('emptyTrashConfirm'))) return;
-    const command = view === 'groups' ? 'empty_group_trash' : 'empty_trash';
+    const command = { groups: 'empty_group_trash', boards: 'empty_board_trash' }[view] || 'empty_trash';
     try {
       await invoke(command);
     } catch (err) {
@@ -923,17 +904,11 @@
     // In Memo Web on a phone the manager is the main view: it never closes.
     beforeLeave: () => !isMobileWeb(),
     onNew: newNote,
-    menuItems: () => {
-      const items = [
-        { label: t('pin'), checked: !!win.pinned, run: () => bar.togglePin() },
-        { label: t('managerColor'), run: () => colors.open() },
-        { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err)) },
-      ];
-      if (!isMobileWeb()) {
-        items.push({ label: t('close'), run: () => bar.close() });
-      }
-      return items;
-    },
+    menuItems: () => [
+      { label: t('pin'), checked: !!win.pinned, run: () => bar.togglePin() },
+      { label: t('managerColor'), run: () => colors.open() },
+      { label: t('bringAllToFront'), run: () => invoke('bring_notes_to_front').catch((err) => console.error('bring_notes_to_front', err)) },
+    ],
     onMenuOpen: () => colors.close(),
     // Native context menu only in text fields.
     nativeMenuIn: 'input, textarea',
@@ -1011,25 +986,29 @@
   });
 
   // ------------------------------------------------------------- cloud
-  // Google account for cloud sync (cloud.rs). The section only shows in
-  // builds with an OAuth client. Errors come back as short codes.
+  // Cloud accounts for sync (cloud.rs): Google Drive, OneDrive or both,
+  // one row each. The section only shows in builds with an OAuth client;
+  // each row only with its own. Errors come back as short codes.
 
-  const cloud = { available: false, email: null, waiting: false, error: null, status: {} };
+  const cloud = { providers: [], accounts: [], waiting: '', errors: {} };
+  const cloudRows = [...document.querySelectorAll('[data-cloud-row]')];
   const CLOUD_ERRORS = {
     denied: 'cloudErrDenied',
     timeout: 'cloudErrTimeout',
     network: 'cloudErrNetwork',
     keyring: 'cloudErrKeyring',
   };
+  const accountOf = (p) => cloud.accounts.find((a) => a.provider === p);
 
-  // One line: who is connected, then how syncing goes.
-  function cloudStatusText() {
-    if (cloud.waiting) return t('cloudWaiting');
-    if (cloud.error) return t(CLOUD_ERRORS[cloud.error] || 'cloudErrOther');
-    if (!cloud.email) return t('cloudOff');
-    const st = cloud.status || {};
+  // One line per cloud: who is connected, then how syncing goes.
+  function cloudStatusText(p) {
+    if (cloud.waiting === p) return t('cloudWaiting');
+    if (cloud.errors[p]) return t(CLOUD_ERRORS[cloud.errors[p]] || 'cloudErrOther');
+    const account = accountOf(p);
+    if (!account) return t(cloud.accounts.length ? 'cloudNotConnected' : 'cloudOff');
+    const st = account.status || {};
     if (st.error === 'reauth') return t('cloudErrReauth');
-    const parts = [t('cloudOn', { email: cloud.email })];
+    const parts = [t('cloudOn', { email: account.email })];
     if (st.syncing) parts.push(t('cloudSyncing'));
     else if (st.error) parts.push(t('cloudOffline'));
     else if (st.lastSync) parts.push(t('cloudSynced', { time: editedLabel(st.lastSync) }));
@@ -1038,56 +1017,71 @@
   }
 
   function renderCloud() {
-    document.querySelectorAll('[data-cloud]').forEach((el) => { el.hidden = !cloud.available; });
+    document.querySelectorAll('[data-cloud]').forEach((el) => { el.hidden = !cloud.providers.length; });
     if (panels[view]) renderSections(); // the Sync section comes and goes with it
-    const reauth = (cloud.status || {}).error === 'reauth';
-    $('cloudConnectBtn').hidden = (!!cloud.email && !reauth) || cloud.waiting;
-    $('cloudCancelBtn').hidden = !cloud.waiting;
-    $('cloudSyncBtn').hidden = !cloud.email || reauth || cloud.waiting;
-    $('cloudSyncBtn').disabled = !!(cloud.status || {}).syncing;
-    $('cloudDisconnectBtn').hidden = !cloud.email || cloud.waiting;
-    $('cloudStatus').textContent = cloudStatusText();
+    for (const row of cloudRows) {
+      const p = row.dataset.cloudRow;
+      const account = accountOf(p);
+      const st = (account && account.status) || {};
+      const reauth = st.error === 'reauth';
+      const waiting = cloud.waiting === p;
+      const btn = (act) => row.querySelector(`[data-cloud-act="${act}"]`);
+      row.hidden = !cloud.providers.includes(p);
+      // One sign-in at a time: the other row's Connect waits.
+      btn('connect').hidden = (!!account && !reauth) || waiting;
+      btn('connect').disabled = !!cloud.waiting;
+      btn('cancel').hidden = !waiting;
+      btn('sync').hidden = !account || reauth || waiting;
+      btn('sync').disabled = !!st.syncing;
+      btn('disconnect').hidden = !account || waiting;
+      row.querySelector('[data-cloud-status]').textContent = cloudStatusText(p);
+    }
   }
 
   async function loadCloud() {
     try {
-      [cloud.available, cloud.email, cloud.status] = await invoke('get_cloud_account');
+      [cloud.providers, cloud.accounts] = await invoke('get_cloud_account');
     } catch (err) {
       console.error('get_cloud_account', err);
     }
     renderCloud();
   }
 
-  $('cloudConnectBtn').addEventListener('click', async () => {
-    Object.assign(cloud, { waiting: true, error: null });
-    renderCloud();
-    try {
-      cloud.email = await invoke('connect_cloud');
-    } catch (err) {
-      if (err !== 'cancelled' && err !== 'busy') cloud.error = err;
-      console.error('connect_cloud', err);
-    }
-    cloud.waiting = false;
-    await loadCloud();
-  });
-
-  $('cloudSyncBtn').addEventListener('click', () => {
-    invoke('sync_cloud').catch((err) => console.error('sync_cloud', err));
-  });
-
-  $('cloudCancelBtn').addEventListener('click', () => {
-    invoke('cancel_cloud_connect').catch((err) => console.error('cancel_cloud_connect', err));
-  });
-
-  $('cloudDisconnectBtn').addEventListener('click', async () => {
-    cloud.error = null;
-    try {
-      await invoke('disconnect_cloud');
-    } catch (err) {
-      console.error('disconnect_cloud', err);
+  async function cloudAct(p, act) {
+    if (act === 'connect') {
+      cloud.waiting = p;
+      cloud.errors[p] = null;
+      renderCloud();
+      try {
+        await invoke('connect_cloud', { provider: p });
+      } catch (err) {
+        if (err !== 'cancelled' && err !== 'busy') cloud.errors[p] = err;
+        console.error('connect_cloud', err);
+      }
+      cloud.waiting = '';
+    } else if (act === 'cancel') {
+      invoke('cancel_cloud_connect').catch((err) => console.error('cancel_cloud_connect', err));
+      return;
+    } else if (act === 'sync') {
+      invoke('sync_cloud').catch((err) => console.error('sync_cloud', err));
+      return;
+    } else if (act === 'disconnect') {
+      cloud.errors[p] = null;
+      try {
+        await invoke('disconnect_cloud', { provider: p });
+      } catch (err) {
+        console.error('disconnect_cloud', err);
+      }
     }
     await loadCloud();
-  });
+  }
+
+  for (const row of cloudRows) {
+    row.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cloud-act]');
+      if (btn) cloudAct(row.dataset.cloudRow, btn.dataset.cloudAct);
+    });
+  }
 
   // ---------------------------------------------------------------- help
   // Each group is a title and [topic, how, demo?] items. In "how", {{…}}

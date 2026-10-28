@@ -1,15 +1,17 @@
-//! Google account for cloud sync (Configurações → Sincronização).
+//! Cloud accounts for sync (Configurações → Sincronização): a Google account
+//! (Google Drive), a Microsoft account (OneDrive), or both.
 //!
-//! Sign-in is OAuth 2.0 for desktop apps: the system browser opens Google's
-//! consent page, which redirects to a one-shot HTTP server on
-//! `127.0.0.1:<random port>`; the code is exchanged with PKCE. The refresh
-//! token goes to the OS credential store (Windows Credential Manager, macOS
-//! Keychain, Secret Service on Linux), never to a file. The account's e-mail
-//! is kept in `config.json` (per machine).
+//! Sign-in is OAuth 2.0 for desktop apps, the same for both: the system
+//! browser opens the provider's consent page, which redirects to a one-shot
+//! HTTP server on a random loopback port; the code is exchanged with PKCE.
+//! The refresh token goes to the OS credential store (Windows Credential
+//! Manager, macOS Keychain, Secret Service on Linux), never to a file. The
+//! accounts' e-mails are kept in `config.json` (per machine).
 //!
-//! The OAuth client comes from the build environment
+//! The OAuth clients come from the build environment
 //! (`MEMO_GOOGLE_CLIENT_ID` / `MEMO_GOOGLE_CLIENT_SECRET`, see
-//! docs/google-cloud.md); a build without it has no cloud sync.
+//! docs/google-cloud.md; `MEMO_MICROSOFT_CLIENT_ID`, see docs/onedrive.md);
+//! a build without one has no sync through that provider.
 //!
 //! Errors returned to the page are short codes (`ERR_*`) it translates.
 
@@ -28,16 +30,151 @@ use std::{
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
-const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
-const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
-const USERINFO_URL: &str = "https://openidconnect.googleapis.com/v1/userinfo";
-/// Only the app's own hidden folder in the user's Drive (a non-sensitive
-/// scope), plus the e-mail to show which account is connected.
-const SCOPES: &str = "https://www.googleapis.com/auth/drive.appdata openid email";
-
-/// Credential store entry holding the refresh token.
+/// Credential store service holding the refresh tokens (one entry per
+/// provider, `Provider::keyring_user`).
 const KEYRING_SERVICE: &str = "Memo";
-const KEYRING_USER: &str = "google-drive";
+
+/// Where the memories are synced.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Provider {
+    /// Google Drive, the app's hidden `appDataFolder`.
+    Google,
+    /// OneDrive, the app's folder (`Apps/Memo`).
+    Microsoft,
+}
+
+impl Provider {
+    pub const ALL: [Provider; 2] = [Provider::Google, Provider::Microsoft];
+
+    /// The name in `config.json` and for the pages.
+    pub fn id(self) -> &'static str {
+        match self {
+            Provider::Google => "google",
+            Provider::Microsoft => "microsoft",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        match id {
+            "google" => Some(Provider::Google),
+            "microsoft" => Some(Provider::Microsoft),
+            _ => None,
+        }
+    }
+
+    /// The build's OAuth client, if it has one. Microsoft's is a public
+    /// client: PKCE and no secret.
+    fn client(self) -> Option<(&'static str, Option<&'static str>)> {
+        match self {
+            Provider::Google => {
+                let id = option_env!("MEMO_GOOGLE_CLIENT_ID").filter(|s| !s.is_empty())?;
+                let secret = option_env!("MEMO_GOOGLE_CLIENT_SECRET").filter(|s| !s.is_empty());
+                Some((id, secret))
+            }
+            Provider::Microsoft => {
+                let id = option_env!("MEMO_MICROSOFT_CLIENT_ID").filter(|s| !s.is_empty())?;
+                Some((id, None))
+            }
+        }
+    }
+
+    /// This build can connect an account of this provider.
+    pub fn available(self) -> bool {
+        self.client().is_some()
+    }
+
+    fn auth_url(self) -> &'static str {
+        match self {
+            Provider::Google => "https://accounts.google.com/o/oauth2/v2/auth",
+            Provider::Microsoft => "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+        }
+    }
+
+    fn token_url(self) -> &'static str {
+        match self {
+            Provider::Google => "https://oauth2.googleapis.com/token",
+            Provider::Microsoft => "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        }
+    }
+
+    /// Only the app's own folder (non-sensitive scopes), plus the e-mail to
+    /// show which account is connected.
+    fn scopes(self) -> &'static str {
+        match self {
+            Provider::Google => "https://www.googleapis.com/auth/drive.appdata openid email",
+            Provider::Microsoft => "Files.ReadWrite.AppFolder User.Read offline_access",
+        }
+    }
+
+    /// Microsoft only accepts `localhost` for a loopback redirect (any port).
+    fn redirect_host(self) -> &'static str {
+        match self {
+            Provider::Google => "127.0.0.1",
+            Provider::Microsoft => "localhost",
+        }
+    }
+
+    /// Asks for a refresh token every time (an account that already
+    /// consented on another computer gets one too), and lets the user pick
+    /// the account.
+    fn auth_params(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            Provider::Google => &[("access_type", "offline"), ("prompt", "consent")],
+            Provider::Microsoft => &[("prompt", "select_account")],
+        }
+    }
+
+    fn keyring_user(self) -> &'static str {
+        match self {
+            Provider::Google => "google-drive",
+            Provider::Microsoft => "onedrive",
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Provider::Google => "Google",
+            Provider::Microsoft => "Microsoft",
+        }
+    }
+
+    /// The signed-in account's e-mail.
+    async fn email(self, http: &reqwest::Client, token: &str) -> Result<String, String> {
+        #[derive(Deserialize)]
+        struct Google {
+            email: String,
+        }
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Microsoft {
+            mail: Option<String>,
+            user_principal_name: Option<String>,
+        }
+        let url = match self {
+            Provider::Google => "https://openidconnect.googleapis.com/v1/userinfo",
+            Provider::Microsoft => "https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName",
+        };
+        let response = http
+            .get(url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .and_then(|r| r.error_for_status())
+            .map_err(|_| ERR_NETWORK)?;
+        Ok(match self {
+            Provider::Google => response.json::<Google>().await.map_err(|_| ERR_NETWORK)?.email,
+            Provider::Microsoft => {
+                let me: Microsoft = response.json().await.map_err(|_| ERR_NETWORK)?;
+                me.mail.or(me.user_principal_name).unwrap_or_else(|| "OneDrive".into())
+            }
+        })
+    }
+}
+
+/// The providers this build can connect (`Provider::id`s).
+pub fn providers() -> Vec<&'static str> {
+    Provider::ALL.into_iter().filter(|p| p.available()).map(Provider::id).collect()
+}
 
 /// How long the browser sign-in may take before giving up.
 const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(300);
@@ -58,17 +195,6 @@ static SIGNING_IN: AtomicBool = AtomicBool::new(false);
 /// Set by `cancel_sign_in`; the waiting loop checks it.
 static CANCEL: AtomicBool = AtomicBool::new(false);
 
-/// The build's OAuth client, if it has one.
-fn client() -> Option<(&'static str, Option<&'static str>)> {
-    let id = option_env!("MEMO_GOOGLE_CLIENT_ID").filter(|s| !s.is_empty())?;
-    let secret = option_env!("MEMO_GOOGLE_CLIENT_SECRET").filter(|s| !s.is_empty());
-    Some((id, secret))
-}
-
-/// This build can connect a Google account.
-pub fn available() -> bool {
-    client().is_some()
-}
 
 pub fn random_b64(len: usize) -> String {
     let mut bytes = vec![0u8; len];
@@ -93,23 +219,25 @@ struct TokenResponse {
 struct RefreshResponse {
     access_token: String,
     expires_in: u64,
+    /// Microsoft sends a new one with every refresh.
+    refresh_token: Option<String>,
 }
 
-/// Current access token and when it expires.
-static ACCESS: Mutex<Option<(String, Instant)>> = Mutex::new(None);
+/// Current access tokens: provider, token, when it expires.
+static ACCESS: Mutex<Vec<(Provider, String, Instant)>> = Mutex::new(Vec::new());
 
-/// An access token for the Drive API, refreshed from the stored sign-in
-/// when the cached one is about to expire.
-pub async fn access_token() -> Result<String, String> {
-    if let Some((token, expires)) = ACCESS.lock().unwrap().clone() {
+/// An access token for the provider's API, refreshed from the stored
+/// sign-in when the cached one is about to expire.
+pub async fn access_token(provider: Provider) -> Result<String, String> {
+    let cached = ACCESS.lock().unwrap().iter().find(|(p, ..)| *p == provider).cloned();
+    if let Some((_, token, expires)) = cached {
         if expires > Instant::now() + Duration::from_secs(60) {
             return Ok(token);
         }
     }
-    let (client_id, client_secret) = client().ok_or(ERR_UNAVAILABLE)?;
-    let refresh = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
-        .and_then(|entry| entry.get_password())
-        .map_err(|_| ERR_REAUTH)?;
+    let (client_id, client_secret) = provider.client().ok_or(ERR_UNAVAILABLE)?;
+    let entry = keyring::Entry::new(KEYRING_SERVICE, provider.keyring_user()).map_err(|_| ERR_REAUTH)?;
+    let refresh = entry.get_password().map_err(|_| ERR_REAUTH)?;
     let mut form = vec![
         ("grant_type", "refresh_token"),
         ("refresh_token", refresh.as_str()),
@@ -119,7 +247,7 @@ pub async fn access_token() -> Result<String, String> {
         form.push(("client_secret", secret));
     }
     let response = http()?
-        .post(TOKEN_URL)
+        .post(provider.token_url())
         .form(&form)
         .send()
         .await
@@ -134,69 +262,67 @@ pub async fn access_token() -> Result<String, String> {
         .json()
         .await
         .map_err(|_| ERR_NETWORK)?;
+    if let Some(rotated) = tokens.refresh_token.as_deref().filter(|r| *r != refresh) {
+        if let Err(err) = entry.set_password(rotated) {
+            eprintln!("memo: can't store the {} sign-in: {err}", provider.name());
+        }
+    }
     let expires = Instant::now() + Duration::from_secs(tokens.expires_in);
-    *ACCESS.lock().unwrap() = Some((tokens.access_token.clone(), expires));
+    let mut access = ACCESS.lock().unwrap();
+    access.retain(|(p, ..)| *p != provider);
+    access.push((provider, tokens.access_token.clone(), expires));
     Ok(tokens.access_token)
 }
 
-/// Drops the cached access token (after a 401, or on sign-out).
+/// Drops the cached access tokens (after a 401, or on sign-out).
 pub fn forget_access_token() {
-    *ACCESS.lock().unwrap() = None;
-}
-
-#[derive(Deserialize)]
-struct UserInfo {
-    email: String,
+    ACCESS.lock().unwrap().clear();
 }
 
 /// Signs in with the browser, stores the refresh token and returns the
 /// account's e-mail.
-pub async fn sign_in(app: &AppHandle, lang: &'static str) -> Result<String, String> {
-    let (client_id, client_secret) = client().ok_or(ERR_UNAVAILABLE)?;
+pub async fn sign_in(app: &AppHandle, provider: Provider, lang: &'static str) -> Result<String, String> {
+    let (client_id, client_secret) = provider.client().ok_or(ERR_UNAVAILABLE)?;
     if SIGNING_IN.swap(true, Ordering::SeqCst) {
         return Err(ERR_BUSY.into());
     }
     CANCEL.store(false, Ordering::SeqCst);
-    let result = sign_in_inner(app, lang, client_id, client_secret).await;
+    let result = sign_in_inner(app, provider, lang, client_id, client_secret).await;
     SIGNING_IN.store(false, Ordering::SeqCst);
     result
 }
 
 async fn sign_in_inner(
     app: &AppHandle,
+    provider: Provider,
     lang: &'static str,
     client_id: &str,
     client_secret: Option<&str>,
 ) -> Result<String, String> {
     let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-    let redirect = format!("http://127.0.0.1:{port}");
+    let redirect = format!("http://{}:{port}", provider.redirect_host());
     let verifier = random_b64(32);
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
     let state = random_b64(16);
 
-    let url = reqwest::Url::parse_with_params(
-        AUTH_URL,
-        &[
-            ("client_id", client_id),
-            ("redirect_uri", &redirect),
-            ("response_type", "code"),
-            ("scope", SCOPES),
-            ("code_challenge", &challenge),
-            ("code_challenge_method", "S256"),
-            ("state", &state),
-            // Always return a refresh token, even for an account that
-            // already consented on another computer.
-            ("access_type", "offline"),
-            ("prompt", "consent"),
-        ],
-    )
-    .map_err(|e| e.to_string())?;
+    let mut params = vec![
+        ("client_id", client_id),
+        ("redirect_uri", redirect.as_str()),
+        ("response_type", "code"),
+        ("scope", provider.scopes()),
+        ("code_challenge", challenge.as_str()),
+        ("code_challenge_method", "S256"),
+        ("state", state.as_str()),
+    ];
+    params.extend_from_slice(provider.auth_params());
+    let url = reqwest::Url::parse_with_params(provider.auth_url(), &params).map_err(|e| e.to_string())?;
     app.opener()
         .open_url(url.as_str(), None::<&str>)
         .map_err(|e| e.to_string())?;
 
-    let code = tauri::async_runtime::spawn_blocking(move || wait_for_code(listener, &state, lang))
+    let name = provider.name();
+    let code = tauri::async_runtime::spawn_blocking(move || wait_for_code(listener, &state, lang, name))
         .await
         .map_err(|e| e.to_string())??;
 
@@ -212,7 +338,7 @@ async fn sign_in_inner(
     }
     let http = http()?;
     let tokens: TokenResponse = http
-        .post(TOKEN_URL)
+        .post(provider.token_url())
         .form(&form)
         .send()
         .await
@@ -222,25 +348,16 @@ async fn sign_in_inner(
         .await
         .map_err(|_| ERR_NETWORK)?;
     let refresh = tokens.refresh_token.ok_or(ERR_DENIED)?;
-    let user: UserInfo = http
-        .get(USERINFO_URL)
-        .bearer_auth(&tokens.access_token)
-        .send()
-        .await
-        .and_then(|r| r.error_for_status())
-        .map_err(|_| ERR_NETWORK)?
-        .json()
-        .await
-        .map_err(|_| ERR_NETWORK)?;
+    let email = provider.email(&http, &tokens.access_token).await?;
 
-    keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+    keyring::Entry::new(KEYRING_SERVICE, provider.keyring_user())
         .and_then(|entry| entry.set_password(&refresh))
         .map_err(|err| {
-            eprintln!("memo: can't store the Google sign-in: {err}");
+            eprintln!("memo: can't store the {} sign-in: {err}", provider.name());
             ERR_KEYRING
         })?;
     forget_access_token();
-    Ok(user.email)
+    Ok(email)
 }
 
 /// Stops a sign-in waiting for the browser.
@@ -248,10 +365,10 @@ pub fn cancel_sign_in() {
     CANCEL.store(true, Ordering::SeqCst);
 }
 
-/// Accepts connections on the loopback server until Google's redirect
-/// arrives (other requests, like a favicon, get a 404), the user cancels or
-/// the time runs out. Returns the authorization code.
-fn wait_for_code(listener: TcpListener, state: &str, lang: &str) -> Result<String, String> {
+/// Accepts connections on the loopback server until the provider's
+/// redirect arrives (other requests, like a favicon, get a 404), the user
+/// cancels or the time runs out. Returns the authorization code.
+fn wait_for_code(listener: TcpListener, state: &str, lang: &str, provider: &str) -> Result<String, String> {
     listener.set_nonblocking(true).map_err(|e| e.to_string())?;
     let deadline = Instant::now() + SIGN_IN_TIMEOUT;
     loop {
@@ -284,7 +401,7 @@ fn wait_for_code(listener: TcpListener, state: &str, lang: &str) -> Result<Strin
             continue;
         }
         let code = get("code").map(str::to_string);
-        respond(&mut stream, "200 OK", &done_page(lang, code.is_some()));
+        respond(&mut stream, "200 OK", &done_page(lang, provider, code.is_some()));
         return code.ok_or_else(|| ERR_DENIED.into());
     }
 }
@@ -311,12 +428,12 @@ fn respond(stream: &mut TcpStream, status: &str, body: &str) {
 }
 
 /// The page the browser shows after the redirect.
-fn done_page(lang: &str, ok: bool) -> String {
+fn done_page(lang: &str, provider: &str, ok: bool) -> String {
     let (title, text) = match (lang, ok) {
-        ("pt", true) => ("Memo conectado", "Sua conta Google foi conectada ao Memo. Pode fechar esta aba."),
-        ("pt", false) => ("Memo não conectado", "O acesso não foi permitido. Pode fechar esta aba e tentar de novo no Memo."),
-        (_, true) => ("Memo connected", "Your Google account is now connected to Memo. You can close this tab."),
-        (_, false) => ("Memo not connected", "Access was not allowed. You can close this tab and try again in Memo."),
+        ("pt", true) => ("Memo conectado", format!("Sua conta {provider} foi conectada ao Memo. Pode fechar esta aba.")),
+        ("pt", false) => ("Memo não conectado", "O acesso não foi permitido. Pode fechar esta aba e tentar de novo no Memo.".into()),
+        (_, true) => ("Memo connected", format!("Your {provider} account is now connected to Memo. You can close this tab.")),
+        (_, false) => ("Memo not connected", "Access was not allowed. You can close this tab and try again in Memo.".into()),
     };
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>{title}</title></head>\
@@ -328,11 +445,11 @@ fn done_page(lang: &str, ok: bool) -> String {
 }
 
 /// Forgets the account on this computer by removing its token from the
-/// credential store. The token is not revoked at Google: that would revoke
-/// the grant itself and disconnect the user's other computers too.
-pub fn sign_out() {
+/// credential store. The token is not revoked at the provider: that would
+/// revoke the grant itself and disconnect the user's other computers too.
+pub fn sign_out(provider: Provider) {
     forget_access_token();
-    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
+    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, provider.keyring_user()) {
         let _ = entry.delete_credential();
     }
 }

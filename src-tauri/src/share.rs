@@ -410,6 +410,7 @@ pub(crate) fn create(store: &Store, payload: &Payload, pos: Option<(i32, i32)>) 
                 name: col.name.clone(),
                 color: if valid(&col.color) { col.color.clone() } else { String::new() },
                 note_ids: col.notes.iter().filter_map(|&n| created.notes.get(n).cloned()).collect(),
+                ..Default::default()
             })
             .collect();
         store.update_board(&board.id, |b| {
@@ -441,11 +442,13 @@ pub(crate) fn create(store: &Store, payload: &Payload, pos: Option<(i32, i32)>) 
     created
 }
 
-/// Imports `payload` and opens the shared item beside `anchor` (a group
-/// with its memories and boards out).
+/// Imports `payload` and opens the shared item in the middle of the screen
+/// of `anchor` (or of any Memo window); a group with its memories and
+/// boards out.
 pub(crate) fn import(app: &AppHandle, payload: &Payload, anchor: Option<&WebviewWindow>) {
     let store = app.state::<Shared>();
-    let created = create(&store, payload, anchor.and_then(beside));
+    let created = create(&store, payload, None);
+    center(app, &store, payload, &created, anchor);
     store.flush();
     let opened = match payload.kind.as_str() {
         "board" => created
@@ -469,6 +472,40 @@ pub(crate) fn import(app: &AppHandle, payload: &Payload, anchor: Option<&Webview
     groups_changed(app);
     boards_changed(app);
     notify(app);
+}
+
+/// Moves the shared item (the first of its kind in `created`) to the middle
+/// of the work area of the screen `anchor` is on.
+fn center(app: &AppHandle, store: &Store, payload: &Payload, created: &Created, anchor: Option<&WebviewWindow>) {
+    let window = anchor.cloned().or_else(|| {
+        let windows: Vec<_> = app.webview_windows().into_values().filter(is_app_window).collect();
+        windows.iter().find(|w| w.is_focused().unwrap_or(false)).or(windows.first()).cloned()
+    });
+    let Some(screen) = window.as_ref().and_then(desk::current_screen) else {
+        return;
+    };
+    let (ax, ay, aw, ah) = screen.work;
+    let at = |w: f64, h: f64| {
+        let (w, h) = ((w * screen.scale).round() as i32, (h * screen.scale).round() as i32);
+        (Some(ax + ((aw - w) / 2).max(0)), Some(ay + ((ah - h) / 2).max(0)))
+    };
+    match payload.kind.as_str() {
+        "board" => {
+            if let Some(id) = created.boards.first() {
+                store.update_board(id, |b| (b.x, b.y) = at(b.width, b.height));
+            }
+        }
+        "group" => {
+            if let Some(id) = created.groups.first() {
+                store.update_group(id, |g| (g.x, g.y) = at(g.width, TITLEBAR_H));
+            }
+        }
+        _ => {
+            if let Some(id) = created.notes.first() {
+                store.update(id, |n| (n.x, n.y) = at(n.width, n.height));
+            }
+        }
+    }
 }
 
 // ------------------------------------------------------------------ offers
@@ -571,7 +608,7 @@ pub(crate) fn copy_share(
     Ok(text)
 }
 
-/// The offer's Import button: the pending item, opened beside the window.
+/// The offer's Import button: the pending item, in the middle of the screen.
 #[tauri::command]
 pub(crate) async fn import_share(app: AppHandle, window: WebviewWindow) {
     import_pending(&app, Some(&window));

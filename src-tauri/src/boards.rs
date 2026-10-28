@@ -130,6 +130,15 @@ pub(crate) fn restore_board_id(app: AppHandle, id: String, store: State<'_, Shar
     Ok(())
 }
 
+/// Manager's Boards trash: "Empty trash".
+#[tauri::command]
+pub(crate) fn empty_board_trash(app: AppHandle, store: State<'_, Shared>) {
+    store.empty_board_trash();
+    store.flush();
+    boards_changed(&app);
+    notify(&app);
+}
+
 #[tauri::command]
 pub(crate) async fn delete_board_forever(app: AppHandle, id: String, store: State<'_, Shared>) -> Result<(), String> {
     destroy_window(&app, &Kind::Board.label(&id));

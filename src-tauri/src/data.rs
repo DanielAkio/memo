@@ -291,20 +291,51 @@ pub(crate) async fn install_update(app: AppHandle) {
     updater::install(&app).await;
 }
 
-/// Configurações → Sincronização: whether this build can connect a Google
-/// account, the one connected on this computer and how syncing goes.
-#[tauri::command]
-pub(crate) fn get_cloud_account(app: AppHandle) -> (bool, Option<String>, sync::Status) {
-    (cloud::available(), cloud_account(&app), sync::status())
+/// A connected cloud account, for the manager.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CloudAccount {
+    provider: &'static str,
+    email: String,
+    status: sync::Status,
 }
 
-/// The Google account connected on this computer, if this build can sync.
+/// Configurações → Sincronização: the clouds this build can connect
+/// ("google", "microsoft") and the accounts connected on this computer
+/// (none, one or both), each with how syncing goes.
+#[tauri::command]
+pub(crate) fn get_cloud_account(app: AppHandle) -> (Vec<&'static str>, Vec<CloudAccount>) {
+    let accounts = cloud_logins(&app)
+        .into_iter()
+        .map(|(p, email)| CloudAccount { provider: p.id(), email, status: sync::status(p) })
+        .collect();
+    (cloud::providers(), accounts)
+}
+
+/// Some cloud account is connected on this computer.
 pub(crate) fn cloud_account(app: &AppHandle) -> Option<String> {
-    if !cloud::available() {
-        return None;
+    cloud_logins(app).into_iter().next().map(|(_, email)| email)
+}
+
+/// The accounts connected on this computer that this build can sync with.
+pub(crate) fn cloud_logins(app: &AppHandle) -> Vec<(cloud::Provider, String)> {
+    let Ok(dir) = default_data_dir(app) else { return Vec::new() };
+    let config = Config::load(&dir.join(CONFIG));
+    [
+        (cloud::Provider::Google, config.google_account),
+        (cloud::Provider::Microsoft, config.microsoft_account),
+    ]
+    .into_iter()
+    .filter(|(p, _)| p.available())
+    .filter_map(|(p, email)| Some((p, email?)))
+    .collect()
+}
+
+fn account_of(config: &mut Config, provider: cloud::Provider) -> &mut Option<String> {
+    match provider {
+        cloud::Provider::Google => &mut config.google_account,
+        cloud::Provider::Microsoft => &mut config.microsoft_account,
     }
-    let dir = default_data_dir(app).ok()?;
-    Config::load(&dir.join(CONFIG)).google_account
 }
 
 /// "Sync now".
@@ -313,17 +344,19 @@ pub(crate) fn sync_cloud(app: AppHandle) {
     sync::sync_now(&app);
 }
 
-/// Signs in with Google in the browser and remembers the account. Errors are
-/// `cloud::ERR_*` codes the page translates.
+/// Signs in with `provider` ("google" or "microsoft") in the browser and
+/// remembers the account, beside the other cloud's if one is connected.
+/// Errors are `cloud::ERR_*` codes the page translates.
 #[tauri::command]
-pub(crate) async fn connect_cloud(app: AppHandle) -> Result<String, String> {
+pub(crate) async fn connect_cloud(app: AppHandle, provider: String) -> Result<String, String> {
+    let provider = cloud::Provider::from_id(&provider).ok_or(cloud::ERR_UNAVAILABLE)?;
     let lang = app.state::<Shared>().effective_language();
-    let email = cloud::sign_in(&app, lang).await?;
+    let email = cloud::sign_in(&app, provider, lang).await?;
     let path = default_data_dir(&app).map_err(|e| e.to_string())?.join(CONFIG);
     let mut config = Config::load(&path);
-    config.google_account = Some(email.clone());
+    *account_of(&mut config, provider) = Some(email.clone());
     config.save(&path).map_err(|e| e.to_string())?;
-    sync::on_connected(&app);
+    sync::on_connected(&app, provider);
     let _ = app.emit("cloud-changed", ());
     refresh_tray(&app);
     Ok(email)
@@ -335,15 +368,17 @@ pub(crate) fn cancel_cloud_connect() {
     cloud::cancel_sign_in();
 }
 
-/// Forgets the Google account on this computer; the memories stay here.
+/// Forgets `provider`'s account on this computer; the memories stay here
+/// (and in the other cloud, if one is connected).
 #[tauri::command]
-pub(crate) fn disconnect_cloud(app: AppHandle) -> Result<(), String> {
-    cloud::sign_out();
+pub(crate) fn disconnect_cloud(app: AppHandle, provider: String) -> Result<(), String> {
+    let provider = cloud::Provider::from_id(&provider).ok_or(cloud::ERR_UNAVAILABLE)?;
+    cloud::sign_out(provider);
     let path = default_data_dir(&app).map_err(|e| e.to_string())?.join(CONFIG);
     let mut config = Config::load(&path);
-    config.google_account = None;
+    *account_of(&mut config, provider) = None;
     config.save(&path).map_err(|e| e.to_string())?;
-    sync::reset(&app);
+    sync::reset(&app, provider);
     let _ = app.emit("cloud-changed", ());
     refresh_tray(&app);
     Ok(())

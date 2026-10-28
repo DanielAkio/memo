@@ -3,7 +3,8 @@
 // window frames, pops pinned windows into OS-level Document Picture-in-Picture
 // when available, adapts to full-screen single-view on mobile (< 680px),
 // stores data in localStorage (+ IndexedDB for pasted images), and syncs with
-// Google Drive's appDataFolder using the same format as sync.rs.
+// Google Drive's appDataFolder or OneDrive's app folder using the same format
+// as sync.rs.
 
 (() => {
   // OAuth 2.0 popup callback: send the token hash to the opener and close.
@@ -18,7 +19,7 @@
   }
 
   const STORAGE_KEY = 'memo.web.data.v1';
-  const TOKEN_KEY = 'memo.web.googleToken';
+  const TOKEN_KEYS = { google: 'memo.web.googleToken', microsoft: 'memo.web.microsoftToken' };
   const IDB_NAME = 'memo-web-db';
   const IDB_IMAGES = 'images';
 
@@ -211,6 +212,8 @@
     pt: {
       newNote: 'Nova memória',
       newGroup: 'Novo grupo',
+      newBoard: 'Novo quadro',
+      importShare: 'Importar item compartilhado',
       showAll: 'Mostrar todas as memórias',
       manager: 'Gerenciador do Memo',
       trash: 'Lixeira',
@@ -231,6 +234,8 @@
     en: {
       newNote: 'New memory',
       newGroup: 'New group',
+      newBoard: 'New board',
+      importShare: 'Import shared item',
       showAll: 'Show all memories',
       manager: 'Memo Manager',
       trash: 'Trash',
@@ -489,7 +494,9 @@
       groups: [],
       boards: [],
       deleted: [],
+      // Cloud sync bookkeeping, one per cloud (sync.rs / store.rs).
       sync: { account: '', pageToken: null, files: {}, deferred: [], lastSync: 0 },
+      syncMicrosoft: { account: '', pageToken: null, files: {}, deferred: [], lastSync: 0 },
     };
   }
 
@@ -500,9 +507,11 @@
     const base = defaultData();
     const out = Object.assign(base, d || {});
     out.manager = Object.assign(base.manager, (d && d.manager) || {});
-    out.sync = Object.assign(base.sync, (d && d.sync) || {});
-    out.sync.files = out.sync.files || {};
-    out.sync.deferred = Array.isArray(out.sync.deferred) ? out.sync.deferred : [];
+    for (const key of ['sync', 'syncMicrosoft']) {
+      out[key] = Object.assign(base[key], (d && d[key]) || {});
+      out[key].files = out[key].files || {};
+      out[key].deferred = Array.isArray(out[key].deferred) ? out[key].deferred : [];
+    }
     out.notes = Array.isArray(out.notes) ? out.notes : [];
     out.groups = Array.isArray(out.groups) ? out.groups : [];
     out.boards = Array.isArray(out.boards) ? out.boards : [];
@@ -1214,11 +1223,8 @@
           }, true);
           // A shared item pasted (outside a text field) or, with clipboard
           // access granted, in the clipboard when the window gets the focus.
-          f.contentWindow.addEventListener('focus', () => checkClipboard(label));
-          f.contentDocument.addEventListener('paste', (e) => {
-            if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
-            offerShared(e.clipboardData && e.clipboardData.getData('text/plain'));
-          });
+          f.contentWindow.addEventListener('focus', checkClipboard);
+          f.contentDocument.addEventListener('paste', onSharePaste);
           const sub = f.contentDocument.getElementById('defaultTextFrame');
           if (sub) {
             sub.addEventListener('load', () => applyZoomToFrame(f));
@@ -1732,6 +1738,15 @@
       for (const b of list(s.boards).map((i) => boards[i]).filter(Boolean)) updateBoard(b.id, (x) => { x.groupId = g.id; });
       return g;
     });
+    // The shared item opens in the middle of the screen (share.rs `center`).
+    const wa = workArea();
+    const z = data.zoom || 1;
+    const middle = (x, w, h) => {
+      x.x = Math.max(wa.left, Math.round(wa.left + (wa.right - wa.left - w * z) / 2));
+      x.y = Math.max(wa.top, Math.round(wa.top + (wa.bottom - wa.top - h * z) / 2));
+    };
+    const main = { note: notes[0], board: boards[0], group: groups[0] }[payload.kind];
+    if (main) middle(main, main.width || DEFAULT_W, payload.kind === 'group' ? TITLEBAR_H : main.height || DEFAULT_H);
     markDirty(true);
     if (payload.kind === 'board' && boards[0]) openBoardWindow(boards[0]);
     else if (payload.kind === 'group' && groups[0]) raiseGroup(groups[0].id);
@@ -1760,13 +1775,38 @@
   }
 
   // Browsers ask before a page reads the clipboard: on focus only once the
-  // person allowed it; a paste always works.
-  async function checkClipboard(label) {
+  // person allowed it (the menus' "Import shared item" asks, see
+  // importFromClipboard); a paste always works.
+  async function checkClipboard() {
     try {
       const perm = await navigator.permissions.query({ name: 'clipboard-read' });
       if (perm.state !== 'granted') return;
       offerShared(await navigator.clipboard.readText());
     } catch {}
+  }
+
+  // A paste anywhere (even in a memory's text, which still gets it) offers
+  // the shared item it carries.
+  function onSharePaste(e) {
+    offerShared(e.clipboardData && e.clipboardData.getData('text/plain'));
+  }
+  document.addEventListener('paste', onSharePaste);
+  window.addEventListener('focus', checkClipboard);
+
+  // The menus' "Import shared item": the offer, or else what the clipboard
+  // holds, even if dismissed before (the browser may ask first).
+  async function importFromClipboard(label) {
+    let payload = takeShare();
+    if (!payload) {
+      try {
+        const m = SHARE_CODE_RE.exec(await navigator.clipboard.readText());
+        if (m) {
+          shareDone.add(m[0]);
+          payload = await decodeShare(m[0]);
+        }
+      } catch {}
+    }
+    if (payload) await importShare(payload, label);
   }
 
   function takeShare() {
@@ -2355,16 +2395,28 @@
     contextSubmenu.replaceChildren();
   }
 
-  function buildAppTrayItems(sourceLabel = null) {
+  // The app's commands, as in the desktop tray (`full`); a titlebar menu
+  // ends with the few a window needs at hand (tray.rs `app_menu_items`).
+  // "Import shared item" is always there: a browser lets a page read the
+  // clipboard only on a click like this one (or a paste).
+  function buildAppTrayItems(sourceLabel = null, full = true) {
     const lang = effectiveLanguage();
     const L = TRAY_LABELS[lang];
     const th = effectiveTheme();
     const lay = data.manager.layout === 'cards' ? 'cards' : 'list';
     const langSet = data.language || 'system';
 
-    const items = [
+    const create = [
       { label: L.newNote, run: () => createNote({ parentLabel: sourceLabel || 'manager' }) },
       { label: L.newGroup, run: () => createGroup(sourceLabel || 'manager') },
+      { label: L.newBoard, run: () => createBoard(sourceLabel || 'manager') },
+      { label: L.importShare, run: () => importFromClipboard(sourceLabel || 'manager') },
+    ];
+    if (!full) {
+      return [...create, null, { label: L.manager, run: () => openManagerWindow({ view: 'notes', scope: 'current' }) }];
+    }
+    const items = [
+      ...create,
       { label: L.showAll, run: () => bringNotesToFront() },
       null,
       { label: L.manager, run: () => openManagerWindow({ view: 'notes', scope: 'current' }) },
@@ -2406,7 +2458,7 @@
       },
     ];
 
-    if (data.sync && data.sync.account) {
+    if (connectedClouds().length) {
       items.push({ label: L.syncNow, run: () => syncCloudNow() });
     }
     return items;
@@ -2513,7 +2565,7 @@
     const combined = [
       ...mapOwn(ownItems),
       ...(ownItems && ownItems.length ? [null] : []),
-      ...buildAppTrayItems(label),
+      ...buildAppTrayItems(label, false),
     ];
     showPopupMenu(combined, x, y, (picked) => {
       if (picked && picked.run) picked.run();
@@ -2584,6 +2636,7 @@
     out.defaultHtml = inlineImages(out.defaultHtml);
     delete out.deleted;
     delete out.sync;
+    delete out.syncMicrosoft;
     const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2730,35 +2783,78 @@
     return next;
   }
 
-  // ------------------------------------------------ Google Drive sync
+  // ------------------------------------------------ cloud sync (Google Drive / OneDrive)
 
   const DRIVE_API = 'https://www.googleapis.com';
-  const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-  const USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
-  const SCOPES = 'https://www.googleapis.com/auth/drive.appdata openid email';
+  const GRAPH_API = 'https://graph.microsoft.com/v1.0';
+  // Sign-in per provider (cloud.rs Provider), in a popup with the implicit
+  // flow: the token comes back in the redirect's hash.
+  const PROVIDERS = {
+    google: {
+      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      scopes: 'https://www.googleapis.com/auth/drive.appdata openid email',
+      params: { include_granted_scopes: 'true', prompt: 'select_account' },
+      clientId: () => clientIdFrom('memo-google-client-id', 'MEMO_GOOGLE_CLIENT_ID', 'memo.web.googleClientId'),
+      async email(token) {
+        const r = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) throw new Error('userinfo');
+        return (await r.json()).email || 'Google Drive';
+      },
+    },
+    microsoft: {
+      authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+      scopes: 'Files.ReadWrite.AppFolder User.Read',
+      params: { prompt: 'select_account', response_mode: 'fragment' },
+      clientId: () => clientIdFrom('memo-microsoft-client-id', 'MEMO_MICROSOFT_CLIENT_ID', 'memo.web.microsoftClientId'),
+      async email(token) {
+        const r = await fetch(`${GRAPH_API}/me?$select=mail,userPrincipalName`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) throw new Error('me');
+        const me = await r.json();
+        return me.mail || me.userPrincipalName || 'OneDrive';
+      },
+    },
+  };
   const SETTINGS_FILE = 'settings.json';
   const IMAGE_PREFIX = 'image-';
 
-  let cloudStatus = { syncing: false, lastSync: 0, pending: 0, error: null };
+  const idleStatus = () => ({ syncing: false, lastSync: 0, pending: 0, error: null });
+  const cloudStatus = { google: idleStatus(), microsoft: idleStatus() };
   let oauthCancel = null;
   let syncTimer = null;
 
-  function googleClientId() {
+  // A provider's OAuth client: the page's meta tag (filled when the site is
+  // built), a global, or one saved in this browser.
+  function clientIdFrom(meta, global, key) {
     if (IS_SITE_HOME) return '';
-    const meta = document.querySelector('meta[name="memo-google-client-id"]')?.content?.trim();
-    if (meta) return meta;
-    if (window.MEMO_GOOGLE_CLIENT_ID) return String(window.MEMO_GOOGLE_CLIENT_ID).trim();
+    const fromMeta = document.querySelector(`meta[name="${meta}"]`)?.content?.trim();
+    if (fromMeta) return fromMeta;
+    if (window[global]) return String(window[global]).trim();
     try {
-      return (localStorage.getItem('memo.web.googleClientId') || '').trim();
+      return (localStorage.getItem(key) || '').trim();
     } catch {
       return '';
     }
   }
 
-  function loadStoredToken() {
+  function cloudProviders() {
+    return Object.keys(PROVIDERS).filter((p) => PROVIDERS[p].clientId());
+  }
+
+  // A cloud's sync bookkeeping: Google Drive's (`sync`) or OneDrive's.
+  function syncState(provider) {
+    return provider === 'microsoft' ? data.syncMicrosoft : data.sync;
+  }
+
+  // The clouds with an account connected here (none, one or both).
+  function connectedClouds() {
+    if (IS_SITE_HOME) return [];
+    return cloudProviders().filter((p) => syncState(p) && syncState(p).account);
+  }
+
+  function loadStoredToken(provider) {
     if (IS_SITE_HOME) return null;
     try {
-      const raw = localStorage.getItem(TOKEN_KEY);
+      const raw = localStorage.getItem(TOKEN_KEYS[provider]);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (parsed && parsed.accessToken && parsed.expiresAt > nowMs() + 30_000) {
@@ -2768,33 +2864,34 @@
     return null;
   }
 
-  function saveStoredToken(accessToken, expiresInSec) {
+  function saveStoredToken(accessToken, expiresInSec, provider) {
     if (IS_SITE_HOME) return;
     try {
-      localStorage.setItem(TOKEN_KEY, JSON.stringify({
+      localStorage.setItem(TOKEN_KEYS[provider], JSON.stringify({
         accessToken,
         expiresAt: nowMs() + (Number(expiresInSec) || 3600) * 1000,
       }));
     } catch {}
   }
 
-  function clearStoredToken() {
+  function clearStoredToken(provider) {
     if (IS_SITE_HOME) return;
     try {
-      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_KEYS[provider]);
     } catch {}
   }
 
-  function updateCloudStatus(patch) {
-    Object.assign(cloudStatus, patch);
-    cloudStatus.pending = computeUploads().length;
+  function updateCloudStatus(provider, patch) {
+    Object.assign(cloudStatus[provider], patch);
+    cloudStatus[provider].pending = computeUploads(syncState(provider)).length;
     emit('cloud-changed');
   }
 
-  function connectCloudAccount() {
+  function connectCloudAccount(provider = 'google') {
     if (IS_SITE_HOME) return Promise.reject('unavailable');
     if (oauthCancel) return Promise.reject('busy');
-    const clientId = googleClientId();
+    const P = PROVIDERS[provider];
+    const clientId = P && P.clientId();
     if (!clientId) return Promise.reject('unavailable');
 
     return new Promise((resolve, reject) => {
@@ -2806,17 +2903,16 @@
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: 'token',
-        scope: SCOPES,
+        scope: P.scopes,
         state,
-        include_granted_scopes: 'true',
-        prompt: 'select_account',
+        ...P.params,
       });
 
       const w = 520;
       const h = 620;
       const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
       const top = Math.round(window.screenY + (window.outerHeight - h) / 2);
-      const popup = window.open(`${AUTH_URL}?${params}`, 'memo-google-auth', `width=${w},height=${h},left=${left},top=${top}`);
+      const popup = window.open(`${P.authUrl}?${params}`, 'memo-cloud-auth', `width=${w},height=${h},left=${left},top=${top}`);
       if (!popup) {
         reject('denied');
         return;
@@ -2867,17 +2963,17 @@
           reject('denied');
           return;
         }
-        saveStoredToken(token, expiresIn);
+        saveStoredToken(token, expiresIn, provider);
         try {
-          const r = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${token}` } });
-          if (!r.ok) throw new Error('userinfo');
-          const info = await r.json();
-          const email = info.email || 'Google Drive';
-          if (data.sync.account !== email) {
-            data.sync = { account: email, pageToken: null, files: {}, deferred: [], lastSync: 0 };
+          const email = await P.email(token);
+          // Another account starts over; the other cloud stays as it is.
+          if (syncState(provider).account !== email) {
+            const fresh = { account: email, pageToken: null, files: {}, deferred: [], lastSync: 0 };
+            if (provider === 'microsoft') data.syncMicrosoft = fresh;
+            else data.sync = fresh;
           }
           markDirty(false);
-          cloudStatus.error = null;
+          cloudStatus[provider].error = null;
           syncCloudNow();
           resolve(email);
         } catch {
@@ -2889,11 +2985,13 @@
     });
   }
 
-  function disconnectCloudAccount() {
+  function disconnectCloudAccount(provider) {
     if (IS_SITE_HOME) return;
-    clearStoredToken();
-    data.sync = { account: '', pageToken: null, files: {}, deferred: [], lastSync: 0 };
-    cloudStatus = { syncing: false, lastSync: 0, pending: 0, error: null };
+    clearStoredToken(provider);
+    const fresh = { account: '', pageToken: null, files: {}, deferred: [], lastSync: 0 };
+    if (provider === 'microsoft') data.syncMicrosoft = fresh;
+    else data.sync = fresh;
+    cloudStatus[provider] = idleStatus();
     markDirty(false);
     emit('cloud-changed');
   }
@@ -2942,8 +3040,8 @@
     };
   }
 
-  function computeUploads() {
-    const st = data.sync || { files: {}, deferred: [] };
+  function computeUploads(st = data.sync) {
+    st = st || { files: {}, deferred: [] };
     const files = st.files || {};
     const synced = (name) => (files[name] ? files[name].synced : undefined);
     const deferredNames = new Set((st.deferred || []).map((d) => `note-${d.id}.json`));
@@ -2984,68 +3082,192 @@
     return out;
   }
 
-  async function driveFetch(token, path, query = {}) {
-    const url = new URL(`${DRIVE_API}${path}`);
-    for (const [k, v] of Object.entries(query)) {
-      if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
-    }
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  // A failed request: a lost sign-in (401) or anything else.
+  function cloudError(r, provider) {
     if (r.status === 401) {
-      clearStoredToken();
-      throw 'reauth';
+      clearStoredToken(provider);
+      return 'reauth';
     }
-    if (!r.ok) throw 'network';
-    return r;
+    return 'network';
   }
 
-  async function driveUpload(token, fileId, name, stamp, contentType, bodyBytes) {
-    const meta = { appProperties: { stamp: String(stamp) } };
-    if (!fileId) {
-      meta.name = name;
-      meta.parents = ['appDataFolder'];
-    }
-    const boundary = `memo-${genId()}`;
-    const enc = new TextEncoder();
-    const head = enc.encode(
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n`
-      + `--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`,
-    );
-    const tail = enc.encode(`\r\n--${boundary}--`);
-    const payload = new Uint8Array(head.length + bodyBytes.length + tail.length);
-    payload.set(head, 0);
-    payload.set(bodyBytes, head.length);
-    payload.set(tail, head.length + bodyBytes.length);
-
-    const send = async (id) => {
-      const url = id
-        ? `${DRIVE_API}/upload/drive/v3/files/${id}?uploadType=multipart&fields=id`
-        : `${DRIVE_API}/upload/drive/v3/files?uploadType=multipart&fields=id`;
-      return fetch(url, {
-        method: id ? 'PATCH' : 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`,
-        },
-        body: payload,
-      });
+  // The cloud folder as the sync sees it (sync.rs `Remote`): files by name
+  // with a stamp, and the changes since a token.
+  function googleRemote(token) {
+    const get = async (path, query = {}) => {
+      const url = new URL(`${DRIVE_API}${path}`);
+      for (const [k, v] of Object.entries(query)) {
+        if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+      }
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) throw cloudError(r, 'google');
+      return r;
     };
-
-    let res = await send(fileId);
-    if (fileId && res.status === 404) res = await send(null);
-    if (res.status === 401) {
-      clearStoredToken();
-      throw 'reauth';
-    }
-    if (!res.ok) throw 'network';
-    const created = await res.json();
-    return created.id;
+    const fromMeta = (m) => {
+      if (!m || m.trashed || !(m.name?.endsWith('.json') || m.name?.startsWith(IMAGE_PREFIX))) return null;
+      const stamp = Number(m.appProperties && m.appProperties.stamp);
+      if (!Number.isFinite(stamp)) return null;
+      return { id: m.id, name: m.name, stamp };
+    };
+    return {
+      async startToken() {
+        return (await (await get('/drive/v3/changes/startPageToken')).json()).startPageToken;
+      },
+      async listAll() {
+        const all = [];
+        let pageToken = null;
+        do {
+          const list = await (await get('/drive/v3/files', {
+            spaces: 'appDataFolder',
+            pageSize: 1000,
+            fields: 'nextPageToken,files(id,name,appProperties,trashed)',
+            pageToken,
+          })).json();
+          for (const m of list.files || []) {
+            const rf = fromMeta(m);
+            if (rf) all.push(rf);
+          }
+          pageToken = list.nextPageToken;
+        } while (pageToken);
+        return dedupeRemote(all);
+      },
+      async changes(page) {
+        const all = [];
+        while (page) {
+          const list = await (await get('/drive/v3/changes', {
+            pageToken: page,
+            spaces: 'appDataFolder',
+            pageSize: 1000,
+            fields: 'nextPageToken,newStartPageToken,changes(file(id,name,appProperties,trashed))',
+          })).json();
+          for (const c of list.changes || []) {
+            const rf = fromMeta(c.file);
+            if (rf) all.push(rf);
+          }
+          if (list.newStartPageToken) return [dedupeRemote(all), list.newStartPageToken];
+          page = list.nextPageToken;
+        }
+        throw 'network';
+      },
+      download: (id) => get(`/drive/v3/files/${id}`, { alt: 'media' }),
+      async upload(fileId, name, stamp, contentType, bodyBytes) {
+        const meta = { appProperties: { stamp: String(stamp) } };
+        if (!fileId) {
+          meta.name = name;
+          meta.parents = ['appDataFolder'];
+        }
+        const boundary = `memo-${genId()}`;
+        const enc = new TextEncoder();
+        const head = enc.encode(
+          `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n`
+          + `--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`,
+        );
+        const tail = enc.encode(`\r\n--${boundary}--`);
+        const payload = new Uint8Array(head.length + bodyBytes.length + tail.length);
+        payload.set(head, 0);
+        payload.set(bodyBytes, head.length);
+        payload.set(tail, head.length + bodyBytes.length);
+        const send = (id) => fetch(id
+          ? `${DRIVE_API}/upload/drive/v3/files/${id}?uploadType=multipart&fields=id`
+          : `${DRIVE_API}/upload/drive/v3/files?uploadType=multipart&fields=id`, {
+          method: id ? 'PATCH' : 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+          },
+          body: payload,
+        });
+        let res = await send(fileId);
+        if (fileId && res.status === 404) res = await send(null);
+        if (!res.ok) throw cloudError(res, 'google');
+        return (await res.json()).id;
+      },
+    };
   }
 
-  function remoteFileFromMeta(m) {
-    if (!m || m.trashed || !(m.name?.endsWith('.json') || m.name?.startsWith(IMAGE_PREFIX))) return null;
-    const stamp = Number(m.appProperties && m.appProperties.stamp);
-    if (!Number.isFinite(stamp)) return null;
-    return { id: m.id, name: m.name, stamp };
+  // OneDrive's app folder (sync.rs `OneDrive`): no custom metadata, so a
+  // file's stamp is in its name, `<name>~<stamp>`; a new stamp writes a new
+  // file and deletes the one it replaces.
+  const ONEDRIVE_SIMPLE_MAX = 4 * 1024 * 1024;
+  function oneDriveRemote(token) {
+    const auth = { Authorization: `Bearer ${token}` };
+    const call = async (url, init = {}) => {
+      const r = await fetch(url, { ...init, headers: { ...auth, ...(init.headers || {}) } });
+      if (!r.ok) throw cloudError(r, 'microsoft');
+      return r;
+    };
+    const fromItem = (it) => {
+      if (!it || it.deleted || !it.file) return null;
+      const at = it.name.lastIndexOf('~');
+      if (at < 0) return null;
+      const name = it.name.slice(0, at);
+      const stamp = Number(it.name.slice(at + 1));
+      if (!Number.isFinite(stamp) || !(name.endsWith('.json') || name.startsWith(IMAGE_PREFIX))) return null;
+      return { id: it.id, name, stamp };
+    };
+    const pages = async (url) => {
+      const all = [];
+      for (;;) {
+        const page = await (await call(url)).json();
+        for (const it of page.value || []) {
+          const rf = fromItem(it);
+          if (rf) all.push(rf);
+        }
+        if (page['@odata.nextLink']) url = page['@odata.nextLink'];
+        else return [all, page['@odata.deltaLink'] || null];
+      }
+    };
+    const remove = (id) => fetch(`${GRAPH_API}/me/drive/items/${id}`, { method: 'DELETE', headers: auth }).catch(() => {});
+    const path = (name) => `${GRAPH_API}/me/drive/special/approot:/${encodeURIComponent(name)}:`;
+    return {
+      async startToken() {
+        const [, delta] = await pages(`${GRAPH_API}/me/drive/special/approot/delta?token=latest`);
+        if (!delta) throw 'network';
+        return delta;
+      },
+      async listAll() {
+        const [all] = await pages(`${GRAPH_API}/me/drive/special/approot/children?$top=999&$select=id,name,file`);
+        const keep = dedupeRemote(all);
+        // Older copies left by a sync that stopped halfway.
+        const kept = new Set(keep.map((f) => f.id));
+        for (const f of all) if (!kept.has(f.id)) await remove(f.id);
+        return keep;
+      },
+      async changes(link) {
+        const [all, delta] = await pages(link);
+        if (!delta) throw 'network';
+        return [dedupeRemote(all), delta];
+      },
+      // Through the item's download URL (the /content redirect has no CORS).
+      async download(id) {
+        const item = await (await call(`${GRAPH_API}/me/drive/items/${id}?$select=id,@microsoft.graph.downloadUrl`)).json();
+        const r = await fetch(item['@microsoft.graph.downloadUrl']);
+        if (!r.ok) throw 'network';
+        return r;
+      },
+      async upload(fileId, name, stamp, contentType, bodyBytes) {
+        const target = path(`${name}~${stamp}`);
+        let res;
+        if (bodyBytes.length <= ONEDRIVE_SIMPLE_MAX) {
+          res = await call(`${target}/content`, { method: 'PUT', headers: { 'Content-Type': contentType }, body: bodyBytes });
+        } else {
+          const session = await (await call(`${target}/createUploadSession`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace' } }),
+          })).json();
+          res = await fetch(session.uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Range': `bytes 0-${bodyBytes.length - 1}/${bodyBytes.length}` },
+            body: bodyBytes,
+          });
+          if (!res.ok) throw 'network';
+        }
+        const { id } = await res.json();
+        if (fileId && fileId !== id) await remove(fileId);
+        return id;
+      },
+    };
   }
 
   function dedupeRemote(files) {
@@ -3057,61 +3279,31 @@
     return [...byName.values()];
   }
 
-  async function runCloudSync() {
-    if (IS_SITE_HOME || !data.sync || !data.sync.account || cloudStatus.syncing) return;
-    const token = loadStoredToken();
+  // One cloud's run (sync.rs `run_with`). With both clouds connected,
+  // what one brings in is sent to the other on its run: this browser is the
+  // bridge between them.
+  async function runCloudSync(provider) {
+    const st = syncState(provider);
+    if (IS_SITE_HOME || !st || !st.account || cloudStatus[provider].syncing) return;
+    const token = loadStoredToken(provider);
     if (!token) {
-      updateCloudStatus({ syncing: false, error: 'reauth' });
+      updateCloudStatus(provider, { syncing: false, error: 'reauth' });
       return;
     }
 
-    updateCloudStatus({ syncing: true });
+    updateCloudStatus(provider, { syncing: true });
     try {
-      const st = data.sync;
       st.files = st.files || {};
+      const cloud = (provider === 'microsoft' ? oneDriveRemote : googleRemote)(token);
       let remote = [];
       let nextToken = st.pageToken;
 
       if (!st.pageToken) {
-        const startRes = await (await driveFetch(token, '/drive/v3/changes/startPageToken')).json();
-        nextToken = startRes.startPageToken;
-        let pageToken = null;
-        const all = [];
-        do {
-          const list = await (await driveFetch(token, '/drive/v3/files', {
-            spaces: 'appDataFolder',
-            pageSize: 1000,
-            fields: 'nextPageToken,files(id,name,appProperties,trashed)',
-            pageToken,
-          })).json();
-          for (const m of list.files || []) {
-            const rf = remoteFileFromMeta(m);
-            if (rf) all.push(rf);
-          }
-          pageToken = list.nextPageToken;
-        } while (pageToken);
-        remote = dedupeRemote(all);
+        // Token first, so nothing changed during the listing is missed.
+        nextToken = await cloud.startToken();
+        remote = await cloud.listAll();
       } else {
-        let page = st.pageToken;
-        const all = [];
-        while (page) {
-          const list = await (await driveFetch(token, '/drive/v3/changes', {
-            pageToken: page,
-            spaces: 'appDataFolder',
-            pageSize: 1000,
-            fields: 'nextPageToken,newStartPageToken,changes(file(id,name,appProperties,trashed))',
-          })).json();
-          for (const c of list.changes || []) {
-            const rf = remoteFileFromMeta(c.file);
-            if (rf) all.push(rf);
-          }
-          if (list.newStartPageToken) {
-            nextToken = list.newStartPageToken;
-            break;
-          }
-          page = list.nextPageToken;
-        }
-        remote = dedupeRemote(all);
+        [remote, nextToken] = await cloud.changes(st.pageToken);
       }
 
       remote.sort((a, b) => {
@@ -3132,7 +3324,7 @@
           st.files[file.name] = { fileId: file.id, synced: known };
           continue;
         }
-        const bodyText = await (await driveFetch(token, `/drive/v3/files/${file.id}`, { alt: 'media' })).text();
+        const bodyText = await (await cloud.download(file.id)).text();
         if (file.name === SETTINGS_FILE) {
           const doc = JSON.parse(bodyText);
           const localStamp = data.defaultsUpdatedAt || 0;
@@ -3191,7 +3383,7 @@
           for (const imgName of imageRefs(doc.html)) {
             if (!imageCache.has(imgName) && st.files[`${IMAGE_PREFIX}${imgName}`]) {
               try {
-                const imgRes = await driveFetch(token, `/drive/v3/files/${st.files[`${IMAGE_PREFIX}${imgName}`].fileId}`, { alt: 'media' });
+                const imgRes = await cloud.download(st.files[`${IMAGE_PREFIX}${imgName}`].fileId);
                 const buf = new Uint8Array(await imgRes.arrayBuffer());
                 const mime = mimeForName(imgName);
                 const dataUrl = `data:${mime};base64,${bytesToBase64(buf)}`;
@@ -3291,7 +3483,7 @@
 
       // Push local changes.
       const enc = new TextEncoder();
-      for (const up of computeUploads()) {
+      for (const up of computeUploads(st)) {
         for (const imgName of up.images) {
           const driveImgName = `${IMAGE_PREFIX}${imgName}`;
           if (st.files[driveImgName]) continue;
@@ -3299,33 +3491,41 @@
           if (!rec || !rec.dataUrl) continue;
           const b64 = rec.dataUrl.split(',')[1] || '';
           const bytes = base64ToBytes(b64);
-          const id = await driveUpload(token, null, driveImgName, 1, rec.mime || mimeForName(imgName), bytes);
+          const id = await cloud.upload(null, driveImgName, 1, rec.mime || mimeForName(imgName), bytes);
           st.files[driveImgName] = { fileId: id, synced: 1 };
         }
         const existingId = st.files[up.name]?.fileId || null;
-        const id = await driveUpload(token, existingId, up.name, up.stamp, 'application/json', enc.encode(up.body));
+        const id = await cloud.upload(existingId, up.name, up.stamp, 'application/json', enc.encode(up.body));
         st.files[up.name] = { fileId: id, synced: up.stamp };
       }
 
       st.lastSync = nowMs();
       markDirty(false);
-      updateCloudStatus({ syncing: false, lastSync: st.lastSync, error: null });
+      updateCloudStatus(provider, { syncing: false, lastSync: st.lastSync, error: null });
     } catch (err) {
-      updateCloudStatus({ syncing: false, error: typeof err === 'string' ? err : 'network' });
+      updateCloudStatus(provider, { syncing: false, error: typeof err === 'string' ? err : 'network' });
+    }
+  }
+
+  // Every connected cloud, one after the other.
+  async function syncAllClouds() {
+    for (const p of connectedClouds()) {
+      if (loadStoredToken(p) || cloudStatus[p].error !== 'reauth') await runCloudSync(p);
     }
   }
 
   function scheduleCloudSync() {
-    if (IS_SITE_HOME || !data.sync || !data.sync.account) return;
-    updateCloudStatus({});
+    const clouds = connectedClouds();
+    if (!clouds.length) return;
+    for (const p of clouds) updateCloudStatus(p, {});
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => runCloudSync(), 3000);
+    syncTimer = setTimeout(() => syncAllClouds(), 3000);
   }
 
   function syncCloudNow() {
     if (IS_SITE_HOME) return;
     clearTimeout(syncTimer);
-    runCloudSync();
+    return syncAllClouds();
   }
 
   // ------------------------------------------------ command invoke handler
@@ -3530,6 +3730,9 @@
         return null;
       case 'delete_board_forever':
         deleteBoardForever(args.id);
+        return null;
+      case 'empty_board_trash':
+        for (const x of data.boards.filter((brd) => brd.trashedAt)) deleteBoardForever(x.id);
         return null;
       case 'update_board_drop_zones': {
         const bid = (b && b.id) || (args && args.id) || idOf(label);
@@ -3755,16 +3958,19 @@
 
       // Cloud Sync
       case 'get_cloud_account':
-        cloudStatus.pending = computeUploads().length;
-        cloudStatus.lastSync = (data.sync && data.sync.lastSync) || cloudStatus.lastSync || 0;
-        return [Boolean(googleClientId()), (data.sync && data.sync.account) || null, copy(cloudStatus)];
+        return [cloudProviders(), connectedClouds().map((p) => {
+          const st = syncState(p);
+          cloudStatus[p].pending = computeUploads(st).length;
+          cloudStatus[p].lastSync = st.lastSync || cloudStatus[p].lastSync || 0;
+          return { provider: p, email: st.account, status: copy(cloudStatus[p]) };
+        })];
       case 'connect_cloud':
-        return connectCloudAccount();
+        return connectCloudAccount(args.provider || 'google');
       case 'cancel_cloud_connect':
         if (oauthCancel) oauthCancel();
         return null;
       case 'disconnect_cloud':
-        disconnectCloudAccount();
+        disconnectCloudAccount(args.provider || 'google');
         return null;
       case 'sync_cloud':
         syncCloudNow();
@@ -4484,17 +4690,13 @@
       }
     }
 
-    if (data.sync && data.sync.account && loadStoredToken()) {
-      runCloudSync();
-    }
-    setInterval(() => {
-      if (data.sync && data.sync.account && loadStoredToken()) runCloudSync();
-    }, 5 * 60_000);
+    syncAllClouds();
+    setInterval(() => syncAllClouds(), 5 * 60_000);
   }
 
   window.addEventListener('focus', () => {
-    if (data.sync && data.sync.account && loadStoredToken()) {
-      if (nowMs() - (cloudStatus.lastSync || 0) >= 30_000) runCloudSync();
+    for (const p of connectedClouds()) {
+      if (loadStoredToken(p) && nowMs() - (cloudStatus[p].lastSync || 0) >= 30_000) runCloudSync(p);
     }
   });
 
