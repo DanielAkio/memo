@@ -28,7 +28,9 @@ the private key is **never committed** (`*.key` and `*.key.pub` are git-ignored)
 ## Releasing
 
 Unchanged: bump the version (`package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`), push a `v*` tag
-and run the Build workflow from it. With the secret present, the workflow also:
+and run the Build workflow from it. The draft release starts with the commits since the last published release as its
+description; rewrite it for users (New / Fixes / Website and README) before publishing. With the secret present, the
+workflow also:
 
 - turns on `bundle.createUpdaterArtifacts`, so each job also builds signed update packages (macOS `.app.tar.gz`,
   Linux `.AppImage`, the Windows `*-setup.exe`) with a `.sig` beside them;

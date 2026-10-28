@@ -22,14 +22,27 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Its description starts as the commits since the last published
+      # release (not drafts), version bumps left out; it is rewritten for
+      # users before publishing. An existing draft keeps its description.
       - name: Create the draft release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
-            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag --title "Memo $TAG" --notes ""
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 && exit 0
+          prev=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName 2> /dev/null || true)
+          range=${prev:+$prev..}$TAG
+          { [ -n "$prev" ] && echo "Changes since $prev:" && echo
+            git log "$range" --no-merges --invert-grep --grep '^Bump version' --format='- **%s**%n%n%b' |
+              grep -v '^Co-Authored-By:' | sed '/^$/N;/^\n$/D'
+          } > notes.md
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag --title "Memo $TAG" --notes-file notes.md
 
   build:
     needs: release

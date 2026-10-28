@@ -317,6 +317,17 @@ const DESKTOP_ONLY = {
   else pass('Local Memo Web at localhost/memo/ (127.0.0.1 and /site/ redirect)');
 }
 
+// Every release has a description: the build workflow fills the draft with
+// the commits since the last published release.
+{
+  const wf = read('.github/workflows/build.yml');
+  if (/--notes ""/.test(wf) || !/--notes-file notes\.md/.test(wf) || !/fetch-depth: 0/.test(wf)) {
+    fail('build.yml must give the draft release the changes since the last published one as its description');
+  } else {
+    pass('The draft release gets the changes since the last published one');
+  }
+}
+
 // The README points to the website instead of repeating it: none of the
 // landing page's section headings, and links to the site and the code
 // signing policy (SignPath requires that one).
