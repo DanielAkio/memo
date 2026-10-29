@@ -1046,6 +1046,10 @@ try {
       out.others = b.columns[0].noteIds.length + b.columns[2].noteIds.length;
       out.opened = Boolean(added[0] && M.wins['note-' + added[0]]);
       out.cards = doc.querySelectorAll('.board-column')[1].querySelectorAll('.board-card').length;
+      // The column header shows no count of its memories (only dot, name, ✕).
+      const head = doc.querySelectorAll('.board-column')[1].querySelector('.col-head');
+      out.headText = [...head.querySelectorAll('*')].filter((el) => !el.children.length && /^\d+$/.test(el.textContent.trim())).length;
+      out.countEl = doc.querySelectorAll('.col-count').length;
       if (added[0]) M.closeWin('note-' + added[0]);
       M.closeWin('board-add-board');
       return out;
@@ -1056,6 +1060,7 @@ try {
     assert.equal(res.inColumn && res.others === 0, true, 'At the bottom of that column only');
     assert.equal(res.opened, true, 'It opens to be written');
     assert.equal(res.cards, 1, 'Its card shows in the column');
+    assert.deepEqual([res.countEl, res.headText], [0, 0], 'A column header shows no memory count');
   });
 
   // ------------------------------------------------ 7e. Card preview: long lines don't overlap
@@ -1276,8 +1281,21 @@ try {
 
       // Folding: the arrow keeps only the title, and opens it again.
       const card = () => doc.querySelector('.board-card[data-note-id="cf-a"]');
+      // The group bar's toggle: same arrow, up while open, 180° when folded.
+      const arrow = () => {
+        const svg = card().querySelector('.card-fold-btn svg');
+        return { path: svg.querySelector('path').getAttribute('d'), turn: win.getComputedStyle(svg).transform, ease: win.getComputedStyle(svg).transitionDuration };
+      };
+      const groupArrow = await (async () => {
+        const g = await fetch('/src/windows/group/group.html').then((r) => r.text());
+        return new DOMParser().parseFromString(g, 'text/html').querySelector('#toggleBtn path').getAttribute('d');
+      })();
+      out.arrowOpen = arrow();
       card().querySelector('.card-fold-btn').click();
+      out.arrowTurning = card().querySelector('.card-fold-btn').getAttribute('aria-expanded');
       await wait(200);
+      out.arrowFolded = arrow();
+      out.groupArrow = groupArrow;
       out.folded = card().classList.contains('is-folded') && !card().querySelector('.card-snippet');
       out.foldSaved = [...(M.boards['cf-board'].columns.find((c) => c.id === 'c1').collapsed || [])];
       card().querySelector('.card-fold-btn').click();
@@ -1297,6 +1315,10 @@ try {
     assert.equal(res.cleaned, true, 'Dropped, the skeleton and the dragged copy go');
     assert.deepEqual(res.order, ['c2', 'c1'], 'A column dragged past another moves there, saved');
     assert.deepEqual(res.drawn, ['c2', 'c1'], 'and is drawn there');
+    assert.equal(res.arrowOpen.path, res.groupArrow, 'The fold arrow is the group bar\'s toggle arrow');
+    assert.equal(res.arrowOpen.turn, 'none', 'It points up while open');
+    assert.equal(res.arrowTurning, 'false', 'A click turns it at once (then the card folds)');
+    assert.equal(res.arrowFolded.turn.replace(/\s/g, '').startsWith('matrix(-1,') && res.arrowFolded.ease === '0.16s', true, `Folded, it is turned 180° with the group's 160 ms (${res.arrowFolded.turn})`);
     assert.equal(res.folded, true, 'A folded memory shows only its title');
     assert.deepEqual(res.foldSaved, ['cf-a'], 'Folding is saved in the column');
     assert.equal(res.unfolded, true, 'The arrow opens it again');
@@ -2525,6 +2547,56 @@ try {
       assert.equal(res.button, true, 'The board shows the button on a phone');
       assert.equal(res.added, 1, 'It creates one memory');
       assert.deepEqual(res.counts, [0, 0, 1], 'In that column');
+    } finally {
+      await webPage.close();
+    }
+  });
+
+  await step('Web version: a memory opened from a board closes by itself when a click goes elsewhere', async () => {
+    const webPage = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const bid = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const before = new Set((await inv('manager', 'list_boards')).map((x) => x.id));
+        await inv('manager', 'new_board');
+        return (await inv('manager', 'list_boards')).map((x) => x.id).find((x) => !before.has(x));
+      });
+      await webPage.waitForTimeout(400);
+      const boardFrame = webPage.frameLocator(`iframe[name="board-${bid}"]`);
+      // A column's "New memory" opens one from the board.
+      const before = await webPage.evaluate(async () => (await window.MemoWeb.invoke('manager', 'list_notes')).map((n) => n.id));
+      await boardFrame.locator('.col-add-note').first().click();
+      await webPage.waitForTimeout(400);
+      const id = await webPage.evaluate(async (before) => (await window.MemoWeb.invoke('manager', 'list_notes')).map((n) => n.id).find((x) => !before.includes(x)), before);
+      const open = () => webPage.evaluate((sel) => Boolean(document.querySelector(sel)), `.win[data-label="note-${id}"]`);
+      // Editing it keeps it open.
+      await webPage.frameLocator(`iframe[name="note-${id}"]`).locator('#editor').click();
+      await webPage.keyboard.type('Comprar pão');
+      await webPage.waitForTimeout(300);
+      const whileEditing = await open();
+      // A click on the board (another window) closes it.
+      await boardFrame.locator('.col-head').first().click({ position: { x: 60, y: 10 } });
+      await webPage.waitForTimeout(400);
+      const afterOther = await open();
+      // Opened again from its card, a click on the desk closes it too.
+      await boardFrame.locator(`.board-card[data-note-id="${id}"]`).click();
+      await webPage.waitForTimeout(400);
+      await webPage.frameLocator(`iframe[name="note-${id}"]`).locator('#editor').click();
+      await webPage.mouse.click(1390, 890);
+      await webPage.waitForTimeout(400);
+      const afterDesk = await open();
+      const still = await webPage.evaluate(async ([id, bid]) => {
+        const b = await window.MemoWeb.invoke(`board-${bid}`, 'load_board');
+        const n = (await window.MemoWeb.invoke('manager', 'list_notes')).find((x) => x.id === id);
+        return { onBoard: b.columns[0].noteIds.includes(id), kept: Boolean(n && !n.trashedAt) };
+      }, [id, bid]);
+      assert.equal(whileEditing, true, 'It stays open while being edited');
+      assert.equal(afterOther, false, 'A click on another window closes it');
+      assert.equal(afterDesk, false, 'A click on the desk closes it');
+      assert.deepEqual(still, { onBoard: true, kept: true }, 'It stays on its board, not trashed');
     } finally {
       await webPage.close();
     }

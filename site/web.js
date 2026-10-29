@@ -2051,6 +2051,24 @@
     if (n.groupId) notifyGroups();
   }
 
+  // A memory opened from a board closes once another window or the desk
+  // gets the focus, as on the desktop (is_board_transient, 150 ms later).
+  const boardTransient = new Set();
+  function closeOnBlur(id) {
+    boardTransient.add(id);
+    const w = wins[`note-${id}`];
+    const fw = w && w.f && w.f.contentWindow;
+    if (!fw || fw.__memoCloseOnBlur) return;
+    fw.__memoCloseOnBlur = true;
+    fw.addEventListener('blur', () => setTimeout(() => {
+      const now = wins[`note-${id}`];
+      if (!boardTransient.has(id) || !now || document.activeElement === now.f) return;
+      boardTransient.delete(id);
+      closeNoteById(id);
+      notifyBoards();
+    }, 150));
+  }
+
   function closeNoteById(id) {
     const n = findNote(id);
     if (!n) return;
@@ -3957,6 +3975,7 @@
         updateBoard(b.id, (x) => { x.columns.find((c) => c.id === args.columnId).noteIds.push(note.id); });
         notifyBoards();
         await openNoteWindow(note, true);
+        closeOnBlur(note.id);
         return null;
       }
       case 'open_board': {
@@ -4098,6 +4117,8 @@
         target.hidden = false;
         // Only this one, even inside a group that is put away or closed.
         await openNoteWindow(target);
+        if (cmd === 'open_board_note') closeOnBlur(target.id);
+        else boardTransient.delete(target.id);
         const wKey = `note-${target.id}`;
         const win = wins[wKey];
         if (win) {

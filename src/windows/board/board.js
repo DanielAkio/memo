@@ -611,10 +611,6 @@
 
       titleWrap.append(title, titleInput);
 
-      const count = document.createElement('span');
-      count.className = 'col-count';
-      count.textContent = String(col.noteIds.length);
-
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.className = 'col-menu-btn';
@@ -631,7 +627,7 @@
         }
       });
 
-      head.append(dot, titleWrap, count, deleteBtn);
+      head.append(dot, titleWrap, deleteBtn);
 
       // Cards list
       const cardsList = document.createElement('div');
@@ -710,15 +706,18 @@
         cardFold.title = foldLabel;
         cardFold.setAttribute('aria-label', foldLabel);
         cardFold.setAttribute('aria-expanded', String(!folded));
-        cardFold.innerHTML = '<svg viewBox="0 0 16 16" width="10" height="10"><path d="M4.5 6.25 8 9.75l3.5-3.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        // The group bar's toggle arrow: up when open, turned 180° when folded.
+        cardFold.innerHTML = '<svg viewBox="0 0 16 16" width="10" height="10"><path d="M4.5 9.75 8 6.25l3.5 3.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         cardFold.addEventListener('pointerdown', (e) => e.stopPropagation());
         cardFold.addEventListener('click', (e) => {
           e.stopPropagation();
           const list = (col.collapsed || []).filter((id) => id !== note.id);
           if (!folded) list.push(note.id);
           col.collapsed = list;
-          renderColumns();
           saveColumns();
+          // Turn the arrow first, then fold or open the card.
+          cardFold.setAttribute('aria-expanded', String(folded));
+          setTimeout(renderColumns, 160);
         });
 
         cardTop.append(cardDot, cardTitle, cardFold, cardDel);

@@ -184,16 +184,6 @@ body.is-col-moving * { cursor: grabbing !important; user-select: none; }
   outline: none;
 }
 
-.col-count {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-ash);
-  padding: 1px 6px;
-  border-radius: 9999px;
-  background: var(--overlay-hover);
-  flex: none;
-}
-
 .col-menu-btn {
   display: flex;
   align-items: center;
@@ -357,9 +347,11 @@ body.is-col-moving * { cursor: grabbing !important; user-select: none; }
   color: var(--color-paper);
   background: var(--overlay-hover);
 }
-/* Folded: only the title; the arrow stays, pointing right. */
+/* Folded: only the title; the arrow stays. Like the group bar's toggle, it
+   points up while open and turns 180° when folded. */
 .board-card.is-folded .card-fold-btn { display: flex; }
-.board-card.is-folded .card-fold-btn svg { transform: rotate(-90deg); }
+.card-fold-btn svg { transition: transform 160ms ease; }
+.card-fold-btn[aria-expanded="false"] svg { transform: rotate(180deg); }
 .board-card.is-folded { padding-bottom: 10px; }
 .card-del-btn:hover {
   color: var(--color-coral);
