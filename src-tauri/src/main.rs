@@ -13,6 +13,7 @@ mod images;
 mod manager;
 mod mcp;
 mod notes;
+mod reminders;
 mod share;
 mod store;
 mod sync;
@@ -288,6 +289,8 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // A reminder's system notification (reminders.rs).
+        .plugin(tauri_plugin_notification::init())
         // In-app updates from the GitHub releases (updater.rs).
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Start with the system: same name and argument as the Windows
@@ -317,6 +320,7 @@ fn main() {
             open_link,
             set_pinned,
             set_color,
+            set_reminder,
             rename,
             close_window,
             trash_window,
@@ -344,6 +348,8 @@ fn main() {
             set_default_color,
             get_new_note_defaults,
             set_default_title,
+            get_reminder_defaults,
+            set_reminder_defaults,
             get_group_defaults,
             set_default_group_color,
             set_default_group_title,
@@ -466,6 +472,7 @@ fn main() {
             }
             sync::start(&handle);
             updater::start(&handle);
+            reminders::start(&handle);
             if mcp::enabled(&default_dir) {
                 if let Err(err) = mcp::start(&handle, &default_dir) {
                     eprintln!("memo: mcp: {err}");

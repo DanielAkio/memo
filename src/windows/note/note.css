@@ -526,7 +526,8 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   white-space: nowrap;
   overflow: hidden;
 }
-#count.is-alert { color: var(--color-mist); }
+.foot-alert { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--color-mist); }
+.foot-alert:empty { display: none; }
 /* The boards the note is on (base.css .pill), after its group and drawn
    like it: icon and name in the footer's type, no chip. */
 .foot-boards { display: flex; gap: 10px; min-width: 0; flex: 0 4 auto; }
@@ -540,6 +541,25 @@ html.embedded, html.embedded body, .embedded .frame { background: transparent; }
   letter-spacing: inherit;
 }
 .foot-boards:empty { display: none; }
+/* Its reminder (components/reminder.js), beside Aa and drawn like the
+   board pills; a button that opens the reminder popover. */
+.foot-reminder { display: flex; flex: none; margin-left: auto; }
+.foot-reminder:empty { display: none; }
+.foot-reminder .pill {
+  min-width: 0;
+  height: 22px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border-radius: var(--radius-badge);
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.foot-reminder .pill:hover { background: var(--overlay-hover); }
+/* No reminder yet: the bell alone, to set one. */
+.foot-reminder .pill.is-unset { gap: 0; }
 .foot-aa {
   flex: none;
   height: 20px;

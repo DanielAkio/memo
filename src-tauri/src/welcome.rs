@@ -35,6 +35,7 @@ pub const PT: Welcome = Welcome {
         r#"<div class="bullet">Leve o cursor até a borda da tela para encaixar a memória</div>"#,
         r#"<div class="bullet">Encolha pela borda de baixo para deixar só a barra</div>"#,
         r#"<div class="bullet">Junte memórias num grupo em "Sem grupo", no rodapé</div>"#,
+        r#"<div class="bullet">Lembrete…, no menu …: na hora, a memória aparece fixada por cima de tudo</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Escrever</b></div>"#,
         r#"<div class="bullet">Selecione um trecho para <b>negrito</b>, <i>itálico</i>, <u>sublinhado</u>, <span style="background-color: rgb(255, 230, 0)">marca-texto</span> ou <font size="5">tamanho</font></div>"#,
@@ -73,6 +74,7 @@ Organizar
 - Leve o cursor até a borda da tela para encaixar a memória
 - Encolha pela borda de baixo para deixar só a barra
 - Junte memórias num grupo em \"Sem grupo\", no rodapé
+- Lembrete…, no menu …: na hora, a memória aparece fixada por cima de tudo
 
 Escrever
 - Selecione um trecho para negrito, itálico, sublinhado, marca-texto ou tamanho
@@ -117,6 +119,7 @@ pub const EN: Welcome = Welcome {
         r#"<div class="bullet">Move the cursor to the screen edge to snap the memory</div>"#,
         r#"<div class="bullet">Shrink it from the bottom edge to leave only the bar</div>"#,
         r#"<div class="bullet">Put memories in a group from "No group", in the footer</div>"#,
+        r#"<div class="bullet">Reminder…, in the … menu: when it comes, the memory shows up pinned on top of everything</div>"#,
         r#"<div><br></div>"#,
         r#"<div><b>Writing</b></div>"#,
         r#"<div class="bullet">Select some text for <b>bold</b>, <i>italic</i>, <u>underline</u>, <span style="background-color: rgb(255, 230, 0)">highlight</span> or <font size="5">size</font></div>"#,
@@ -155,6 +158,7 @@ Organizing
 - Move the cursor to the screen edge to snap the memory
 - Shrink it from the bottom edge to leave only the bar
 - Put memories in a group from \"No group\", in the footer
+- Reminder…, in the … menu: when it comes, the memory shows up pinned on top of everything
 
 Writing
 - Select some text for bold, italic, underline, highlight or size

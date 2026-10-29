@@ -35,15 +35,8 @@
 
   // The plain-text format (lists, code, tables): components/text.js.
   const { esc, plain, LIST_RE, MAX_LEVEL, TABLE_ROW_RE, TABLE_SEP_RE, rowCells } = MemoText;
-  // In the plain text (toPlain) an image is "[imagem]" / "[image]", in the
-  // language it was written in, so an image-only note is not blank and the
-  // manager, tray and group lists show something for it.
-  const IMAGE_MARK_RE = /\[(?:imagem|image)\]/g;
 
   const firstLine = (text) => plain(text).split('\n').map((s) => s.trim()).find(Boolean) || t('emptyNote');
-  // Table rows' "|" and "| --- |" header lines are not words.
-  const TABLE_MARKS_RE = /^\s*\|(?:\s*:?-+:?\s*\|)+\s*$|(?<=^|\s)\|(?=\s|$)/gm;
-  const wordCount = (text) => (plain(text).replace(IMAGE_MARK_RE, ' ').replace(TABLE_MARKS_RE, ' ').trim().match(/\S+/g) || []).length;
   const displayName = () => note.title || firstLine(note.text);
 
   // ------------------------------------------------------------- render
@@ -59,12 +52,12 @@
   }
 
   function renderMeta() {
-    const n = wordCount(note.text);
-    $('count').textContent = t(n === 1 ? 'wordOne' : 'wordMany', { n });
     // Bottom left, always: the note's group, or "No group"; then the boards
     // it is on, if any.
     groups.render();
     $('footBoards').replaceChildren(...MemoPill.boardsOf(boards, note.id).map((b) => MemoPill.create('board', b)));
+    const bell = !EMBED && MemoReminder.pill(note.remindAt, () => reminder.toggle());
+    $('footReminder').replaceChildren(...(bell ? [bell] : []));
     editor.classList.toggle('is-empty', !note.text.trim() && !editor.querySelector('.check, img'));
     renderName();
   }
@@ -2202,16 +2195,11 @@
     onContentChanged();
   }
 
-  // A message in the footer for a few seconds, in place of the word count.
+  // A message in the footer for a few seconds.
   function showAlert(text) {
-    const count = $('count');
-    count.textContent = text;
-    count.classList.add('is-alert');
+    $('footAlert').textContent = text;
     clearTimeout(alertTimer);
-    alertTimer = setTimeout(() => {
-      count.classList.remove('is-alert');
-      renderMeta();
-    }, 4000);
+    alertTimer = setTimeout(() => { $('footAlert').textContent = ''; }, 4000);
   }
 
   // The image the selection holds exactly (clicked, or selected with Shift+arrow).
@@ -3131,6 +3119,20 @@
   // The boards, for the pills of those the note is on (renderMeta).
   let boards = [];
 
+  // Its reminder (components/reminder.js): set from the titlebar menu or the
+  // footer's bell; when it comes, Rust brings the note up pinned and sends
+  // "reminder-fired".
+  const reminder = new MemoReminder.Picker({
+    get: () => note && note.remindAt,
+    set: (at) => {
+      note.remindAt = at;
+      renderMeta();
+      invoke('set_reminder', { at }).catch((err) => console.error('set_reminder', err));
+    },
+    defaults: () => invoke('get_reminder_defaults'),
+    onOpen: () => { colors.close(); groups.close(); hideFormatBar(); },
+  });
+
   async function loadGroups() {
     if (EMBED || !note) return;
     try {
@@ -3178,9 +3180,10 @@
       { label: t('rename'), run: () => bar.startRename() },
       { label: t('pin'), checked: !!note.pinned, run: () => bar.togglePin() },
       { label: t('noteColor'), run: () => colors.open() },
+      { label: t('reminderMenu'), run: () => reminder.open() },
       { label: t('moveToTrash'), run: () => bar.trash() },
     ] : []),
-    onMenuOpen: () => { saveMenuSelection(); colors.close(); groups.close(); hideFormatBar(); },
+    onMenuOpen: () => { saveMenuSelection(); colors.close(); groups.close(); reminder.close(); hideFormatBar(); },
     // Native context menu only in the text and the title field (copy,
     // paste, spellcheck); elsewhere in the note it makes no sense.
     nativeMenuIn: 'input, #editor',
@@ -3263,6 +3266,12 @@
     if (!EMBED) {
       TAURI.event.listen('groups-changed', loadGroups);
       TAURI.event.listen('boards-changed', loadGroups);
+      TAURI.event.listen('reminder-fired', () => {
+        note.remindAt = null;
+        note.pinned = true;
+        reminder.close();
+        render();
+      });
       await loadGroups();
     }
     if (!EMBED && !new URLSearchParams(location.search).has('nofocus')) {

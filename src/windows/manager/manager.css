@@ -624,6 +624,20 @@ textarea.field { resize: vertical; min-height: 84px; }
 /* Settings → Defaults: Memória · Grupo · Quadro above their panes. */
 .def-switch { width: max-content; margin: 0 0 12px; }
 
+/* The reminder's three quick choices, one per row: "Daqui a [1] [horas]" or
+   "No dia [Amanhã] às [09:00]" (manager.js renderReminderDefaults). */
+.reminder-defaults { display: grid; gap: 6px; }
+.reminder-default { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--color-fog); font-size: 13px; }
+.reminder-default .field { flex: none; width: auto; height: 30px; color-scheme: dark; }
+.reminder-default .select { min-width: 0; }
+.reminder-default .rd-amount,
+.reminder-default .rd-days { width: 64px; }
+.reminder-default .rd-time { width: 96px; }
+:root[data-theme="light"] .reminder-default .field { color-scheme: light; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .reminder-default .field { color-scheme: light; }
+}
+
 /* The columns new boards start with: dot, name, ↑ ↓ ✕ per row. */
 .def-columns { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
 .def-column { display: flex; align-items: center; gap: 6px; }
@@ -940,7 +954,6 @@ textarea.field { resize: vertical; min-height: 84px; }
   color: var(--color-mist);
 }
 .demo-field .icon-btn { width: auto; height: auto; }
-/* A note's footer showing its group (bottom left) and word count. */
 /* A pasted image (grey mock picture) with its resize frame and handle,
    as drawn in a note (note.css, .image-frame). */
 .demo-image {

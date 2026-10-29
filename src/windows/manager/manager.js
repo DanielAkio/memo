@@ -426,7 +426,9 @@
     const actions = el('div', 'card-actions');
     // The group and the boards it is on, as pills (only those it has); the
     // trash X goes to the card's corner (card()).
-    actions.append(...groupPill(note.groupId), ...boardsOf(note).map(boardPill), trashBtn);
+    // Its reminder first, if any (components/reminder.js).
+    const bell = note.trashedAt ? null : MemoReminder.pill(note.remindAt);
+    actions.append(...(bell ? [bell] : []), ...groupPill(note.groupId), ...boardsOf(note).map(boardPill), trashBtn);
     const item = noteBase(note, editedLabel(note.updatedAt), actions);
     // Closed with ✕: dimmed, a click reopens it.
     item.classList.toggle('is-closed', Boolean(note.hidden));
@@ -540,15 +542,95 @@
   async function loadDefaults() {
     try {
       let groupColor, boardColor;
-      [[$('defaultTitle').value], [groupColor, $('groupDefaultTitle').value], [boardColor, $('boardDefaultTitle').value, defColumns.list]] =
-        await Promise.all([invoke('get_new_note_defaults'), invoke('get_group_defaults'), invoke('get_board_defaults')]);
+      [[$('defaultTitle').value], [groupColor, $('groupDefaultTitle').value], [boardColor, $('boardDefaultTitle').value, defColumns.list],
+        reminderChoices] =
+        await Promise.all([invoke('get_new_note_defaults'), invoke('get_group_defaults'), invoke('get_board_defaults'),
+          invoke('get_reminder_defaults')]);
       groupPane.show(groupColor);
       boardPane.show(boardColor);
     } catch (err) {
       console.error('defaults', err);
     }
     renderDefColumns();
+    renderReminderDefaults();
   }
+
+  // The reminder popover's three quick choices (components/reminder.js
+  // format), one row each: "Daqui a [N] [minutos|horas|dias|semanas]" or
+  // "No dia [Hoje|Amanhã|Daqui a N dias|Segunda…] ([N] dias) às [HH:MM]".
+  // Saved on each change; a value that isn't valid goes back to Memo's.
+  let reminderChoices = MemoReminder.CHOICES.slice();
+
+  function renderReminderDefaults() {
+    const box = $('reminderDefaults');
+    const option = (value, text, selected) => {
+      const o = el('option', '', text);
+      o.value = value;
+      o.selected = value === selected;
+      return o;
+    };
+    const select = (cls, pairs, selected) => {
+      const s = el('select', `field select ${cls}`);
+      s.append(...pairs.map(([v, text]) => option(v, text, selected)));
+      return s;
+    };
+    const number = (cls, value) => {
+      const n = el('input', `field ${cls}`);
+      Object.assign(n, { type: 'number', min: 1, max: MemoReminder.AMOUNT_MAX, value: String(value) });
+      n.inputMode = 'numeric';
+      return n;
+    };
+    box.replaceChildren(...reminderChoices.map((spec, i) => {
+      const c = MemoReminder.parse(spec) || MemoReminder.parse(MemoReminder.CHOICES[i]);
+      const row = el('div', 'reminder-default');
+      row.dataset.choice = String(i);
+      row.setAttribute('aria-label', t('reminderChoice', { n: i + 1 }));
+      const kind = select('rd-kind', [['in', t('reminderKindIn')], ['at', t('reminderKindAt')]], c.kind);
+      row.append(kind);
+      if (c.kind === 'in') {
+        row.append(number('rd-amount', c.amount), select('rd-unit',
+          [['m', t('unitMinutes')], ['h', t('unitHours')], ['d', t('unitDays')], ['w', t('unitWeeks')]], c.unit));
+      } else {
+        const days = [['today', t('dayToday')], ['tomorrow', t('dayTomorrow')], ['plus', t('dayPlus')],
+          ...[1, 2, 3, 4, 5, 6, 0].map((d) => [MemoReminder.WEEKDAYS[d], MemoReminder.weekdayName(MemoReminder.WEEKDAYS[d])])];
+        row.append(select('rd-day', days, c.day));
+        if (c.day === 'plus') row.append(number('rd-days', c.days), el('span', 'rd-word', t('daysLater')));
+        const time = el('input', 'field rd-time');
+        Object.assign(time, { type: 'time', value: c.time });
+        row.append(el('span', 'rd-word', t('atTime')), time);
+      }
+      return row;
+    }));
+  }
+
+  // A row's controls as a choice; switching the kind starts from Memo's.
+  function readReminderChoice(row, i) {
+    const q = (cls) => row.querySelector(`.${cls}`);
+    const kind = q('rd-kind').value;
+    const prev = MemoReminder.parse(reminderChoices[i]) || {};
+    if (kind === 'in') {
+      if (prev.kind !== 'in') return 'in:1h';
+      return MemoReminder.format({ kind, amount: Math.round(Number(q('rd-amount').value)), unit: q('rd-unit').value });
+    }
+    if (prev.kind !== 'at') return 'at:tomorrow@09:00';
+    const days = q('rd-days') ? Math.round(Number(q('rd-days').value)) : 1;
+    return MemoReminder.format({ kind, day: q('rd-day').value, days, time: q('rd-time').value });
+  }
+
+  $('reminderDefaults').addEventListener('change', async (e) => {
+    const row = e.target.closest('.reminder-default');
+    if (!row) return;
+    const i = Number(row.dataset.choice);
+    const list = reminderChoices.slice();
+    list[i] = readReminderChoice(row, i);
+    try {
+      await invoke('set_reminder_defaults', { choices: list });
+      reminderChoices = await invoke('get_reminder_defaults');
+    } catch (err) {
+      console.error('set_reminder_defaults', err);
+    }
+    renderReminderDefaults();
+  });
 
   // The columns new boards start with: `list` null = the language's own
   // (To Do, In Progress, Done), shown as such until one is changed; then
@@ -1270,6 +1352,12 @@
       btn.append(icon(DEMO_ICONS[name] || ''));
       slot.replaceWith(btn);
     }
+    // <span data-reminder="tomorrow">: the real reminder pill at that quick
+    // choice, as Memo comes (components/reminder.js).
+    for (const slot of box.querySelectorAll('[data-reminder]')) {
+      const preset = MemoReminder.presets().find((p) => p.key === slot.dataset.reminder);
+      slot.replaceWith(MemoReminder.pill(preset ? preset.at : Date.now()));
+    }
     for (const pre of box.querySelectorAll('pre[data-lang]')) {
       const grammar = window.Prism && window.Prism.languages[pre.dataset.lang];
       if (grammar) pre.innerHTML = window.Prism.highlight(pre.textContent, grammar, pre.dataset.lang);
@@ -1314,6 +1402,7 @@
     renderUpdate();
     renderAi(aiSwitch.getAttribute('aria-checked') === 'true');
     renderDefColumns();
+    renderReminderDefaults();
     render();
   }
 

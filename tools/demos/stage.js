@@ -120,6 +120,14 @@
         else if (b) { b.color = a.color; M.emit('boards-changed'); }
         else M.manager.color = a.color;
         return null;
+      case 'get_reminder_defaults':
+        return M.reminderDefaults || ['in:1h', 'at:today@18:00', 'at:tomorrow@09:00'];
+      case 'set_reminder_defaults':
+        M.reminderDefaults = a.choices;
+        return null;
+      case 'set_reminder':
+        if (n) { n.remindAt = a.at || null; M.emit('notes-changed'); }
+        return null;
       case 'set_pinned': {
         const o = n || g || b || M.manager;
         o.pinned = a.pinned;

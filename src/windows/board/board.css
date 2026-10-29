@@ -358,7 +358,8 @@ body.is-col-moving * { cursor: grabbing !important; user-select: none; }
   background: var(--overlay-hover);
 }
 
-/* .card-snippet styled in base.css */
+/* .card-snippet styled in base.css; the reminder pill in base.css. */
+.board-card .reminder-pill { align-self: flex-start; height: 20px; font-size: 11px; }
 
 body.is-card-dragging,
 body.is-card-dragging * {

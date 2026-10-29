@@ -128,6 +128,9 @@ pub struct Note {
     /// Closed with ✕: still active (listed in the manager, which reopens it)
     /// but its window is not opened.
     pub hidden: bool,
+    /// When to remind (ms): the memory comes to the front, pinned, with a
+    /// system notification (reminders.rs); `None` = no reminder.
+    pub remind_at: Option<u64>,
 }
 
 impl Note {
@@ -146,6 +149,7 @@ impl Note {
             color: self.color.clone(),
             group_id: self.group_id.clone(),
             trashed_at: self.trashed_at,
+            remind_at: self.remind_at,
         }
     }
 }
@@ -158,6 +162,7 @@ struct NoteContent {
     color: String,
     group_id: String,
     trashed_at: Option<u64>,
+    remind_at: Option<u64>,
 }
 
 /// Record of a note or group deleted for good (see `TOMBSTONE_TTL_MS`).
@@ -188,6 +193,7 @@ impl Default for Note {
             welcome_copy: false,
             group_id: String::new(),
             hidden: false,
+            remind_at: None,
         }
     }
 }
@@ -230,6 +236,9 @@ struct FileData {
     /// Columns new boards start with; `None` = the language's own (To Do,
     /// In Progress, Done).
     default_board_columns: Option<Vec<ColumnDefault>>,
+    /// The reminder's three quick choices (`reminder_choice` format); empty
+    /// = `REMINDER_CHOICES`.
+    reminder_choices: Vec<String>,
     notes: Vec<Note>,
     /// Groups of notes (compact bars that show or hide their notes).
     groups: Vec<Group>,
@@ -267,6 +276,7 @@ pub struct NoteDoc {
     pub created_at: u64,
     pub updated_at: u64,
     pub trashed_at: Option<u64>,
+    pub remind_at: Option<u64>,
     pub deleted: bool,
     pub deleted_at: u64,
 }
@@ -321,6 +331,7 @@ pub struct SettingsDoc {
     pub default_board_color: Option<String>,
     pub default_board_title: String,
     pub default_board_columns: Option<Vec<ColumnDefault>>,
+    pub reminder_choices: Vec<String>,
     pub updated_at: u64,
 }
 
@@ -456,6 +467,12 @@ impl ColumnDefault {
 
 /// At most this many default columns.
 pub const DEFAULT_COLUMNS_MAX: usize = 20;
+
+/// The reminder's quick choices as Memo comes (`reminder_choice` format):
+/// in 1 hour, today at 18:00, tomorrow at 09:00.
+pub const REMINDER_CHOICES: [&str; 3] = ["in:1h", "at:today@18:00", "at:tomorrow@09:00"];
+/// The largest N in "in N …" and "in N days at".
+pub const REMINDER_AMOUNT_MAX: u32 = 365;
 
 /// A kanban board (Trello-like) containing status columns with memories.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -661,6 +678,48 @@ fn now_nanos() -> u128 {
         .unwrap_or(0)
 }
 
+/// A reminder quick choice (components/reminder.js reads the same format):
+/// - `in:<N><unit>`: in N minutes (`m`), hours (`h`), days (`d`) or weeks
+///   (`w`), N from 1 to `REMINDER_AMOUNT_MAX`;
+/// - `at:<day>@HH:MM`: that day at that time, the day being `today`,
+///   `tomorrow`, `+N` (in N days, 1 to `REMINDER_AMOUNT_MAX`) or the next
+///   `mon`…`sun`.
+pub fn reminder_choice(s: &str) -> bool {
+    let amount = |n: &str| {
+        !n.is_empty() && n.len() <= 3 && n.bytes().all(|b| b.is_ascii_digit())
+            && n.parse::<u32>().is_ok_and(|n| (1..=REMINDER_AMOUNT_MAX).contains(&n))
+    };
+    if let Some(rest) = s.strip_prefix("in:") {
+        return match rest.char_indices().last() {
+            Some((i, unit)) => "mhdw".contains(unit) && amount(&rest[..i]),
+            None => false,
+        };
+    }
+    let Some((day, time)) = s.strip_prefix("at:").and_then(|r| r.split_once('@')) else {
+        return false;
+    };
+    let day_ok = ["today", "tomorrow", "mon", "tue", "wed", "thu", "fri", "sat", "sun"].contains(&day)
+        || day.strip_prefix('+').is_some_and(amount);
+    let time_ok = time.len() == 5
+        && time.split_once(':').is_some_and(|(h, m)| {
+            h.len() == 2 && m.len() == 2
+                && h.parse::<u32>().is_ok_and(|h| h < 24) && m.parse::<u32>().is_ok_and(|m| m < 60)
+        });
+    day_ok && time_ok
+}
+
+/// The quick choices as stored: three, each valid or Memo's for its place;
+/// all of Memo's are kept as none (so a change of Memo's reaches them).
+fn clean_reminder_choices(choices: &[String]) -> Vec<String> {
+    let list: Vec<String> = (0..REMINDER_CHOICES.len())
+        .map(|i| match choices.get(i) {
+            Some(c) if reminder_choice(c) => c.clone(),
+            _ => REMINDER_CHOICES[i].to_string(),
+        })
+        .collect();
+    if list.iter().zip(REMINDER_CHOICES).all(|(a, b)| a == b) { Vec::new() } else { list }
+}
+
 fn set_content(note: &mut Note, content: NoteContent) {
     note.title = content.title;
     note.text = content.text;
@@ -668,6 +727,7 @@ fn set_content(note: &mut Note, content: NoteContent) {
     note.color = content.color;
     note.group_id = content.group_id;
     note.trashed_at = content.trashed_at;
+    note.remind_at = content.remind_at;
 }
 
 /// Moves inline images (data URLs) into files in `dir`; true if any moved.
@@ -1027,6 +1087,16 @@ impl Store {
             .collect()
     }
 
+    /// Ids of the memories (not in the trash) whose reminder is due at `now`.
+    pub fn due_reminders(&self, now: u64) -> Vec<String> {
+        let data = self.data.lock().unwrap();
+        data.notes
+            .iter()
+            .filter(|n| n.trashed_at.is_none() && n.remind_at.is_some_and(|at| at <= now))
+            .map(|n| n.id.clone())
+            .collect()
+    }
+
     /// Notes not in the trash.
     pub fn active(&self) -> Vec<Note> {
         let data = self.data.lock().unwrap();
@@ -1190,6 +1260,24 @@ impl Store {
     pub fn set_default_title(&self, title: String) {
         let mut data = self.data.lock().unwrap();
         data.default_title = title;
+        data.defaults_updated_at = now_ms();
+        drop(data);
+        self.mark_dirty();
+    }
+
+    /// The reminder's three quick choices (`reminder_choice` format), Memo's
+    /// where none is chosen.
+    pub fn reminder_choices(&self) -> Vec<String> {
+        let data = self.data.lock().unwrap();
+        (0..REMINDER_CHOICES.len())
+            .map(|i| data.reminder_choices.get(i).cloned().unwrap_or_else(|| REMINDER_CHOICES[i].to_string()))
+            .collect()
+    }
+
+    /// A choice that isn't valid goes back to Memo's for its place.
+    pub fn set_reminder_choices(&self, choices: &[String]) {
+        let mut data = self.data.lock().unwrap();
+        data.reminder_choices = clean_reminder_choices(choices);
         data.defaults_updated_at = now_ms();
         drop(data);
         self.mark_dirty();
@@ -1678,6 +1766,7 @@ impl Store {
                 default_board_color: data.default_board_color.clone(),
                 default_board_title: data.default_board_title.clone(),
                 default_board_columns: data.default_board_columns.clone(),
+                reminder_choices: data.reminder_choices.clone(),
                 updated_at: data.defaults_updated_at,
             },
         }
@@ -1730,6 +1819,7 @@ impl Store {
                 color,
                 group_id: doc.group_id.clone(),
                 trashed_at: doc.trashed_at,
+                remind_at: doc.remind_at,
             };
             match index {
                 Some(i) => {
@@ -1860,6 +1950,7 @@ impl Store {
             .default_board_columns
             .as_ref()
             .map(|c| c.iter().take(DEFAULT_COLUMNS_MAX).map(ColumnDefault::clean).collect());
+        data.reminder_choices = clean_reminder_choices(&doc.reminder_choices);
         data.defaults_updated_at = doc.updated_at;
         drop(data);
         self.mark_dirty();
@@ -1932,6 +2023,64 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn reminders_come_due_and_travel_as_content() {
+        let dir = temp_dir("reminders");
+        let store = Store::load(dir.join("notes.json"));
+        let due = store.create(None);
+        let later = store.create(None);
+        let trashed = store.create(None);
+        let none = store.create(None);
+        store.data.lock().unwrap().notes.iter_mut().for_each(|n| n.updated_at = 1000);
+        let at_due = store.update(&due.id, |n| n.remind_at = Some(5_000)).unwrap();
+        assert!(at_due.updated_at > 1000, "a reminder is content: it syncs");
+        store.update(&later.id, |n| n.remind_at = Some(9_000));
+        store.update(&trashed.id, |n| {
+            n.remind_at = Some(1_000);
+            n.trashed_at = Some(2_000);
+        });
+        assert_eq!(store.due_reminders(6_000), vec![due.id.clone()]);
+        assert_eq!(store.due_reminders(9_000), vec![due.id.clone(), later.id.clone()]);
+        assert!(!store.due_reminders(u64::MAX).contains(&none.id));
+        assert!(!store.due_reminders(u64::MAX).contains(&trashed.id), "never from the trash");
+
+        // From the cloud: the reminder comes with the memory.
+        let mut doc = crate::sync::note_doc(&store.get(&due.id).unwrap());
+        doc.remind_at = Some(7_000);
+        doc.updated_at += 1;
+        store.apply_note_doc(&doc);
+        assert_eq!(store.get(&due.id).unwrap().remind_at, Some(7_000));
+    }
+
+    #[test]
+    fn reminder_quick_choices_are_settings() {
+        let dir = temp_dir("reminder-defaults");
+        let store = Store::load(dir.join("notes.json"));
+        let list = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let memo = list(&REMINDER_CHOICES);
+        assert_eq!(store.reminder_choices(), memo, "as Memo comes");
+        // Any span or day: minutes, hours, days, weeks; today, tomorrow, in N
+        // days, a day of the week.
+        for ok in ["in:90m", "in:2h", "in:3d", "in:1w", "at:+3@07:45", "at:mon@09:00", "at:sun@23:59", "at:today@00:00"] {
+            assert!(reminder_choice(ok), "{ok}");
+        }
+        for bad in ["", "in:", "in:0h", "in:1y", "in:999d", "in:h", "in:1é", "at:today@24:00", "at:today@9:00",
+            "at:+0@09:00", "at:someday@09:00", "at:tomorrow", "tomorrow"] {
+            assert!(!reminder_choice(bad), "{bad}");
+        }
+        let mine = list(&["in:30m", "at:+2@17:30", "at:fri@08:15"]);
+        store.set_reminder_choices(&mine);
+        assert_eq!(store.reminder_choices(), mine);
+        // They travel with the other defaults.
+        assert_eq!(store.sync_snapshot().settings.reminder_choices, mine);
+        // A choice that isn't valid goes back to Memo's for its place.
+        store.set_reminder_choices(&list(&["in:3d", "at:today@25:00"]));
+        assert_eq!(store.reminder_choices(), list(&["in:3d", REMINDER_CHOICES[1], REMINDER_CHOICES[2]]));
+        // "Default settings" puts them back.
+        store.reset_defaults();
+        assert_eq!(store.reminder_choices(), memo);
     }
 
     #[test]

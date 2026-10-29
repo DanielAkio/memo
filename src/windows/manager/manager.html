@@ -217,6 +217,12 @@
                         data-i18n-attr="title=text"></iframe>
               </div>
             </div>
+            <!-- The reminder popover's quick choices (components/reminder.js). -->
+            <div class="setting setting-top">
+              <span class="setting-label" data-i18n="reminderChoices"></span>
+              <!-- One row per choice: "Daqui a [N] [unit]" or "No dia [day] ([N] dias) às [time]" (manager.js). -->
+              <div class="field-wrap reminder-defaults" id="reminderDefaults"></div>
+            </div>
           </div>
           <div class="def-pane" data-pane="group" hidden>
             <div class="setting">
@@ -450,6 +456,7 @@
   <script src="../../components/confirm.js"></script>
   <script src="../../components/titlebar.js"></script>
   <script src="../../components/pill.js"></script>
+  <script src="../../components/reminder.js"></script>
   <script src="../../components/text.js"></script>
   <script src="../../components/card.js"></script>
   <script src="../../vendor/prism.js" data-manual></script>

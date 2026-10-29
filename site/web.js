@@ -71,6 +71,7 @@
         '<div class="bullet">Leve o cursor até a borda da tela para encaixar a memória</div>',
         '<div class="bullet">Encolha pela borda de baixo para deixar só a barra</div>',
         '<div class="bullet">Junte memórias num grupo em "Sem grupo", no rodapé</div>',
+        '<div class="bullet">Lembrete…, no menu …: na hora, a memória aparece fixada por cima de tudo</div>',
         '<div><br></div>',
         '<div><b>Escrever</b></div>',
         '<div class="bullet">Selecione um trecho para <b>negrito</b>, <i>itálico</i>, <u>sublinhado</u>, <span style="background-color: rgb(255, 230, 0)">marca-texto</span> ou <font size="5">tamanho</font></div>',
@@ -108,6 +109,7 @@
         '- Leve o cursor até a borda da tela para encaixar a memória',
         '- Encolha pela borda de baixo para deixar só a barra',
         '- Junte memórias num grupo em "Sem grupo", no rodapé',
+        '- Lembrete…, no menu …: na hora, a memória aparece fixada por cima de tudo',
         '',
         'Escrever',
         '- Selecione um trecho para negrito, itálico, sublinhado, marca-texto ou tamanho',
@@ -150,6 +152,7 @@
         '<div class="bullet">Move the cursor to the screen edge to snap the memory</div>',
         '<div class="bullet">Shrink it from the bottom edge to leave only the bar</div>',
         '<div class="bullet">Put memories in a group from "No group", in the footer</div>',
+        '<div class="bullet">Reminder…, in the … menu: when it comes, the memory shows up pinned on top of everything</div>',
         '<div><br></div>',
         '<div><b>Writing</b></div>',
         '<div class="bullet">Select some text for <b>bold</b>, <i>italic</i>, <u>underline</u>, <span style="background-color: rgb(255, 230, 0)">highlight</span> or <font size="5">size</font></div>',
@@ -187,6 +190,7 @@
         '- Move the cursor to the screen edge to snap the memory',
         '- Shrink it from the bottom edge to leave only the bar',
         '- Put memories in a group from "No group", in the footer',
+        '- Reminder…, in the … menu: when it comes, the memory shows up pinned on top of everything',
         '',
         'Writing',
         '- Select some text for bold, italic, underline, highlight or size',
@@ -506,6 +510,8 @@
       defaultBoardColor: '',
       defaultBoardTitle: '',
       defaultBoardColumns: null,
+      // The reminder's three quick choices (none = Memo's, REMINDER_CHOICES).
+      reminderChoices: [],
       defaultsUpdatedAt: 0,
       manager: { x: null, y: null, width: 560, height: 480, pinned: false, color: 'iris', layout: 'cards' },
       notes: [],
@@ -739,7 +745,7 @@
   }
 
   function noteContentSnapshot(n) {
-    return JSON.stringify([n.title, n.text, n.html, n.color, n.groupId, n.trashedAt]);
+    return JSON.stringify([n.title, n.text, n.html, n.color, n.groupId, n.trashedAt, n.remindAt || null]);
   }
 
   function groupContentSnapshot(g) {
@@ -2930,6 +2936,7 @@
                 color: n.color,
                 groupId: n.groupId,
                 trashedAt: null,
+                remindAt: n.remindAt || null,
                 updatedAt: n.updatedAt,
               });
               if (wins[`note-${local.id}`]) {
@@ -3226,6 +3233,59 @@
     emit('cloud-changed');
   }
 
+  // ------------------------------------------------ reminders (reminders.rs)
+  // A due reminder brings its memory up, pinned on top, with a system
+  // notification when the browser allows it; one missed while the page was
+  // closed fires when it opens.
+
+  const REMINDER_CHECK_MS = 20_000;
+
+  // The reminder's three quick choices (store.rs REMINDER_CHOICES,
+  // reminder_choice, clean_reminder_choices): each valid or Memo's for its
+  // place; all of Memo's are kept as none.
+  const REMINDER_CHOICES = ['in:1h', 'at:today@18:00', 'at:tomorrow@09:00'];
+
+  function reminderChoiceOk(s) {
+    const amount = (n) => Number(n) >= 1 && Number(n) <= 365;
+    let m = /^in:(\d{1,3})[mhdw]$/.exec(String(s || ''));
+    if (m) return amount(m[1]);
+    m = /^at:(today|tomorrow|\+(\d{1,3})|mon|tue|wed|thu|fri|sat|sun)@([01]\d|2[0-3]):[0-5]\d$/.exec(String(s || ''));
+    return Boolean(m) && (!m[2] || amount(m[2]));
+  }
+
+  function cleanReminderChoices(choices) {
+    const list = REMINDER_CHOICES.map((def, i) => (Array.isArray(choices) && reminderChoiceOk(choices[i]) ? choices[i] : def));
+    return list.every((c, i) => c === REMINDER_CHOICES[i]) ? [] : list;
+  }
+
+  function reminderDefaults() {
+    return REMINDER_CHOICES.map((def, i) => (data.reminderChoices || [])[i] || def);
+  }
+
+  async function fireDueReminders(now = nowMs()) {
+    for (const n of activeNotes().filter((x) => x.remindAt && x.remindAt <= now)) {
+      updateNote(n.id, (x) => {
+        x.remindAt = null;
+        x.pinned = true;
+      });
+      await invokeCommand('manager', 'open_note', { id: n.id });
+      await invokeCommand(`note-${n.id}`, 'set_pinned', { pinned: true });
+      emitToWindow(`note-${n.id}`, 'reminder-fired');
+      notifyBoards();
+      showReminderNotification(n);
+    }
+  }
+
+  function showReminderNotification(n) {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const first = (n.text || '').split('\n').map((l) => l.trim().replace(/^\[[ xX]\] /, '')).find(Boolean) || '';
+    try {
+      new Notification(n.title || TRAY_LABELS[effectiveLanguage()].untitled, { body: first.slice(0, 120), tag: `memo-${n.id}` });
+    } catch {
+      // Some browsers only notify from a service worker: the memory still comes up.
+    }
+  }
+
   function noteDocOf(n) {
     return {
       version: 1,
@@ -3238,6 +3298,7 @@
       createdAt: n.createdAt || 0,
       updatedAt: n.updatedAt || 0,
       trashedAt: n.trashedAt || null,
+      remindAt: n.remindAt || null,
       deleted: false,
       deletedAt: 0,
     };
@@ -3269,6 +3330,7 @@
       defaultBoardColor: data.defaultBoardColor || null,
       defaultBoardTitle: data.defaultBoardTitle || '',
       defaultBoardColumns: data.defaultBoardColumns || null,
+      reminderChoices: data.reminderChoices || [],
       updatedAt: data.defaultsUpdatedAt || 0,
     };
   }
@@ -3571,6 +3633,7 @@
             data.defaultBoardColor = doc.defaultBoardColor === 'random' || isValidColor(doc.defaultBoardColor) ? doc.defaultBoardColor : '';
             data.defaultBoardTitle = String(doc.defaultBoardTitle || '').slice(0, BOARD_NAME_MAX);
             data.defaultBoardColumns = cleanColumnDefaults(doc.defaultBoardColumns);
+            data.reminderChoices = cleanReminderChoices(doc.reminderChoices);
             data.defaultsUpdatedAt = doc.updatedAt || 0;
           }
           st.files[file.name] = { fileId: file.id, synced: file.stamp };
@@ -3693,6 +3756,7 @@
                 welcomeCopy: false,
                 groupId: doc.groupId || '',
                 hidden: true,
+                remindAt: doc.remindAt || null,
               });
             } else {
               Object.assign(local, {
@@ -3703,6 +3767,7 @@
                 groupId: doc.groupId || '',
                 updatedAt: doc.updatedAt,
                 trashedAt: doc.trashedAt || null,
+                remindAt: doc.remindAt || null,
               });
               if (doc.trashedAt) closeWindow(`note-${doc.id}`);
               else if (wins[`note-${doc.id}`]) wins[`note-${doc.id}`].f.contentWindow.location.reload();
@@ -3807,6 +3872,7 @@
           defaultColor: '', defaultTitle: '', defaultText: '', defaultHtml: '',
           defaultGroupColor: '', defaultGroupTitle: '',
           defaultBoardColor: '', defaultBoardTitle: '', defaultBoardColumns: null,
+          reminderChoices: [],
           defaultsUpdatedAt: nowMs(),
         });
         markDirty(true);
@@ -3891,6 +3957,20 @@
         } else {
           data.manager.color = color;
           markDirty(false);
+        }
+        return null;
+      }
+      // A memory's reminder (Rust notes.rs set_reminder; fired by
+      // fireDueReminders). The first one asks for the browser's permission
+      // to notify.
+      case 'set_reminder': {
+        if (!n) return null;
+        const at = Number(args.at) || null;
+        updateNote(n.id, (x) => { x.remindAt = at; });
+        notifyNotes();
+        notifyBoards();
+        if (at && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+          Notification.requestPermission().catch(() => {});
         }
         return null;
       }
@@ -4220,6 +4300,13 @@
         data.defaultsUpdatedAt = nowMs();
         markDirty(true);
         return null;
+      case 'get_reminder_defaults':
+        return reminderDefaults();
+      case 'set_reminder_defaults':
+        data.reminderChoices = cleanReminderChoices(args.choices);
+        data.defaultsUpdatedAt = nowMs();
+        markDirty(true);
+        return null;
 
       // Storage & Backup
       case 'get_data_dir':
@@ -4315,6 +4402,7 @@
   window.MemoWeb = {
     createTauri,
     invoke: invokeCommand,
+    fireDueReminders,
     openManager: openManagerWindow,
     createNote,
     createGroup,
@@ -4981,6 +5069,8 @@
     window.addEventListener('hashchange', offerSharedLink);
     syncAllClouds();
     setInterval(() => syncAllClouds(), 5 * 60_000);
+    await fireDueReminders();
+    setInterval(() => fireDueReminders(), REMINDER_CHECK_MS);
   }
 
   window.addEventListener('focus', () => {

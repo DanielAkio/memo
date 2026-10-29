@@ -2610,6 +2610,253 @@ try {
     }
   });
 
+  await step('Reminders: set from the titlebar menu or the footer bell; the bell shows on the note, the manager and the board', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const out = {};
+      M.addNote({ id: 'rm-note', title: 'Ligar', text: 'x' });
+      M.addBoard({ id: 'rm-board', name: 'B' });
+      M.boards['rm-board'].columns = [{ id: 'rm-col', name: '', color: '', noteIds: ['rm-note'], collapsed: [] }];
+      await M.openNote('rm-note');
+      await M.openWin('board-rm-board', '/src/windows/board/board.html', { x: 360, y: 40, w: 420, h: 300 });
+      await wait(300);
+      const doc = M.frameDoc('note-rm-note');
+      const win = doc.defaultView;
+      // The bell is always in the footer: alone without a reminder, and a
+      // click on it opens the popover.
+      const bare = doc.querySelector('#footReminder .reminder-pill');
+      out.bareBell = Boolean(bare && bare.classList.contains('is-unset') && bare.querySelector('svg') && !bare.textContent.trim());
+      bare.click();
+      await wait(30);
+      out.bareOpens = !doc.querySelector('.reminder-menu').hidden;
+      doc.querySelector('.reminder-menu').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      // The titlebar menu's "Reminder…" opens the popover.
+      let items = [];
+      M.hooks.show_title_menu = (label, a) => { items = a.items || []; return null; };
+      doc.getElementById('titlebar').dispatchEvent(new win.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 10 }));
+      await wait(50);
+      delete M.hooks.show_title_menu;
+      const entry = items.find((i) => i && i.label === 'Lembrete…');
+      out.inMenu = Boolean(entry);
+      for (const l of M.listeners) if (l.ev === 'title-menu' && l.w === win) l.cb({ payload: entry.id });
+      await wait(30);
+      const menu = doc.querySelector('.reminder-menu');
+      out.opened = !menu.hidden;
+      out.presets = [...menu.querySelectorAll('[data-preset]')].map((b) => b.dataset.preset);
+      out.noRemoveYet = !menu.querySelector('.reminder-remove');
+      // "Tomorrow at 09:00".
+      menu.querySelector('[data-preset="tomorrow"]').click();
+      await wait(80);
+      const at = new Date(M.notes['rm-note'].remindAt);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      out.tomorrow9 = at.toDateString() === tomorrow.toDateString() && at.getHours() === 9 && at.getMinutes() === 0;
+      out.closedAfterPick = menu.hidden;
+      out.footer = (doc.querySelector('#footReminder .reminder-pill') || {}).textContent;
+      // The footer has no word count; the bell sits right before Aa, on the right.
+      const foot = doc.querySelector('.statusbar');
+      out.noWords = !doc.getElementById('count') && !/palavra|word/i.test(foot.textContent);
+      const bellBox = doc.getElementById('footReminder').getBoundingClientRect();
+      const aaBox = doc.getElementById('trayBtn').getBoundingClientRect();
+      out.besideAa = doc.getElementById('footReminder').nextElementSibling === doc.getElementById('trayBtn')
+        && aaBox.left - bellBox.right >= 0 && aaBox.left - bellBox.right < 16;
+      // Its time is never cut: the group and boards give way first.
+      const bellText = doc.querySelector('#footReminder .reminder-pill span');
+      out.timeWhole = bellText.scrollWidth <= bellText.clientWidth;
+      await wait(200);
+      const card = M.frameDoc('manager').querySelector('.reminder-pill');
+      out.manager = card && card.textContent;
+      const onBoard = M.frameDoc('board-rm-board').querySelector('.board-card[data-note-id="rm-note"] .reminder-pill');
+      out.board = onBoard && onBoard.textContent;
+      // The footer's bell opens it again: a date and time of one's own.
+      doc.querySelector('#footReminder .reminder-pill').click();
+      await wait(30);
+      out.reopened = !menu.hidden;
+      const input = menu.querySelector('.reminder-pick input');
+      input.value = '2031-05-04T07:30';
+      input.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await wait(50);
+      out.picked = M.notes['rm-note'].remindAt === new Date('2031-05-04T07:30').getTime();
+      // Esc closes it without a change; "Remove reminder" clears it.
+      doc.querySelector('#footReminder .reminder-pill').click();
+      await wait(30);
+      menu.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      out.escClosed = menu.hidden && M.notes['rm-note'].remindAt != null;
+      // The quick choices come from Settings (get_reminder_defaults).
+      M.reminderDefaults = ['in:30m', 'at:+3@17:00', 'at:fri@08:30'];
+      doc.querySelector('#footReminder .reminder-pill').click();
+      await wait(50);
+      out.customLabels = [...menu.querySelectorAll('[data-preset]')].map((b) => b.textContent);
+      menu.querySelector('[data-preset="fri"]').click();
+      await wait(50);
+      const at2 = new Date(M.notes['rm-note'].remindAt);
+      out.customFriday = at2.getDay() === 5 && at2.getHours() === 8 && at2.getMinutes() === 30
+        && at2 > Date.now() && at2 - Date.now() <= 7 * 86_400_000;
+      delete M.reminderDefaults;
+      // When each kind of choice falls, from Wednesday 2026-10-28 10:00.
+      const R = win.MemoReminder;
+      const from = new Date(2026, 9, 28, 10, 0).getTime();
+      const fall = (spec) => { const ms = R.when(R.parse(spec), from); return ms && new Date(ms).toString().slice(0, 21); };
+      out.falls = {
+        weeks: fall('in:2w'), plus: fall('at:+3@07:45'), mon: fall('at:mon@09:00'),
+        wedLater: fall('at:wed@18:00'), wedGone: fall('at:wed@09:00'), todayGone: fall('at:today@09:00'),
+      };
+      // "Remove reminder" clears it.
+      doc.querySelector('#footReminder .reminder-pill').click();
+      await wait(50);
+      menu.querySelector('.reminder-remove').click();
+      await wait(50);
+      const after = doc.querySelector('#footReminder .reminder-pill');
+      out.removed = M.notes['rm-note'].remindAt === null && Boolean(after) && after.classList.contains('is-unset') && !after.textContent.trim();
+      M.closeWin('note-rm-note');
+      M.closeWin('board-rm-board');
+      delete M.notes['rm-note'];
+      delete M.boards['rm-board'];
+      M.emit('notes-changed');
+      M.emit('boards-changed');
+      return out;
+    });
+    assert.equal(res.bareBell, true, 'With no reminder, the footer still shows the bell, alone');
+    assert.equal(res.bareOpens, true, 'A click on it opens the reminder popover');
+    assert.equal(res.inMenu, true, 'The titlebar menu has "Lembrete…"');
+    assert.equal(res.opened, true, 'It opens the reminder popover');
+    assert.ok(res.presets.includes('in') && res.presets.includes('tomorrow'), `Quick choices (${res.presets})`);
+    assert.equal(res.noRemoveYet, true, 'No "Remove" without a reminder');
+    assert.equal(res.tomorrow9, true, '"Amanhã às 09:00" sets tomorrow at 09:00');
+    assert.equal(res.closedAfterPick, true, 'Picking closes the popover');
+    assert.match(res.footer || '', /Amanhã 09:00/, 'The note footer shows the bell and when');
+    assert.equal(res.noWords, true, 'The note footer has no word count');
+    assert.equal(res.besideAa, true, 'The bell sits right before Aa');
+    assert.equal(res.timeWhole, true, 'The bell\'s time is never cut');
+    assert.match(res.manager || '', /Amanhã 09:00/, 'So does its manager card');
+    assert.match(res.board || '', /Amanhã 09:00/, 'And its board card');
+    assert.equal(res.reopened, true, 'The footer bell opens the popover');
+    assert.equal(res.picked, true, 'A date and time of one\'s own, confirmed with Enter');
+    assert.equal(res.escClosed, true, 'Esc closes it without a change');
+    assert.equal(res.removed, true, '"Remover lembrete" clears it; the bell stays, alone');
+    assert.deepEqual(res.customLabels, ['Em 30 minutos', 'Em 3 dias às 17:00', 'Sexta-feira às 08:30'],
+      'The quick choices follow Settings');
+    assert.equal(res.customFriday, true, '"Sexta-feira às 08:30" sets the next Friday at 08:30');
+    assert.deepEqual(res.falls, {
+      weeks: 'Wed Nov 11 2026 10:00', plus: 'Sat Oct 31 2026 07:45', mon: 'Mon Nov 02 2026 09:00',
+      wedLater: 'Wed Oct 28 2026 18:00', wedGone: 'Wed Nov 04 2026 09:00', todayGone: null,
+    }, 'Each kind of choice falls on the right day');
+  });
+
+  await step('Web version: Settings → Defaults → Memory sets the reminder\'s quick choices', async () => {
+    const webPage = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const res = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const doc = document.querySelector('iframe[name="manager"]').contentDocument;
+        const row = (i) => doc.querySelector(`#reminderDefaults .reminder-default[data-choice="${i}"]`);
+        const set = async (i, cls, value) => {
+          const f = row(i).querySelector(`.${cls}`);
+          f.value = value;
+          f.dispatchEvent(new Event('change', { bubbles: true }));
+          await wait(80);
+        };
+        const get = () => inv('manager', 'get_reminder_defaults');
+        const out = { rows: doc.querySelectorAll('#reminderDefaults .reminder-default').length, first: row(0).textContent };
+        await set(0, 'rd-amount', '2');
+        await set(0, 'rd-unit', 'w');
+        out.weeks = (await get())[0];
+        await set(1, 'rd-day', 'plus');
+        await set(1, 'rd-days', '5');
+        out.plus = (await get())[1];
+        await set(2, 'rd-day', 'mon');
+        await set(2, 'rd-time', '07:30');
+        out.monday = (await get())[2];
+        await set(0, 'rd-kind', 'at');
+        out.switched = (await get())[0];
+        // Nonsense goes back to Memo's.
+        await set(1, 'rd-days', '0');
+        out.fallback = (await get())[1];
+        await inv('manager', 'reset_settings');
+        out.reset = await get();
+        return out;
+      });
+      assert.equal(res.rows, 3, 'Three quick choices');
+      assert.match(res.first, /Daqui a.*horas/, 'The first starts as "Daqui a 1 horas"');
+      assert.equal(res.weeks, 'in:2w', '"Daqui a 2 semanas"');
+      assert.equal(res.plus, 'at:+5@18:00', '"No dia Daqui a 5 dias às 18:00"');
+      assert.equal(res.monday, 'at:mon@07:30', '"No dia Segunda-feira às 07:30"');
+      assert.equal(res.switched, 'at:tomorrow@09:00', 'Switching to "No dia" starts at tomorrow 09:00');
+      assert.equal(res.fallback, 'at:today@18:00', 'An invalid choice goes back to Memo\'s');
+      assert.deepEqual(res.reset, ['in:1h', 'at:today@18:00', 'at:tomorrow@09:00'], '"Configurações padrão" restores them');
+    } finally {
+      await webPage.close();
+    }
+  });
+
+  await step('Web version: a due reminder brings its memory up pinned, with a notification; never from the trash', async () => {
+    const webPage = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    try {
+      await webPage.addInitScript(() => {
+        window.__shown = [];
+        window.Notification = class {
+          constructor(title, opts) { window.__shown.push({ title, body: opts && opts.body }); }
+          static requestPermission() { return Promise.resolve('granted'); }
+        };
+        window.Notification.permission = 'granted';
+      });
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const res = await webPage.evaluate(async () => {
+        const W = window.MemoWeb;
+        const inv = W.invoke;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const ids = async () => (await inv('manager', 'list_notes')).map((x) => x.id);
+        const make = async (name, text) => {
+          const before = new Set(await ids());
+          await inv('manager', 'new_note');
+          const id = (await ids()).find((x) => !before.has(x));
+          await inv(`note-${id}`, 'rename', { name });
+          await inv(`note-${id}`, 'save_text', { text, html: `<div>${text}</div>` });
+          return id;
+        };
+        const due = await make('Ligar', '[ ] Para a Ana');
+        const binned = await make('Lixo', 'y');
+        const later = await make('Depois', 'z');
+        const past = Date.now() - 1000;
+        await inv(`note-${due}`, 'set_reminder', { at: past });
+        await inv(`note-${binned}`, 'set_reminder', { at: past });
+        await inv(`note-${later}`, 'set_reminder', { at: Date.now() + 3_600_000 });
+        await inv(`note-${due}`, 'close_window');
+        await inv('manager', 'move_to_trash', { id: binned });
+        await wait(200);
+        const open = (id) => Boolean(document.querySelector(`.win[data-label="note-${id}"]`));
+        const out = { closedBefore: !open(due) };
+        await W.fireDueReminders();
+        await wait(300);
+        const list = await inv('manager', 'list_notes');
+        const n = (id) => list.find((x) => x.id === id);
+        out.opened = open(due);
+        out.pinned = n(due).pinned === true;
+        out.cleared = n(due).remindAt == null;
+        out.notified = window.__shown;
+        out.trashKept = n(binned).remindAt != null && !open(binned);
+        out.laterWaits = n(later).remindAt != null;
+        return out;
+      });
+      assert.equal(res.closedBefore, true, 'The memory was closed');
+      assert.equal(res.opened, true, 'It opens');
+      assert.equal(res.pinned, true, 'Pinned on top');
+      assert.equal(res.cleared, true, 'Its reminder is used up');
+      assert.deepEqual(res.notified, [{ title: 'Ligar', body: 'Para a Ana' }], 'One system notification, with its name and first line');
+      assert.equal(res.trashKept, true, 'A memory in the trash never fires');
+      assert.equal(res.laterWaits, true, 'A later one waits');
+    } finally {
+      await webPage.close();
+    }
+  });
+
   await step('Web version: trashing a board sends its memories to the trash; restoring it brings them back', async () => {
     const webPage = await browser.newPage();
     try {

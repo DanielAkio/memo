@@ -722,6 +722,9 @@
 
         cardTop.append(cardDot, cardTitle, cardFold, cardDel);
         card.append(cardTop);
+        // Its reminder, if any (components/reminder.js), folded or not.
+        const bell = MemoReminder.pill(note.remindAt);
+        if (bell) card.append(bell);
         if (folded) {
           cardsList.append(card);
           continue;

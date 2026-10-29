@@ -275,6 +275,18 @@ pub(crate) fn set_default_title(title: String, store: State<'_, Shared>) {
     store.set_default_title(title.trim().chars().take(TITLE_MAX).collect());
 }
 
+/// The reminder's three quick choices (`store::reminder_choice` format), for
+/// Settings and a note's reminder popover.
+#[tauri::command]
+pub(crate) fn get_reminder_defaults(store: State<'_, Shared>) -> Vec<String> {
+    store.reminder_choices()
+}
+
+#[tauri::command]
+pub(crate) fn set_reminder_defaults(choices: Vec<String>, store: State<'_, Shared>) {
+    store.set_reminder_choices(&choices);
+}
+
 /// Colour and name new groups start with, for the manager's Settings.
 #[tauri::command]
 pub(crate) fn get_group_defaults(store: State<'_, Shared>) -> (String, String) {

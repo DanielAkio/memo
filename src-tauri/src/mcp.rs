@@ -96,6 +96,10 @@ fn tools() -> Value {
     });
     let title = json!({ "type": "string", "description": "Name shown in the titlebar (\"\" = untitled, max 80 characters)." });
     let pinned = json!({ "type": "boolean", "description": "Keep it above every other app." });
+    let remind_at = json!({
+        "type": "string",
+        "description": "Remind at this ISO 8601 date-time with its offset (e.g. 2026-10-29T09:00:00-03:00): the memory then opens pinned on top of everything, with a system notification. \"\" removes the reminder.",
+    });
     json!([
         tool(
             "list_memories",
@@ -118,6 +122,7 @@ fn tools() -> Value {
                 "text": { "type": "string", "description": "Content, in the plain-text format described in the server instructions." },
                 "color": color,
                 "pinned": pinned,
+                "remind_at": remind_at,
                 "group_id": { "type": "string", "description": "Put it in this group." },
                 "open": { "type": "boolean", "description": "Show its window on screen.", "default": true },
             }),
@@ -134,6 +139,7 @@ fn tools() -> Value {
                 "append": { "type": "string", "description": "Lines to add at the end." },
                 "color": color,
                 "pinned": pinned,
+                "remind_at": remind_at,
             }),
             &["id"],
             false,
@@ -263,6 +269,7 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
         }
         "create_memory" => {
             let color = color_arg(args)?;
+            let remind = remind_arg(args)?;
             let group = match str_arg(args, "group_id").filter(|g| !g.is_empty()) {
                 Some(id) => Some(active_group(&store, id)?),
                 None => None,
@@ -282,6 +289,9 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
                     }
                     if let Some(pinned) = bool_arg(args, "pinned") {
                         n.pinned = pinned;
+                    }
+                    if let Some(at) = remind {
+                        n.remind_at = at;
                     }
                     if let Some(group) = &group {
                         n.group_id = group.id.clone();
@@ -308,6 +318,7 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
             }
             let color = color_arg(args)?;
             let pinned = bool_arg(args, "pinned");
+            let remind = remind_arg(args)?;
             let updated = store
                 .update(&note.id, |n| {
                     if let Some(title) = str_arg(args, "title") {
@@ -335,6 +346,9 @@ fn run(app: &AppHandle, name: &str, args: &Value) -> Result<Value, String> {
                     }
                     if let Some(pinned) = pinned {
                         n.pinned = pinned;
+                    }
+                    if let Some(at) = remind {
+                        n.remind_at = at;
                     }
                 })
                 .ok_or("memory not found")?;
@@ -515,6 +529,7 @@ fn memory(app: &AppHandle, store: &Store, n: &Note, full: bool) -> Value {
         "onScreen": app.get_webview_window(&Kind::Note.label(&n.id)).is_some(),
         "group": group,
         "inTrash": n.trashed_at.is_some(),
+        "remindAt": n.remind_at.map(iso),
         "createdAt": iso(n.created_at),
         "updatedAt": iso(n.updated_at),
     })
@@ -859,6 +874,52 @@ fn iso(ms: u64) -> String {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = yoe + era * 400 + i64::from(m <= 2);
     format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z", rem / 3600, rem % 3600 / 60, rem % 60)
+}
+
+/// Milliseconds from an ISO 8601 date-time with its offset
+/// ("2026-10-29T09:00:00-03:00", "…Z"); the inverse of `iso`.
+fn parse_iso(s: &str) -> Option<u64> {
+    let (date, rest) = s.trim().split_once(['T', ' '])?;
+    let mut ymd = date.split('-').map(|p| p.parse::<i64>().ok());
+    let (y, m, d) = (ymd.next()??, ymd.next()??, ymd.next()??);
+    let (time, offset_min) = match rest.strip_suffix(['Z', 'z']) {
+        Some(time) => (time, 0),
+        None => {
+            let i = rest.rfind(['+', '-'])?;
+            let (time, off) = rest.split_at(i);
+            let sign = if off.starts_with('-') { -1 } else { 1 };
+            let (h, mi) = off[1..].split_once(':').unwrap_or((&off[1..], "0"));
+            (time, sign * (h.parse::<i64>().ok()? * 60 + mi.parse::<i64>().ok()?))
+        }
+    };
+    let mut hms = time.split(':');
+    let h = hms.next()?.parse::<i64>().ok()?;
+    let mi = hms.next()?.parse::<i64>().ok()?;
+    let sec = hms.next().map_or(Some(0.0), |s| s.parse::<f64>().ok())? as i64;
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) || h > 23 || mi > 59 || sec > 60 {
+        return None;
+    }
+    // Days since 1970-01-01 from a civil date (Howard Hinnant's algorithm).
+    let y = y - i64::from(m <= 2);
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (m + if m > 2 { -3 } else { 9 }) + 2) / 5 + d - 1;
+    let days = era * 146_097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719_468;
+    let secs = days * 86_400 + h * 3600 + mi * 60 + sec - offset_min * 60;
+    u64::try_from(secs).ok().map(|s| s * 1000)
+}
+
+/// `remind_at`: absent = unchanged, "" or null = no reminder, else a date-time.
+fn remind_arg(args: &Value) -> Result<Option<Option<u64>>, String> {
+    match args.get("remind_at") {
+        None => Ok(None),
+        Some(Value::Null) => Ok(Some(None)),
+        Some(Value::String(s)) if s.trim().is_empty() => Ok(Some(None)),
+        Some(Value::String(s)) => parse_iso(s)
+            .map(|ms| Some(Some(ms)))
+            .ok_or_else(|| format!("remind_at is not an ISO 8601 date-time with an offset: {s}")),
+        Some(_) => Err("remind_at must be a string".into()),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1294,6 +1355,21 @@ mod tests {
     fn dates() {
         assert_eq!(iso(0), "1970-01-01T00:00:00Z");
         assert_eq!(iso(1_792_594_466_000), "2026-10-21T14:54:26Z");
+    }
+
+    #[test]
+    fn reminder_dates() {
+        assert_eq!(parse_iso("2026-10-21T14:54:26Z"), Some(1_792_594_466_000));
+        assert_eq!(parse_iso("2026-10-21T11:54:26-03:00"), Some(1_792_594_466_000));
+        assert_eq!(parse_iso("2026-10-21T16:54+02:00"), Some(1_792_594_440_000));
+        assert_eq!(parse_iso("2024-02-29T00:00:00Z").map(iso).as_deref(), Some("2024-02-29T00:00:00Z"));
+        // A time with no offset could be any time zone.
+        assert_eq!(parse_iso("2026-10-21T14:54:26"), None);
+        assert_eq!(parse_iso("tomorrow"), None);
+        assert_eq!(remind_arg(&json!({})), Ok(None));
+        assert_eq!(remind_arg(&json!({ "remind_at": "" })), Ok(Some(None)));
+        assert_eq!(remind_arg(&json!({ "remind_at": "1970-01-01T00:00:01Z" })), Ok(Some(Some(1000))));
+        assert!(remind_arg(&json!({ "remind_at": "soon" })).is_err());
     }
 
     #[test]

@@ -120,6 +120,14 @@ pub(crate) fn set_color(
     Ok(())
 }
 
+/// Reminds of the calling window's memory at `at` (ms), or no more (`None`):
+/// it then comes to the front, pinned (reminders.rs).
+#[tauri::command]
+pub(crate) fn set_reminder(app: AppHandle, window: WebviewWindow, at: Option<u64>) {
+    app.state::<Shared>().update(&Kind::Note.id_of(&window), |n| n.remind_at = at);
+    notify(&app);
+}
+
 // Creating and destroying windows from sync commands can deadlock on
 // Windows, so the commands that do so are async.
 #[tauri::command]

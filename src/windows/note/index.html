@@ -175,7 +175,10 @@
       </button>
       <!-- The boards it is on, as pills (shown only, as in the manager). -->
       <span class="foot-boards" id="footBoards"></span>
-      <span id="count"></span>
+      <!-- A short notice for a few seconds (an image that can't be pasted). -->
+      <span class="foot-alert" id="footAlert"></span>
+      <!-- Its reminder, if any, beside Aa: a click changes or removes it. -->
+      <span class="foot-reminder" id="footReminder"></span>
       <button class="foot-aa" id="trayBtn" type="button" aria-pressed="false" data-i18n-attr="aria-label=formatTray,title=formatTray">Aa</button>
       <span class="grip" id="grip" aria-hidden="true">
         <svg viewBox="0 0 10 10"><path d="M9 3 3 9M9 6 6 9"/></svg>
@@ -191,6 +194,7 @@
   <script src="../../components/update.js"></script>
   <script src="../../components/titlebar.js"></script>
   <script src="../../components/pill.js"></script>
+  <script src="../../components/reminder.js"></script>
   <script src="../../components/text.js"></script>
   <script src="../../components/group-picker.js"></script>
   <script src="../../vendor/prism.js" data-manual></script>

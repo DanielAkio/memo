@@ -167,6 +167,8 @@ pub(crate) struct TrayLabels {
     pub(crate) check_updates: &'static str,
     pub(crate) update_to: &'static str,
     pub(crate) quit: &'static str,
+    /// A memory with no name (a reminder's notification, reminders.rs).
+    pub(crate) untitled: &'static str,
 }
 
 pub(crate) fn tray_labels(lang: &str) -> TrayLabels {
@@ -195,6 +197,7 @@ pub(crate) fn tray_labels(lang: &str) -> TrayLabels {
             check_updates: "Check for updates",
             update_to: "Update to version",
             quit: "Quit Memo",
+            untitled: "Untitled",
         }
     } else {
         TrayLabels {
@@ -221,6 +224,7 @@ pub(crate) fn tray_labels(lang: &str) -> TrayLabels {
             check_updates: "Procurar atualizações",
             update_to: "Atualizar para a versão",
             quit: "Sair do Memo",
+            untitled: "Sem título",
         }
     }
 }

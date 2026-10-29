@@ -52,6 +52,7 @@ src/                     frontend: plain HTML/CSS/JS, no bundler (frontendDist =
     confirm.js           MemoConfirm: "Empty trash" and "Quit" act on a second click within 3 s
     share.js             MemoShare: the titlebar's share button copies the item's link ("Link copied" toast)
     update.js            MemoUpdate: a newer Memo as a toast in every window (Update and restart, progress, ✕)
+    reminder.js          MemoReminder: a memory's reminder — label, bell pill (note footer, manager/board cards), popover
   assets/                no-image-pt/en.png: what an image becomes in an imported shared memory
   lib/
     chrome.js            window behaviour: drag, resize handles, snapping, title menu (MemoChrome), zoom (MemoZoom)
@@ -76,6 +77,7 @@ src-tauri/
   src/cloud.rs           cloud sign-in, Google or Microsoft (`Provider`; OAuth loopback + PKCE, token in the OS credential store)
   src/mcp.rs             AI control: MCP tools; local HTTP endpoint in the app + `memo --mcp` stdio bridge (opt-in)
   src/clients.rs         AI control setup: finds MCP clients here and adds/removes Memo in their config files
+  src/reminders.rs       reminders: a due `remindAt` opens its memory pinned, with a system notification (checked every 20 s and at launch)
   src/updater.rs         in-app updates (tauri-plugin-updater): checks, download + install, status for Settings/tray
   src/sync.rs            sync engine over a `Remote` (Google Drive, OneDrive): pull (changes / delta), apply, push; conflicts; fake-cloud tests
   src/share.rs           sharing by link: Memo Web's address with a `memo:v1:` code after `#` (deflate + base64url, same

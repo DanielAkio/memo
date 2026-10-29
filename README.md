@@ -20,8 +20,9 @@
   </picture>
 </p>
 
-Every memory is its own little window. Click the **pin** and it floats over every other app. Memories save
-themselves, gather in groups and boards, share as a link, and can sync through your own Google Drive or OneDrive.
+Every memory is its own little window. Click the **pin** and it floats over every other app; set a **reminder** and
+it comes back on top right on time. Memories save themselves, gather in groups and boards, share as a link, and can
+sync through your own Google Drive or OneDrive.
 There is no sign-up, no ads and no tracking.
 
 Features, downloads and help for the first launch are all on the **[website](https://danielakio.github.io/memo/)**.

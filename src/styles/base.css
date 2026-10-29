@@ -412,6 +412,45 @@ button { font: inherit; color: inherit; }
 .pill svg[data-color]:not([data-color=""]) { stroke: var(--note-color); }
 .pill span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
+/* A memory's reminder (components/reminder.js): the bell pill and the
+   popover that sets it, under the titlebar on the right. */
+.pill.reminder-pill { flex: 0 0 auto; max-width: none; border: 0; cursor: default; }
+.pill.reminder-pill svg { stroke-linecap: round; }
+button.pill.reminder-pill:hover { color: var(--color-paper); background: var(--overlay-strong); }
+.menu.reminder-menu { right: 8px; left: auto; width: 230px; max-width: calc(100% - 16px); z-index: 60; outline: none; }
+.reminder-menu .menu-item:focus-visible { outline: 1px solid var(--color-mist); outline-offset: -1px; }
+.reminder-pick { display: flex; gap: 6px; padding: 2px 2px 2px 4px; }
+.reminder-pick input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--color-carbon);
+  box-shadow: var(--hairline);
+  color: var(--color-paper);
+  color-scheme: dark;
+  font: 12px var(--font-ui);
+}
+:root[data-theme="light"] .reminder-pick input { color-scheme: light; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .reminder-pick input { color-scheme: light; }
+}
+.reminder-pick input:focus { outline: 1px solid var(--color-iris); outline-offset: -1px; }
+.reminder-ok {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--overlay-strong);
+  color: var(--color-paper);
+  font: 500 12px var(--font-ui);
+  cursor: default;
+}
+.reminder-ok:hover { background: var(--overlay-active); }
+
 /* A note's colour dot on a card (manager, board). */
 .card-dot {
   flex: none;

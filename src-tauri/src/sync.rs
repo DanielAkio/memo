@@ -213,7 +213,7 @@ fn group_file(id: &str) -> String {
     format!("group-{id}.json")
 }
 
-fn note_doc(note: &Note) -> NoteDoc {
+pub(crate) fn note_doc(note: &Note) -> NoteDoc {
     NoteDoc {
         version: 1,
         id: note.id.clone(),
@@ -225,6 +225,7 @@ fn note_doc(note: &Note) -> NoteDoc {
         created_at: note.created_at,
         updated_at: note.updated_at,
         trashed_at: note.trashed_at,
+        remind_at: note.remind_at,
         ..Default::default()
     }
 }
@@ -1281,7 +1282,11 @@ mod tests {
     }
 
     fn computer(name: &str) -> Shared {
-        let dir = std::env::temp_dir().join(format!("memo-sync-test-{name}-{}", crate::now_ms()));
+        // Tests run in parallel: the counter keeps two of them from sharing a
+        // folder (and its images) within the same millisecond.
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("memo-sync-test-{name}-{}-{n}", crate::now_ms()));
         std::fs::create_dir_all(&dir).unwrap();
         Arc::new(Store::load(dir.join("notes.json")))
     }
