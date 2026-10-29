@@ -361,12 +361,18 @@
 
   // ---------------------------------------------------- presentation overlays
 
-  // A pulse where a click lands.
-  M.ring = (x, y) => {
-    const el = document.createElement('div');
-    el.className = 'ring';
-    Object.assign(el.style, { left: `${x}px`, top: `${y}px` });
-    document.body.append(el);
-    setTimeout(() => el.remove(), 800);
+  // A pulse where a click lands, drawn at progress `t` (0..1; 1 removes it):
+  // the recorder steps it frame by frame, as a CSS animation would run on the
+  // wall clock and skip ahead between slow screenshots.
+  M.ring = (x, y, t) => {
+    let el = document.querySelector('.ring');
+    if (t >= 1) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'ring';
+      document.body.append(el);
+    }
+    const e = 1 - (1 - t) ** 3;
+    Object.assign(el.style, { left: `${x}px`, top: `${y}px`, transform: `scale(${0.3 + 1.2 * e})`, opacity: String(1 - e) });
   };
 })();

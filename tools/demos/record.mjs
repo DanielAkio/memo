@@ -369,9 +369,12 @@ async function pitch() {
   const p = await at('note-today', '#pinBtn');
   await rec.move(p.cx, p.cy, 1100);
   await rec.hold(400);
-  await ev(([x, y]) => window.Memo.ring(x, y), [p.cx, p.cy]);
-  await rec.click({ after: 120 });
-  await rec.hold(1300);
+  await page.mouse.down(); await page.mouse.up();
+  for (let i = 0; i <= 21; i++) {
+    await ev(([x, y, t]) => window.Memo.ring(x, y, t), [p.cx, p.cy, i / 21]);
+    await rec.shot(33);
+  }
+  await rec.hold(1000);
   // 2. A spreadsheet comes forward: the memory stays on top.
   await bring('sheet');
   const c = await cell(4, 4);

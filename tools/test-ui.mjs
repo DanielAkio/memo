@@ -1017,8 +1017,16 @@ try {
       sheet.remove();
       await M.invoke('note-pitch-note', 'set_pinned', { pinned: false });
       M.closeWin('note-pitch-note');
+      // The click pulse is drawn at the progress the recorder asks for, so
+      // every frame of the GIF shows a step of it.
+      const ring = (t) => { M.ring(100, 100, t); const el = document.querySelector('.ring'); return el && { scale: parseFloat(el.style.transform.slice(6)), opacity: Number(el.style.opacity), anim: getComputedStyle(el).animationName }; };
+      out.ring = [ring(0), ring(0.5), ring(1)];
       return out;
     });
+    const [r0, r5, r1] = res.ring;
+    assert.ok(r0.scale < r5.scale && r0.opacity > r5.opacity, `The click pulse grows and fades step by step (${JSON.stringify(res.ring)})`);
+    assert.equal(r5.anim, 'none', 'The click pulse runs on no wall-clock animation');
+    assert.equal(r1, null, 'The click pulse is gone at its end');
     assert.equal(res.noCaption, true, 'The presentation GIF has no captions');
     assert.equal(res.front, true, 'A clicked app comes forward');
     assert.equal(res.noteAbove, true, 'A pinned memory stays above it');
