@@ -1454,7 +1454,7 @@ try {
     assert.deepEqual(res.calls, ['note-sb-note', 'board-sb-board', 'group-sb-group'], 'Each copies its own item');
   });
 
-  await step('Titlebar: the share button shows only while the pointer is over the titlebar; the other buttons always', async () => {
+  await step('Titlebar: the buttons on the right show only while the window is in use (pointer anywhere over it, or focus)', async () => {
     const labels = ['note-hv-note', 'board-hv-board', 'group-hv-group', 'group-hv-narrow'];
     await page.evaluate(async (labels) => {
       const M = window.Memo;
@@ -1468,7 +1468,8 @@ try {
       // A group bar at its minimum width (main.rs GROUP_MIN_W).
       await M.openWin(labels[3], '/src/windows/group/group.html', { x: 360, y: 280, w: 210, h: 40 });
     }, labels);
-    await page.mouse.move(900, 500);
+    // A click on the desk: no window has the focus.
+    await page.mouse.click(900, 500);
     await page.waitForTimeout(150);
     const state = (label) => page.evaluate((label) => {
       const M = window.Memo;
@@ -1478,16 +1479,16 @@ try {
       const edge = doc.documentElement.clientWidth;
       const btns = [...actions.querySelectorAll('.icon-btn')].filter((b) => !b.hidden);
       const r = M.wins[label].f.getBoundingClientRect();
-      const visible = (b) => getComputedStyle(b).display !== 'none';
-      const always = btns.filter((b) => b.id !== 'shareBtn');
-      const share = doc.getElementById('shareBtn');
+      const visible = (b) => b.getClientRects().length > 0;
       return {
-        always: always.length >= 3 && always.every(visible),
-        shown: visible(share),
-        hidden: !visible(share),
+        count: btns.length,
+        shown: btns.every(visible),
+        hidden: !btns.some(visible),
         nameW: name ? name.getBoundingClientRect().width : 0,
         fits: btns.every((b) => b.getBoundingClientRect().right <= edge + 0.5),
         bar: { x: r.left + r.width / 2, y: r.top + 12 },
+        // Below the titlebar (a group bar is all titlebar).
+        body: { x: r.left + r.width / 2, y: r.top + Math.max(12, r.height * 0.6) },
       };
     }, label);
     const res = {};
@@ -1496,22 +1497,39 @@ try {
       await page.mouse.move(before.bar.x, before.bar.y);
       await page.waitForTimeout(120);
       const over = await state(label);
+      await page.mouse.move(before.body.x, before.body.y);
+      await page.waitForTimeout(120);
+      const overBody = await state(label);
       await page.mouse.move(900, 500);
       await page.waitForTimeout(120);
       const after = await state(label);
-      res[label] = { before, over, after };
+      res[label] = { before, over, overBody, after };
     }
+    // The focused window keeps them, the pointer elsewhere (typing in a note).
+    await page.evaluate(() => {
+      const f = window.Memo.wins['note-hv-note'].f;
+      f.contentWindow.focus();
+      f.contentDocument.getElementById('editor').focus();
+    });
+    await page.waitForTimeout(120);
+    const focused = await state('note-hv-note');
+    await page.mouse.click(900, 500);
+    await page.waitForTimeout(120);
+    const unfocused = await state('note-hv-note');
     await page.evaluate((labels) => labels.forEach((l) => window.Memo.closeWin(l)), labels);
     for (const label of labels) {
-      const { before, over, after } = res[label];
-      assert.equal(before.always && over.always && after.always, true, `${label}: +, −, ✕ (and a group's toggle) always show`);
-      assert.equal(before.hidden, true, `${label}: the share button waits for the pointer`);
-      assert.equal(over.shown, true, `${label}: the pointer over the titlebar shows them`);
+      const { before, over, overBody, after } = res[label];
+      assert.ok(before.count >= 4, `${label}: share, +, −, ✕ (and a group's toggle)`);
+      assert.equal(before.hidden, true, `${label}: the buttons wait for the window to be used`);
+      assert.equal(over.shown, true, `${label}: the pointer over the titlebar shows them all`);
+      assert.equal(overBody.shown, true, `${label}: so does the pointer anywhere over the window`);
       assert.equal(over.fits, true, `${label}: they all fit in the bar`);
-      assert.equal(after.hidden, true, `${label}: it goes when the pointer leaves`);
+      assert.equal(after.hidden, true, `${label}: they go when the pointer leaves`);
     }
+    assert.equal(focused.shown, true, 'The focused window shows them, the pointer elsewhere');
+    assert.equal(unfocused.hidden, true, 'They go when it loses the focus');
     assert.ok(res['note-hv-note'].before.nameW > res['note-hv-note'].over.nameW,
-      `The name has the share button's room while it is hidden (${res['note-hv-note'].before.nameW} > ${res['note-hv-note'].over.nameW})`);
+      `The name has the buttons' room while they are hidden (${res['note-hv-note'].before.nameW} > ${res['note-hv-note'].over.nameW})`);
   });
 
   await step('Titlebar menus keep only the window\'s own commands (no Close, no duplicates of the app part)', async () => {
@@ -1594,6 +1612,132 @@ try {
       assert.notDeepEqual(changed, fresh, 'The settings were changed');
       assert.deepEqual(afterOne, changed, 'One click changes nothing (it asks for a second)');
       assert.deepEqual(after, fresh, 'The second click restores every preference');
+    } finally {
+      await webPage.close();
+    }
+  });
+
+  await step('Web version on a phone: a group opens full screen with its memories listed; a tap opens one, Back returns', async () => {
+    const webPage = await browser.newPage({ viewport: { width: 390, height: 800 } });
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const gid = await webPage.evaluate(async () => {
+        const inv = window.MemoWeb.invoke;
+        const ids = async (cmd) => (await inv('manager', cmd)).map((x) => x.id);
+        const newOne = async (cmd, list) => { const b = new Set(await ids(list)); await inv('manager', cmd); return (await ids(list)).find((x) => !b.has(x)); };
+        const g = await newOne('new_group', 'list_groups');
+        await inv(`group-${g}`, 'rename', { name: 'Viagem' });
+        for (const [name, text] of [['Passagens', 'Comprar ida'], ['Mala', '[ ] Carregador']]) {
+          const id = await newOne('new_note', 'list_notes');
+          await inv(`note-${id}`, 'rename', { name });
+          await inv(`note-${id}`, 'save_text', { text, html: '' });
+          await inv(`note-${id}`, 'set_note_group', { groupId: g });
+          await inv(`note-${id}`, 'close_window');
+        }
+        await inv(`group-${g}`, 'close_window');
+        return g;
+      });
+      await webPage.waitForTimeout(300);
+      // From the manager, as a tap on the group's card.
+      await webPage.evaluate((g) => window.MemoWeb.invoke('manager', 'focus_group', { id: g }), gid);
+      await webPage.waitForTimeout(600);
+      const state = () => webPage.evaluate((g) => {
+        const win = document.querySelector(`.win[data-label="group-${g}"]`);
+        const box = win && win.getBoundingClientRect();
+        const notes = [...document.querySelectorAll('.win.is-note')].filter((w) => getComputedStyle(w).display !== 'none');
+        const doc = win && win.querySelector('iframe').contentDocument;
+        return {
+          group: Boolean(win) && getComputedStyle(win).display !== 'none' && box.width >= 380 && box.height >= 700,
+          name: doc && doc.getElementById('groupName').textContent,
+          members: doc ? [...doc.querySelectorAll('#members .member .card-title')].map((e) => e.textContent).sort() : [],
+          notes: notes.length,
+          topIsGroup: Number(win && win.style.zIndex) >= Math.max(0, ...[...document.querySelectorAll('.win')].map((w) => Number(w.style.zIndex) || 0)),
+        };
+      }, gid);
+      const opened = await state();
+      await webPage.frameLocator(`iframe[name="group-${gid}"]`).locator('#members .member', { hasText: 'Mala' }).click();
+      await webPage.waitForTimeout(500);
+      const onNote = await webPage.evaluate(() => {
+        const notes = [...document.querySelectorAll('.win.is-note')];
+        const top = notes[notes.length - 1];
+        return { count: notes.length, title: top && top.querySelector('iframe').contentDocument.getElementById('noteName').textContent };
+      });
+      await webPage.goBack();
+      await webPage.waitForTimeout(500);
+      const back = await state();
+      await webPage.goBack();
+      await webPage.waitForTimeout(500);
+      const home = await state();
+      assert.equal(opened.group, true, 'The group fills the screen');
+      assert.equal(opened.name, 'Viagem', 'Its bar is on top');
+      assert.deepEqual(opened.members, ['Mala', 'Passagens'], 'Its memories are listed under the bar');
+      assert.equal(opened.notes, 0, 'No memory window opens by itself');
+      assert.deepEqual(onNote, { count: 1, title: 'Mala' }, 'A tap opens that memory');
+      assert.equal(back.notes, 0, 'Back closes the memory');
+      assert.equal(back.group && back.topIsGroup, true, 'and shows the group again');
+      assert.equal(home.group, false, 'Back again returns to the manager');
+    } finally {
+      await webPage.close();
+    }
+  });
+
+  await step('Web version: a Settings section shows a reset button only while it was changed; it resets that section', async () => {
+    const webPage = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    try {
+      await webPage.goto(`http://127.0.0.1:${port}/site/app.html`);
+      await webPage.waitForSelector('iframe[name="manager"]');
+      await webPage.waitForTimeout(400);
+      const res = await webPage.evaluate(async () => {
+        const inv = (c, a) => window.MemoWeb.invoke('manager', c, a);
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const doc = document.querySelector('iframe[name="manager"]').contentDocument;
+        // Start as Memo comes.
+        await inv('reset_settings');
+        await wait(300);
+        const shown = () => [...doc.querySelectorAll('.sec-reset')].filter((b) => !b.hidden).map((b) => b.dataset.reset).sort();
+        const out = { sections: [...doc.querySelectorAll('.sec-reset')].map((b) => b.dataset.reset), fresh: shown() };
+        await inv('change_theme', { theme: 'dark' });
+        await inv('set_default_group_title', { title: 'G' });
+        await inv('set_magnet', { on: false });
+        doc.getElementById('settingsView').dispatchEvent(new Event('change'));
+        await wait(400);
+        out.changed = shown();
+        // At the far right of the section's title.
+        const btn = doc.querySelector('.sec-reset[data-reset="appearance"]');
+        const title = btn.closest('.settings-title').getBoundingClientRect();
+        out.farRight = title.right - btn.getBoundingClientRect().right < 4;
+        // One click asks; it doesn't open or close the section.
+        const sec = btn.closest('.sec');
+        const openBefore = sec.classList.contains('is-open');
+        btn.click();
+        await wait(100);
+        out.asks = (await inv('get_theme')) === 'dark' && sec.classList.contains('is-open') === openBefore;
+        btn.click();
+        await wait(400);
+        out.theme = await inv('get_theme');
+        out.afterAppearance = shown();
+        out.groupTitleKept = (await inv('get_group_defaults'))[1];
+        const defBtn = doc.querySelector('.sec-reset[data-reset="defaults"]');
+        defBtn.click();
+        defBtn.click();
+        await wait(400);
+        out.groupTitle = (await inv('get_group_defaults'))[1];
+        out.afterDefaults = shown();
+        await inv('reset_settings');
+        return out;
+      });
+      assert.deepEqual(res.sections, ['appearance', 'defaults', 'application'], 'Appearance, Defaults and App can be reset');
+      assert.deepEqual(res.fresh, [], 'Nothing changed: no reset button');
+      assert.deepEqual(res.changed, ['appearance', 'application', 'defaults'], 'A changed section shows its button');
+      assert.equal(res.farRight, true, 'The button sits at the far right of the section title');
+      assert.equal(res.asks, true, 'One click only asks (and leaves the section as it was)');
+      assert.equal(res.theme, 'system', 'The second click resets the section');
+      assert.deepEqual(res.afterAppearance, ['application', 'defaults'], 'Its button goes; the others stay');
+      assert.equal(res.groupTitleKept, 'G', 'Other sections keep their changes');
+      assert.equal(res.groupTitle, '', 'Defaults reset on their own');
+      assert.deepEqual(res.afterDefaults, ['application'], 'Only App is left changed');
     } finally {
       await webPage.close();
     }
@@ -2608,6 +2752,61 @@ try {
     } finally {
       await webPage.close();
     }
+  });
+
+  await step('Titlebar rename works and looks like a board column\'s: a click on the name opens the field; a drag does not', async () => {
+    const res = await page.evaluate(async () => {
+      const M = window.Memo;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      M.addNote({ id: 'rn-note', title: 'Compras', text: 'x' });
+      M.addGroup({ id: 'rn-group', name: 'Casa' });
+      M.addBoard({ id: 'rn-board', name: 'Q' });
+      await M.openNote('rn-note');
+      await M.openWin('group-rn-group', '/src/windows/group/group.html', { x: 40, y: 340, w: 300, h: 34 });
+      await M.openWin('board-rn-board', '/src/windows/board/board.html', { x: 360, y: 40, w: 520, h: 320 });
+      await wait(400);
+      const press = (doc, el, dx = 0) => {
+        const win = doc.defaultView;
+        const r = el.getBoundingClientRect();
+        const x = r.left + 5;
+        const y = r.top + r.height / 2;
+        el.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: x, clientY: y, screenX: x, screenY: y, pointerId: 1 }));
+        doc.getElementById('titlebar').dispatchEvent(new win.PointerEvent('pointerup', { bubbles: true, button: 0, clientX: x + dx, clientY: y, screenX: x + dx, screenY: y, pointerId: 1 }));
+      };
+      const out = {};
+      for (const [label, nameId] of [['note-rn-note', 'noteName'], ['group-rn-group', 'groupName'], ['board-rn-board', 'boardName']]) {
+        const doc = M.frameDoc(label);
+        const name = doc.getElementById(nameId);
+        const input = name.parentElement.querySelector('.title-input');
+        press(doc, name, 30); // a drag that starts on the name
+        await wait(30);
+        const dragged = !input.hidden;
+        press(doc, name); // a click
+        await wait(30);
+        const clicked = !input.hidden && doc.activeElement === input;
+        input.dispatchEvent(new doc.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await wait(30);
+        out[label] = { dragged, clicked, closed: input.hidden, hover: name.classList.contains('can-rename') };
+      }
+      // The same field as a column's name.
+      const bdoc = M.frameDoc('board-rn-board');
+      bdoc.querySelector('.col-title').click();
+      await wait(30);
+      const look = (el) => { const s = getComputedStyle(el); el.hidden = false; return [s.borderTopColor, s.borderTopWidth, s.backgroundColor, s.height, s.borderTopLeftRadius].join(' '); };
+      const ndoc = M.frameDoc('note-rn-note');
+      out.sameField = look(ndoc.getElementById('titleInput')) === look(bdoc.querySelector('.col-input'));
+      ndoc.getElementById('titleInput').hidden = true;
+      for (const l of ['note-rn-note', 'group-rn-group', 'board-rn-board']) M.closeWin(l);
+      delete M.notes['rn-note'];
+      delete M.groups['rn-group'];
+      delete M.boards['rn-board'];
+      return out;
+    });
+    for (const label of ['note-rn-note', 'group-rn-group', 'board-rn-board']) {
+      assert.deepEqual(res[label], { dragged: false, clicked: true, closed: true, hover: true },
+        `${label}: a click on the name renames (Esc cancels); a drag from it doesn't`);
+    }
+    assert.equal(res.sameField, true, 'The rename field looks like a column\'s');
   });
 
   await step('Reminders: set from the titlebar menu or the footer bell; the bell shows on the note, the manager and the board', async () => {

@@ -142,12 +142,12 @@ pub async fn check(app: &AppHandle, manual: bool) {
     }
 }
 
-/// Downloads and installs the update found (checking first if none was),
-/// then starts the new version.
+/// Downloads and installs the newest version, then starts it. It always
+/// checks first: one may have come out since the last check, and the one
+/// found then must not be installed instead (if the check fails, the one
+/// found then is installed).
 pub async fn install(app: &AppHandle) {
-    if PENDING.lock().unwrap().is_none() {
-        check(app, true).await;
-    }
+    check(app, true).await;
     let Some(update) = PENDING.lock().unwrap().clone() else {
         return;
     };

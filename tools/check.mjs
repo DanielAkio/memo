@@ -347,6 +347,17 @@ const DESKTOP_ONLY = {
   else pass('README.md shows the English pitch GIF');
 }
 
+// "Update" installs the newest version: install() checks again first (a
+// newer one may have come out since the last check), never only when none
+// was found.
+{
+  const src = read('src-tauri/src/updater.rs');
+  const body = (src.split(/pub async fn install\(/)[1] || '').split(/\n}\n/)[0];
+  const firstLine = body.split('\n').slice(1).find((l) => l.trim() && !l.trim().startsWith('//')) || '';
+  if (!/^\s*check\(app, true\)\.await;\s*$/.test(firstLine)) fail('updater.rs install() must start with check(app, true).await, so the newest version installs');
+  else pass('Updating installs the newest version (it checks again first)');
+}
+
 // A group bar's minimum width, the same on the desktop and Memo Web.
 {
   const rust = /const GROUP_MIN_W: f64 = ([\d.]+);/.exec(read('src-tauri/src/main.rs'));

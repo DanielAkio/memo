@@ -68,6 +68,7 @@ window.MemoI18n = (() => {
       remindInDays: 'Em {n} dias às {time}',
       remindWeekday: '{day} às {time}',
       reminderChoices: 'Lembrete',
+      restoreSection: 'Restaurar o padrão desta seção',
       reminderChoice: 'Opção {n}',
       reminderKindIn: 'Daqui a',
       reminderKindAt: 'No dia',
@@ -363,6 +364,7 @@ window.MemoI18n = (() => {
       remindInDays: 'In {n} days at {time}',
       remindWeekday: '{day} at {time}',
       reminderChoices: 'Reminder',
+      restoreSection: 'Restore this section’s defaults',
       reminderChoice: 'Choice {n}',
       reminderKindIn: 'In',
       reminderKindAt: 'On',
@@ -670,7 +672,7 @@ window.MemoI18n = (() => {
           ['Nova memória', 'Botão + na barra, {{Mod+N}} ou o ícone do Memo na bandeja.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-name">Lista de compras</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Título', 'Clique duplo na barra de título; {{Enter}} ou clicar fora salva, {{Esc}} cancela.',
+          ['Título', 'Clique no nome na barra de título (ou clique duplo na barra), como no nome de uma coluna de quadro; {{Enter}} ou clicar fora salva, {{Esc}} cancela.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-input">Lista de compras</span></span>'],
           ['Menu da barra', 'O botão … ou o clique direito em qualquer ponto da barra (memória, grupo ou Gerenciador) abre um menu com os comandos dela (numa memória, Formatar; renomear, fixar, cor, lembrete, fechar) e, abaixo, todos os do Memo: nova memória, novo grupo, mostrar todas, Gerenciador, Lixeira, Configurações, Ajuda, tema, idioma e sair. Assim nada precisa ser procurado em outra janela.',
@@ -809,7 +811,7 @@ window.MemoI18n = (() => {
           ['New memory', 'The + button in the titlebar, {{Mod+N}} or the Memo tray icon.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-name">Shopping list</span><i data-icon="plus" class="demo-hot"></i><i data-icon="more"></i><i data-icon="close"></i></span>'],
-          ['Title', 'Double-click the titlebar; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.',
+          ['Title', 'Click the name in the titlebar (or double-click the bar), as a board column\'s name; {{Enter}} or clicking elsewhere saves, {{Esc}} cancels.',
             '<span class="demo-bar"><i data-icon="pin"></i><span class="demo-dot" data-color="yellow"></span>'
             + '<span class="demo-input">Shopping list</span></span>'],
           ['Bar menu', 'The … button, or a right click anywhere on the bar (a memory’s, a group’s or the Manager’s), opens a menu with its commands (on a memory, Format; rename, pin, color, reminder, close) and, below them, all of Memo’s: new memory, new group, show all, Manager, Trash, Settings, Help, theme, language and quit. Nothing has to be looked for in another window.',

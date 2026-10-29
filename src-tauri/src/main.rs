@@ -338,6 +338,8 @@ fn main() {
             empty_trash,
             change_theme,
             reset_settings,
+            reset_settings_section,
+            get_settings_changed,
             get_zoom,
             change_zoom,
             get_language,

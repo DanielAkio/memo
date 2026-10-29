@@ -1397,7 +1397,7 @@
     return new Promise((resolve) => {
       f.addEventListener('load', () => {
         applyZoomToFrame(f);
-        if (label === 'manager') {
+        if (label === 'manager' || isGroup(label)) {
           try {
             f.contentDocument.documentElement.classList.toggle('is-mobile', isMobile());
             f.contentWindow.dispatchEvent(new Event('memo-mobile-changed'));
@@ -1436,12 +1436,19 @@
     }
   }
 
+  // Back on a phone: closes the memory on top, back to the group it was
+  // opened from (if one is open), else to the manager; then the group.
   window.addEventListener('popstate', () => {
     if (!isMobile()) return;
     const openNoteLabels = Object.keys(wins).filter(isNote);
+    const group = Object.keys(wins).find((l) => isGroup(l) && wins[l].el.classList.contains('mobile-open'));
     if (openNoteLabels.length) {
       const topNote = openNoteLabels[openNoteLabels.length - 1];
       closeNoteById(idOf(topNote));
+      if (group) raiseWindow(group);
+      else openManagerWindow();
+    } else if (group) {
+      closeWindow(group);
       openManagerWindow();
     }
   });
@@ -2182,9 +2189,29 @@
     else takeOutGroup(g);
   }
 
+  // On a phone a group opens on its own, full screen: its bar on top and the
+  // list of its memories below (group.js); a tap on one opens it, and Back
+  // returns to the group, then to the manager.
+  async function openGroupOnMobile(g) {
+    const label = `group-${g.id}`;
+    g.hidden = false;
+    if (!wins[label]) await openGroupWindow(g);
+    wins[label].el.classList.add('mobile-open');
+    raiseWindow(label);
+    try {
+      if (!history.state || history.state.memoGroup !== label) history.pushState({ memoGroup: label }, '');
+    } catch {}
+    markDirty(false);
+    notifyGroups();
+  }
+
   function raiseGroup(gid) {
     const g = findGroup(gid);
     if (!g) return;
+    if (isMobile()) {
+      openGroupOnMobile(g);
+      return;
+    }
     g.hidden = false;
     if (!wins[`group-${gid}`]) openGroupWindow(g);
     if (g.open) {
@@ -2988,6 +3015,48 @@
     applyDesktopThemeAndLang();
     markDirty(false);
     emit('language-changed', eff);
+  }
+
+  // Settings sections that go back to how Memo comes, each with its own reset
+  // button shown while something in it was changed (manager.rs
+  // reset_settings_section, get_settings_changed). Memo Web has no update
+  // notices: "application" is the magnet.
+  const SETTINGS_SECTIONS = ['appearance', 'defaults', 'application'];
+
+  function resetSettingsSection(section) {
+    if (section === 'appearance') {
+      setThemeSetting('system');
+      setLanguageSetting('system');
+      stepZoom(0);
+      setManagerLayout('cards');
+    } else if (section === 'defaults') {
+      Object.assign(data, {
+        defaultColor: '', defaultTitle: '', defaultText: '', defaultHtml: '',
+        defaultGroupColor: '', defaultGroupTitle: '',
+        defaultBoardColor: '', defaultBoardTitle: '', defaultBoardColumns: null,
+        reminderChoices: [],
+        defaultsUpdatedAt: nowMs(),
+      });
+      markDirty(true);
+      notifyNotes();
+    } else if (section === 'application') {
+      data.magnetOff = false;
+      markDirty(false);
+      emit('magnet-changed', true);
+    }
+  }
+
+  function settingsChanged() {
+    const changed = {
+      appearance: data.theme !== 'system' || data.language !== 'system' || (data.zoom || 1) !== 1
+        || data.manager.layout !== 'cards',
+      defaults: Boolean(data.defaultColor || data.defaultTitle || data.defaultText || data.defaultHtml
+        || (data.defaultGroupColor && data.defaultGroupColor !== 'random') || data.defaultGroupTitle
+        || data.defaultBoardColor || data.defaultBoardTitle || data.defaultBoardColumns
+        || (data.reminderChoices || []).length),
+      application: Boolean(data.magnetOff),
+    };
+    return SETTINGS_SECTIONS.filter((s) => changed[s]);
   }
 
   function setManagerLayout(layout) {
@@ -3862,22 +3931,14 @@
       // As reset_settings on the desktop: preferences and the defaults for
       // new items back to how Memo comes (sign-ins stay).
       case 'reset_settings':
-        setThemeSetting('system');
-        setLanguageSetting('system');
-        stepZoom(0);
-        setManagerLayout('cards');
-        data.magnetOff = false;
-        emit('magnet-changed', true);
-        Object.assign(data, {
-          defaultColor: '', defaultTitle: '', defaultText: '', defaultHtml: '',
-          defaultGroupColor: '', defaultGroupTitle: '',
-          defaultBoardColor: '', defaultBoardTitle: '', defaultBoardColumns: null,
-          reminderChoices: [],
-          defaultsUpdatedAt: nowMs(),
-        });
-        markDirty(true);
-        notifyNotes();
+        for (const section of SETTINGS_SECTIONS) resetSettingsSection(section);
         return null;
+      case 'reset_settings_section':
+        if (!SETTINGS_SECTIONS.includes(args.section)) throw new Error(`unknown settings section: ${args.section}`);
+        resetSettingsSection(args.section);
+        return null;
+      case 'get_settings_changed':
+        return settingsChanged();
 
       // Dragging & Resizing
       case 'drag_start':

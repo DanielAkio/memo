@@ -468,6 +468,27 @@ body {
 .sec-toggle[aria-expanded="true"]::before { transform: rotate(45deg); margin-bottom: 4px; }
 .sec-toggle:focus-visible { outline: 1px solid var(--color-smoke); outline-offset: 2px; border-radius: 4px; }
 .sec > .settings-title:hover { color: var(--color-fog); }
+/* Back to how Memo comes, at the far right of a section's title; only while
+   something in it was changed (manager.js refreshResets). */
+.sec-reset {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -4px 0 -4px auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-ash);
+  cursor: default;
+}
+.sec-reset[hidden] { display: none; }
+.sec-reset svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.sec-reset:hover, .sec-reset:focus-visible { background: var(--overlay-hover); color: var(--color-paper); outline: 0; }
+/* Waiting for the second click: solid red, as the other confirming buttons. */
+.sec-reset.confirming,
+.sec-reset.confirming:hover { background: var(--danger); color: #fff; }
 
 .setting {
   position: relative; /* anchors the tooltip of an "i" in its label */

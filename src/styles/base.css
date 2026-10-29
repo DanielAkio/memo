@@ -333,7 +333,10 @@ button { font: inherit; color: inherit; }
 }
 
 /* The window's name in its titlebar (note, group, board; the manager's fixed
-   title), and the field that renames it on double click (TitleBar). */
+   title), and the field that renames it (TitleBar: a click on the name, or a
+   double click on the bar). Renaming looks and works the same as a board
+   column's name (board.css .col-title / .col-input): the name lights up
+   under the pointer, a click turns it into the field. */
 .win-name {
   min-width: 0;
   overflow: hidden;
@@ -346,17 +349,24 @@ button { font: inherit; color: inherit; }
   color: var(--color-mist);
 }
 .win-name.is-empty { color: var(--color-ash); font-weight: 400; }
-.title-input {
-  flex: 1;
+.win-name.can-rename,
+.col-title {
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.win-name.can-rename { margin: -2px -4px; }
+.win-name.can-rename:hover,
+.col-title:hover { background: var(--overlay-hover); }
+.title-input,
+.col-input {
   min-width: 0;
-  height: 24px;
-  margin: 0 0 0 -6px;
-  padding: 0 6px;
-  border: 0;
-  outline: 0;
-  border-radius: var(--radius-badge);
-  background: var(--overlay-subtle);
-  box-shadow: var(--hairline);
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid var(--color-iris);
+  outline: none;
+  border-radius: 4px;
+  background: var(--color-carbon);
   color: var(--color-paper);
   caret-color: var(--color-paper);
   font-family: var(--font-ui);
@@ -364,7 +374,9 @@ button { font: inherit; color: inherit; }
   font-weight: 500;
   letter-spacing: -0.010em;
 }
-.title-input::placeholder { color: var(--color-ash); font-weight: 400; }
+.title-input { flex: 1; margin: 0 0 0 -5px; }
+.title-input::placeholder,
+.col-input::placeholder { color: var(--color-ash); font-weight: 400; }
 .win-name[hidden], .title-input[hidden] { display: none; }
 
 /* A note's title on a card (manager, board). */
@@ -515,12 +527,13 @@ html, body {
   gap: 2px;
 }
 
-/* The share button (#shareBtn) shows only while the pointer is over the
-   titlebar (or it has the keyboard focus), leaving its room to the name the
-   rest of the time; the other buttons always show. Touch screens, with no
-   hover, keep it. */
+/* The buttons on the right (share, group toggle, +, −, ✕, the manager's
+   new group / board) show only while the window is in use: the pointer
+   anywhere over it, or it has the focus (TitleBar sets .is-focused), or one
+   of them has the keyboard focus. The rest of the time their room goes to
+   the name. Touch screens, with no hover, keep them. */
 @media (hover: hover) {
-  .titlebar:not(:hover) #shareBtn:not(:focus-visible) { display: none; }
+  :root:not(:hover) .frame:not(.is-focused) .titlebar .actions:not(:has(:focus-visible)) { display: none; }
 }
 
 

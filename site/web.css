@@ -336,7 +336,9 @@ body.interacting .win:not(.active-gesture) iframe {
     height: 100% !important;
     box-shadow: none;
   }
-  body:not(.home) .win.is-group {
+  /* Group bars only show when one is opened from the manager: full screen,
+     with its memories listed under the bar (web.js openGroupOnMobile). */
+  body:not(.home) .win.is-group:not(.mobile-open) {
     display: none !important;
   }
   body:not(.home) .tray-bar {

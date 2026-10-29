@@ -1,7 +1,8 @@
 // Memo — the titlebar every window shares (note, group bar, board and
 // manager): pin far left, colour control, name, action buttons on the
 // right. It wires what is the same everywhere: the pin (button and
-// Mod+Shift+P), double-click rename, Mod+N, the buttons, dragging /
+// Mod+Shift+P), rename (a click on the name or a double click on the bar),
+// Mod+N, the buttons, dragging /
 // resizing / Snap / middle-click close (MemoChrome.attach), the … and
 // right-click menu (MemoChrome.titleMenu), the focused look, and the
 // browser's context menu kept to text fields. The window keeps its data and
@@ -76,6 +77,22 @@ class TitleBar {
     });
     if (o.menuItems) {
       window.MemoChrome.titleMenu({ titlebar: o.titlebar, items: o.menuItems, onOpen: o.onMenuOpen });
+    }
+    // A click on the name renames, as a board column's name does (a drag
+    // that starts on it still moves the window). The bar captures the
+    // pointer while dragging, so the release is heard there.
+    if (o.rename) {
+      o.rename.name.classList.add('can-rename');
+      let down = null;
+      const at = (e) => [e.screenX || e.clientX, e.screenY || e.clientY];
+      o.rename.name.addEventListener('pointerdown', (e) => { down = e.button === 0 ? at(e) : null; });
+      o.titlebar.addEventListener('pointerup', (e) => {
+        const from = down;
+        down = null;
+        if (!from || e.button !== 0) return;
+        const [x, y] = at(e);
+        if (Math.hypot(x - from[0], y - from[1]) < 3) this.startRename();
+      });
     }
     window.addEventListener('keydown', (e) => {
       if (!window.MemoI18n.isMod(e)) return;

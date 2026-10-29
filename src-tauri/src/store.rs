@@ -1265,6 +1265,31 @@ impl Store {
         self.mark_dirty();
     }
 
+    /// Settings → Aparência differs from how Memo comes (theme, language,
+    /// zoom, layout): its section shows a reset button.
+    pub fn appearance_changed(&self) -> bool {
+        self.theme() != "system"
+            || self.language() != "system"
+            || (self.zoom() - 1.0).abs() > 1e-9
+            || self.manager_layout() != LAYOUTS[0]
+    }
+
+    /// Some default for new memories, groups or boards (reminder choices
+    /// included) differs from how Memo comes.
+    pub fn defaults_changed(&self) -> bool {
+        let d = self.data.lock().unwrap();
+        d.default_color.is_some()
+            || !d.default_title.is_empty()
+            || !d.default_text.is_empty()
+            || !d.default_html.is_empty()
+            || d.default_group_color.is_some()
+            || !d.default_group_title.is_empty()
+            || d.default_board_color.is_some()
+            || !d.default_board_title.is_empty()
+            || d.default_board_columns.is_some()
+            || !d.reminder_choices.is_empty()
+    }
+
     /// The reminder's three quick choices (`reminder_choice` format), Memo's
     /// where none is chosen.
     pub fn reminder_choices(&self) -> Vec<String> {
@@ -2055,6 +2080,27 @@ mod tests {
     }
 
     #[test]
+    fn a_settings_section_is_changed_only_off_memos_values() {
+        let dir = temp_dir("settings-changed");
+        let store = Store::load(dir.join("notes.json"));
+        assert!(!store.appearance_changed() && !store.defaults_changed(), "as Memo comes");
+        store.set_theme("dark");
+        assert!(store.appearance_changed());
+        store.set_theme("system");
+        store.set_zoom(1.1);
+        assert!(store.appearance_changed());
+        store.set_zoom(1.0);
+        store.set_language("en");
+        assert!(store.appearance_changed());
+        store.set_language("system");
+        assert!(!store.appearance_changed(), "back to Memo's");
+        store.set_default_group_title("Work".into());
+        assert!(store.defaults_changed());
+        store.reset_defaults();
+        assert!(!store.defaults_changed());
+    }
+
+    #[test]
     fn reminder_quick_choices_are_settings() {
         let dir = temp_dir("reminder-defaults");
         let store = Store::load(dir.join("notes.json"));
@@ -2079,8 +2125,10 @@ mod tests {
         store.set_reminder_choices(&list(&["in:3d", "at:today@25:00"]));
         assert_eq!(store.reminder_choices(), list(&["in:3d", REMINDER_CHOICES[1], REMINDER_CHOICES[2]]));
         // "Default settings" puts them back.
+        assert!(store.defaults_changed(), "changed quick choices are a changed default");
         store.reset_defaults();
         assert_eq!(store.reminder_choices(), memo);
+        assert!(!store.defaults_changed());
     }
 
     #[test]

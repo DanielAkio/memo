@@ -55,7 +55,50 @@
     } catch (err) {
       console.error('load_group', err);
     }
+    renderMembers();
   }
+
+  // Memo Web on a phone (<html class="is-mobile">): the group opens full
+  // screen, and its memories are listed under the bar as cards (dot, name,
+  // preview, components/card.js); a tap opens one.
+  const isMobile = () => document.documentElement.classList.contains('is-mobile');
+
+  async function renderMembers() {
+    const box = $('members');
+    if (!group || !isMobile()) {
+      box.replaceChildren();
+      return;
+    }
+    let notes = [];
+    try {
+      notes = (await invoke('list_notes')).filter((n) => n.groupId === group.id && !n.trashedAt);
+    } catch (err) {
+      console.error('list_notes', err);
+    }
+    notes.sort((a, b) => b.updatedAt - a.updatedAt);
+    box.replaceChildren(...notes.map((n) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'member';
+      card.dataset.noteId = n.id;
+      const head = document.createElement('span');
+      head.className = 'member-head';
+      const dot = document.createElement('span');
+      dot.className = 'card-dot';
+      MemoColor.paint(dot, n.color);
+      const title = document.createElement('span');
+      title.className = 'card-title';
+      title.textContent = n.title || t('untitled');
+      title.classList.toggle('is-empty', !n.title);
+      head.append(dot, title);
+      card.append(head);
+      const preview = MemoCard.render(n, { className: 'card-preview' });
+      if (preview) card.append(preview);
+      card.addEventListener('click', () => invoke('open_note', { id: n.id }).catch((err) => console.error('open_note', err)));
+      return card;
+    }));
+  }
+  window.addEventListener('memo-mobile-changed', renderMembers);
 
   const toggle = () => invoke('toggle_group').catch((err) => console.error('toggle_group', err));
   const newNote = () => invoke('new_note_in_group').catch((err) => console.error('new_note_in_group', err));

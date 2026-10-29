@@ -234,15 +234,52 @@ pub(crate) fn change_theme(app: AppHandle, theme: String) -> Result<(), String> 
 /// data folder stay as they are (they are set up, not preferences).
 #[tauri::command]
 pub(crate) fn reset_settings(app: AppHandle) -> Result<(), String> {
-    set_theme(&app, "system");
-    set_language(&app, "system");
-    change_zoom(app.clone(), 0);
-    set_layout(&app, LAYOUTS[0]);
-    toggle_magnet(&app, true);
-    updater::set_auto(&app, true)?;
-    app.state::<Shared>().reset_defaults();
-    notify(&app);
+    for section in SETTINGS_SECTIONS {
+        reset_settings_section(app.clone(), section.to_string())?;
+    }
     Ok(())
+}
+
+/// The Settings sections that can go back to how Memo comes, each with its
+/// own reset button (shown only while something in it was changed).
+const SETTINGS_SECTIONS: [&str; 3] = ["appearance", "defaults", "application"];
+
+/// One Settings section back to how Memo comes: "appearance" (theme,
+/// language, zoom, layout), "defaults" (new memories, groups, boards and
+/// the reminder's quick choices) or "application" (magnet, update notices).
+#[tauri::command]
+pub(crate) fn reset_settings_section(app: AppHandle, section: String) -> Result<(), String> {
+    match section.as_str() {
+        "appearance" => {
+            set_theme(&app, "system");
+            set_language(&app, "system");
+            change_zoom(app.clone(), 0);
+            set_layout(&app, LAYOUTS[0]);
+        }
+        "defaults" => {
+            app.state::<Shared>().reset_defaults();
+            notify(&app);
+        }
+        "application" => {
+            toggle_magnet(&app, true);
+            updater::set_auto(&app, true)?;
+        }
+        _ => return Err(format!("unknown settings section: {section}")),
+    }
+    Ok(())
+}
+
+/// The Settings sections that differ from how Memo comes: their reset
+/// buttons show.
+#[tauri::command]
+pub(crate) fn get_settings_changed(app: AppHandle) -> Vec<&'static str> {
+    let store = app.state::<Shared>();
+    let changed = [
+        store.appearance_changed(),
+        store.defaults_changed(),
+        !store.magnet() || !updater::auto_enabled(&app),
+    ];
+    SETTINGS_SECTIONS.into_iter().zip(changed).filter(|(_, c)| *c).map(|(s, _)| s).collect()
 }
 
 /// Reopens the welcome note (button in the manager's Help tab).

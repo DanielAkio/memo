@@ -880,6 +880,65 @@
   }
   for (const sec of settingsView.querySelectorAll('.sec')) makeToggle(sec, 'settings');
 
+  // A reset button at the far right of a Settings section's title, shown
+  // only while something in it differs from how Memo comes
+  // (get_settings_changed); a second click puts the section back
+  // (reset_settings_section). Sync, AI control and storage are set up, not
+  // preferences: they have none.
+  const resetButtons = ['appearance', 'defaults', 'application'].map((name) => {
+    const btn = el('button', 'sec-reset');
+    btn.type = 'button';
+    btn.hidden = true;
+    btn.dataset.reset = name;
+    btn.title = t('restoreSection');
+    btn.setAttribute('aria-label', t('restoreSection'));
+    btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.75 8a4.25 4.25 0 1 0 1.25-3"/><path d="M4.75 2.25v2.75H7.5"/></svg>';
+    settingsView.querySelector(`.sec[data-sec="${name}"] .settings-title`).append(btn);
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirmFirst(btn, t('resetSettingsConfirm'))) return;
+      try {
+        await invoke('reset_settings_section', { section: name });
+        if (name === 'defaults') {
+          defaultColor = await invoke('get_default_color');
+          notePane.show(defaultColor);
+          await loadDefaults();
+          $('defaultTextFrame').contentWindow.location.reload();
+        }
+      } catch (err) {
+        console.error('reset_settings_section', err);
+      }
+      refreshResets();
+    });
+    return btn;
+  });
+
+  let resetsTimer = null;
+  function refreshResets(delay = 150) {
+    clearTimeout(resetsTimer);
+    resetsTimer = setTimeout(async () => {
+      try {
+        const changed = await invoke('get_settings_changed');
+        for (const btn of resetButtons) {
+          btn.hidden = !changed.includes(btn.dataset.reset);
+          if (btn.hidden) MemoConfirm.disarm(btn);
+        }
+      } catch (err) {
+        console.error('get_settings_changed', err);
+      }
+    }, delay);
+  }
+  // Any edit in Settings (fields, switches, swatches; the default text in
+  // its embedded editor, once it has saved) and the changes that come from
+  // elsewhere (tray, other windows, sync).
+  for (const type of ['change', 'click', 'input']) settingsView.addEventListener(type, () => refreshResets());
+  $('defaultTextFrame').addEventListener('load', (e) => {
+    e.target.contentDocument.addEventListener('input', () => refreshResets(1500));
+  });
+  for (const ev of ['theme-changed', 'language-changed', 'zoom-changed', 'layout-changed', 'magnet-changed',
+    'update-changed', 'notes-changed', 'store-replaced']) listen(ev, () => refreshResets());
+  refreshResets();
+
   function showSection(name) {
     search.value = '';
     openSecs.settings.add(name);
@@ -1403,6 +1462,11 @@
     renderAi(aiSwitch.getAttribute('aria-checked') === 'true');
     renderDefColumns();
     renderReminderDefaults();
+    for (const btn of resetButtons) {
+      if (btn.classList.contains('confirming')) continue;
+      btn.title = t('restoreSection');
+      btn.setAttribute('aria-label', t('restoreSection'));
+    }
     render();
   }
 

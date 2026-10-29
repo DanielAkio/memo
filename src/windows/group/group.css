@@ -76,6 +76,40 @@
   max-width: calc(100% - 12px);
 }
 
+/* Memo Web on a phone: the group full screen, its memories listed under the
+   bar as cards (group.js renderMembers); the colour wash stays on the bar,
+   and putting memories away or out means nothing there. */
+.group-members { display: none; }
+:root.is-mobile .group-members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  border-top: 1px solid var(--color-graphite);
+}
+:root.is-mobile .group.frame:not([data-color=""]) { background-size: 100% var(--titlebar-h); }
+:root.is-mobile #toggleBtn { display: none; }
+.member {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-obsidian);
+  box-shadow: var(--hairline);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.member:active { background: var(--overlay-active); }
+.member-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
 /* A note being dragged over the bar: dropping it adds it to the group. */
 .frame.drop-hover {
   background: var(--color-obsidian);
